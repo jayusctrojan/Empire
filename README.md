@@ -27,7 +27,8 @@ Empire/
 │   ├── 06_v4_unified_architecture.md ✅ (Includes Appendices A-R)
 │   ├── 07_performance_scaling.md ✅
 │   ├── 08_video_processing.md ✅
-│   └── 09_orchestrator_requirements.md ✅
+│   ├── 09_orchestrator_requirements.md ✅
+│   └── 10_n8n_orchestration.md ✅ (NEW - Implementation Guide)
 │
 └── Supporting Files
     ├── README.md (this file)
@@ -41,6 +42,7 @@ Note: All appendices are integrated into Section 6
 - ✅ All sections complete and reviewed (October 12, 2025)
 - ✅ No placeholders or incomplete sections
 - ✅ Ready for October 14, 2025 deployment
+- ✅ Milestone-based implementation plan in Section 10
 - ✅ Quarterly review schedule established
 
 ## 📋 Section Overview
@@ -121,6 +123,48 @@ This section now contains all appendices:
 - CrewAI multi-agent coordination
 - Mac Studio resource scheduling
 - Cost-aware orchestration
+
+#### [10. n8n Orchestration Implementation](10_n8n_orchestration.md) ⭐ **NEW**
+- **Milestone-based implementation approach**
+- 8 incremental milestones with testing
+- Practical n8n workflow templates
+- Step-by-step testing checklists
+- Production deployment guide
+- Troubleshooting and optimization tips
+
+### Implementation Milestones (Section 10)
+
+**Milestone 1:** Document Intake and Classification
+- Set up intake endpoints and file validation
+- Implement classification and routing logic
+
+**Milestone 2:** Mac Studio Local Processing
+- Connect to Mac Studio endpoints
+- Implement local LLM and vision processing
+
+**Milestone 3:** Vector Storage and RAG
+- Generate embeddings locally
+- Set up Pinecone and retrieval pipeline
+
+**Milestone 4:** Multi-Agent Orchestration
+- CrewAI integration
+- Agent coordination and task distribution
+
+**Milestone 5:** Cost Tracking and Optimization
+- Real-time cost monitoring
+- Budget alerts and optimization routing
+
+**Milestone 6:** Error Handling and Recovery
+- Circuit breakers and retry logic
+- Fallback mechanisms and dead letter queue
+
+**Milestone 7:** Monitoring and Observability
+- Metrics collection and alerting
+- Performance dashboards
+
+**Milestone 8:** Complete Integration Testing
+- End-to-end workflow validation
+- Production readiness certification
 
 ## 🏗️ v5.0 Mac Studio Architecture
 
@@ -229,18 +273,22 @@ Mac Studio M3 Ultra (96GB) - October 14, 2025 Delivery
 - Configure Tailscale VPN
 
 **Week 2: Integration**
-- Update n8n workflows
-- Smart routing logic
-- Cloud service connections
-- Monitoring setup
-- Cost tracking
+- Implement n8n Milestone 1-3
+- Test document processing
+- Verify Mac Studio integration
+- Setup vector storage
 
-**Week 3-4: Optimization**
-- Performance tuning
-- Cache optimization
-- Documentation
-- Final testing
-- Production ready
+**Week 3: Advanced Features**
+- Implement n8n Milestone 4-6
+- Multi-agent orchestration
+- Cost tracking system
+- Error handling framework
+
+**Week 4: Production Ready**
+- Implement n8n Milestone 7-8
+- Complete integration testing
+- Performance optimization
+- Final deployment
 
 ## ⚡ Performance Comparison
 
@@ -256,10 +304,11 @@ Mac Studio M3 Ultra (96GB) - October 14, 2025 Delivery
 ## ✅ Next Steps
 
 1. **Review Architecture:** Study `empire-arch.txt` for complete v5.0 details
-2. **Prepare for Delivery:** Ensure readiness for October 14, 2025
-3. **Plan Migration:** Document current data for migration
-4. **Test Procedures:** Validate disaster recovery plans
-5. **Budget Planning:** Allocate $4,200 initial + $100-195/month
+2. **Follow Implementation Guide:** Use Section 10 for milestone-based deployment
+3. **Prepare for Delivery:** Ensure readiness for October 14, 2025
+4. **Plan Migration:** Document current data for migration
+5. **Test Procedures:** Validate disaster recovery plans
+6. **Budget Planning:** Allocate $4,200 initial + $100-195/month
 
 ## 🔒 Security & Compliance
 
@@ -274,6 +323,7 @@ Mac Studio M3 Ultra (96GB) - October 14, 2025 Delivery
 - **Version 5.0** represents a paradigm shift to local-first AI
 - Mac Studio delivery confirmed for **October 14, 2025**
 - Render workspace ID: `tea-d1vtdtre5dus73a4rb4g`
+- Section 10 provides practical implementation roadmap
 - All sensitive data processing happens locally
 - Cloud services used only for orchestration and non-sensitive tasks
 - Complete system can operate offline for core functions
@@ -283,6 +333,7 @@ Mac Studio M3 Ultra (96GB) - October 14, 2025 Delivery
 
 For questions or clarifications about the v5.0 architecture:
 - Review `empire-arch.txt` for detailed specifications
+- Follow Section 10 for step-by-step implementation
 - Check individual section files for specific requirements
 - Section 6 contains all appendices (A through R)
 - Consult disaster recovery procedures in Section 6
