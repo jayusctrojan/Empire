@@ -4,351 +4,613 @@
 
 ### 2.1.1 System Context
 
-The AI Empire File Processing System operates as a comprehensive middleware platform within the enterprise architecture, now enhanced with hybrid cloud-local processing, mem-agent integration, and comprehensive backup capabilities:
+The AI Empire File Processing System v5.0 operates as a revolutionary LOCAL-FIRST AI powerhouse with Mac Studio M3 Ultra at its core, achieving 98% on-device inference while maintaining enterprise-grade capabilities:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                  AI Empire v4.0 Unified Architecture                 │
+│              AI Empire v5.0 Mac Studio Edition Architecture          │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                       │
-│  ┌─────────────────┐         ┌────────────────────┐                │
-│  │   Mac Mini M4    │◀──────▶│   Private Cloud    │                │
-│  │  Local Hub       │         │   Infrastructure   │                │
-│  │  • mem-agent     │         │   • n8n (Render)   │                │
-│  │  • Local cache   │         │   • CrewAI         │                │
-│  │  • Sensitive     │         │   • Supabase       │                │
-│  │    processing    │         │   • Pinecone       │                │
-│  └─────────┬───────┘         └────────┬───────────┘                │
-│            │                           │                             │
-│            └──────────┬────────────────┘                            │
-│                       ▼                                              │
-│            ┌─────────────────────┐                                  │
-│            │   Smart Router      │                                  │
-│            │  • Cost-based       │                                  │
-│            │  • Privacy-aware    │                                  │
-│            │  • Load balanced    │                                  │
-│            └─────────┬───────────┘                                  │
-│                      │                                               │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │                     Cache Architecture                        │  │
-│  │  L1: Mac Mini RAM (4GB) - <10ms - Hot data                  │  │
-│  │  L2: Mac Mini SSD (100GB) - <100ms - Recent data            │  │
-│  │  L3: Backblaze B2 - <500ms - Cold storage/backup            │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                      │
-│  Input Sources       ┌───────────────┐    Processing Services      │
-│  ┌──────────────┐   │   Document    │    ┌──────────────┐        │
-│  │ Web Upload   │──▶│   Processing  │───▶│ MarkItDown   │        │
-│  │ Backblaze B2 │   │   Pipeline     │    │ Mistral OCR  │        │
-│  │ YouTube URLs │   │               │    │ Voyage AI    │        │
-│  │ Web Scraping │   └───────────────┘    │ Soniox       │        │
-│  └──────────────┘                         └──────────────┘        │
-│                                                                      │
-│  Storage Layer      ┌───────────────────────────┐                  │
-│  ┌──────────────┐  │   Hybrid RAG System       │                  │
-│  │ Pinecone     │◀─│  • Vector Search          │                  │
-│  │ Supabase     │  │  • Graph Traversal        │                  │
-│  │ LightRAG     │  │  • SQL Queries            │                  │
-│  │ Backblaze B2 │  │  • Cohere Reranking       │                  │
-│  └──────────────┘  └───────────────────────────┘                  │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │         Mac Studio M3 Ultra (96GB) - AI Powerhouse          │    │
+│  │  ┌────────────────────────────────────────────────────┐    │    │
+│  │  │ • Llama 3.3 70B (35GB) - GPT-4 quality locally     │    │    │
+│  │  │ • 32 tokens/second inference speed                  │    │    │
+│  │  │ • Qwen2.5-VL-7B - Vision analysis (5GB)           │    │    │
+│  │  │ • mem-agent MCP - Always-on memory (3GB)          │    │    │
+│  │  │ • nomic-embed-text - Local embeddings (2GB)       │    │    │
+│  │  │ • BGE-reranker - Local reranking                   │    │    │
+│  │  │ • 31GB free for caching                            │    │    │
+│  │  └────────────────────────────────────────────────────┘    │    │
+│  │                           ▼                                 │    │
+│  │  ┌────────────────────────────────────────────────────┐    │    │
+│  │  │    Open WebUI + LiteLLM + Claude Desktop MCP       │    │    │
+│  │  └────────────────────────────────────────────────────┘    │    │
+│  └─────────────────────────────┬───────────────────────────────┘    │
+│                                 │                                     │
+│                                 ▼                                     │
+│         ┌──────────────────────────────────────────────┐            │
+│         │        Smart Routing (98% Local)             │            │
+│         │  • Sensitive docs → Mac Studio ONLY          │            │
+│         │  • Complex reasoning → Local Llama 70B       │            │
+│         │  • Vision tasks → Local Qwen-VL              │            │
+│         │  • Heavy parallel → Cloud orchestration      │            │
+│         │  • Transcription → Soniox API                │            │
+│         └──────────────────┬───────────────────────────┘            │
+│                             │                                         │
+│  ┌──────────────────────────▼───────────────────────────────────┐   │
+│  │            Minimal Cloud Services (Secondary)                 │   │
+│  │                                                               │   │
+│  │  • n8n (Render) - Workflow orchestration only ($15-30)       │   │
+│  │  • CrewAI (Render) - Multi-agent coordination ($15-20)       │   │
+│  │  • Supabase - Relational data, private ($25)                 │   │
+│  │  • Pinecone - Vector storage, private ($0-70)                │   │
+│  │  • Backblaze B2 - Encrypted backups ($10-20)                 │   │
+│  │  • Hyperbolic.ai - Edge cases ONLY ($5-10)                  │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+│                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │              Everything Backed Up (Zero-Knowledge)            │   │
+│  │  Mac Studio → B2 (client-side encrypted, continuous)          │   │
+│  │  Model weights → GitHub LFS                                   │   │
+│  │  mem-agent memories → B2 (encrypted, <5 min sync)             │   │
+│  │  Configurations → GitHub private repo                         │   │
+│  │  Vectors → Pinecone exports → B2                             │   │
+│  │  Databases → Automated snapshots → B2                        │   │
+│  └───────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────┘
-
 ```
 
 ### 2.1.2 System Interfaces
 
-The system integrates with multiple external services and platforms:
+The system integrates with multiple services, prioritizing local processing:
 
-**Cloud Services:**
-- **Render:** Hosts n8n workflows and CrewAI agents
-- **Supabase:** PostgreSQL database and real-time subscriptions
-- **Pinecone:** Vector database for semantic search
-- **Backblaze B2:** Primary storage and encrypted backup solution
-- **Hyperbolic.ai:** LLM inference (DeepSeek-V3, Llama-3.3-70B, Qwen models)
+**Local Infrastructure (PRIMARY):**
+- **Mac Studio M3 Ultra:** 28-core CPU, 60-core GPU, 32-core Neural Engine
+- **Llama 3.3 70B:** Primary reasoning engine (35GB, 32 tok/s)
+- **Qwen2.5-VL-7B:** Vision and image analysis (5GB)
+- **mem-agent MCP:** Persistent memory management (3GB, <500ms retrieval)
+- **nomic-embed-text:** Local embedding generation (2GB)
+- **BGE-reranker:** Local result reranking
+- **Open WebUI:** User interface for local LLM interaction
+- **LiteLLM:** API compatibility layer
+- **Claude Desktop:** Primary interface with MCP integration
+- **Tailscale VPN:** Secure remote access
 
-**Local Infrastructure:**
-- **Mac Mini M4:** Local processing hub with mem-agent MCP
-- **Claude Desktop:** Primary user interface with MCP integration
-- **Local file system:** Temporary cache and sensitive document processing
-
-**API Services:**
-- **MarkItDown MCP:** Document conversion (40+ formats)
-- **Mistral API:** OCR and embeddings
-- **Voyage AI:** Advanced embedding generation
-- **Soniox API:** Audio/video transcription
-- **Firecrawl:** Web content extraction
-- **Cohere:** Search result reranking
-- **LightRAG API:** Knowledge graph operations
+**Cloud Services (SECONDARY - Minimal Use):**
+- **Render:** Hosts n8n workflows and CrewAI agents ($30-50/month)
+- **Supabase:** PostgreSQL database with private VPC ($25/month)
+- **Pinecone:** Vector database for semantic search ($0-70/month)
+- **Backblaze B2:** Primary storage and zero-knowledge backups ($10-20/month)
+- **Hyperbolic.ai:** Backup LLM for edge cases only ($5-10/month)
+- **Mistral OCR:** Complex PDF processing when needed ($20/month)
+- **Soniox:** Professional audio/video transcription ($10-20/month)
+- **Firecrawl:** Web content extraction (as needed)
 
 ### 2.1.3 Hardware Interfaces
 
-**Mac Mini M4 Specifications:**
-- Apple M4 chip with 10-core CPU, 10-core GPU
-- 24GB unified memory
-- 512GB SSD storage
-- 10Gb Ethernet support
-- 2x Thunderbolt 4, 2x USB-A, HDMI 2.1
-- Power: 39W active, 7W idle
-- macOS 15.0 (Sequoia) or later
+**Mac Studio M3 Ultra Specifications:**
+- Apple M3 Ultra chip: 28-core CPU, 60-core GPU, 32-core Neural Engine
+- 96GB unified memory (800 GB/s bandwidth)
+- 1TB+ SSD storage recommended
+- 10Gb Ethernet for high-speed networking
+- 6x Thunderbolt 4, 2x USB-A, HDMI 2.1
+- Power consumption: ~65W average during inference
+- Cooling: Adequate ventilation required for 24/7 operation
+- UPS backup recommended for power continuity
 
-**Network Requirements:**
-- Minimum 100 Mbps symmetric internet connection
-- Recommended 1 Gbps symmetric connection
-- Low latency (<50ms) to cloud services
-- VPN capability for secure cloud connections
-- Automatic failover to offline mode
+**Performance Capabilities:**
+- LLM inference: 32 tokens/second for 70B model
+- Document processing: 500+ per day capacity
+- Parallel workflows: 10+ concurrent
+- Memory usage: ~65GB for models, 31GB free for caching
+- CPU utilization: ~40% average
+- GPU utilization: ~60% during inference
 
 ### 2.1.4 Software Interfaces
 
 **Operating Systems:**
-- macOS 15.0+ (Mac Mini)
-- Ubuntu 24 LTS (Cloud services)
+- macOS 15.0+ (Sequoia) on Mac Studio
+- Ubuntu 24 LTS for cloud services
 
 **Runtime Environments:**
-- Python 3.11+
-- Node.js 20 LTS
-- Docker Desktop 24.0+
+- Python 3.11+ for AI models
+- Node.js 20 LTS for n8n
+- Docker Desktop 24.0+ for containerization
+- Homebrew for package management
+- Ollama for model management
 
 **Core Frameworks:**
+- Open WebUI for LLM interface
+- LiteLLM for API compatibility
 - n8n 1.0+ for workflow automation
 - CrewAI 0.5+ for multi-agent orchestration
 - LangChain 0.1+ for LLM operations
-- mem-agent for persistent memory management
+- mem-agent for persistent memory
+- Claude Desktop with MCP support
 
 **Database Interfaces:**
-- PostgreSQL via Supabase (with connection pooling)
-- Vector database via Pinecone API
-- Knowledge graph via LightRAG API
+- PostgreSQL via Supabase (connection pooling)
+- Pinecone vector database API
+- LightRAG knowledge graph API
+- Local SQLite for caching
 
 ### 2.1.5 Communications Interfaces
 
 **Protocols:**
-- HTTPS/TLS 1.3 for all API communications
+- HTTPS/TLS 1.3 for all external API communications
 - WebSocket for real-time updates
-- gRPC for high-performance service communication
-- SSH for secure administration
-- MCP (Model Context Protocol) for mem-agent integration
+- SSH for secure Mac Studio administration
+- MCP (Model Context Protocol) for mem-agent
+- Tailscale VPN for secure remote access
+- gRPC for high-performance local communication
 
 **Data Formats:**
 - JSON for API payloads
-- Markdown for processed documents
+- Markdown for processed documents and memories
 - Protocol Buffers for binary data
 - Encrypted blobs for backup storage
+- GGUF format for local model storage
 
 ## 2.2 Product Functions
 
-The AI Empire system provides the following major functional capabilities:
+### 2.2.1 Local AI Processing Functions (v5.0 PRIMARY)
 
-### 2.2.1 Document Processing Functions
+1. **GPT-4 Quality Local Inference**
+   - Llama 3.3 70B running at 32 tokens/second
+   - Complete privacy for sensitive content
+   - No per-token costs or rate limits
+   - Unlimited usage within hardware capacity
+   - API replacement value: ~$200-300/month
 
-- **Universal Format Conversion:** Convert 40+ document formats to standardized Markdown
-- **Intelligent OCR:** Automatic fallback to Mistral OCR for complex PDFs
-- **Multimedia Processing:** Extract and transcribe audio/video content
-- **Web Content Extraction:** Scrape and process web pages and resources
-- **Change Detection:** Hash-based identification of modified content
-- **Local Sensitive Processing:** Process confidential documents on Mac Mini only
+2. **Vision and Image Analysis**
+   - Qwen2.5-VL-7B for visual content understanding
+   - Process diagrams, screenshots, documents with images
+   - Real-time analysis without cloud dependencies
+   - Frame extraction from videos
 
-### 2.2.2 Intelligence Generation Functions
+3. **Persistent Memory Management**
+   - mem-agent MCP always running (<500ms retrieval)
+   - Human-readable Markdown storage
+   - Context optimization and pruning
+   - Automatic backup to encrypted B2
+   - User-specific memory isolation
 
-- **Semantic Chunking:** Context-aware document segmentation with quality scoring
-- **Embedding Generation:** Create semantic vectors using Voyage AI
-- **Metadata Enrichment:** AI-powered classification and tagging
-- **Entity Extraction:** Identify and catalog key entities and relationships
-- **Knowledge Graph Construction:** Build interconnected knowledge structures
-- **Visual Analysis:** Process images and diagrams with Qwen2.5-VL-7B
+4. **Local Embeddings and Search**
+   - nomic-embed-text for semantic vectors
+   - BGE-reranker for result optimization
+   - No external API calls for embeddings
+   - Reduced latency and costs
 
-### 2.2.3 Retrieval and Search Functions
+### 2.2.2 Privacy & Security Functions (v5.0 CORE)
 
-- **Hybrid Search:** Combine vector, keyword, and graph search
-- **Cohere Reranking:** Optimize search results for relevance
-- **SQL Query Support:** Execute complex queries on structured data
-- **Persistent Memory:** Maintain context through mem-agent (<100ms retrieval)
-- **Graph Traversal:** Navigate knowledge relationships
-- **Smart Caching:** 80%+ cache hit rate for frequent operations
+1. **100% Local Sensitive Processing**
+   - Financial documents never leave Mac Studio
+   - Client data processed locally only
+   - Healthcare/legal documents stay private
+   - PII detection and local-only routing
 
-### 2.2.4 Processing Optimization Functions
+2. **Zero-Knowledge Backup System**
+   - Client-side encryption before any upload
+   - User controls all encryption keys
+   - Backblaze cannot decrypt data
+   - Continuous sync every 5 minutes
+   - Cross-region replication available
 
-- **Parallel Processing:** Handle up to 5 documents simultaneously
-- **Fast Track Pipeline:** 70% faster processing for simple documents
-- **Smart Routing:** Cost, privacy, and complexity-based processing decisions
-- **Adaptive Caching:** Dynamic TTL based on usage patterns
-- **Query Result Caching:** Store and reuse frequent query results
-- **Offline Capability:** Continue operations without cloud access
+3. **Multi-Layer Security**
+   - FileVault full disk encryption
+   - AES-256 for data at rest
+   - TLS 1.3 for any cloud communication
+   - Tailscale VPN for remote access
+   - API key vault implementation
 
-### 2.2.5 System Management Functions
+### 2.2.3 Document Processing Functions
 
-- **Cost Tracking:** Real-time API usage and cost monitoring
-- **Performance Analytics:** Detailed processing metrics and KPIs
-- **Error Recovery:** Intelligent retry with circuit breakers
-- **Security Monitoring:** Threat detection and audit logging
-- **Backup Management:** Automated encrypted backups to B2 (continuous)
-- **Disaster Recovery:** 4-hour RTO, 1-hour RPO guaranteed
+1. **Universal Format Conversion**
+   - 40+ formats via MarkItDown MCP
+   - Intelligent OCR routing for complex PDFs
+   - Local processing for sensitive documents
+   - Hash-based change detection
 
-### 2.2.6 Memory Management Functions (v4.0 NEW)
+2. **Multimedia Processing**
+   - YouTube transcript extraction
+   - Audio/video transcription (Soniox)
+   - Frame extraction and analysis
+   - Speaker diarization support
 
-- **Persistent Context:** mem-agent maintains user-specific context
-- **Local Memory Storage:** Markdown-based, human-readable format
-- **Fast Retrieval:** <100ms access time for local queries
-- **Automatic Backup:** Continuous sync to encrypted B2 storage
-- **Context Optimization:** Automatic pruning and relevance scoring
-- **Privacy Protection:** Sensitive memories never leave Mac Mini
+3. **Web Content Ingestion**
+   - Firecrawl for web scraping
+   - JavaScript-rendered content
+   - Scheduled crawling capabilities
+   - Clean Markdown extraction
 
-### 2.2.7 Hybrid Processing Functions (v4.0 NEW)
+4. **Fast Track Pipeline**
+   - 70% faster for simple formats (.txt, .md, .html)
+   - Bypass heavy processing when unnecessary
+   - Automatic quality validation
+   - Direct Markdown conversion
 
-- **Privacy-Based Routing:** Automatic detection of sensitive content
-- **Local-First Processing:** Keep confidential data on Mac Mini
-- **Cloud Burst:** Scale to cloud for heavy compute when needed
-- **Intelligent Failover:** Automatic offline mode during connectivity loss
-- **Cost Optimization:** Route to most cost-effective processing location
-- **Performance Balancing:** Optimize for latency vs throughput
+### 2.2.4 Intelligence Generation Functions
+
+1. **Semantic Processing**
+   - Context-aware chunking with quality scoring
+   - Dynamic chunk sizing based on content
+   - Semantic density calculation
+   - Overlap optimization for context
+
+2. **Knowledge Extraction**
+   - Entity recognition and cataloging
+   - Relationship mapping
+   - Metadata enrichment
+   - Structured data extraction (LangExtract)
+
+3. **Multi-Agent Analysis**
+   - CrewAI orchestration for complex tasks
+   - Collaborative intelligence generation
+   - Organizational recommendations
+   - Strategic insights
+
+### 2.2.5 Retrieval and Search Functions
+
+1. **Hybrid RAG System**
+   - Vector search (Pinecone)
+   - Graph traversal (LightRAG)
+   - SQL queries for structured data
+   - Keyword matching
+   - Cohere reranking for relevance
+
+2. **Smart Caching**
+   - 3-tier cache: Memory, Redis, Disk
+   - 80%+ cache hit rate target
+   - Adaptive TTL based on usage
+   - Query result caching
+   - Local Mac Studio cache (31GB)
+
+### 2.2.6 Performance Optimization Functions
+
+1. **Parallel Processing**
+   - 5 concurrent documents (cloud)
+   - 10+ concurrent workflows (local)
+   - Intelligent queue management
+   - Priority-based routing
+   - Load balancing
+
+2. **Cost Management**
+   - Real-time API cost tracking
+   - Smart routing to minimize costs
+   - Local processing preference
+   - Budget alerts at 80% threshold
+   - Monthly target: <$195
+
+### 2.2.7 System Management Functions
+
+1. **Monitoring and Analytics**
+   - Prometheus metrics collection
+   - Grafana dashboards
+   - Performance analytics
+   - Cost tracking
+   - Quality monitoring
+
+2. **Backup and Recovery**
+   - Continuous backup to B2
+   - 4-hour RTO guarantee
+   - 1-hour RPO target
+   - Automated integrity checks
+   - Quarterly disaster recovery drills
+
+3. **Workflow Orchestration**
+   - n8n automation
+   - Scheduled processing
+   - Event-driven triggers
+   - SFTP/local file monitoring
+   - Direct API integration
 
 ## 2.3 User Characteristics
 
 ### 2.3.1 Primary Users
 
-**Solopreneurs / Knowledge Workers:**
-- Technical Skill Level: Intermediate
-- Domain Expertise: High in their specific field
-- Usage Pattern: Daily document processing and retrieval
-- Key Needs: Fast, accurate, private information extraction
-- Budget Conscious: Value $125-230/month operational costs
+**Privacy-Conscious Solopreneurs (v5.0 Focus):**
+- Technical Expertise: Medium to High
+- Investment Capacity: $4,200 initial + $100-195/month
+- Document Volume: 50-500 documents daily
+- Primary Concerns: Complete privacy, unlimited LLM usage, cost control
+- Value Proposition: GPT-4 quality without per-token costs
+- Workflow: Mixed batch and interactive processing
+- Peak Hours: Business hours for interactive, overnight for batch
 
-**System Administrators:**
-- Technical Skill Level: Advanced
-- Domain Expertise: IT infrastructure and security
-- Usage Pattern: System monitoring and maintenance
-- Key Needs: Reliability, security, performance visibility
-- Comfort with: Command-line tools, infrastructure management
+**Knowledge Workers:**
+- Process sensitive business documents
+- Need fast, accurate extraction
+- Value data sovereignty
+- Require professional outputs
+- Appreciate offline capability
 
-**Data Analysts:**
-- Technical Skill Level: Advanced in data tools
-- Domain Expertise: Data analysis and visualization
-- Usage Pattern: Complex queries and report generation
-- Key Needs: SQL access, bulk processing, export capabilities
-- Preference for: Structured data access and API integration
+**Financial Professionals:**
+- Handle confidential client data
+- Require zero-knowledge architecture
+- Need audit trails
+- Value local processing
+- Demand high accuracy
 
 ### 2.3.2 Secondary Users
 
-**Privacy-Conscious Users:**
-- Technical Skill Level: Varies
-- Domain Expertise: Privacy and security awareness
-- Usage Pattern: Sensitive document processing
-- Key Needs: Complete data control, local processing, encryption
-- Concern: Data sovereignty and zero-knowledge architecture
+**System Administrators:**
+- Maintain Mac Studio hardware
+- Monitor system performance
+- Manage backups and recovery
+- Handle security updates
+- Optimize resource usage
 
-**Developers / Integrators:**
-- Technical Skill Level: Advanced
-- Domain Expertise: API integration and automation
-- Usage Pattern: System integration via APIs and webhooks
-- Key Needs: Comprehensive API documentation, reliability
-- Focus: Building custom workflows and integrations
+**Developers/Integrators:**
+- Build custom workflows
+- Integrate via APIs
+- Extend functionality
+- Create custom agents
+- Optimize processing pipelines
 
 ## 2.4 Constraints
 
-### 2.4.1 Regulatory Constraints
+### 2.4.1 Technical Constraints
 
-- **GDPR Compliance:** Full data protection and privacy controls
-- **SOC 2 Type II:** Security and availability requirements
-- **HIPAA Ready:** Healthcare data handling capabilities (if configured)
-- **Data Residency:** Support for regional data storage requirements
-- **Privacy Regulations:** Compliance with local data protection laws
+**TC-001:** Mac Studio must operate 24/7 with >99.5% uptime
+**TC-002:** Memory limited to 96GB total (65GB for models, 31GB free)
+**TC-003:** Local model size limited to available memory
+**TC-004:** Network bandwidth minimum 100 Mbps symmetric
+**TC-005:** Maximum file size 300MB per document
+**TC-006:** Concurrent processing limited to hardware capacity
+**TC-007:** Power supply must support continuous 65W average draw
+**TC-008:** Cooling must maintain safe operating temperatures
 
-### 2.4.2 Technical Constraints
+### 2.4.2 Resource Constraints
 
-- **API Rate Limits:** Respect third-party service limitations
-  - Hyperbolic.ai: Rate limits per plan tier
-  - Mistral: Usage quotas and rate limiting
-  - Cohere: Reranking request limits
-  - Pinecone: Query per second limits
-- **Storage Quotas:** Manage within Backblaze B2 limits
-- **Processing Capacity:** Mac Mini memory constraints (24GB total)
-- **Network Bandwidth:** Optimize for available connectivity
-- **Model Size Limits:** Local models limited to 7B-13B parameters on M4
+**TC-009:** Monthly operational budget <$195
+**TC-010:** Mac Studio delivery: October 14, 2025
+**TC-011:** Initial investment: ~$4,200
+**TC-012:** Storage growth <20% monthly
+**TC-013:** Backup storage costs at B2 rates ($0.005/GB/month)
 
-### 2.4.3 Business Constraints
+### 2.4.3 Regulatory Constraints
 
-- **Budget Limits:** Monthly operational cost target of <$230
-  - Stretch up to $255 during peak usage
-  - Alerts at 80% of budget threshold
-- **Licensing:** Compliance with all third-party licenses
-  - Open-source software licenses
-  - Commercial service agreements
-  - Data processing agreements
-- **Support Hours:** 24/7 system availability requirement for critical operations
-- **Training Requirements:** Minimal user training needed (Claude Desktop familiar interface)
+**TC-014:** GDPR compliance required
+**TC-015:** SOC 2 Type II compliance
+**TC-016:** Data retention policies
+**TC-017:** Zero-knowledge architecture for sensitive data
+**TC-018:** Client-side encryption mandatory
 
 ### 2.4.4 Environmental Constraints
 
-- **Power Requirements:** Reliable power supply for Mac Mini (24/7 operation)
-- **Cooling:** Adequate ventilation for M4 chip operation
-- **Physical Security:** Secure location for Mac Mini hardware
-- **Network Reliability:** Backup connectivity options recommended
-- **Space Requirements:** Minimal footprint for Mac Mini deployment
+**TC-019:** Adequate ventilation for Mac Studio
+**TC-020:** UPS backup power recommended
+**TC-021:** Secure physical location required
+**TC-022:** Temperature range: 10-35°C operating
+**TC-023:** Humidity: 5-90% non-condensing
+
+### 2.4.5 Cost Constraints
+
+**One-Time Investment (October 14, 2025):**
+- Mac Studio M3 Ultra (96GB): $3,999
+- UPS Battery Backup: $150-200
+- Network/accessories: $50
+- **Total Initial:** ~$4,200
+
+**Monthly Operating Costs (v5.0):**
+
+| Service | Cost Range | Purpose | Change from v4.0 |
+|---------|------------|---------|------------------|
+| Render (n8n + CrewAI) | $30-50 | Orchestration only | Same |
+| Supabase | $25 | Database | Same |
+| Pinecone | $0-70 | Vectors | Same |
+| Backblaze B2 | $10-20 | Backup | Same |
+| Hyperbolic.ai | $5-10 | Edge cases ONLY | ↓ 80% reduction |
+| Mistral OCR | $20 | Complex PDFs | Same |
+| Soniox | $10-20 | Transcription | Same |
+| **TOTAL** | **$100-195/month** | | ↓ 40% from v4.0 |
+
+**ROI Calculation:**
+- Cloud LLM equivalent cost: $200-300/month
+- API replacement value: ~$200-300/month
+- Total savings: $100-200+/month
+- Payback period: 3-6 years
+- Additional benefits: 10x performance, complete privacy, unlimited usage
 
 ## 2.5 Assumptions and Dependencies
 
 ### 2.5.1 Assumptions
 
-- Stable internet connectivity with minimum 100 Mbps bandwidth
-- Continued availability of third-party API services at reasonable costs
-- Mac Mini hardware reliability and 24/7 operation capability (>99% uptime)
-- User compliance with data format requirements and guidelines
-- Adequate cooling and power infrastructure for Mac Mini operation
-- User has basic technical competency with macOS and command-line tools
-- Backblaze B2 storage costs remain stable ($0.005/GB/month)
-- Cloud service pricing remains within budget constraints
+1. **Hardware Assumptions**
+   - Mac Studio maintains 24/7 operation with >99.5% uptime
+   - Hardware warranty covers potential failures
+   - Delivery on October 14, 2025 as scheduled
+   - 96GB memory sufficient for current and near-term models
+   - Network bandwidth remains stable
+
+2. **Software Assumptions**
+   - Llama 3.3 70B continues to be available
+   - Open-source models maintain current licensing
+   - MCP protocol remains stable
+   - macOS updates maintain compatibility
+   - Docker and container ecosystem stable
+
+3. **Business Assumptions**
+   - Document volume <500/day
+   - Storage growth <20% monthly
+   - Cloud service pricing remains stable
+   - User has technical competency for Mac administration
+   - Single-user or small team usage
+
+4. **Performance Assumptions**
+   - 32 tokens/second maintained for 70B model
+   - <500ms memory retrieval achievable
+   - 80% cache hit rate attainable
+   - Network latency <50ms to cloud services
 
 ### 2.5.2 Dependencies
 
+**Critical Dependencies:**
+- Mac Studio hardware availability and reliability
+- macOS 15.0+ compatibility
+- Ollama model distribution platform
+- Open WebUI maintenance and updates
+- mem-agent MCP continued development
+
 **External Service Dependencies:**
-- **Render:** Platform availability for n8n and CrewAI hosting
-- **Hyperbolic.ai:** API availability for LLM inference
-- **Pinecone:** Service uptime for vector operations (>99.9% SLA)
-- **Backblaze B2:** Availability for storage and backup (>99.9% SLA)
-- **Supabase:** Database availability and performance
-- **Mistral:** OCR and embedding API availability
-- **Voyage AI:** Embedding generation service
-- **Cohere:** Reranking API availability
-- **Soniox:** Audio/video transcription service
-- **Firecrawl:** Web scraping API availability
-- **LightRAG:** Knowledge graph API availability
+- Render platform availability (>99.9% SLA)
+- Backblaze B2 storage (>99.9% SLA)
+- Pinecone vector database
+- Supabase PostgreSQL
+- Minimal Hyperbolic.ai usage
+- GitHub for configuration management
 
 **Software Dependencies:**
-- **Anthropic MCP:** Protocol stability for Claude Desktop integration
-- **mem-agent:** Model availability and continued development
-- **Python ecosystem:** Stability of required packages
-- **Node.js ecosystem:** Stability for n8n and related tools
-- **Docker:** Runtime compatibility and updates
-- **macOS:** Continued support for M4 architecture
-
-**Infrastructure Dependencies:**
-- **Mac Mini M4:** Hardware availability and reliability
-- **Network infrastructure:** ISP reliability and bandwidth
-- **Power infrastructure:** Uninterruptible power supply (UPS) recommended
-- **VPN services:** Secure connectivity to cloud resources (optional but recommended)
+- Python 3.11+ ecosystem
+- Node.js 20 LTS stability
+- Docker Desktop for Mac
+- Homebrew package manager
+- Claude Desktop MCP support
 
 ### 2.5.3 Risk Mitigation
 
-**Service Availability Risks:**
-- Multiple provider options for critical services
-- Local caching reduces dependency on cloud services
-- Offline mode for essential operations
-- Documented failover procedures
-
-**Cost Risks:**
-- Budget monitoring and alerting at 80% threshold
-- Free tier maximization strategies
-- Local processing reduces API costs
-- Cost optimization through smart routing
-
-**Hardware Risks:**
-- Regular backups ensure data recovery
+**Hardware Failure:**
+- Complete backup in B2 enables recovery
 - Documented rebuild procedures
-- Alternative processing via cloud if Mac Mini fails
-- Hardware warranty and support plans
+- 4-hour RTO with replacement hardware
+- Temporary cloud fallback possible
 
-**Security Risks:**
-- Defense in depth architecture
-- Zero-knowledge encryption for backups
-- Regular security updates and audits
-- Compliance with security frameworks
+**Service Outages:**
+- 98% processing continues locally
+- Offline mode for critical operations
+- Cached data for continuity
+- Multiple provider options
+
+**Cost Overruns:**
+- Real-time cost monitoring
+- Automatic routing to cheaper options
+- Budget alerts at 80%
+- Local processing reduces API costs
+
+**Security Breaches:**
+- Zero-knowledge architecture
+- Client-side encryption
+- No sensitive data in cloud
+- Regular security audits
+
+## 2.6 Performance Targets (v5.0)
+
+### 2.6.1 Local Processing Performance
+
+| Metric | Target | Current Capability |
+|--------|--------|-------------------|
+| LLM Inference Speed | 32 tok/s | 32 tok/s (Llama 70B) |
+| Memory Retrieval | <500ms | <100ms typical |
+| Document Throughput | 500/day | 500+ achievable |
+| Parallel Workflows | 10+ | 10+ concurrent |
+| End-to-end Latency | 1-3 sec | 1-3 sec achieved |
+| Cache Hit Rate | >80% | 80%+ with optimization |
+| Uptime | >99.5% | 99.5%+ expected |
+
+### 2.6.2 Quality Metrics
+
+| Metric | Target | Measurement Method |
+|--------|--------|-------------------|
+| Processing Accuracy | >95% | Automated validation |
+| Search Relevance | >85% | User satisfaction scores |
+| Memory Recall | >90% | Context relevance scoring |
+| Error Rate | <1% | Error log analysis |
+| Backup Success | 100% | Automated monitoring |
+
+### 2.6.3 Resource Utilization
+
+| Resource | Target | Monitoring |
+|----------|--------|------------|
+| CPU Usage | <60% avg | Prometheus |
+| GPU Usage | <70% peak | Activity Monitor |
+| Memory Usage | <70GB | System metrics |
+| Disk I/O | <80% capacity | iostat |
+| Network | <50% bandwidth | Network monitor |
+| Power | <100W avg | Power metrics |
+
+## 2.7 Disaster Recovery
+
+### 2.7.1 Recovery Scenarios
+
+**Mac Studio Failure:**
+1. Order replacement Mac Studio (1-2 days)
+2. Restore from Backblaze B2 encrypted backups
+3. Pull models from Ollama/HuggingFace
+4. Restore mem-agent memories from backup
+5. Restore configurations from GitHub
+6. Full recovery in 4-6 hours post-hardware
+
+**Cloud Service Failure:**
+1. 98% of processing continues locally
+2. Queue non-critical operations
+3. Use alternative providers if available
+4. Manual processing if needed
+5. Full service restoration when available
+
+**Complete Disaster:**
+1. All data recoverable from B2
+2. Infrastructure as Code for rebuild
+3. Step-by-step recovery documentation
+4. Tested quarterly with drills
+5. 4-hour RTO, 1-hour RPO targets
+
+### 2.7.2 Backup Strategy
+
+**Continuous Backups:**
+- Real-time: Document changes
+- Every 5 min: Memory updates
+- Hourly: Database snapshots
+- Daily: Full system backup
+- Weekly: Archive creation
+
+**Backup Locations:**
+- Primary: Backblaze B2 (encrypted)
+- Models: GitHub LFS
+- Configs: GitHub private repos
+- Databases: Automated snapshots
+- Cross-region replication available
+
+## 2.8 Implementation Roadmap
+
+### 2.8.1 Phase 1: Mac Studio Setup (Day 1 - October 14, 2025)
+
+**Day 1 Tasks:**
+- Unbox and connect Mac Studio
+- Connect UPS and network
+- Enable SSH and remote access
+- Install Homebrew and Docker
+- Install Ollama and pull Llama 3.3 70B
+- Setup Open WebUI and LiteLLM
+- Configure mem-agent MCP
+- Initial testing and validation
+
+### 2.8.2 Phase 2: Core Services (Week 1)
+
+- Pull Qwen2.5-VL-7B vision model
+- Configure automated backups to B2
+- Setup Claude Desktop with MCP
+- Install nomic-embed and BGE-reranker
+- Configure Tailscale VPN
+- Performance benchmarking
+- Security hardening
+
+### 2.8.3 Phase 3: Integration (Week 2)
+
+- Update n8n workflows for Mac Studio
+- Configure smart routing logic
+- Test privacy-based routing
+- Integrate with cloud services
+- Setup monitoring and alerting
+- Cost tracking implementation
+- Disaster recovery testing
+
+### 2.8.4 Phase 4: Optimization (Week 3-4)
+
+- Fine-tune model parameters
+- Optimize memory usage
+- Cache strategy refinement
+- Performance optimization
+- Documentation completion
+- User training (if needed)
+- Go-live preparation
