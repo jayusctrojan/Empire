@@ -1,0 +1,207 @@
+AI Empire Complete Architecture v4.1 (Revised)
+Unified Private Cloud + Mac Mini Enhancement
+Core Infrastructure
+Mac Mini M4 (24GB) - Local Processing Hub
+	•	Primary Purpose: Run mem-agent MCP for memory management
+	•	Secondary Uses: Local model hosting, caching, processing when cloud unavailable
+	•	All data backed up to encrypted cloud storage
+Private Cloud Infrastructure
+	•	n8n (Render) - Workflow orchestration
+	•	CrewAI (Render) - Multi-agent system
+	•	Supabase - Private PostgreSQL database
+	•	Pinecone - Private vector database
+	•	Backblaze B2 - Private storage (primary + backups)
+	•	LightRAG API - Knowledge graph
+	•	Hyperbolic.ai - LLM inference
+Data Architecture
+All Data is Private - Location Strategy:
+
+Primary Processing Locations:
+├── Mac Mini Processing
+│   ├── mem-agent context retrieval
+│   ├── Sensitive document analysis
+│   ├── Real-time memory management
+│   └── Offline capability
+│
+└── Cloud Processing
+    ├── Heavy compute tasks
+    ├── Parallel processing
+    ├── Team collaboration
+    └── API integrations
+
+Backup Strategy (Everything Backed Up):
+├── Mac Mini → Backblaze B2 (encrypted)
+│   ├── Markdown knowledge base
+│   ├── Personal context
+│   ├── Financial documents
+│   └── Client data
+│
+└── Cloud → Cloud (redundancy)
+    ├── Supabase → Backblaze B2
+    ├── Pinecone → Periodic exports
+    └── Configuration → Git repository
+Document Processing Pipeline
+Input Sources:
+├── Web Upload
+├── Backblaze B2 monitoring
+├── YouTube URLs
+├── Web Scraping (Firecrawl)
+└── Direct file uploads
+
+Smart Routing (n8n):
+├── Requires mem-agent features → Mac Mini
+│   └── Then backed up to Backblaze B2
+│
+├── Requires heavy processing → Cloud APIs
+│   └── Results cached on Mac Mini
+│
+└── Standard processing → Cloud pipeline
+    └── Frequently accessed → cached locally
+
+Processing Services:
+├── MarkItDown MCP (40+ formats)
+├── Mistral OCR (complex PDFs)
+├── Soniox (audio/video transcription)
+├── mem-agent (context management)
+├── Voyage AI (embeddings)
+└── Cohere (reranking)
+Storage Architecture
+Storage Type
+Location
+Purpose
+Backup
+Markdown Knowledge
+Mac Mini
+mem-agent access
+Backblaze B2 (encrypted)
+Vector Embeddings
+Pinecone
+Semantic search
+Export snapshots to B2
+Structured Data
+Supabase
+Relational queries
+Built-in backups + B2
+Raw Files
+Backblaze B2
+Primary storage
+Cross-region replication
+Cache Layer
+Mac Mini
+Fast access
+Temporary (regenerable)
+Configurations
+Mac Mini + Git
+System settings
+GitHub private repo
+Privacy & Security Architecture
+All Private Data with Defense in Depth:
+
+Mac Mini Security:
+- FileVault encryption
+- API key vault
+- mem-agent privacy filters
+- Network isolation options
+
+Cloud Security:
+- TLS encryption in transit
+- AES-256 encryption at rest
+- API key authentication
+- Private VPC networks (where available)
+- SOC 2 compliant vendors
+
+Backup Encryption:
+- Client-side encryption before upload
+- Zero-knowledge backup to B2
+- Encrypted export of sensitive data
+AI Model Distribution
+Mac Mini Models
+	•	mem-agent (4B) - Always running for memory
+	•	Future capacity for 7B-13B models
+Cloud Models (Hyperbolic.ai)
+	•	DeepSeek-V3 - Complex reasoning
+	•	Llama-3.3-70B - Analysis tasks
+	•	Qwen2.5-VL-7B - Visual processing
+	•	Qwen2.5-3B - Fast responses
+Workflow Integration
+Unified Workflow Examples:
+
+Financial Document Processing:
+1. Upload to n8n endpoint
+2. Route to Mac Mini for processing
+3. mem-agent creates contextual memory
+4. Automatic encrypted backup to B2
+5. Available across all interfaces
+
+Course Material Processing:
+1. Upload to Backblaze B2
+2. Cloud processing pipeline
+3. Store in Pinecone/Supabase
+4. Cache frequently used on Mac Mini
+5. mem-agent tracks learning progress
+
+Hybrid Query:
+1. Query received via Claude Desktop
+2. mem-agent retrieves relevant context
+3. Pinecone provides course knowledge
+4. Hyperbolic LLM synthesizes response
+5. Result cached for future use
+Disaster Recovery
+Recovery Strategy:
+├── Mac Mini Failure
+│   ├── Restore from Backblaze B2
+│   ├── Reinstall mem-agent
+│   ├── Restore configurations from Git
+│   └── Resume operations (4-hour RTO)
+│
+├── Cloud Service Failure
+│   ├── Failover to cached data on Mini
+│   ├── Queue operations for retry
+│   └── Alert for manual intervention
+│
+└── Complete Recovery
+    ├── All data in Backblaze B2
+    ├── Infrastructure as Code (IaC)
+    └── Documented setup procedures
+Cost Structure
+One-Time Costs
+	•	Mac Mini M4 24GB: $899
+	•	Initial setup: 4-6 hours
+Monthly Recurring
+	•	Hyperbolic.ai: $20-50
+	•	Render (n8n + CrewAI): $30-50
+	•	Supabase: $25
+	•	Pinecone: $0-70
+	•	Backblaze B2: $10-20 (with backups)
+	•	Mistral OCR: ~$20 (usage-based)
+	•	Total: ~$125-230/month
+Performance Metrics
+	•	Document processing: 200+ per day
+	•	Parallel processing: 5 concurrent
+	•	Memory retrieval: <500ms (local), <2s (cloud)
+	•	Uptime target: 99.5%
+	•	Backup frequency: Continuous (changes) + Daily (full)
+	•	Recovery time objective: 4 hours
+Implementation Roadmap
+Week 1: Mac Mini Setup
+	•	Install mem-agent MCP
+	•	Configure automated backups to B2
+	•	Set up Claude Desktop integration
+	•	Create initial memory structure
+Week 2: Integration
+	•	Update n8n workflows for hybrid routing
+	•	Configure backup automation
+	•	Test disaster recovery procedures
+	•	Document all configurations
+Week 3-4: Optimization
+	•	Tune caching strategies
+	•	Optimize routing logic
+	•	Performance testing
+	•	Team training (if applicable)
+Key Principles
+	1	Everything is private - You own all data
+	2	Everything is backed up - No single point of failure
+	3	Process where optimal - Mini for memory/sensitive, cloud for scale
+	4	Cache intelligently - Keep frequently used data close
+	5	Encrypt comprehensively - At rest and in transit
+This architecture gives you the mem-agent capabilities you need while ensuring all data is properly backed up and recoverable, maintaining complete privacy across your entire infrastructure.
