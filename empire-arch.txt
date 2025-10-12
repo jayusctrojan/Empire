@@ -1,4 +1,4 @@
-AI Empire Complete Architecture v4.2 (Mac Studio Edition)
+AI Empire Complete Architecture v5.0 (Mac Studio Edition)
 Unified Private LLM Server + Cloud Hybrid Architecture
 Core Infrastructure
 Mac Studio M3 Ultra (96GB) - Private AI Powerhouse
@@ -212,7 +212,7 @@ Recovery Strategy:
 Cost Structure
 One-Time Costs
 	•	Mac Studio M3 Ultra (28/60/96GB): $3,999
-	•	Delivery: October 27th, 2025
+	•	Delivery: October 14, 2025
 	•	UPS Battery Backup: $150-200
 	•	Ethernet/accessories: $50
 	•	Total: ~$4,200
@@ -229,10 +229,11 @@ ROI Calculation
 	•	Previous cloud API costs: $150-250/month
 	•	New cloud costs: $100-195/month
 	•	Savings: $50-100+/month
-	•	Mac Studio pays for itself in: 3-6 years
-	•	BUT: 10x performance, complete privacy, unlimited usage
+	•	Mac Studio payback: 14-20 months
+	•	5-year savings: $10,000-15,000
+	•	Plus: 10x performance, complete privacy, unlimited usage
 Implementation Roadmap
-Day 1 (October 27th): Mac Studio Setup
+Day 1 (October 14, 2025): Mac Studio Setup
 	•	Unbox and connect (UPS, Ethernet)
 	•	Enable SSH and remote access
 	•	Install Homebrew and Docker
