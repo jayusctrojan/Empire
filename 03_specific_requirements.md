@@ -9,6 +9,10 @@
 **FR-001:** The system SHALL accept documents in 40+ supported formats
 
 *Priority: Essential*
+*Description: Universal document conversion to standardized Markdown*
+*Input: Documents in supported formats (PDF, DOCX, XLSX, PPTX, HTML, TXT, CSV, etc.)*
+*Output: Standardized Markdown with preserved structure and content*
+*Validation: Format detection accuracy >99%*
 *Source: Product Management*
 *Verification: Integration Testing*
 *Status: Active - All Versions*
@@ -16,12 +20,14 @@
 **FR-002:** The system SHALL convert all supported formats to clean Markdown using MarkItDown MCP
 
 *Priority: Essential*
+*Processing: Via MarkItDown MCP Server*
 *Dependencies: TC-003*
 *Status: Active - All Versions*
 
 **FR-003:** The system SHALL preserve document structure including headings, lists, and paragraphs
 
 *Priority: Essential*
+*Success Rate: >95% structure preservation*
 *Status: Active - All Versions*
 
 **FR-004:** The system SHALL extract and preserve tables with proper formatting
@@ -53,11 +59,13 @@
 **FR-007:** The system SHALL assess PDF complexity before processing
 
 *Priority: Essential*
+*Description: Intelligent routing based on PDF complexity*
 *Status: Active - All Versions*
 
 **FR-008:** The system SHALL route simple text-based PDFs to MarkItDown MCP
 
 *Priority: Essential*
+*Processing: Direct MarkItDown processing for simple PDFs*
 *Status: Active - All Versions*
 
 **FR-009:** The system SHALL route complex PDFs to Mistral OCR when:
@@ -69,6 +77,7 @@
 
 *Priority: Essential*
 *Note: v5.0 - Only complex PDFs use cloud OCR, simple PDFs processed locally*
+*Success Rate: >95% successful extraction*
 *Status: Active - All Versions*
 
 **FR-010:** The system SHALL merge OCR output seamlessly with main pipeline
@@ -128,6 +137,7 @@ def assessPDFComplexity(file):
 - Tags and categories
 
 *Priority: High*
+*Processing: Automated metadata retrieval*
 *Status: Active - All Versions*
 
 **FR-017:** The system SHALL retrieve video transcripts using three-tier hierarchy:
@@ -136,6 +146,7 @@ def assessPDFComplexity(file):
 3. Soniox transcription of audio (fallback)
 
 *Priority: Essential*
+*Accuracy: >90% transcription accuracy*
 *Status: Active - All Versions*
 
 **FR-018:** The system SHALL extract video frames at configurable intervals (default: 30 seconds)
@@ -165,6 +176,11 @@ def assessPDFComplexity(file):
 **FR-022:** The system SHALL transcribe audio/video files using Soniox API
 
 *Priority: Essential*
+*Description: Professional transcription with speaker diarization*
+*Processing: Via Soniox API*
+*Formats: MP3, WAV, MP4, MOV, WebM*
+*Features: Speaker identification, timestamp preservation*
+*Accuracy: >90% transcription accuracy*
 *Note: Cloud-based service, no local alternative currently*
 *Status: Active - All Versions*
 
@@ -201,6 +217,10 @@ def assessPDFComplexity(file):
 **FR-028:** The system SHALL integrate Firecrawl for web scraping capabilities
 
 *Priority: Essential*
+*Description: Extract content from web resources*
+*Processing: Via Firecrawl API*
+*Features: JavaScript rendering, dynamic content handling*
+*Output: Clean Markdown with preserved structure*
 *Note: Cloud service for web scraping*
 *Status: Active - All Versions*
 
@@ -328,6 +348,9 @@ def assessPDFComplexity(file):
 **VIS-001:** The system SHALL process images using local Qwen2.5-VL-7B (5GB)
 
 *Priority: Essential*
+*Description: Vision and image analysis*
+*Processing: Local on Mac Studio*
+*Features: Object detection, scene description, text extraction*
 *Replaces: Mistral Pixtral-12B API*
 *Performance: Real-time analysis*
 *Status: Active - v5.0*
@@ -346,6 +369,7 @@ def assessPDFComplexity(file):
 **VIS-003:** The system SHALL generate searchable descriptions for all extracted images
 
 *Priority: Essential*
+*Output: Structured image metadata and descriptions*
 *Status: Active - v5.0*
 
 **VIS-004:** The system SHALL store visual analysis results as metadata:
@@ -384,7 +408,42 @@ def assessPDFComplexity(file):
 
 ### 3.1.5 Hybrid RAG System Requirements (All Versions)
 
-#### 3.1.5.1 Hash-Based Change Detection
+#### 3.1.5.1 Vector Search Integration
+
+**HR-001:** The system SHALL perform semantic vector searches
+
+*Priority: Essential*
+*Backend: Pinecone vector database*
+*Embeddings: Local nomic-embed generation (v5.0)*
+*Features: Similarity search, filtering, metadata queries*
+*Performance: <500ms query response time*
+*Status: Active - All Versions*
+
+**HR-002:** The system SHALL maintain and query knowledge graphs
+
+*Priority: High*
+*Backend: LightRAG API*
+*Features: Entity relationships, graph traversal, pattern detection*
+*Updates: Real-time graph updates on document ingestion*
+*Status: Active - All Versions*
+
+**HR-003:** The system SHALL execute SQL queries on structured data
+
+*Priority: High*
+*Backend: Supabase PostgreSQL*
+*Features: Complex joins, aggregations, window functions*
+*Interface: Standard SQL syntax support*
+*Status: Active - All Versions*
+
+**HR-004:** The system SHALL combine multiple search strategies with reranking
+
+*Priority: Essential*
+*Components: Vector + Keyword + Graph search*
+*Reranking: Local BGE-reranker primary, Cohere fallback (v5.0)*
+*Optimization: Dynamic weight adjustment based on query type*
+*Status: Active - All Versions*
+
+#### 3.1.5.2 Hash-Based Change Detection
 
 **FR-046:** The system SHALL compute SHA-256 hash for all processed content
 
@@ -415,39 +474,6 @@ def assessPDFComplexity(file):
 **FR-051:** The system SHALL synchronize hash records to Airtable for audit
 
 *Priority: Medium*
-*Status: Active - All Versions*
-
-#### 3.1.5.2 Hybrid Search with Reranking
-
-**FR-052:** The system SHALL implement hybrid search combining vector and keyword search
-
-*Priority: Essential*
-*Status: Active - All Versions*
-
-**FR-053:** The system SHALL integrate reranking for result optimization
-
-*Priority: Essential*
-*Note: v5.0 - Primarily local BGE-reranker, Cohere as fallback*
-*Status: Active - All Versions*
-
-**FR-054:** The system SHALL support configurable top-k retrieval (default: 30)
-
-*Priority: High*
-*Status: Active - All Versions*
-
-**FR-055:** The system SHALL rerank results to top-10 most relevant
-
-*Priority: Essential*
-*Status: Active - All Versions*
-
-**FR-056:** The system SHALL maintain original relevance scores for analysis
-
-*Priority: Medium*
-*Status: Active - All Versions*
-
-**FR-057:** The system SHALL support fallback to basic search if reranking fails
-
-*Priority: High*
 *Status: Active - All Versions*
 
 #### 3.1.5.3 Knowledge Graph Integration (LightRAG)
@@ -491,14 +517,35 @@ def assessPDFComplexity(file):
 
 ### 3.1.6 Content Intelligence Requirements (UPDATED v5.0)
 
-#### 3.1.6.1 Semantic Processing
+#### 3.1.6.1 Named Entity Recognition
+
+**FR-008:** The system SHALL identify and extract named entities
+
+*Priority: High*
+*Categories: People, Organizations, Locations, Dates, Products*
+*Processing: Local Llama 70B with confidence scoring (v5.0)*
+*Storage: Entity catalog with relationships*
+*Status: Active - All Versions*
+
+**FR-009:** The system SHALL generate rich metadata for documents
+
+*Priority: Medium*
+*Components: Tags, categories, summaries, key points*
+*Processing: AI-powered classification and summarization*
+*Quality: Confidence scores for all generated metadata*
+*Status: Active - All Versions*
+
+#### 3.1.6.2 Semantic Processing
 
 **FR-068:** The system SHALL chunk content using configurable parameters:
 - Default chunk size: 1000 characters
 - Default overlap: 200 characters
 - Sentence boundary respect: enabled
+- Optimal chunk size: 512-2048 tokens
 
 *Priority: Essential*
+*Method: Context-aware chunking with overlap*
+*Quality: Chunk coherence scoring*
 *Status: Active - All Versions*
 
 **FR-069:** The system SHALL generate embeddings for all chunks
@@ -519,7 +566,7 @@ def assessPDFComplexity(file):
 *Note: v5.0 - Uses local Llama 70B*
 *Status: Active - All Versions*
 
-#### 3.1.6.2 Contextual Embeddings
+#### 3.1.6.3 Contextual Embeddings
 
 **FR-072:** The system SHALL create contextual descriptions for chunks
 
@@ -547,7 +594,7 @@ def assessPDFComplexity(file):
 *Priority: Low*
 *Status: Active - All Versions*
 
-#### 3.1.6.3 Tabular Data Processing
+#### 3.1.6.4 Tabular Data Processing
 
 **FR-082:** The system SHALL detect and extract tables from documents
 
@@ -585,13 +632,17 @@ def assessPDFComplexity(file):
 *Priority: High*
 *Status: Active - All Versions*
 
-### 3.1.7 Memory Management Requirements (REPLACED v5.0)
+### 3.1.7 Memory and Agent Architecture Requirements
 
-#### 3.1.7.1 mem-agent Local Memory (v5.0)
+#### 3.1.7.1 Long-term Memory Management (v5.0)
 
 **MEM-001:** The system SHALL use mem-agent MCP for persistent memory management
 
 *Priority: Essential*
+*Description: Maintains persistent user context*
+*Backend: mem-agent (4B model) on Mac Studio*
+*Features: Context retrieval, memory updates, relevance scoring*
+*Performance: <100ms local retrieval time*
 *Model: 4B parameters, 3GB memory usage*
 *Location: Mac Studio local*
 *Replaces: Zep cloud service*
@@ -651,39 +702,16 @@ def assessPDFComplexity(file):
 *Priority: Low*
 *Status: Active - v5.0*
 
-### 3.1.8 Agent Architecture Requirements (All Versions)
+#### 3.1.7.2 Multi-Agent Orchestration
 
-**FR-099:** The system SHALL implement two distinct agent configurations:
-- Agent A: With persistent memory (mem-agent in v5.0, Zep in v4.0)
-- Agent B: Without persistent memory (session only)
-
-*Priority: Essential*
-*Status: Active - All Versions*
-
-**FR-100:** The system SHALL route users to appropriate agent based on:
-- User preferences
-- Use case requirements
-- Privacy settings
+**FR-012:** The system SHALL coordinate multiple AI agents
 
 *Priority: High*
+*Description: Multi-agent orchestration for complex tasks*
+*Framework: CrewAI on Render*
+*Agents: Research, Analysis, Writing, Review agents*
+*Coordination: Task delegation and result aggregation*
 *Status: Active - All Versions*
-
-**FR-101:** The system SHALL maintain separate conversation histories
-
-*Priority: Essential*
-*Status: Active - All Versions*
-
-**FR-102:** The system SHALL support agent switching within sessions
-
-*Priority: Medium*
-*Status: Active - All Versions*
-
-**FR-103:** The system SHALL clearly identify active agent to users
-
-*Priority: High*
-*Status: Active - All Versions*
-
-### 3.1.9 Multi-Agent Analysis Requirements (Cloud-Based)
 
 **FR-110:** The system SHALL execute CrewAI analysis using 1-5 specialized agents
 
@@ -727,7 +755,31 @@ def assessPDFComplexity(file):
 *Priority: High*
 *Status: Active - All Versions*
 
-### 3.1.10 Vector Storage Requirements (Cloud-Based)
+### 3.1.8 Processing Optimization Requirements
+
+#### 3.1.8.1 Parallel Processing
+
+**PFR-001:** The system SHALL process multiple documents concurrently
+
+*Priority: Essential*
+*Description: Parallel document processing for improved throughput*
+*Capacity: Up to 10 workflows simultaneously (v5.0, up from 5)*
+*Load Balancing: Dynamic allocation based on complexity*
+*Resource Management: CPU and memory optimization*
+*Status: Enhanced - v5.0*
+
+#### 3.1.8.2 Fast Track Pipeline
+
+**PFR-002:** The system SHALL provide expedited processing for simple documents
+
+*Priority: High*
+*Description: Fast track for simple documents*
+*Criteria: Documents <10 pages, standard formats, no OCR needed*
+*Performance: 70% faster than standard pipeline*
+*Routing: Automatic detection and routing*
+*Status: Active - All Versions*
+
+### 3.1.9 Vector Storage Requirements (Cloud-Based)
 
 **FR-117:** The system SHALL store vectors in Pinecone immediately after processing
 
@@ -787,9 +839,9 @@ def assessPDFComplexity(file):
 *Priority: Essential*
 *Status: Active - All Versions*
 
-### 3.1.11 Privacy and Security Requirements (ENHANCED v5.0)
+### 3.1.10 Privacy and Security Requirements (ENHANCED v5.0)
 
-#### 3.1.11.1 Local-First Processing
+#### 3.1.10.1 Local-First Processing
 
 **PRV-001:** The system SHALL process sensitive documents on Mac Studio only
 
@@ -815,7 +867,7 @@ def assessPDFComplexity(file):
 *Coverage: All core functions except cloud storage*
 *Status: Active - v5.0*
 
-#### 3.1.11.2 Zero-Knowledge Backup
+#### 3.1.10.2 Zero-Knowledge Backup
 
 **PRV-005:** The system SHALL encrypt all data client-side before backup
 
@@ -839,21 +891,37 @@ def assessPDFComplexity(file):
 
 ### 3.2.1 Performance Requirements (ENHANCED v5.0)
 
-**NFR-001:** The system SHALL process documents up to 300MB within 30 minutes
+**NFR-001: Response Time**
+- Query Response: <2 seconds for 95% of requests
+- Document Processing: <5 minutes for standard documents
+- Fast Track: <90 seconds for simple documents
+- Memory Retrieval: <100ms for local, <500ms for cloud
+- LLM Inference: 32 tokens/second for Llama 70B
 
-*Measurement: 95th percentile processing time*
-*Status: Active - All Versions*
+*Priority: Essential*
+*Measurement: Response time monitoring*
+*Status: Active - v5.0*
 
-**NFR-002:** The system SHALL handle concurrent processing of up to 10 workflows
+**NFR-002: Throughput**
+- Document Processing: 500+ documents per day (v5.0, up from 200+)
+- Concurrent Users: Support for 10+ simultaneous users
+- Concurrent Workflows: 10 parallel (v5.0, up from 5)
+- API Calls: 10,000+ requests per day
+- Storage Operations: 1,000+ read/write operations per hour
 
-*Measurement: System stability under load*
-*Note: v5.0 - Increased from 5 to 10 with Mac Studio*
+*Priority: Essential*
+*Measurement: System throughput metrics*
 *Status: Enhanced - v5.0*
 
-**NFR-003:** The system SHALL achieve 32 tokens/second for LLM inference
+**NFR-003: Resource Utilization**
+- CPU Usage: <60% average (28-core Mac Studio)
+- GPU Usage: <70% during inference (60-core GPU)
+- Memory Usage: ~65GB for models, 31GB free
+- Network Bandwidth: <100 Mbps average
+- Storage Growth: <10GB per day
 
-*Measurement: Llama 3.3 70B performance*
-*Hardware: Mac Studio M3 Ultra*
+*Priority: High*
+*Measurement: Resource monitoring*
 *Status: Active - v5.0*
 
 **NFR-004:** The system SHALL complete hash checking within 500ms
@@ -872,29 +940,6 @@ def assessPDFComplexity(file):
 *Note: Pinecone cloud latency*
 *Status: Active - All Versions*
 
-**NFR-007:** The system SHALL support 500+ documents per day throughput
-
-*Measurement: Daily processing capacity*
-*Note: v5.0 - Increased from 100+ to 500+*
-*Status: Enhanced - v5.0*
-
-**NFR-008:** The system SHALL complete local reranking within 500ms
-
-*Measurement: BGE-reranker performance*
-*Note: v5.0 - Local reranking primary*
-*Status: Active - v5.0*
-
-**NFR-009:** The system SHALL retrieve memories from mem-agent within 500ms
-
-*Measurement: 95th percentile retrieval time*
-*Target: <100ms typical*
-*Status: Active - v5.0*
-
-**NFR-010:** The system SHALL process visual queries locally within 2 seconds
-
-*Measurement: Qwen2.5-VL performance*
-*Status: Active - v5.0*
-
 **NFR-011:** The system SHALL maintain 98% local processing ratio
 
 *Measurement: Local vs cloud processing metrics*
@@ -905,94 +950,40 @@ def assessPDFComplexity(file):
 *Measurement: Cache effectiveness*
 *Status: Active - All Versions*
 
-### 3.2.2 Reliability Requirements
+### 3.2.2 Security Requirements (ENHANCED v5.0)
 
-**NFR-020:** The system SHALL maintain 99.5% uptime availability
-
-*Measurement: Monthly uptime percentage*
-*Note: v5.0 - Improved from 99%*
-*Status: Enhanced - v5.0*
-
-**NFR-021:** The system SHALL implement automatic retry logic for all external API calls:
-- Initial retry: 1 second
-- Exponential backoff: 2x
-- Maximum retries: 3
-- Maximum delay: 30 seconds
-
-*Measurement: Retry success rate*
-*Status: Active - All Versions*
-
-**NFR-022:** The system SHALL gracefully degrade when external services fail
-
-*Measurement: System stability during outages*
-*Note: v5.0 - Most processing continues locally*
-*Status: Active - All Versions*
-
-**NFR-023:** The system SHALL maintain data consistency across all storage layers
-
-*Measurement: Consistency check results*
-*Status: Active - All Versions*
-
-**NFR-024:** The system SHALL recover from failures without data loss
-
-*Measurement: Recovery testing results*
-*Status: Active - All Versions*
-
-**NFR-025:** The system SHALL achieve 4-hour RTO (Recovery Time Objective)
-
-*Measurement: Disaster recovery drills*
-*Status: Active - v5.0*
-
-**NFR-026:** The system SHALL achieve 1-hour RPO (Recovery Point Objective)
-
-*Measurement: Maximum data loss window*
-*Status: Active - v5.0*
-
-### 3.2.3 Scalability Requirements
-
-**NFR-030:** The system SHALL scale to handle 100,000+ documents in storage
-
-*Measurement: Storage performance at scale*
-*Note: v5.0 - Increased capacity*
-*Status: Enhanced - v5.0*
-
-**NFR-031:** The system SHALL support up to 10M vectors with maintained performance
-
-*Measurement: Vector search latency at scale*
-*Note: v5.0 - Increased from 1M*
-*Status: Enhanced - v5.0*
-
-**NFR-032:** The system SHALL utilize Mac Studio resources efficiently:
-- CPU usage: <60% average
-- GPU usage: <70% during inference
-- Memory: ~65GB for models, 31GB free
-
-*Measurement: Resource monitoring*
-*Status: Active - v5.0*
-
-**NFR-033:** The system SHALL support incremental capacity increases
-
-*Measurement: Scaling without downtime*
-*Status: Active - All Versions*
-
-### 3.2.4 Security Requirements (ENHANCED v5.0)
-
-**SR-001:** The system SHALL authenticate all API requests using JWT tokens
+**SR-001: Data Encryption**
+- At Rest: AES-256 encryption for all stored data
+- In Transit: TLS 1.3 for all communications
+- Backup: Client-side encryption before upload
+- Keys: Secure key management with rotation
 
 *Priority: Essential*
 *Status: Active - All Versions*
 
-**SR-002:** The system SHALL implement role-based access control (RBAC)
+**SR-002: Authentication and Authorization**
+- Method: OAuth 2.0 / JWT tokens
+- MFA: Support for multi-factor authentication
+- RBAC: Role-based access control
+- Session: Secure session management with timeout
 
 *Priority: Essential*
 *Status: Active - All Versions*
 
-**SR-003:** The system SHALL encrypt data in transit using TLS 1.3
+**SR-003: Audit Logging**
+- Coverage: All data access and modifications
+- Details: User, timestamp, action, resource
+- Storage: Immutable audit log storage
+- Retention: 90-day minimum retention
 
-*Priority: Essential*
+*Priority: High*
 *Status: Active - All Versions*
 
-**SR-004:** The system SHALL encrypt sensitive data at rest using AES-256
+**SR-004: Privacy Compliance**
+- GDPR: Full compliance with data protection
+- PII: Automatic detection and handling
+- Right to Delete: Support for data deletion requests
+- Consent: Explicit consent management
 
 *Priority: Essential*
 *Status: Active - All Versions*
@@ -1036,6 +1027,99 @@ def assessPDFComplexity(file):
 *Storage: Encrypted and backed up*
 *Status: Active - All Versions*
 
+### 3.2.3 Reliability Requirements
+
+**NFR-004: Availability**
+- Uptime: 99.5% availability (excluding planned maintenance)
+- Failover: Automatic failover between local and cloud
+- Recovery: 4-hour RTO, 1-hour RPO
+- Redundancy: All critical components redundant
+
+*Priority: Essential*
+*Measurement: Monthly uptime percentage*
+*Status: Enhanced - v5.0*
+
+**NFR-005: Error Handling**
+- Detection: Automatic error detection and classification
+- Recovery: Intelligent retry with exponential backoff
+- Circuit Breaker: Prevent cascade failures
+- Notification: Real-time error alerting
+
+*Priority: Essential*
+*Status: Active - All Versions*
+
+**NFR-021:** The system SHALL implement automatic retry logic for all external API calls:
+- Initial retry: 1 second
+- Exponential backoff: 2x
+- Maximum retries: 3
+- Maximum delay: 30 seconds
+
+*Measurement: Retry success rate*
+*Status: Active - All Versions*
+
+**NFR-022:** The system SHALL gracefully degrade when external services fail
+
+*Measurement: System stability during outages*
+*Note: v5.0 - Most processing continues locally*
+*Status: Active - All Versions*
+
+**NFR-023:** The system SHALL maintain data consistency across all storage layers
+
+*Measurement: Consistency check results*
+*Status: Active - All Versions*
+
+**NFR-024:** The system SHALL recover from failures without data loss
+
+*Measurement: Recovery testing results*
+*Status: Active - All Versions*
+
+**NFR-025:** The system SHALL achieve 4-hour RTO (Recovery Time Objective)
+
+*Measurement: Disaster recovery drills*
+*Status: Active - v5.0*
+
+**NFR-026:** The system SHALL achieve 1-hour RPO (Recovery Point Objective)
+
+*Measurement: Maximum data loss window*
+*Status: Active - v5.0*
+
+### 3.2.4 Scalability Requirements
+
+**NFR-006: Horizontal Scaling**
+- Cloud Services: Auto-scaling based on load
+- Processing: Dynamic worker allocation
+- Storage: Unlimited storage via Backblaze B2
+- Database: Connection pooling and read replicas
+
+*Priority: High*
+*Status: Active - All Versions*
+
+**NFR-007: Vertical Scaling**
+- Mac Studio: Support for model expansion up to 96GB
+- Models: Ability to host larger models (up to 70B)
+- Cache: Expandable cache storage (31GB available)
+- Processing: GPU acceleration fully utilized
+
+*Priority: Medium*
+*Status: Active - v5.0*
+
+**NFR-030:** The system SHALL scale to handle 100,000+ documents in storage
+
+*Measurement: Storage performance at scale*
+*Note: v5.0 - Increased capacity*
+*Status: Enhanced - v5.0*
+
+**NFR-031:** The system SHALL support up to 10M vectors with maintained performance
+
+*Measurement: Vector search latency at scale*
+*Note: v5.0 - Increased from 1M*
+*Status: Enhanced - v5.0*
+
+**NFR-033:** The system SHALL support incremental capacity increases
+
+*Measurement: Scaling without downtime*
+*Status: Active - All Versions*
+
 ## 3.3 External Interface Requirements
 
 ### 3.3.1 User Interfaces
@@ -1077,6 +1161,10 @@ def assessPDFComplexity(file):
 
 **UI-011:** The interface SHALL integrate via MCP protocol
 
+*Integration: Via MCP protocol*
+*Features: Document upload, query interface, result display*
+*Response: Real-time streaming responses*
+*Visualization: Rich media support*
 *Status: Active - v5.0*
 
 **UI-012:** The interface SHALL access mem-agent memories
@@ -1087,15 +1175,29 @@ def assessPDFComplexity(file):
 
 *Status: Active - v5.0*
 
+#### 3.3.1.4 Web Dashboard
+
+**UI-014:** The interface SHALL provide browser-based management
+
+*Access: Browser-based management interface*
+*Features: System monitoring, cost tracking, configuration*
+*Responsive: Mobile and desktop compatible*
+*Security: Secure authentication required*
+*Status: Active - All Versions*
+
 ### 3.3.2 Hardware Interfaces
 
 **HW-001:** Mac Studio M3 Ultra Interface
 - 28-core CPU, 60-core GPU, 32-core Neural Engine
 - 96GB unified memory (800 GB/s bandwidth)
-- 1TB+ SSD storage
-- 10Gb Ethernet
+- 1TB+ SSD storage recommended
+- 10Gb Ethernet connection
 - 6x Thunderbolt 4 ports
-- Power consumption: ~65W average
+- 2x USB-A, HDMI 2.1
+- Power consumption: ~65W average during inference
+- Cooling: Adequate ventilation required for 24/7 operation
+- Optional: External storage via Thunderbolt
+- Optional: Monitoring display for maintenance
 
 *Status: Active - v5.0*
 
@@ -1221,6 +1323,17 @@ Cost: $5-10/month
 ```
 *Status: Active - v5.0 (Minimal)*
 
+#### 3.3.3.3 API Interfaces
+
+**SI-009:** RESTful API Interface
+- Protocol: RESTful API with OpenAPI specification
+- Format: JSON request/response
+- Authentication: API key or OAuth token
+- Rate Limiting: Configurable per client
+- Versioning: URI-based versioning (/api/v1/)
+
+*Status: Active - All Versions*
+
 ### 3.3.4 Communications Interfaces
 
 **CI-001:** The system SHALL use HTTPS for all external communications
@@ -1229,12 +1342,252 @@ Cost: $5-10/month
 **CI-004:** The system SHALL use MCP for model context protocol
 **CI-005:** The system SHALL implement Tailscale VPN for secure remote access
 **CI-006:** The system SHALL use SSH for Mac Studio administration
+**CI-007:** The system SHALL support gRPC for high-performance local communication
 
 *Status: Active - All Versions*
 
-## 3.4 Deprecated Requirements (Historical Reference)
+## 3.4 System Features
 
-### 3.4.1 Deprecated in v5.0
+### 3.4.1 Intelligent Document Router
+
+**Description:** Automatically routes documents to optimal processing pipeline
+**Priority:** Critical
+**Stimulus:** Document upload or URL submission
+**Response:** Document routed to appropriate processor
+
+**Functional Requirements:**
+- Analyze document complexity and type
+- Assess privacy requirements for local vs cloud routing
+- Select optimal processing pipeline (local first for v5.0)
+- Route to local or cloud based on privacy needs
+- Track routing decisions for optimization
+- Maintain routing metrics for analysis
+
+*Status: Active - v5.0*
+
+### 3.4.2 Smart Cost Optimizer
+
+**Description:** Minimizes API costs through intelligent routing
+**Priority:** High
+**Stimulus:** Processing request received
+**Response:** Cost-optimized processing path selected
+
+**Functional Requirements:**
+- Track API costs in real-time
+- Prioritize local processing (98% target)
+- Cache frequently accessed data (80%+ hit rate)
+- Batch API calls when possible
+- Use local processing when cost-effective
+- Generate cost reports and projections
+
+*Status: Active - v5.0*
+
+### 3.4.3 Memory Context System
+
+**Description:** Maintains persistent context across interactions
+**Priority:** High
+**Stimulus:** User query or document processing
+**Response:** Relevant context retrieved and applied
+
+**Functional Requirements:**
+- Store interaction history locally (mem-agent)
+- Retrieve relevant context for queries (<100ms)
+- Update memory with new information
+- Manage memory size and relevance
+- Backup memories to encrypted storage
+- Support memory versioning
+
+*Status: Active - v5.0*
+
+### 3.4.4 Adaptive Processing Pipeline
+
+**Description:** Dynamically adjusts processing based on content characteristics
+**Priority:** High
+**Stimulus:** Document characteristics detected
+**Response:** Optimal processing pipeline selected
+
+**Functional Requirements:**
+- Detect document type and complexity
+- Identify sensitive content for local processing
+- Select appropriate AI models
+- Configure chunking parameters
+- Optimize for quality vs speed
+- Monitor pipeline performance
+
+*Status: Active - v5.0*
+
+## 3.5 Performance Requirements
+
+### 3.5.1 Static Performance Requirements
+
+**SPR-001: System Capacity**
+- Maximum Documents: 500+ per day (v5.0, up from 200+)
+- Maximum Users: 10 concurrent
+- Maximum Storage: 100TB active data (via B2)
+- Maximum Memory: 96GB (Mac Studio M3 Ultra)
+- Maximum Models: 65GB model storage, 31GB operational
+
+*Priority: Essential*
+*Status: Active - v5.0*
+
+**SPR-002: Response Times**
+- P50 Latency: <1 second
+- P95 Latency: <2 seconds
+- P99 Latency: <5 seconds
+- Maximum: 30 seconds timeout
+- LLM Generation: 32 tokens/second
+
+*Priority: Essential*
+*Status: Active - v5.0*
+
+### 3.5.2 Dynamic Performance Requirements
+
+**DPR-001: Load Adaptation**
+- Auto-scaling: Based on queue depth
+- Throttling: Graceful degradation under load
+- Priority: Fast track for simple documents
+- Backpressure: Queue management for overload
+- Resource Allocation: Dynamic based on workload
+
+*Priority: High*
+*Status: Active - v5.0*
+
+**DPR-002: Intelligent Caching**
+- Cache Hit Rate: >80% target
+- Cache Size: 31GB memory + 100GB SSD
+- TTL Management: Adaptive based on usage
+- Prefetching: Predictive cache warming
+- Invalidation: Smart cache invalidation
+
+*Priority: High*
+*Status: Active - v5.0*
+
+## 3.6 Design Constraints
+
+### 3.6.1 Hardware Constraints
+
+- **Mac Studio M3 Ultra:** 96GB unified memory limit
+- **Storage:** 1TB+ SSD recommended for models and cache
+- **Network:** 10Gb Ethernet for optimal performance
+- **Power:** Continuous 65W average draw capability
+- **Cooling:** Adequate ventilation for 24/7 operation
+- **GPU:** 60-core GPU shared between inference tasks
+- **Location:** Secure physical location required
+
+*Status: Active - v5.0*
+
+### 3.6.2 Software Constraints
+
+- **Operating System:** macOS 15.0+ (Sequoia) required
+- **Python:** 3.11+ requirement
+- **Docker:** Docker Desktop for Mac compatibility
+- **MCP Protocol:** Anthropic MCP protocol limitations
+- **Model Formats:** GGUF format for efficient storage
+- **API Compatibility:** LiteLLM for OpenAI compatibility
+- **Memory Management:** mem-agent MCP constraints
+
+*Status: Active - v5.0*
+
+### 3.6.3 Regulatory Constraints
+
+- **GDPR:** Compliance mandatory for EU users
+- **SOC 2:** Type II audit requirements
+- **HIPAA:** Ready architecture (requires configuration)
+- **Data Residency:** Restrictions on data location
+- **Privacy Laws:** State and country-specific requirements
+- **Industry Regulations:** Sector-specific compliance
+- **Encryption Standards:** AES-256 minimum
+
+*Status: Active - All Versions*
+
+### 3.6.4 Architectural Constraints
+
+- **Local First:** 98% processing must be local
+- **Cloud Dependency:** Minimal cloud service usage
+- **Backup Strategy:** Zero-knowledge encryption required
+- **Network Latency:** <50ms to cloud services
+- **Model Size:** Limited by 96GB total memory
+- **Concurrent Processing:** Hardware-limited parallelism
+
+*Status: Active - v5.0*
+
+## 3.7 Software System Attributes
+
+### 3.7.1 Reliability
+
+- **Mean Time Between Failures:** >720 hours
+- **Mean Time To Recovery:** <4 hours
+- **Error Rate:** <0.1% of operations
+- **Data Integrity:** 99.999% accuracy
+- **Backup Success Rate:** 100% target
+- **Service Availability:** 99.5% uptime
+
+*Priority: Essential*
+*Status: Active - v5.0*
+
+### 3.7.2 Maintainability
+
+- **Code Coverage:** >80% test coverage
+- **Documentation:** Complete API documentation
+- **Logging:** Comprehensive operational logs
+- **Monitoring:** Real-time system metrics
+- **Debugging:** Remote debugging capability
+- **Updates:** Zero-downtime deployments
+
+*Priority: High*
+*Status: Active - All Versions*
+
+### 3.7.3 Portability
+
+- **Platform:** macOS and Linux support
+- **Database:** PostgreSQL standard compliance
+- **APIs:** OpenAPI 3.1 specification
+- **Data Formats:** Standard format exports (JSON, CSV, Markdown)
+- **Model Formats:** GGUF for model portability
+- **Container Support:** Docker compatibility
+
+*Priority: Medium*
+*Status: Active - All Versions*
+
+### 3.7.4 Security
+
+- **Encryption:** AES-256 minimum for all sensitive data
+- **Authentication:** Industry standard protocols (OAuth 2.0, JWT)
+- **Authorization:** Fine-grained permissions (RBAC)
+- **Audit:** Complete audit trail with immutable logs
+- **Vulnerability Management:** Regular security updates
+- **Penetration Testing:** Annual security audits
+
+*Priority: Essential*
+*Status: Active - All Versions*
+
+### 3.7.5 Usability
+
+- **Learning Curve:** <2 hours for basic operations
+- **Documentation:** Comprehensive user guides
+- **Error Messages:** Clear and actionable
+- **Accessibility:** WCAG 2.1 AA compliance
+- **Localization:** Multi-language support ready
+- **User Feedback:** In-app feedback mechanisms
+
+*Priority: High*
+*Status: Active - All Versions*
+
+### 3.7.6 Performance
+
+- **Responsiveness:** <2 second response for 95% of queries
+- **Throughput:** 500+ documents per day
+- **Efficiency:** 98% local processing ratio
+- **Resource Usage:** <60% CPU, <70% GPU average
+- **Scalability:** Linear scaling with resources
+- **Optimization:** Continuous performance tuning
+
+*Priority: Essential*
+*Status: Active - v5.0*
+
+## 3.8 Deprecated Requirements (Historical Reference)
+
+### 3.8.1 Deprecated in v5.0
 
 #### Zep Memory Service (Replaced by mem-agent)
 
@@ -1243,26 +1596,6 @@ Cost: $5-10/month
 *Deprecated: v5.0*
 *Replaced by: MEM-001 through MEM-010*
 *Reason: Local mem-agent provides better privacy and performance*
-
-**DEPRECATED-FR-093:** ~~The system SHALL create unique user profiles in Zep~~
-
-*Deprecated: v5.0*
-*Replaced by: MEM-004*
-
-**DEPRECATED-FR-094:** ~~The system SHALL store user facts and preferences as graph edges~~
-
-*Deprecated: v5.0*
-*Replaced by: MEM-003 (Markdown storage)*
-
-**DEPRECATED-FR-095:** ~~The system SHALL retrieve relevant memories from Zep~~
-
-*Deprecated: v5.0*
-*Replaced by: MEM-002*
-
-**DEPRECATED-FR-096:** ~~The system SHALL update Zep memories asynchronously~~
-
-*Deprecated: v5.0*
-*Replaced by: MEM-006*
 
 #### OpenAI Embeddings (Replaced by nomic-embed)
 
@@ -1288,7 +1621,7 @@ Cost: $5-10/month
 *Replaced by: LLR-010 (BGE-reranker primary, Cohere fallback)*
 *Reason: Local reranking reduces costs and latency*
 
-### 3.4.2 Migration Path
+### 3.8.2 Migration Path
 
 For users migrating from v4.0 to v5.0:
 
@@ -1296,10 +1629,11 @@ For users migrating from v4.0 to v5.0:
 2. **Embedding Migration:** Re-generate with nomic-embed for better local performance
 3. **Vision Migration:** Re-process images with local Qwen2.5-VL
 4. **API Migration:** Update to LiteLLM endpoints for compatibility
+5. **Hardware Migration:** Transition from Mac Mini M4 to Mac Studio M3 Ultra
 
-## 3.5 Performance Metrics Summary
+## 3.9 Performance Metrics Summary
 
-### 3.5.1 v5.0 Target Metrics
+### 3.9.1 v5.0 Target Metrics
 
 | Metric | Target | Method |
 |--------|--------|--------|
@@ -1314,7 +1648,7 @@ For users migrating from v4.0 to v5.0:
 | Backup Success | 100% | Automated B2 sync |
 | Recovery Time | 4 hours | Documented procedures |
 
-### 3.5.2 Resource Utilization
+### 3.9.2 Resource Utilization
 
 | Resource | Usage | Available |
 |----------|-------|-----------|
@@ -1325,7 +1659,7 @@ For users migrating from v4.0 to v5.0:
 | Network | <50Mbps | 10Gbps capable |
 | Power Average | 65W | Well within limits |
 
-## 3.6 Compliance and Standards
+## 3.10 Compliance and Standards
 
 **CS-001:** The system SHALL comply with IEEE 830-1998 for documentation
 **CS-002:** The system SHALL follow OpenAPI 3.1 for API specification
