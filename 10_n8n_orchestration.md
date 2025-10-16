@@ -338,8 +338,37 @@ Milestone_3_Workflow:
           vector: "{{$json.queryVector}}"
           topK: 10
           includeMetadata: true
+  
+    8_hierarchical_structure_extraction:
+    type: "n8n-nodes-base.function"
+    code: |
+      // Extract document hierarchy
+      const hierarchy = extractHeadings(text);
+      const chunkMapping = mapChunksToSections(chunks, hierarchy);
+      return {
+        hierarchy: hierarchy,
+        chunk_ranges: chunkMapping,
+        parent_child_relationships: buildRelationships(hierarchy)
+      };
+  
+    9_store_hierarchy:
+    type: "n8n-nodes-base.postgres"
+    operation: "insert"
+    table: "document_hierarchies"
+    columns:
+      - document_id
+      - hierarchical_index
+      - chunk_mappings
+  
+    10_context_expansion_edge_function:
+    type: "n8n-nodes-base.httpRequest"
+    parameters:
+      url: "{{$env.SUPABASE_URL}}/functions/v1/context-expansion"
+      method: "POST"
+      bodyParameters:
+        doc_id: "{{$json.document_id}}"
+        chunk_ranges: "{{$json.expansion_ranges}}"
 ```
-
 ### 10.4.3 Testing Checklist
 
 - [ ] Chunk document correctly

@@ -1346,6 +1346,49 @@ Cost: $5-10/month
 
 *Status: Active - All Versions*
 
+### 3.3.5 Context Expansion Requirements (NEW)
+
+**CER-001: Hierarchical Document Structure Extraction**
+*Priority: Essential*
+*Description: Extract and store document hierarchy with heading levels*
+*Processing: During ingestion after chunking*
+*Storage: PostgreSQL hierarchical_index in record_manager*
+*Output: JSON structure with H1-H6 mappings to chunk IDs*
+*Dependencies: Smart markdown chunking*
+*Status: Active - v5.0*
+
+**CER-002: Neighbor Chunk Retrieval**
+*Priority: High*
+*Description: Support retrieval of adjacent chunks (±1 position)*
+*Method: Line number-based lookup in PostgreSQL*
+*Performance: <100ms retrieval time*
+*Use Case: Expanding context for boundary chunks*
+*Status: Active - v5.0*
+
+**CER-003: Section-Based Expansion**
+*Priority: Essential*
+*Description: Retrieve all chunks within a document section*
+*Method: Chunk range queries based on hierarchy*
+*Metadata: Include parent_range and child_range in chunks*
+*Performance: <500ms for section retrieval*
+*Status: Active - v5.0*
+
+**CER-004: Document Hierarchy Mapping**
+*Priority: Essential*
+*Description: Create and maintain chunk-to-section mappings*
+*Storage: Supabase edge function for retrieval*
+*Format: Hierarchical index with chunk ranges*
+*Update: Automatic on document ingestion*
+*Status: Active - v5.0*
+
+**CER-005: Smart Chunk Merging**
+*Priority: High*
+*Description: Merge tiny chunks (<100 tokens) intelligently*
+*Method: Combine with adjacent chunks while preserving boundaries*
+*Threshold: Configurable minimum chunk size*
+*Quality: Maintain semantic coherence*
+*Status: Active - v5.0*
+
 ## 3.4 System Features
 
 ### 3.4.1 Intelligent Document Router
