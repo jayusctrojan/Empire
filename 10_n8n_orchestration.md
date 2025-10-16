@@ -363,19 +363,750 @@ Milestone_3_Workflow:
 - Retrieval latency <500ms
 - Batch processing efficient
 
-## 10.5 Milestone 4: Multi-Agent Orchestration
+## 10.5 Milestone 4: Universal Content Analysis Workflow
 
 ### 10.5.1 Objectives
+- Implement universal content analysis for ANY valuable content
+- Extract insights, workflows, and frameworks from diverse sources
+- Build comprehensive knowledge base from multiple content types
+- Enable multi-modal RAG system with enhanced capabilities
+- Create reusable patterns from the brightest minds
+
+### 10.5.2 Content Types Handled
+
+```yaml
+Content_Types:
+  Educational:
+    - Courses
+    - Tutorials
+    - Workshops
+    - Webinars
+  
+  Documents:
+    - Research papers
+    - Whitepapers
+    - Case studies
+    - Reports
+  
+  Articles:
+    - Blog posts
+    - News articles
+    - Thought leadership pieces
+  
+  Media:
+    - Videos
+    - Podcasts
+    - Presentations
+    - TED talks
+  
+  Business:
+    - Frameworks
+    - Methodologies
+    - Best practices
+    - Playbooks
+  
+  Expertise:
+    - Expert interviews
+    - AMAs
+    - Conference talks
+  
+  Data:
+    - Datasets
+    - Analytics reports
+    - Market research
+```
+
+### 10.5.3 n8n Workflow Components
+
+#### Node 9: CrewAI Universal Content Analysis
+
+```yaml
+CrewAI_Universal_Analysis:
+  type: "n8n-nodes-base.httpRequest"
+  name: "CrewAI Universal Content Analysis"
+  method: "POST"
+  url: "https://jb-crewai.onrender.com/run-crew"
+  
+  body:
+    task_type: "universal_content_analysis"
+    
+    content:
+      original_text: "{{ $node['LlamaIndex Response Processor'].json.langExtractPayload.original_content }}"
+      chunks: "{{ JSON.stringify($node['LlamaIndex Response Processor'].json.langExtractPayload.chunks) }}"
+      metadata: "{{ JSON.stringify($node['LlamaIndex Response Processor'].json.langExtractPayload.document_metadata) }}"
+      content_type: "{{ $node['File Type Detection & Routing'].json.contentCategory }}"
+      source_url: "{{ $json.source_url || 'direct_upload' }}"
+    
+    analysis_requirements:
+      extract_key_insights: true
+      identify_frameworks: true
+      extract_workflows: true
+      identify_best_practices: true
+      map_to_departments: true
+      extract_quotes: true
+      identify_experts: true
+      extract_data_points: true
+      generate_implementation_guide: true
+    
+    agents:
+      - role: "insight_extractor"
+        goal: "Extract key insights, innovative ideas, and breakthrough concepts from any content"
+        backstory: "Expert at identifying valuable nuggets of wisdom from diverse sources"
+      
+      - role: "workflow_architect"
+        goal: "Identify and design implementable workflows and processes from the content"
+        backstory: "Specializes in translating ideas into actionable workflows"
+      
+      - role: "framework_specialist"
+        goal: "Extract mental models, frameworks, and methodologies that can be applied"
+        backstory: "Deep expertise in identifying reusable patterns across domains"
+      
+      - role: "knowledge_synthesizer"
+        goal: "Connect ideas to existing knowledge and identify relationships"
+        backstory: "Expert at building knowledge graphs and identifying connections"
+      
+      - role: "implementation_strategist"
+        goal: "Create practical implementation plans for extracted insights"
+        backstory: "Translates theoretical knowledge into executable strategies"
+```
+
+#### Node 10: Universal Content Documentation Generator
+
+```javascript
+// Universal Content Documentation Generator
+const crewAIAnalysis = $json;
+const originalData = $node['File Type Detection & Routing'].json;
+const llamaData = $node['LlamaIndex Response Processor'].json;
+
+// Determine content type and structure documentation
+const contentType = detectContentType(originalData);
+const expertiseLevel = assessExpertiseLevel(crewAIAnalysis);
+
+function detectContentType(data) {
+  const filename = data.filename?.toLowerCase() || '';
+  const extension = data.fileExtension;
+  const content = crewAIAnalysis.content_analysis?.type;
+  
+  if (filename.includes('course') || filename.includes('tutorial')) return 'educational';
+  if (filename.includes('paper') || filename.includes('research')) return 'research';
+  if (filename.includes('blog') || filename.includes('article')) return 'article';
+  if (extension === '.mp4' || extension === '.mp3') return 'media';
+  if (content?.includes('framework')) return 'framework';
+  return 'general_knowledge';
+}
+
+function assessExpertiseLevel(analysis) {
+  const complexity = analysis.complexity_score || 5;
+  if (complexity >= 8) return 'expert';
+  if (complexity >= 5) return 'intermediate';
+  return 'foundational';
+}
+
+// Generate universal documentation structure
+const contentDocumentation = {
+  // 1. Content Identification
+  identification: {
+    title: crewAIAnalysis.extracted_title || originalData.filename.replace(/\.[^/.]+$/, ""),
+    type: contentType,
+    source: originalData.source || 'direct_upload',
+    author: crewAIAnalysis.identified_author || 'Unknown',
+    expertise_level: expertiseLevel,
+    processing_date: new Date().toISOString(),
+    original_format: originalData.fileExtension,
+    content_category: originalData.course || 'General Knowledge',
+    tags: crewAIAnalysis.auto_tags || []
+  },
+  
+  // 2. Executive Summary
+  summary: {
+    one_line: crewAIAnalysis.one_line_summary || "Content analysis pending",
+    executive_summary: crewAIAnalysis.executive_summary || "",
+    key_message: crewAIAnalysis.core_message || "",
+    target_audience: crewAIAnalysis.target_audience || "General",
+    value_proposition: crewAIAnalysis.value_prop || "",
+    estimated_implementation_time: crewAIAnalysis.implementation_estimate || "Variable"
+  },
+  
+  // 3. Key Insights & Innovations
+  insights: {
+    breakthrough_ideas: (crewAIAnalysis.breakthrough_ideas || []).map(idea => ({
+      concept: idea.concept,
+      description: idea.description,
+      novelty_score: idea.novelty || 5,
+      impact_potential: idea.impact || 'Medium',
+      implementation_difficulty: idea.difficulty || 'Medium'
+    })),
+    
+    key_insights: (crewAIAnalysis.key_insights || []).map(insight => ({
+      insight: insight.text,
+      category: insight.category || 'General',
+      confidence: insight.confidence || 0.7,
+      supporting_evidence: insight.evidence || [],
+      applications: insight.applications || []
+    })),
+    
+    counterintuitive_findings: crewAIAnalysis.counterintuitive || [],
+    paradigm_shifts: crewAIAnalysis.paradigm_shifts || []
+  },
+  
+  // 4. Extracted Workflows & Processes
+  workflows: {
+    identified_workflows: (crewAIAnalysis.workflows || []).map(workflow => ({
+      name: workflow.name,
+      description: workflow.description,
+      steps: workflow.steps || [],
+      tools_required: workflow.tools || [],
+      estimated_time: workflow.time_estimate || "Not specified",
+      automation_potential: workflow.automation_score || 5,
+      departments: workflow.applicable_departments || ['All']
+    })),
+    
+    process_improvements: crewAIAnalysis.process_improvements || [],
+    automation_opportunities: crewAIAnalysis.automation_opportunities || [],
+    integration_points: crewAIAnalysis.integration_points || []
+  },
+  
+  // 5. Frameworks & Mental Models
+  frameworks: {
+    mental_models: (crewAIAnalysis.mental_models || []).map(model => ({
+      name: model.name,
+      description: model.description,
+      application_examples: model.examples || [],
+      when_to_use: model.use_cases || [],
+      limitations: model.limitations || []
+    })),
+    
+    decision_frameworks: crewAIAnalysis.decision_frameworks || [],
+    problem_solving_methods: crewAIAnalysis.problem_solving || [],
+    strategic_frameworks: crewAIAnalysis.strategic_frameworks || []
+  },
+  
+  // 6. Practical Applications
+  applications: {
+    immediate_applications: (crewAIAnalysis.immediate_applications || []).map(app => ({
+      application: app.description,
+      department: app.department || 'General',
+      effort_required: app.effort || 'Medium',
+      expected_impact: app.impact || 'Medium',
+      prerequisites: app.prerequisites || []
+    })),
+    
+    long_term_opportunities: crewAIAnalysis.long_term_opportunities || [],
+    cross_functional_applications: crewAIAnalysis.cross_functional || [],
+    innovation_opportunities: crewAIAnalysis.innovation_opportunities || []
+  },
+  
+  // 7. Expert Knowledge & Attribution
+  expertise: {
+    identified_experts: (crewAIAnalysis.experts || []).map(expert => ({
+      name: expert.name,
+      credentials: expert.credentials || [],
+      key_contributions: expert.contributions || [],
+      notable_quotes: expert.quotes || [],
+      follow_up_resources: expert.resources || []
+    })),
+    
+    citations: crewAIAnalysis.citations || [],
+    referenced_works: crewAIAnalysis.references || [],
+    recommended_further_reading: crewAIAnalysis.further_reading || []
+  },
+  
+  // 8. Data Points & Metrics
+  data: {
+    key_statistics: crewAIAnalysis.statistics || [],
+    benchmarks: crewAIAnalysis.benchmarks || [],
+    case_study_results: crewAIAnalysis.case_studies || [],
+    roi_examples: crewAIAnalysis.roi_examples || [],
+    success_metrics: crewAIAnalysis.success_metrics || []
+  },
+  
+  // 9. Implementation Guide
+  implementation: {
+    quick_wins: (crewAIAnalysis.quick_wins || []).map(win => ({
+      action: win.action,
+      effort: win.effort || 'Low',
+      impact: win.impact || 'Medium',
+      timeline: win.timeline || '1 week'
+    })),
+    
+    phased_approach: crewAIAnalysis.implementation_phases || [],
+    required_resources: crewAIAnalysis.resources_needed || [],
+    potential_obstacles: crewAIAnalysis.obstacles || [],
+    success_criteria: crewAIAnalysis.success_criteria || []
+  },
+  
+  // 10. Knowledge Graph Connections
+  connections: {
+    related_concepts: crewAIAnalysis.related_concepts || [],
+    prerequisite_knowledge: crewAIAnalysis.prerequisites || [],
+    builds_upon: crewAIAnalysis.builds_upon || [],
+    enables: crewAIAnalysis.enables || [],
+    contradicts: crewAIAnalysis.contradicts || [],
+    complements: crewAIAnalysis.complements || []
+  },
+  
+  // 11. Quality & Relevance Assessment
+  assessment: {
+    credibility_score: crewAIAnalysis.credibility || 7,
+    relevance_score: crewAIAnalysis.relevance || 7,
+    innovation_score: crewAIAnalysis.innovation || 5,
+    practicality_score: crewAIAnalysis.practicality || 7,
+    completeness: crewAIAnalysis.completeness || 0.8,
+    recommendation: crewAIAnalysis.recommendation || "Add to knowledge base",
+    priority_level: crewAIAnalysis.priority || 'Medium'
+  },
+  
+  // 12. Navigation & Reference
+  navigation: {
+    content_structure: crewAIAnalysis.structure_outline || [],
+    key_sections: crewAIAnalysis.key_sections || [],
+    timestamps: crewAIAnalysis.timestamps || [],
+    visual_elements: crewAIAnalysis.visual_descriptions || [],
+    searchable_topics: crewAIAnalysis.topics || []
+  }
+};
+
+// Generate storage paths based on content type
+const generateStoragePath = (type, category) => {
+  const basePath = {
+    'educational': 'courses',
+    'research': 'research-papers',
+    'article': 'articles',
+    'media': 'media-content',
+    'framework': 'frameworks',
+    'general_knowledge': 'knowledge-base'
+  };
+  
+  return `/${basePath[type] || 'general'}/${category}/${Date.now()}_analysis`;
+};
+
+return {
+  documentation: contentDocumentation,
+  filename: `${contentType}_${Date.now()}.json`,
+  storage_instructions: {
+    backblaze_path: generateStoragePath(contentType, contentDocumentation.identification.content_category),
+    pinecone_vectors: true,
+    supabase_metadata: true,
+    priority: contentDocumentation.assessment.priority_level
+  },
+  rag_enhancement: {
+    adds_new_capability: crewAIAnalysis.new_capabilities || [],
+    strengthens_areas: crewAIAnalysis.strengthened_areas || [],
+    fills_knowledge_gaps: crewAIAnalysis.gap_filling || []
+  }
+};
+```
+
+#### Node 11: Knowledge Base Enrichment
+
+```javascript
+// Knowledge Base Enrichment - Enhance RAG system
+const analysis = $json;
+
+// Determine how this content enriches the RAG system
+const ragEnrichment = {
+  // Knowledge Graph Updates
+  new_entities: extractEntities(analysis.documentation),
+  new_relationships: extractRelationships(analysis.documentation),
+  
+  // Capability Expansion
+  new_workflows: analysis.documentation.workflows.identified_workflows.length,
+  new_frameworks: analysis.documentation.frameworks.mental_models.length,
+  new_insights: analysis.documentation.insights.key_insights.length,
+  
+  // Quality Metrics
+  knowledge_quality: analysis.documentation.assessment.credibility_score,
+  implementation_value: analysis.documentation.assessment.practicality_score,
+  innovation_level: analysis.documentation.assessment.innovation_score,
+  
+  // RAG System Impact
+  enhances_departments: identifyDepartmentImpact(analysis.documentation),
+  adds_expertise_in: identifyExpertiseAreas(analysis.documentation),
+  enables_new_queries: identifyNewQueryCapabilities(analysis.documentation)
+};
+
+function extractEntities(doc) {
+  const entities = [];
+  
+  // Extract experts as entities
+  doc.expertise.identified_experts.forEach(expert => {
+    entities.push({
+      type: 'person',
+      name: expert.name,
+      role: 'expert',
+      expertise: expert.credentials
+    });
+  });
+  
+  // Extract frameworks as entities
+  doc.frameworks.mental_models.forEach(model => {
+    entities.push({
+      type: 'framework',
+      name: model.name,
+      category: 'mental_model'
+    });
+  });
+  
+  // Extract workflows as entities
+  doc.workflows.identified_workflows.forEach(workflow => {
+    entities.push({
+      type: 'workflow',
+      name: workflow.name,
+      automation_potential: workflow.automation_potential
+    });
+  });
+  
+  return entities;
+}
+
+function extractRelationships(doc) {
+  const relationships = [];
+  
+  // Connect concepts
+  doc.connections.related_concepts.forEach(concept => {
+    relationships.push({
+      type: 'relates_to',
+      source: doc.identification.title,
+      target: concept
+    });
+  });
+  
+  // Prerequisites
+  doc.connections.prerequisite_knowledge.forEach(prereq => {
+    relationships.push({
+      type: 'requires',
+      source: doc.identification.title,
+      target: prereq
+    });
+  });
+  
+  return relationships;
+}
+
+function identifyDepartmentImpact(doc) {
+  const departments = new Set();
+  
+  doc.workflows.identified_workflows.forEach(workflow => {
+    workflow.departments.forEach(dept => departments.add(dept));
+  });
+  
+  doc.applications.immediate_applications.forEach(app => {
+    departments.add(app.department);
+  });
+  
+  return Array.from(departments);
+}
+
+function identifyExpertiseAreas(doc) {
+  return [
+    ...doc.identification.tags,
+    ...doc.navigation.searchable_topics
+  ].filter(unique);
+}
+
+function identifyNewQueryCapabilities(doc) {
+  return [
+    `How to implement ${doc.identification.title}`,
+    `What are the best practices for ${doc.summary.key_message}`,
+    `Show me workflows related to ${doc.identification.tags.join(', ')}`,
+    `What frameworks apply to ${doc.identification.content_category}`
+  ];
+}
+
+function unique(value, index, self) {
+  return self.indexOf(value) === index;
+}
+
+return {
+  rag_enrichment: ragEnrichment,
+  notification: {
+    message: `New ${analysis.documentation.identification.type} content added to RAG system`,
+    title: analysis.documentation.identification.title,
+    quality: analysis.documentation.assessment.credibility_score,
+    new_capabilities: ragEnrichment.new_workflows + ragEnrichment.new_frameworks,
+    priority: analysis.documentation.assessment.priority_level
+  }
+};
+```
+
+#### Node 12: Store Analysis in Backblaze B2
+
+```javascript
+// Store Processed Analysis in Backblaze B2
+const analysis = $node['Universal Content Documentation Generator'].json;
+const enrichment = $node['Knowledge Base Enrichment'].json;
+const originalFile = $node['File Type Detection & Routing'].json;
+
+// Generate structured folder path
+const generateB2Path = (doc) => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  // Structure: /processed/{content_type}/{year}/{month}/{day}/{filename}
+  const contentType = doc.documentation.identification.type;
+  const originalName = doc.documentation.identification.title
+    .replace(/[^a-z0-9]/gi, '_')
+    .toLowerCase();
+  
+  return `processed/${contentType}/${year}/${month}/${day}/${originalName}_${Date.now()}`;
+};
+
+// Prepare complete analysis document
+const completeAnalysis = {
+  // Metadata
+  metadata: {
+    processed_date: new Date().toISOString(),
+    original_filename: originalFile.filename,
+    content_category: analysis.documentation.identification.content_category,
+    processing_version: "v1.0",
+    storage_location: "backblaze_b2"
+  },
+  
+  // Full Analysis
+  analysis: analysis.documentation,
+  
+  // RAG Enhancement Details
+  rag_impact: enrichment.rag_enrichment,
+  
+  // Storage Instructions
+  storage: analysis.storage_instructions,
+  
+  // Processing Stats
+  stats: {
+    insights_extracted: analysis.documentation.insights.key_insights.length,
+    workflows_identified: analysis.documentation.workflows.identified_workflows.length,
+    frameworks_found: analysis.documentation.frameworks.mental_models.length,
+    experts_identified: analysis.documentation.expertise.identified_experts.length,
+    quality_score: analysis.documentation.assessment.credibility_score,
+    priority: analysis.documentation.assessment.priority_level
+  }
+};
+
+// Generate filenames for different formats
+const basePath = generateB2Path(analysis);
+const files = [
+  {
+    path: `${basePath}/analysis.json`,
+    content: JSON.stringify(completeAnalysis, null, 2),
+    type: 'application/json'
+  },
+  {
+    path: `${basePath}/summary.md`,
+    content: generateMarkdownSummary(completeAnalysis),
+    type: 'text/markdown'
+  },
+  {
+    path: `${basePath}/insights.json`,
+    content: JSON.stringify(analysis.documentation.insights, null, 2),
+    type: 'application/json'
+  }
+];
+
+// Helper function to generate markdown summary
+function generateMarkdownSummary(data) {
+  const doc = data.analysis;
+  return `# ${doc.identification.title}
+
+## Executive Summary
+${doc.summary.executive_summary}
+
+### Key Message
+${doc.summary.key_message}
+
+## Top Insights
+${doc.insights.key_insights.slice(0, 5).map(i => `- ${i.insight}`).join('\n')}
+
+## Identified Workflows
+${doc.workflows.identified_workflows.map(w => `- **${w.name}**: ${w.description}`).join('\n')}
+
+## Frameworks & Mental Models
+${doc.frameworks.mental_models.map(m => `- **${m.name}**: ${m.description}`).join('\n')}
+
+## Quick Wins
+${doc.implementation.quick_wins.map(w => `- ${w.action} (${w.effort} effort, ${w.impact} impact)`).join('\n')}
+
+## Quality Assessment
+- Credibility: ${doc.assessment.credibility_score}/10
+- Relevance: ${doc.assessment.relevance_score}/10
+- Innovation: ${doc.assessment.innovation_score}/10
+- Practicality: ${doc.assessment.practicality_score}/10
+
+## Processing Details
+- Date: ${data.metadata.processed_date}
+- Original File: ${data.metadata.original_filename}
+- Category: ${doc.identification.content_category}
+- Priority: ${doc.assessment.priority_level}
+`;
+}
+
+return files;
+```
+
+#### Node 13: Backblaze B2 Upload
+
+```yaml
+B2_Storage:
+  type: "n8n-nodes-base.s3"
+  name: "Save to Backblaze B2"
+  parameters:
+    bucketName: "ai-empire-documents"
+    operation: "upload"
+    
+    # For each file from Node 12
+    fileName: "{{$json.path}}"
+    fileContent: "{{$json.content}}"
+    
+    additionalFields:
+      acl: "private"
+      storageClass: "STANDARD"
+      serverSideEncryption: "AES256"
+      
+      metadata:
+        processed_date: "{{$now.toISO()}}"
+        content_type: "{{$json.type}}"
+        analysis_version: "v1.0"
+        quality_score: "{{$node['Universal Content Documentation Generator'].json.documentation.assessment.credibility_score}}"
+        
+      tags:
+        - Key: "content_type"
+          Value: "{{$node['File Type Detection & Routing'].json.contentCategory}}"
+        - Key: "processing_status"
+          Value: "completed"
+        - Key: "priority"
+          Value: "{{$node['Universal Content Documentation Generator'].json.documentation.assessment.priority_level}}"
+```
+
+#### Node 14: Update Processing Log
+
+```javascript
+// Log successful processing to database
+const b2Results = items;
+const analysis = $node['Universal Content Documentation Generator'].json;
+
+const logEntry = {
+  // Processing Record
+  document_id: $node['File Type Detection & Routing'].json.hash || generateDocumentId(),
+  processed_timestamp: new Date().toISOString(),
+  
+  // Storage Locations
+  b2_paths: b2Results.map(r => r.json.path),
+  pinecone_namespace: analysis.storage_instructions.pinecone_vectors ? 'course_vectors' : null,
+  supabase_record_id: null, // Will be set if stored in Supabase
+  
+  // Analysis Summary
+  content_type: analysis.documentation.identification.type,
+  content_category: analysis.documentation.identification.content_category,
+  title: analysis.documentation.identification.title,
+  author: analysis.documentation.identification.author,
+  
+  // Metrics
+  insights_count: analysis.documentation.insights.key_insights.length,
+  workflows_count: analysis.documentation.workflows.identified_workflows.length,
+  frameworks_count: analysis.documentation.frameworks.mental_models.length,
+  quality_score: analysis.documentation.assessment.credibility_score,
+  
+  // Status
+  processing_status: 'completed',
+  processing_time_ms: Date.now() - $node['webhook_intake'].json.timestamp,
+  errors: [],
+  
+  // RAG Impact
+  new_capabilities_added: $node['Knowledge Base Enrichment'].json.rag_enrichment.new_workflows + 
+                          $node['Knowledge Base Enrichment'].json.rag_enrichment.new_frameworks,
+  departments_impacted: $node['Knowledge Base Enrichment'].json.rag_enrichment.enhances_departments
+};
+
+function generateDocumentId() {
+  return `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+return logEntry;
+```
+
+### 10.5.4 Testing Checklist
+
+- [ ] Process educational content (course, tutorial)
+- [ ] Process research paper or whitepaper
+- [ ] Process blog post or article
+- [ ] Process video or podcast
+- [ ] Process business framework
+- [ ] Extract insights successfully
+- [ ] Identify workflows and processes
+- [ ] Extract frameworks and mental models
+- [ ] Generate implementation guide
+- [ ] Store in appropriate locations
+- [ ] Verify knowledge graph updates
+- [ ] Test RAG enhancement
+- [ ] Verify Backblaze B2 storage structure
+- [ ] Check processing logs in database
+- [ ] Validate markdown summary generation
+
+### 10.5.5 Success Criteria
+
+- Content type correctly identified
+- Key insights extracted (>5 per document)
+- Workflows identified and documented
+- Frameworks extracted and categorized
+- Expert knowledge attributed
+- Implementation guide generated
+- Knowledge graph enriched
+- RAG capabilities enhanced
+- Quality scores accurate
+- Processing time <3 minutes
+- Files stored in correct B2 structure
+- All formats (JSON, Markdown) generated
+- Database logs complete and accurate
+
+### 10.5.6 Implementation Benefits
+
+**Content Diversity:**
+- Handles ANY valuable content type
+- Adapts to different formats automatically
+- Extracts value from all sources
+
+**Knowledge Extraction:**
+- Breakthrough ideas and innovations
+- Actionable workflows
+- Reusable frameworks
+- Expert attribution
+- Data-driven insights
+
+**RAG Enhancement:**
+- Builds comprehensive knowledge base
+- Creates entity relationships
+- Enables new query types
+- Maps to department needs
+- Prioritizes high-value content
+
+**Storage Organization:**
+- Date-based folder structure in Backblaze B2
+- Content type categorization
+- Multiple output formats for flexibility
+- Complete processing audit trail
+- Easy retrieval and browsing
+
+**Practical Value:**
+- Quick wins for immediate implementation
+- Phased approaches for complex changes
+- Resource requirements clearly defined
+- Success criteria established
+- ROI examples provided
+
+## 10.6 Milestone 5: Multi-Agent Orchestration
+
+### 10.6.1 Objectives
 - Set up CrewAI integration
 - Implement agent coordination
 - Create analysis workflows
 - Test multi-agent tasks
 - Monitor agent performance
 
-### 10.5.2 n8n Workflow Components
+### 10.6.2 n8n Workflow Components
 
 ```yaml
-Milestone_4_Workflow:
+Milestone_5_Workflow:
   name: "Multi_Agent_Analysis"
   
   nodes:
@@ -474,7 +1205,7 @@ Milestone_4_Workflow:
         - summary
 ```
 
-### 10.5.3 Testing Checklist
+### 10.6.3 Testing Checklist
 
 - [ ] Define agent tasks
 - [ ] Test CrewAI connectivity
@@ -487,7 +1218,7 @@ Milestone_4_Workflow:
 - [ ] Measure processing time
 - [ ] Validate recommendations
 
-### 10.5.4 Success Criteria
+### 10.6.4 Success Criteria
 
 - Agents coordinate effectively
 - Tasks completed successfully
@@ -497,19 +1228,19 @@ Milestone_4_Workflow:
 - Quality insights generated
 - Error handling robust
 
-## 10.6 Milestone 5: Cost Tracking and Optimization
+## 10.7 Milestone 6: Cost Tracking and Optimization
 
-### 10.6.1 Objectives
+### 10.7.1 Objectives
 - Implement cost monitoring
 - Track API usage
 - Optimize routing decisions
 - Generate cost reports
 - Alert on budget thresholds
 
-### 10.6.2 n8n Workflow Components
+### 10.7.2 n8n Workflow Components
 
 ```yaml
-Milestone_5_Workflow:
+Milestone_6_Workflow:
   name: "Cost_Optimization_Tracking"
   
   nodes:
@@ -611,7 +1342,7 @@ Milestone_5_Workflow:
           <p>ROI Progress: {{$json.roi_percentage}}%</p>
 ```
 
-### 10.6.3 Testing Checklist
+### 10.7.3 Testing Checklist
 
 - [ ] Track API calls accurately
 - [ ] Calculate costs correctly
@@ -624,7 +1355,7 @@ Milestone_5_Workflow:
 - [ ] Monitor savings tracking
 - [ ] Validate thresholds
 
-### 10.6.4 Success Criteria
+### 10.7.4 Success Criteria
 
 - All costs tracked accurately
 - Budget alerts functional
@@ -635,19 +1366,19 @@ Milestone_5_Workflow:
 - Local processing >98%
 - Savings visible
 
-## 10.7 Milestone 6: Error Handling and Recovery
+## 10.8 Milestone 7: Error Handling and Recovery
 
-### 10.7.1 Objectives
+### 10.8.1 Objectives
 - Implement comprehensive error handling
 - Create recovery workflows
 - Set up circuit breakers
 - Build retry mechanisms
 - Test disaster scenarios
 
-### 10.7.2 n8n Workflow Components
+### 10.8.2 n8n Workflow Components
 
 ```yaml
-Milestone_6_Workflow:
+Milestone_7_Workflow:
   name: "Error_Recovery_System"
   
   nodes:
@@ -754,7 +1485,7 @@ Milestone_6_Workflow:
         - document_data
 ```
 
-### 10.7.3 Testing Checklist
+### 10.8.3 Testing Checklist
 
 - [ ] Simulate Mac Studio offline
 - [ ] Test cloud service failures
@@ -767,7 +1498,7 @@ Milestone_6_Workflow:
 - [ ] Monitor recovery success
 - [ ] Validate error logging
 
-### 10.7.4 Success Criteria
+### 10.8.4 Success Criteria
 
 - Errors caught and classified
 - Circuit breaker prevents cascades
@@ -778,19 +1509,19 @@ Milestone_6_Workflow:
 - System remains stable
 - No data loss
 
-## 10.8 Milestone 7: Monitoring and Observability
+## 10.9 Milestone 8: Monitoring and Observability
 
-### 10.8.1 Objectives
+### 10.9.1 Objectives
 - Set up comprehensive monitoring
 - Create performance dashboards
 - Implement alerting system
 - Track workflow metrics
 - Monitor system health
 
-### 10.8.2 n8n Workflow Components
+### 10.9.2 n8n Workflow Components
 
 ```yaml
-Milestone_7_Workflow:
+Milestone_8_Workflow:
   name: "Monitoring_Observability"
   
   nodes:
@@ -887,7 +1618,7 @@ Milestone_7_Workflow:
         bodyParameters: "{{$json.metrics}}"
 ```
 
-### 10.8.3 Testing Checklist
+### 10.9.3 Testing Checklist
 
 - [ ] Verify metrics collection
 - [ ] Test health checks
@@ -900,7 +1631,7 @@ Milestone_7_Workflow:
 - [ ] Monitor trends
 - [ ] Validate thresholds
 
-### 10.8.4 Success Criteria
+### 10.9.4 Success Criteria
 
 - All metrics collected
 - Health checks functional
@@ -911,16 +1642,16 @@ Milestone_7_Workflow:
 - Trends visible
 - System observable
 
-## 10.9 Milestone 8: Complete Integration Testing
+## 10.10 Milestone 9: Complete Integration Testing
 
-### 10.9.1 Objectives
+### 10.10.1 Objectives
 - Test end-to-end workflows
 - Validate all integrations
 - Stress test system
 - Document performance
 - Certify production ready
 
-### 10.9.2 Integration Test Scenarios
+### 10.10.2 Integration Test Scenarios
 
 ```yaml
 Test_Scenarios:
@@ -962,7 +1693,21 @@ Test_Scenarios:
     expected_time: "<5 minutes"
     expected_cost: "<$0.50"
     
-  scenario_4_multi_agent_analysis:
+  scenario_4_universal_content:
+    description: "Process diverse content with universal analysis"
+    steps:
+      - Upload course material
+      - Detect as educational content
+      - Extract insights and frameworks
+      - Identify workflows
+      - Map to departments
+      - Generate implementation guide
+      - Store in Backblaze B2
+      - Update knowledge graph
+    expected_time: "<3 minutes"
+    expected_cost: "<$0.10"
+    
+  scenario_5_multi_agent_analysis:
     description: "Complex multi-agent task"
     steps:
       - Submit analysis request
@@ -974,7 +1719,7 @@ Test_Scenarios:
     expected_time: "<10 minutes"
     expected_cost: "<$0.30"
     
-  scenario_5_stress_test:
+  scenario_6_stress_test:
     description: "Parallel processing stress test"
     steps:
       - Upload 50 documents
@@ -986,7 +1731,7 @@ Test_Scenarios:
     expected_cost: "<$5.00"
 ```
 
-### 10.9.3 Testing Checklist
+### 10.10.3 Testing Checklist
 
 - [ ] Run all test scenarios
 - [ ] Verify expected outcomes
@@ -999,7 +1744,7 @@ Test_Scenarios:
 - [ ] Test recovery procedures
 - [ ] Document results
 
-### 10.9.4 Success Criteria
+### 10.10.4 Success Criteria
 
 - All scenarios pass
 - Performance meets targets
@@ -1009,9 +1754,9 @@ Test_Scenarios:
 - System stable under load
 - Ready for production
 
-## 10.10 Production Deployment Checklist
+## 10.11 Production Deployment Checklist
 
-### 10.10.1 Pre-Deployment
+### 10.11.1 Pre-Deployment
 
 - [ ] All milestones completed
 - [ ] Testing passed
@@ -1022,7 +1767,7 @@ Test_Scenarios:
 - [ ] Cost tracking active
 - [ ] Security reviewed
 
-### 10.10.2 Deployment Steps
+### 10.11.2 Deployment Steps
 
 1. **Mac Studio Configuration**
    - [ ] Ollama installed and models loaded
@@ -1052,7 +1797,7 @@ Test_Scenarios:
    - [ ] Backup test
    - [ ] Recovery drill
 
-### 10.10.3 Post-Deployment
+### 10.11.3 Post-Deployment
 
 - [ ] Monitor first 24 hours
 - [ ] Review performance metrics
@@ -1062,9 +1807,9 @@ Test_Scenarios:
 - [ ] Document issues
 - [ ] Plan optimizations
 
-## 10.11 Workflow Templates
+## 10.12 Workflow Templates
 
-### 10.11.1 Template Structure
+### 10.12.1 Template Structure
 
 Each milestone includes exportable n8n workflow templates that can be imported directly:
 
@@ -1086,7 +1831,7 @@ Each milestone includes exportable n8n workflow templates that can be imported d
 }
 ```
 
-### 10.11.2 Import Instructions
+### 10.12.2 Import Instructions
 
 1. Open n8n dashboard
 2. Navigate to Workflows
@@ -1097,7 +1842,7 @@ Each milestone includes exportable n8n workflow templates that can be imported d
 7. Test with sample data
 8. Activate workflow
 
-## 10.12 Troubleshooting Guide
+## 10.13 Troubleshooting Guide
 
 ### Common Issues and Solutions
 
@@ -1136,7 +1881,7 @@ Each milestone includes exportable n8n workflow templates that can be imported d
 - Test individual nodes
 - Check rate limits
 
-## 10.13 Performance Optimization Tips
+## 10.14 Performance Optimization Tips
 
 1. **Batch Processing**
    - Group similar documents
@@ -1168,7 +1913,7 @@ Each milestone includes exportable n8n workflow templates that can be imported d
    - Implement proper error handling
    - Monitor execution times
 
-## 10.14 Next Steps
+## 10.15 Next Steps
 
 After completing all milestones:
 
@@ -1198,4 +1943,4 @@ After completing all milestones:
 
 ---
 
-This milestone-based approach ensures systematic implementation and testing of the AI Empire v5.0 system, with each component validated before moving to the next stage.
+This milestone-based approach ensures systematic implementation and testing of the AI Empire v5.0 system, with each component validated before moving to the next stage. The Universal Content Analysis Workflow (Milestone 4) adds powerful capabilities to extract value from any content type, building a comprehensive RAG system from the brightest minds across all domains.
