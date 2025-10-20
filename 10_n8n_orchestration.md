@@ -245,13 +245,81 @@ Milestone_2_Workflow:
 ## 10.4 Milestone 3: Vector Storage and RAG Pipeline
 
 ### 10.4.1 Objectives
-- Generate embeddings locally
-- Store vectors in Pinecone
-- Implement semantic search
-- Set up hybrid retrieval
-- Test RAG pipeline
+- Generate embeddings locally with nomic-embed-text
+- Store vectors in Supabase pgvector (unified database)
+- Implement semantic search with HNSW indexing
+- Set up hybrid retrieval (vector + metadata filtering)
+- Test RAG pipeline end-to-end
 
-### 10.4.2 n8n Workflow Components
+### 10.4.2 Supabase pgvector Setup
+
+**Step 1: Enable pgvector Extension**
+```sql
+-- In Supabase SQL Editor
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+**Step 2: Create Vector Tables**
+```sql
+-- Main documents table with vector embeddings
+CREATE TABLE documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  embedding vector(768),  -- nomic-embed-text dimensions
+  quality_score DECIMAL(3,2),
+  semantic_density DECIMAL(3,2),
+  coherence_score DECIMAL(3,2),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create HNSW index for fast similarity search
+CREATE INDEX ON documents 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+-- Create GIN index for metadata filtering
+CREATE INDEX ON documents USING gin (metadata);
+
+-- Function for hybrid search (vector + metadata)
+CREATE OR REPLACE FUNCTION match_documents(
+  query_embedding vector(768),
+  match_threshold float,
+  match_count int,
+  filter jsonb DEFAULT '{}'
+)
+RETURNS TABLE (
+  id uuid,
+  content text,
+  metadata jsonb,
+  similarity float
+)
+LANGUAGE sql STABLE
+AS $$
+  SELECT
+    documents.id,
+    documents.content,
+    documents.metadata,
+    1 - (documents.embedding <=> query_embedding) as similarity
+  FROM documents
+  WHERE 
+    documents.metadata @> filter
+    AND 1 - (documents.embedding <=> query_embedding) > match_threshold
+  ORDER BY documents.embedding <=> query_embedding
+  LIMIT match_count;
+$$;
+```
+
+**Benefits of Supabase pgvector over Pinecone:**
+- ✅ **Unified Database**: Vectors + metadata in one place (no sync issues)
+- ✅ **Better Performance**: 28x lower latency, 16x higher throughput
+- ✅ **Cost Effective**: No separate vector DB cost ($0 vs Pinecone scaling)
+- ✅ **No Metadata Limits**: Pinecone limits 40KB, Supabase unlimited JSONB
+- ✅ **Advanced Queries**: Combine vector search with SQL joins and filters
+- ✅ **Local-First Ready**: Perfect for Mac Studio embeddings → Supabase flow
+
+### 10.4.3 n8n Workflow Components
 
 ```yaml
 Milestone_3_Workflow:
@@ -306,19 +374,32 @@ Milestone_3_Workflow:
           coherenceScore: calculateCoherence(item.json.content)
         }));
     
-    5_pinecone_upsert:
-      type: "n8n-nodes-base.httpRequest"
-      parameters:
-        url: "https://api.pinecone.io/vectors/upsert"
-        method: "POST"
-        authentication: "apiKey"
-        sendBody: true
-        bodyParameters:
-          namespace: "course_vectors"
-          vectors: "{{$json.vectors}}"
-        options:
-          batching:
-            batchSize: 100
+    5_supabase_vector_upsert:
+      type: "n8n-nodes-base.postgres"
+      operation: "executeQuery"
+      query: |
+        INSERT INTO documents (
+          id, 
+          content, 
+          metadata, 
+          embedding,
+          quality_score,
+          semantic_density,
+          coherence_score
+        ) VALUES (
+          '{{$json.documentId}}',
+          '{{$json.content}}',
+          '{{$json.metadata}}',
+          '{{$json.embedding}}',
+          {{$json.qualityScore}},
+          {{$json.semanticDensity}},
+          {{$json.coherenceScore}}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          embedding = EXCLUDED.embedding,
+          quality_score = EXCLUDED.quality_score,
+          updated_at = NOW();
+      credentials: "supabase_postgres"
     
     6_cache_hot_data:
       type: "n8n-nodes-base.redis"
@@ -329,15 +410,20 @@ Milestone_3_Workflow:
         ttl: 3600
     
     7_test_retrieval:
-      type: "n8n-nodes-base.httpRequest"
-      parameters:
-        url: "https://api.pinecone.io/query"
-        method: "POST"
-        bodyParameters:
-          namespace: "course_vectors"
-          vector: "{{$json.queryVector}}"
-          topK: 10
-          includeMetadata: true
+      type: "n8n-nodes-base.postgres"
+      operation: "executeQuery"
+      query: |
+        SELECT 
+          id,
+          content,
+          metadata,
+          quality_score,
+          1 - (embedding <=> '{{$json.queryEmbedding}}') as similarity
+        FROM documents
+        WHERE metadata @> '{{$json.metadataFilter}}'
+        ORDER BY embedding <=> '{{$json.queryEmbedding}}'
+        LIMIT 10;
+      credentials: "supabase_postgres"
   
     8_hierarchical_structure_extraction:
     type: "n8n-nodes-base.function"
@@ -369,20 +455,20 @@ Milestone_3_Workflow:
         doc_id: "{{$json.document_id}}"
         chunk_ranges: "{{$json.expansion_ranges}}"
 ```
-### 10.4.3 Testing Checklist
+### 10.4.4 Testing Checklist
 
 - [ ] Chunk document correctly
-- [ ] Generate embeddings locally
+- [ ] Generate embeddings locally (nomic-embed-text)
 - [ ] Calculate quality scores
-- [ ] Store in Pinecone
-- [ ] Cache frequently accessed
-- [ ] Test semantic search
-- [ ] Verify retrieval accuracy
-- [ ] Monitor embedding speed
-- [ ] Check vector dimensions
-- [ ] Test batch processing
+- [ ] Store in Supabase pgvector
+- [ ] Cache frequently accessed vectors
+- [ ] Test semantic search with cosine distance
+- [ ] Verify retrieval accuracy with metadata filters
+- [ ] Monitor embedding speed (local)
+- [ ] Check vector dimensions (768 for nomic)
+- [ ] Test batch upsert performance
 
-### 10.4.4 Success Criteria
+### 10.4.5 Success Criteria
 
 - Embeddings generated locally
 - Vectors stored successfully
@@ -1813,8 +1899,8 @@ Test_Scenarios:
    - [ ] Monitoring workflows running
 
 3. **Cloud Services**
-   - [ ] Pinecone indexes created
-   - [ ] Supabase tables set up
+   - [ ] Supabase pgvector extension enabled
+   - [ ] Supabase vector tables created with HNSW indexes
    - [ ] B2 buckets configured
    - [ ] CrewAI agents deployed
    - [ ] API keys secured

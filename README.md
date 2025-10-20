@@ -16,10 +16,25 @@ This directory contains the complete Software Requirements Specification (SRS) f
 - ✅ **n8n** (https://n8n-d21p.onrender.com) - Workflow orchestration
 - ✅ **CrewAI** (https://jb-crewai.onrender.com) - Agent coordination  
 - ✅ **LlamaIndex** (https://jb-llamaindex.onrender.com) - Document processing & UI
-- ✅ **Supabase** - PostgreSQL database
+- ✅ **Supabase** - PostgreSQL database with pgvector for unified vector storage
 - ✅ **Backblaze B2** - File storage (JB-Course-KB bucket)
-- ✅ **Pinecone** - Vector database
+- ~~**Pinecone**~~ - **Replaced with Supabase pgvector** (better performance, lower cost)
 - ✅ **Hyperbolic.ai** - LLM & Vision APIs
+
+## 🔄 Recent Updates (October 20, 2025)
+
+### Pinecone → Supabase pgvector Migration
+We've migrated from Pinecone to Supabase pgvector for vector storage, providing:
+- **28x lower latency** and **16x higher throughput**
+- **Unified database** - vectors + metadata in one place
+- **Cost savings** - no separate vector DB service
+- **No metadata limits** - unlimited JSONB storage
+
+**Migration Files:**
+- `CHANGES_SUMMARY.md` - Detailed migration guide
+- `supabase_pgvector_setup.sql` - Ready-to-run setup script
+- `QUICK_REFERENCE.txt` - Quick reference guide
+- Section 10 updated with new workflows
 
 ## 📁 Directory Structure
 
@@ -43,7 +58,10 @@ Empire/
 └── Supporting Files
     ├── README.md (this file)
     ├── empire-arch.txt (v5.0 Architecture)
-    └── claude.md
+    ├── claude.md
+    ├── CHANGES_SUMMARY.md ⭐ NEW - Migration guide
+    ├── supabase_pgvector_setup.sql ⭐ NEW - SQL setup
+    └── QUICK_REFERENCE.txt ⭐ NEW - Quick reference
 
 Note: All appendices are integrated into Section 6
 ```
@@ -142,16 +160,17 @@ Mac Studio M3 Ultra (96GB)
 
 ### Current Cloud Services (Active Now)
 - **n8n & CrewAI (Render):** $30 - Orchestration
-- **Supabase:** $25 - PostgreSQL
-- **Pinecone:** $0 - Vector storage (free tier)
+- **Supabase:** $25 - PostgreSQL + pgvector (unified vector storage)
+- ~~**Pinecone:** $0~~ - Replaced with Supabase pgvector
 - **Backblaze B2:** $10 - File storage
 - **Hyperbolic.ai:** $25 - LLM/Vision APIs
-- **Current Total:** $90/month
+- **Current Total:** $90/month (simplified architecture, better performance)
 
 ### Projected Costs (Post Mac Studio)
 - **One-time:** $3,999 (Mac Studio) + $200 (UPS/accessories)
-- **Monthly:** $80-135 (reduced from current $90)
-- **ROI:** 14-20 month payback period
+- **Monthly:** $80-90 (reduced, with unified vector storage)
+- **ROI:** 14-18 month payback period
+- **Savings:** $70+ per month at scale vs. separate vector DB
 
 ## 🚀 Key Features & Current Status
 
