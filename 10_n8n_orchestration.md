@@ -245,23 +245,29 @@ Milestone_2_Workflow:
 ## 10.4 Milestone 3: Vector Storage and RAG Pipeline
 
 ### 10.4.1 Objectives
-- Generate embeddings locally with nomic-embed-text
-- Store vectors in Supabase pgvector (unified database)
+- Generate embeddings locally with nomic-embed-text (768 dimensions)
+- Store vectors in Supabase pgvector (unified database architecture)
 - Implement semantic search with HNSW indexing
-- Set up hybrid retrieval (vector + metadata filtering)
-- Test RAG pipeline end-to-end
+- Set up hybrid retrieval combining vector similarity with metadata filtering
+- Test end-to-end RAG pipeline
 
 ### 10.4.2 Supabase pgvector Setup
 
-**Step 1: Enable pgvector Extension**
-```sql
--- In Supabase SQL Editor
-CREATE EXTENSION IF NOT EXISTS vector;
-```
+**Why Supabase pgvector:**
+- **Unified Architecture**: Vectors and metadata in the same PostgreSQL database
+- **High Performance**: HNSW indexing for fast similarity search
+- **Cost Effective**: No separate vector database service needed
+- **Unlimited Metadata**: Store rich JSONB metadata with each vector
+- **SQL Power**: Combine vector search with complex SQL queries and joins
+- **Local-First Ready**: Perfect for Mac Studio embeddings → Supabase workflow
 
-**Step 2: Create Vector Tables**
+**Setup Steps:**
+
 ```sql
--- Main documents table with vector embeddings
+-- Step 1: Enable pgvector extension in Supabase SQL Editor
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Step 2: Create documents table with vector column
 CREATE TABLE documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   content TEXT NOT NULL,
@@ -274,25 +280,26 @@ CREATE TABLE documents (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create HNSW index for fast similarity search
+-- Step 3: Create HNSW index for fast similarity search
 CREATE INDEX ON documents 
 USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
 
--- Create GIN index for metadata filtering
+-- Step 4: Create GIN index for metadata filtering  
 CREATE INDEX ON documents USING gin (metadata);
 
--- Function for hybrid search (vector + metadata)
+-- Step 5: Create hybrid search function
 CREATE OR REPLACE FUNCTION match_documents(
   query_embedding vector(768),
-  match_threshold float,
-  match_count int,
+  match_threshold float DEFAULT 0.5,
+  match_count int DEFAULT 10,
   filter jsonb DEFAULT '{}'
 )
 RETURNS TABLE (
   id uuid,
   content text,
   metadata jsonb,
+  quality_score decimal,
   similarity float
 )
 LANGUAGE sql STABLE
@@ -301,6 +308,7 @@ AS $$
     documents.id,
     documents.content,
     documents.metadata,
+    documents.quality_score,
     1 - (documents.embedding <=> query_embedding) as similarity
   FROM documents
   WHERE 
@@ -310,14 +318,6 @@ AS $$
   LIMIT match_count;
 $$;
 ```
-
-**Benefits of Supabase pgvector over Pinecone:**
-- ✅ **Unified Database**: Vectors + metadata in one place (no sync issues)
-- ✅ **Better Performance**: 28x lower latency, 16x higher throughput
-- ✅ **Cost Effective**: No separate vector DB cost ($0 vs Pinecone scaling)
-- ✅ **No Metadata Limits**: Pinecone limits 40KB, Supabase unlimited JSONB
-- ✅ **Advanced Queries**: Combine vector search with SQL joins and filters
-- ✅ **Local-First Ready**: Perfect for Mac Studio embeddings → Supabase flow
 
 ### 10.4.3 n8n Workflow Components
 
@@ -377,20 +377,19 @@ Milestone_3_Workflow:
     5_supabase_vector_upsert:
       type: "n8n-nodes-base.postgres"
       operation: "executeQuery"
+      credentials: "supabase_postgres"
       query: |
         INSERT INTO documents (
-          id, 
-          content, 
-          metadata, 
+          content,
+          metadata,
           embedding,
           quality_score,
           semantic_density,
           coherence_score
         ) VALUES (
-          '{{$json.documentId}}',
           '{{$json.content}}',
-          '{{$json.metadata}}',
-          '{{$json.embedding}}',
+          '{{$json.metadata}}'::jsonb,
+          '{{$json.embedding}}'::vector,
           {{$json.qualityScore}},
           {{$json.semanticDensity}},
           {{$json.coherenceScore}}
@@ -399,7 +398,10 @@ Milestone_3_Workflow:
           embedding = EXCLUDED.embedding,
           quality_score = EXCLUDED.quality_score,
           updated_at = NOW();
-      credentials: "supabase_postgres"
+      options:
+        batching:
+          enabled: true
+          batchSize: 100
     
     6_cache_hot_data:
       type: "n8n-nodes-base.redis"
@@ -412,18 +414,14 @@ Milestone_3_Workflow:
     7_test_retrieval:
       type: "n8n-nodes-base.postgres"
       operation: "executeQuery"
-      query: |
-        SELECT 
-          id,
-          content,
-          metadata,
-          quality_score,
-          1 - (embedding <=> '{{$json.queryEmbedding}}') as similarity
-        FROM documents
-        WHERE metadata @> '{{$json.metadataFilter}}'
-        ORDER BY embedding <=> '{{$json.queryEmbedding}}'
-        LIMIT 10;
       credentials: "supabase_postgres"
+      query: |
+        SELECT * FROM match_documents(
+          query_embedding := '{{$json.queryEmbedding}}'::vector,
+          match_threshold := 0.7,
+          match_count := 10,
+          filter := '{{$json.metadataFilter}}'::jsonb
+        );
   
     8_hierarchical_structure_extraction:
     type: "n8n-nodes-base.function"
@@ -457,26 +455,29 @@ Milestone_3_Workflow:
 ```
 ### 10.4.4 Testing Checklist
 
-- [ ] Chunk document correctly
-- [ ] Generate embeddings locally (nomic-embed-text)
-- [ ] Calculate quality scores
-- [ ] Store in Supabase pgvector
+- [ ] Chunk document correctly with semantic overlap
+- [ ] Generate embeddings locally with nomic-embed-text (768 dims)
+- [ ] Calculate quality scores for each chunk
+- [ ] Store vectors in Supabase with metadata
 - [ ] Cache frequently accessed vectors
-- [ ] Test semantic search with cosine distance
-- [ ] Verify retrieval accuracy with metadata filters
-- [ ] Monitor embedding speed (local)
-- [ ] Check vector dimensions (768 for nomic)
-- [ ] Test batch upsert performance
+- [ ] Test semantic search with cosine similarity
+- [ ] Verify retrieval accuracy with test queries
+- [ ] Monitor embedding generation speed
+- [ ] Test metadata filtering with JSONB queries
+- [ ] Verify batch upsert performance
+- [ ] Check vector dimensions
+- [ ] Test batch processing
 
 ### 10.4.5 Success Criteria
 
-- Embeddings generated locally
-- Vectors stored successfully
-- Search returns relevant results
-- Quality scores meaningful
+- Embeddings generated locally with nomic-embed-text
+- Vectors stored successfully in Supabase
+- Semantic search returns highly relevant results
+- Quality scores provide meaningful ranking
 - Cache hit rate >60%
-- Retrieval latency <500ms
-- Batch processing efficient
+- Retrieval latency <500ms (with HNSW index)
+- Batch processing handles 100+ vectors efficiently
+- Metadata filtering works seamlessly with vector search
 
 ## 10.5 Milestone 4: Universal Content Analysis Workflow
 
@@ -1900,7 +1901,7 @@ Test_Scenarios:
 
 3. **Cloud Services**
    - [ ] Supabase pgvector extension enabled
-   - [ ] Supabase vector tables created with HNSW indexes
+   - [ ] Supabase vector tables and indexes created
    - [ ] B2 buckets configured
    - [ ] CrewAI agents deployed
    - [ ] API keys secured
