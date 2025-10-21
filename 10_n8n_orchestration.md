@@ -2,7 +2,7 @@
 
 ## 10.1 Overview
 
-This section provides a practical, milestone-based approach to implementing the AI Empire v6.0 workflow orchestration using n8n. Each milestone represents a testable, independent component that builds upon the previous one, allowing for systematic validation before proceeding to the next stage.
+This section provides a practical, milestone-based approach to implementing the AI Empire v5.0 workflow orchestration using n8n. Each milestone represents a testable, independent component that builds upon the previous one, allowing for systematic validation before proceeding to the next stage.
 
 ### 10.1.1 Implementation Philosophy
 
@@ -10,20 +10,19 @@ This section provides a practical, milestone-based approach to implementing the 
 - **Incremental Development:** Build and test one component at a time
 - **Milestone-Based:** Each milestone is independently functional
 - **Test-First:** Validate each component before integration
-- **API-First:** Leverage Claude Sonnet 4.5 API for all intelligent processing
+- **Local-First:** Prioritize Mac Studio processing in every workflow
 - **Fail-Safe:** Include error handling from the beginning
 - **Observable:** Add logging and monitoring at each step
 
-### 10.1.2 n8n Architecture for v6.0
+### 10.1.2 n8n Architecture for v5.0
 
 ```
 n8n Instance (Render - $15-30/month)
 ├── Webhook Endpoints (Entry Points)
 ├── Workflow Engine (Orchestration)
 ├── Node Types:
-│   ├── Claude API Nodes (Primary Processing)
-│   ├── CrewAI Nodes (ESSENTIAL - Content Analysis)
-│   ├── Supabase Nodes (Unified Database + Vectors)
+│   ├── Mac Studio Nodes (Local Processing)
+│   ├── Cloud Service Nodes (Minimal Use)
 │   ├── Router Nodes (Intelligence)
 │   └── Utility Nodes (Support)
 └── Monitoring & Logging
@@ -130,20 +129,20 @@ Milestone_1_Workflow:
 - Response time <2 seconds
 - Error rate <1%
 
-## 10.3 Milestone 2: Claude API Document Processing
+## 10.3 Milestone 2: Mac Studio Local Processing Integration
 
 ### 10.3.1 Objectives
-- Integrate Claude Sonnet 4.5 API
-- Implement intelligent document processing
-- Set up batch processing for cost optimization
-- Enable prompt caching for efficiency
+- Connect to Mac Studio endpoints
+- Implement local LLM processing
+- Set up vision model integration
 - Create fallback mechanisms
+- Test local-first routing
 
 ### 10.3.2 n8n Workflow Components
 
 ```yaml
 Milestone_2_Workflow:
-  name: "Claude_API_Processing"
+  name: "Mac_Studio_Processing"
   
   nodes:
     1_receive_document:
@@ -161,60 +160,46 @@ Milestone_2_Workflow:
         
         return {
           ...items[0].json,
-          requiresHighPrivacy: hasPII || hasFinancial || hasHealthcare,
+          requiresLocal: hasPII || hasFinancial || hasHealthcare,
           privacyLevel: calculatePrivacyLevel(content)
         };
     
-    3_processing_router:
+    3_mac_studio_router:
       type: "n8n-nodes-base.if"
       conditions:
-        - requiresBatch: "{{$json.documents.length > 10}}"
-          route: "batch_processing"
+        - requiresLocal: true
+          route: "mac_studio_only"
         - else:
-          route: "real_time_processing"
+          route: "hybrid_processing"
     
-    4_claude_api_processing:
+    4_llama_processing:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "https://api.anthropic.com/v1/messages"
+        url: "http://mac-studio.local:8000/v1/completions"
         method: "POST"
         authentication: "apiKey"
-        sendHeaders: true
-        headerParameters:
-          "x-api-key": "{{$credentials.anthropicApi.apiKey}}"
-          "anthropic-version": "2023-06-01"
-          "anthropic-beta": "prompt-caching-2024-07-31"
         sendBody: true
         bodyParameters:
-          model: "claude-3-5-sonnet-20241022"
-          max_tokens: 4096
-          temperature: 0.3
-          system: "You are an expert document analyst. Extract structured data, categorize content, and generate summaries."
-          messages: [{
-            role: "user",
-            content: "{{$json.content}}"
-          }]
+          model: "llama-3.3-70b"
+          prompt: "{{$json.content}}"
+          temperature: 0.7
+          max_tokens: 2000
       options:
         timeout: 30000
         retry:
           maxTries: 3
-          waitBetweenTries: 2000
+          waitBetweenTries: 1000
     
-    5_claude_batch_processing:
+    5_qwen_vision:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "https://api.anthropic.com/v1/messages/batches"
+        url: "http://mac-studio.local:8000/v1/vision"
         method: "POST"
-        authentication: "apiKey"
-        sendHeaders: true
-        headerParameters:
-          "x-api-key": "{{$credentials.anthropicApi.apiKey}}"
-          "anthropic-version": "2023-06-01"
         sendBody: true
         bodyParameters:
-          requests: "{{$json.batchRequests}}"
-      options:
-        note: "Batch processing provides 90% cost savings"
+          model: "qwen2.5-vl-7b"
+          image: "{{$json.imageData}}"
+          prompt: "Analyze this image"
     
     6_mem_agent_store:
       type: "n8n-nodes-base.httpRequest"
@@ -226,66 +211,41 @@ Milestone_2_Workflow:
           content: "{{$json.processedContent}}"
           metadata: "{{$json.metadata}}"
     
-    7_cost_tracking:
-      type: "n8n-nodes-base.function"
-      code: |
-        // Track API costs with optimizations
-        const inputTokens = $json.usage.input_tokens;
-        const outputTokens = $json.usage.output_tokens;
-        const isBatch = $json.processing_type === 'batch';
-        const hasCaching = $json.cache_creation_input_tokens > 0;
-        
-        // Claude Sonnet 4.5 pricing (per million tokens)
-        const inputPrice = 3.00;   // $3/M tokens
-        const outputPrice = 15.00;  // $15/M tokens
-        
-        // Apply discounts
-        const batchDiscount = isBatch ? 0.1 : 1.0;  // 90% off for batch
-        const cacheDiscount = hasCaching ? 0.5 : 1.0; // 50% off for cached
-        
-        const cost = (
-          (inputTokens * inputPrice / 1000000) +
-          (outputTokens * outputPrice / 1000000)
-        ) * batchDiscount * cacheDiscount;
-        
-        return {
-          ...items[0].json,
-          cost_usd: cost,
-          savings: {
-            batch: isBatch ? cost * 9 : 0,  // Amount saved
-            cache: hasCaching ? cost : 0
-          }
-        };
+    7_fallback_handler:
+      type: "n8n-nodes-base.errorTrigger"
+      parameters:
+        errorWorkflow: true
+        continueOnFail: true
+        alternativeRoute: "hyperbolic_backup"
 ```
 
 ### 10.3.3 Testing Checklist
 
-- [ ] Test Claude API connectivity
-- [ ] Process document with Claude Sonnet 4.5
-- [ ] Verify batch processing for multiple documents
-- [ ] Test prompt caching effectiveness
+- [ ] Test Mac Studio connectivity
+- [ ] Process document with Llama 70B
+- [ ] Process image with Qwen-VL
 - [ ] Store memory with mem-agent
 - [ ] Test PII detection routing
-- [ ] Verify cost tracking accuracy
-- [ ] Monitor API response times
-- [ ] Check structured output generation
+- [ ] Verify local-only processing
+- [ ] Test fallback to cloud
+- [ ] Monitor token generation speed
+- [ ] Check memory usage
 - [ ] Validate error recovery
 
 ### 10.3.4 Success Criteria
 
-- Claude API integration working
-- Response time <3 seconds for single docs
-- Batch processing reduces costs by 90%
-- Prompt caching reduces costs by 50%
-- Structured JSON output consistent
-- Memory storage functional
-- Error handling robust
-- Monthly costs <$50 for AI processing
+- Mac Studio endpoints accessible
+- 32 tokens/second achieved
+- Vision processing functional
+- Memory storage working
+- Privacy routing accurate
+- Fallback mechanism tested
+- Local processing >95%
 
 ## 10.4 Milestone 3: Vector Storage and RAG Pipeline
 
 ### 10.4.1 Objectives
-- Generate embeddings with Claude or nomic-embed-text
+- Generate embeddings locally with nomic-embed-text (768 dimensions)
 - Store vectors in Supabase pgvector (unified database architecture)
 - Implement semantic search with HNSW indexing
 - Set up hybrid retrieval combining vector similarity with metadata filtering
@@ -299,7 +259,7 @@ Milestone_2_Workflow:
 - **Cost Effective**: No separate vector database service needed
 - **Unlimited Metadata**: Store rich JSONB metadata with each vector
 - **SQL Power**: Combine vector search with complex SQL queries and joins
-- **Perfect Integration**: Works seamlessly with n8n Postgres nodes
+- **Local-First Ready**: Perfect for Mac Studio embeddings → Supabase workflow
 
 **Setup Steps:**
 
@@ -390,20 +350,18 @@ Milestone_3_Workflow:
         
         return chunks;
     
-    3_generate_embeddings:
+    3_local_embeddings:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "https://api.nomic.ai/v1/embeddings"
+        url: "http://mac-studio.local:8000/v1/embeddings"
         method: "POST"
         sendBody: true
         bodyParameters:
-          model: "nomic-embed-text-v1.5"
+          model: "nomic-embed-text"
           input: "{{$json.chunks}}"
-          task_type: "search_document"
         options:
           batchSize: 100
           batchInterval: 100
-          note: "Can also use Claude embeddings if preferred"
     
     4_quality_scoring:
       type: "n8n-nodes-base.function"
@@ -464,12 +422,41 @@ Milestone_3_Workflow:
           match_count := 10,
           filter := '{{$json.metadataFilter}}'::jsonb
         );
+  
+    8_hierarchical_structure_extraction:
+    type: "n8n-nodes-base.function"
+    code: |
+      // Extract document hierarchy
+      const hierarchy = extractHeadings(text);
+      const chunkMapping = mapChunksToSections(chunks, hierarchy);
+      return {
+        hierarchy: hierarchy,
+        chunk_ranges: chunkMapping,
+        parent_child_relationships: buildRelationships(hierarchy)
+      };
+  
+    9_store_hierarchy:
+    type: "n8n-nodes-base.postgres"
+    operation: "insert"
+    table: "document_hierarchies"
+    columns:
+      - document_id
+      - hierarchical_index
+      - chunk_mappings
+  
+    10_context_expansion_edge_function:
+    type: "n8n-nodes-base.httpRequest"
+    parameters:
+      url: "{{$env.SUPABASE_URL}}/functions/v1/context-expansion"
+      method: "POST"
+      bodyParameters:
+        doc_id: "{{$json.document_id}}"
+        chunk_ranges: "{{$json.expansion_ranges}}"
 ```
-
 ### 10.4.4 Testing Checklist
 
 - [ ] Chunk document correctly with semantic overlap
-- [ ] Generate embeddings (768 dims)
+- [ ] Generate embeddings locally with nomic-embed-text (768 dims)
 - [ ] Calculate quality scores for each chunk
 - [ ] Store vectors in Supabase with metadata
 - [ ] Cache frequently accessed vectors
@@ -478,373 +465,74 @@ Milestone_3_Workflow:
 - [ ] Monitor embedding generation speed
 - [ ] Test metadata filtering with JSONB queries
 - [ ] Verify batch upsert performance
+- [ ] Check vector dimensions
+- [ ] Test batch processing
 
 ### 10.4.5 Success Criteria
 
-- Embeddings generated successfully
-- Vectors stored in Supabase pgvector
-- Semantic search returns relevant results
+- Embeddings generated locally with nomic-embed-text
+- Vectors stored successfully in Supabase
+- Semantic search returns highly relevant results
 - Quality scores provide meaningful ranking
 - Cache hit rate >60%
 - Retrieval latency <500ms (with HNSW index)
 - Batch processing handles 100+ vectors efficiently
-- Metadata filtering works seamlessly
+- Metadata filtering works seamlessly with vector search
 
-## 10.5 Milestone 4: Chat UI for Knowledge Base Query
+## 10.5 Milestone 4: Universal Content Analysis Workflow
 
 ### 10.5.1 Objectives
-- Deploy conversational chat interface
-- Connect to Supabase pgvector for RAG queries
-- Enable department agent selection
-- Implement streaming responses
-- Show source citations
-- Track costs and performance
+- Implement universal content analysis for ANY valuable content
+- Extract insights, workflows, and frameworks from diverse sources
+- Build comprehensive knowledge base from multiple content types
+- Enable multi-modal RAG system with enhanced capabilities
+- Create reusable patterns from the brightest minds
 
-### 10.5.2 Chat UI Architecture
+### 10.5.2 Content Types Handled
 
 ```yaml
-Chat_UI_Components:
-  Frontend:
-    - Framework: Gradio or Streamlit
-    - Features:
-      - Conversational interface
-      - Department selector
-      - File upload support
-      - Citation display
-      - Cost tracking
-      - Response metrics
+Content_Types:
+  Educational:
+    - Courses
+    - Tutorials
+    - Workshops
+    - Webinars
   
-  Backend:
-    - Framework: FastAPI
-    - Endpoints:
-      - /api/chat/query
-      - /api/chat/history
-      - /api/agents/list
-      - /api/metrics
-    
-  Integration:
-    - Supabase pgvector for retrieval
-    - Claude API for generation
-    - CrewAI for agent personas
-    - mem-agent for context
+  Documents:
+    - Research papers
+    - Whitepapers
+    - Case studies
+    - Reports
+  
+  Articles:
+    - Blog posts
+    - News articles
+    - Thought leadership pieces
+  
+  Media:
+    - Videos
+    - Podcasts
+    - Presentations
+    - TED talks
+  
+  Business:
+    - Frameworks
+    - Methodologies
+    - Best practices
+    - Playbooks
+  
+  Expertise:
+    - Expert interviews
+    - AMAs
+    - Conference talks
+  
+  Data:
+    - Datasets
+    - Analytics reports
+    - Market research
 ```
 
 ### 10.5.3 n8n Workflow Components
-
-```yaml
-Milestone_4_Workflow:
-  name: "Chat_UI_RAG_Pipeline"
-  
-  nodes:
-    1_chat_webhook:
-      type: "n8n-nodes-base.webhook"
-      parameters:
-        path: "chat-query"
-        method: "POST"
-        responseMode: "lastNode"
-        rawBody: false
-    
-    2_retrieve_context:
-      type: "n8n-nodes-base.httpRequest"
-      parameters:
-        url: "http://mac-studio.local:8001/memory/retrieve"
-        method: "POST"
-        bodyParameters:
-          query: "{{$json.question}}"
-          conversation_id: "{{$json.conversation_id}}"
-          max_tokens: 500
-    
-    3_vector_search:
-      type: "n8n-nodes-base.postgres"
-      operation: "executeQuery"
-      credentials: "supabase_postgres"
-      query: |
-        SELECT * FROM match_documents(
-          query_embedding := (
-            SELECT embedding FROM generate_embedding('{{$json.question}}')
-          ),
-          match_threshold := 0.7,
-          match_count := 5,
-          filter := '{"department": "{{$json.department}}"}'::jsonb
-        );
-    
-    4_prepare_prompt:
-      type: "n8n-nodes-base.function"
-      code: |
-        const context = $json.retrieved_chunks.map(chunk => 
-          `[Source: ${chunk.metadata.source}]\n${chunk.content}`
-        ).join('\n\n');
-        
-        const systemPrompt = getDepartmentPrompt($json.department);
-        
-        return {
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: `Context from knowledge base:\n${context}\n\nUser question: ${$json.question}`
-            }
-          ]
-        };
-    
-    5_claude_chat_response:
-      type: "n8n-nodes-base.httpRequest"
-      parameters:
-        url: "https://api.anthropic.com/v1/messages"
-        method: "POST"
-        authentication: "apiKey"
-        sendHeaders: true
-        headerParameters:
-          "x-api-key": "{{$credentials.anthropicApi.apiKey}}"
-          "anthropic-version": "2023-06-01"
-        sendBody: true
-        bodyParameters:
-          model: "claude-3-5-sonnet-20241022"
-          max_tokens: 2048
-          temperature: 0.7
-          system: "{{$json.system}}"
-          messages: "{{$json.messages}}"
-          stream: true
-    
-    6_format_response:
-      type: "n8n-nodes-base.function"
-      code: |
-        // Format response with citations
-        const response = $json.content;
-        const citations = $json.retrieved_chunks.map(chunk => ({
-          source: chunk.metadata.source,
-          page: chunk.metadata.page,
-          relevance: chunk.similarity
-        }));
-        
-        return {
-          answer: response,
-          citations: citations,
-          tokens_used: $json.usage,
-          cost_usd: calculateCost($json.usage),
-          response_time_ms: Date.now() - $json.start_time
-        };
-    
-    7_store_conversation:
-      type: "n8n-nodes-base.postgres"
-      operation: "insert"
-      table: "conversations"
-      columns:
-        - conversation_id
-        - user_id
-        - question
-        - answer
-        - department
-        - citations
-        - cost_usd
-        - created_at
-```
-
-### 10.5.4 Implementation Code
-
-```python
-# Gradio Chat Interface (chat_ui.py)
-import gradio as gr
-import requests
-from typing import List, Tuple
-import json
-
-class ChatInterface:
-    def __init__(self, n8n_webhook_url: str):
-        self.webhook_url = n8n_webhook_url
-        self.conversation_history = []
-    
-    def query_knowledge_base(
-        self, 
-        question: str, 
-        department: str, 
-        history: List[Tuple[str, str]]
-    ) -> Tuple[List[Tuple[str, str]], str]:
-        """Query the knowledge base via n8n webhook"""
-        
-        # Call n8n webhook
-        response = requests.post(
-            self.webhook_url,
-            json={
-                "question": question,
-                "department": department,
-                "conversation_id": self.get_conversation_id(),
-                "history": history
-            }
-        )
-        
-        result = response.json()
-        
-        # Format response with citations
-        answer = result['answer']
-        citations = "\n\n**Sources:**\n"
-        for cite in result.get('citations', []):
-            citations += f"- {cite['source']} (relevance: {cite['relevance']:.2f})\n"
-        
-        full_response = answer + citations
-        
-        # Update history
-        history.append((question, full_response))
-        
-        # Format metrics
-        metrics = f"""
-        **Metrics:**
-        - Response time: {result['response_time_ms']}ms
-        - Tokens used: {result['tokens_used']}
-        - Cost: ${result['cost_usd']:.4f}
-        """
-        
-        return history, metrics
-    
-    def get_conversation_id(self):
-        """Generate or retrieve conversation ID"""
-        import uuid
-        return str(uuid.uuid4())
-    
-    def launch(self):
-        """Launch Gradio interface"""
-        with gr.Blocks(title="Empire Knowledge Base Chat") as interface:
-            gr.Markdown("# AI Empire Knowledge Base Query System")
-            gr.Markdown("Query your ingested documents with department-specific context")
-            
-            with gr.Row():
-                with gr.Column(scale=3):
-                    chatbot = gr.Chatbot(
-                        value=[],
-                        height=500,
-                        label="Conversation"
-                    )
-                    
-                    with gr.Row():
-                        msg = gr.Textbox(
-                            label="Your Question",
-                            placeholder="Ask about your documents...",
-                            scale=4
-                        )
-                        department = gr.Dropdown(
-                            choices=["General", "Sales", "Marketing", "Finance", "Operations"],
-                            value="General",
-                            label="Department",
-                            scale=1
-                        )
-                    
-                    with gr.Row():
-                        submit = gr.Button("Submit", variant="primary")
-                        clear = gr.Button("Clear")
-                
-                with gr.Column(scale=1):
-                    metrics = gr.Markdown("**Metrics will appear here**")
-                    
-                    gr.Markdown("### Quick Actions")
-                    example_queries = gr.Examples(
-                        examples=[
-                            ["What are our key sales strategies?", "Sales"],
-                            ["Show me marketing frameworks", "Marketing"],
-                            ["What are the financial best practices?", "Finance"],
-                            ["List operational workflows", "Operations"]
-                        ],
-                        inputs=[msg, department]
-                    )
-            
-            # Event handlers
-            submit.click(
-                fn=self.query_knowledge_base,
-                inputs=[msg, department, chatbot],
-                outputs=[chatbot, metrics]
-            )
-            
-            msg.submit(
-                fn=self.query_knowledge_base,
-                inputs=[msg, department, chatbot],
-                outputs=[chatbot, metrics]
-            )
-            
-            clear.click(
-                fn=lambda: ([], "**Metrics will appear here**"),
-                outputs=[chatbot, metrics]
-            )
-        
-        interface.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
-            share=False
-        )
-
-# Deploy on Render
-if __name__ == "__main__":
-    n8n_webhook = "https://your-n8n-instance.onrender.com/webhook/chat-query"
-    chat = ChatInterface(n8n_webhook)
-    chat.launch()
-```
-
-### 10.5.5 Testing Checklist
-
-- [ ] Deploy Chat UI on Render
-- [ ] Test connection to n8n webhook
-- [ ] Query single document successfully
-- [ ] Test department agent selection
-- [ ] Verify source citations display
-- [ ] Check response streaming
-- [ ] Monitor cost tracking
-- [ ] Test conversation history
-- [ ] Verify multi-turn conversations
-- [ ] Load test with concurrent users
-
-### 10.5.6 Success Criteria
-
-- Chat UI accessible and responsive
-- Questions answered accurately from knowledge base
-- Citations provided for all answers
-- Department context working correctly
-- Response time <3 seconds
-- Cost tracking accurate
-- Conversation history maintained
-- Supports 10+ concurrent users
-
-## 10.6 Milestone 5: Universal Content Analysis with CrewAI (ESSENTIAL)
-
-### 10.6.1 Objectives
-- Implement CrewAI Content Analyzer Agent (NOT OPTIONAL)
-- Extract insights, workflows, and frameworks from courses
-- Map content to department applications
-- Generate comprehensive documentation
-- Build knowledge graph relationships
-
-### 10.6.2 Why CrewAI is ESSENTIAL
-
-**CrewAI is the intelligence layer that:**
-- Analyzes ALL ingested content
-- Generates course documentation
-- Identifies department-specific applications
-- Creates implementation roadmaps
-- Extracts frameworks and best practices
-- **Without it, documents are just stored, not understood**
-
-### 10.6.3 CrewAI Content Analyzer Components
-
-```yaml
-CrewAI_Content_Analyzer:
-  status: ESSENTIAL
-  cost: "$15-20/month"
-  deployment: "https://jb-crewai.onrender.com"
-  
-  primary_agent:
-    name: "Content Analyzer"
-    role: "Universal content analysis and documentation"
-    capabilities:
-      - Module-by-module summaries
-      - Framework extraction
-      - Workflow identification
-      - Department mapping
-      - Implementation guides
-      - Insight extraction
-    
-  future_agents_v2:
-    - Sales Department Agent
-    - Marketing Department Agent
-    - Finance Department Agent
-    - Operations Department Agent
-```
 
 #### Node 9: CrewAI Universal Content Analysis
 
@@ -898,90 +586,1477 @@ CrewAI_Universal_Analysis:
         backstory: "Translates theoretical knowledge into executable strategies"
 ```
 
-[Continue with remaining Universal Content Analysis nodes from original Section 10...]
+#### Node 10: Universal Content Documentation Generator
 
-## 10.7 Milestone 6: Multi-Agent Orchestration
+```javascript
+// Universal Content Documentation Generator
+const crewAIAnalysis = $json;
+const originalData = $node['File Type Detection & Routing'].json;
+const llamaData = $node['LlamaIndex Response Processor'].json;
 
-[Keep existing content but ensure CrewAI is marked as ESSENTIAL throughout]
+// Determine content type and structure documentation
+const contentType = detectContentType(originalData);
+const expertiseLevel = assessExpertiseLevel(crewAIAnalysis);
 
-## 10.8 Milestone 7: Cost Tracking and Optimization
+function detectContentType(data) {
+  const filename = data.filename?.toLowerCase() || '';
+  const extension = data.fileExtension;
+  const content = crewAIAnalysis.content_analysis?.type;
+  
+  if (filename.includes('course') || filename.includes('tutorial')) return 'educational';
+  if (filename.includes('paper') || filename.includes('research')) return 'research';
+  if (filename.includes('blog') || filename.includes('article')) return 'article';
+  if (extension === '.mp4' || extension === '.mp3') return 'media';
+  if (content?.includes('framework')) return 'framework';
+  return 'general_knowledge';
+}
 
-### 10.8.1 Objectives
+function assessExpertiseLevel(analysis) {
+  const complexity = analysis.complexity_score || 5;
+  if (complexity >= 8) return 'expert';
+  if (complexity >= 5) return 'intermediate';
+  return 'foundational';
+}
+
+// Generate universal documentation structure
+const contentDocumentation = {
+  // 1. Content Identification
+  identification: {
+    title: crewAIAnalysis.extracted_title || originalData.filename.replace(/\.[^/.]+$/, ""),
+    type: contentType,
+    source: originalData.source || 'direct_upload',
+    author: crewAIAnalysis.identified_author || 'Unknown',
+    expertise_level: expertiseLevel,
+    processing_date: new Date().toISOString(),
+    original_format: originalData.fileExtension,
+    content_category: originalData.course || 'General Knowledge',
+    tags: crewAIAnalysis.auto_tags || []
+  },
+  
+  // 2. Executive Summary
+  summary: {
+    one_line: crewAIAnalysis.one_line_summary || "Content analysis pending",
+    executive_summary: crewAIAnalysis.executive_summary || "",
+    key_message: crewAIAnalysis.core_message || "",
+    target_audience: crewAIAnalysis.target_audience || "General",
+    value_proposition: crewAIAnalysis.value_prop || "",
+    estimated_implementation_time: crewAIAnalysis.implementation_estimate || "Variable"
+  },
+  
+  // 3. Key Insights & Innovations
+  insights: {
+    breakthrough_ideas: (crewAIAnalysis.breakthrough_ideas || []).map(idea => ({
+      concept: idea.concept,
+      description: idea.description,
+      novelty_score: idea.novelty || 5,
+      impact_potential: idea.impact || 'Medium',
+      implementation_difficulty: idea.difficulty || 'Medium'
+    })),
+    
+    key_insights: (crewAIAnalysis.key_insights || []).map(insight => ({
+      insight: insight.text,
+      category: insight.category || 'General',
+      confidence: insight.confidence || 0.7,
+      supporting_evidence: insight.evidence || [],
+      applications: insight.applications || []
+    })),
+    
+    counterintuitive_findings: crewAIAnalysis.counterintuitive || [],
+    paradigm_shifts: crewAIAnalysis.paradigm_shifts || []
+  },
+  
+  // 4. Extracted Workflows & Processes
+  workflows: {
+    identified_workflows: (crewAIAnalysis.workflows || []).map(workflow => ({
+      name: workflow.name,
+      description: workflow.description,
+      steps: workflow.steps || [],
+      tools_required: workflow.tools || [],
+      estimated_time: workflow.time_estimate || "Not specified",
+      automation_potential: workflow.automation_score || 5,
+      departments: workflow.applicable_departments || ['All']
+    })),
+    
+    process_improvements: crewAIAnalysis.process_improvements || [],
+    automation_opportunities: crewAIAnalysis.automation_opportunities || [],
+    integration_points: crewAIAnalysis.integration_points || []
+  },
+  
+  // 5. Frameworks & Mental Models
+  frameworks: {
+    mental_models: (crewAIAnalysis.mental_models || []).map(model => ({
+      name: model.name,
+      description: model.description,
+      application_examples: model.examples || [],
+      when_to_use: model.use_cases || [],
+      limitations: model.limitations || []
+    })),
+    
+    decision_frameworks: crewAIAnalysis.decision_frameworks || [],
+    problem_solving_methods: crewAIAnalysis.problem_solving || [],
+    strategic_frameworks: crewAIAnalysis.strategic_frameworks || []
+  },
+  
+  // 6. Practical Applications
+  applications: {
+    immediate_applications: (crewAIAnalysis.immediate_applications || []).map(app => ({
+      application: app.description,
+      department: app.department || 'General',
+      effort_required: app.effort || 'Medium',
+      expected_impact: app.impact || 'Medium',
+      prerequisites: app.prerequisites || []
+    })),
+    
+    long_term_opportunities: crewAIAnalysis.long_term_opportunities || [],
+    cross_functional_applications: crewAIAnalysis.cross_functional || [],
+    innovation_opportunities: crewAIAnalysis.innovation_opportunities || []
+  },
+  
+  // 7. Expert Knowledge & Attribution
+  expertise: {
+    identified_experts: (crewAIAnalysis.experts || []).map(expert => ({
+      name: expert.name,
+      credentials: expert.credentials || [],
+      key_contributions: expert.contributions || [],
+      notable_quotes: expert.quotes || [],
+      follow_up_resources: expert.resources || []
+    })),
+    
+    citations: crewAIAnalysis.citations || [],
+    referenced_works: crewAIAnalysis.references || [],
+    recommended_further_reading: crewAIAnalysis.further_reading || []
+  },
+  
+  // 8. Data Points & Metrics
+  data: {
+    key_statistics: crewAIAnalysis.statistics || [],
+    benchmarks: crewAIAnalysis.benchmarks || [],
+    case_study_results: crewAIAnalysis.case_studies || [],
+    roi_examples: crewAIAnalysis.roi_examples || [],
+    success_metrics: crewAIAnalysis.success_metrics || []
+  },
+  
+  // 9. Implementation Guide
+  implementation: {
+    quick_wins: (crewAIAnalysis.quick_wins || []).map(win => ({
+      action: win.action,
+      effort: win.effort || 'Low',
+      impact: win.impact || 'Medium',
+      timeline: win.timeline || '1 week'
+    })),
+    
+    phased_approach: crewAIAnalysis.implementation_phases || [],
+    required_resources: crewAIAnalysis.resources_needed || [],
+    potential_obstacles: crewAIAnalysis.obstacles || [],
+    success_criteria: crewAIAnalysis.success_criteria || []
+  },
+  
+  // 10. Knowledge Graph Connections
+  connections: {
+    related_concepts: crewAIAnalysis.related_concepts || [],
+    prerequisite_knowledge: crewAIAnalysis.prerequisites || [],
+    builds_upon: crewAIAnalysis.builds_upon || [],
+    enables: crewAIAnalysis.enables || [],
+    contradicts: crewAIAnalysis.contradicts || [],
+    complements: crewAIAnalysis.complements || []
+  },
+  
+  // 11. Quality & Relevance Assessment
+  assessment: {
+    credibility_score: crewAIAnalysis.credibility || 7,
+    relevance_score: crewAIAnalysis.relevance || 7,
+    innovation_score: crewAIAnalysis.innovation || 5,
+    practicality_score: crewAIAnalysis.practicality || 7,
+    completeness: crewAIAnalysis.completeness || 0.8,
+    recommendation: crewAIAnalysis.recommendation || "Add to knowledge base",
+    priority_level: crewAIAnalysis.priority || 'Medium'
+  },
+  
+  // 12. Navigation & Reference
+  navigation: {
+    content_structure: crewAIAnalysis.structure_outline || [],
+    key_sections: crewAIAnalysis.key_sections || [],
+    timestamps: crewAIAnalysis.timestamps || [],
+    visual_elements: crewAIAnalysis.visual_descriptions || [],
+    searchable_topics: crewAIAnalysis.topics || []
+  }
+};
+
+// Generate storage paths based on content type
+const generateStoragePath = (type, category) => {
+  const basePath = {
+    'educational': 'courses',
+    'research': 'research-papers',
+    'article': 'articles',
+    'media': 'media-content',
+    'framework': 'frameworks',
+    'general_knowledge': 'knowledge-base'
+  };
+  
+  return `/${basePath[type] || 'general'}/${category}/${Date.now()}_analysis`;
+};
+
+return {
+  documentation: contentDocumentation,
+  filename: `${contentType}_${Date.now()}.json`,
+  storage_instructions: {
+    backblaze_path: generateStoragePath(contentType, contentDocumentation.identification.content_category),
+    pinecone_vectors: true,
+    supabase_metadata: true,
+    priority: contentDocumentation.assessment.priority_level
+  },
+  rag_enhancement: {
+    adds_new_capability: crewAIAnalysis.new_capabilities || [],
+    strengthens_areas: crewAIAnalysis.strengthened_areas || [],
+    fills_knowledge_gaps: crewAIAnalysis.gap_filling || []
+  }
+};
+```
+
+#### Node 11: Knowledge Base Enrichment
+
+```javascript
+// Knowledge Base Enrichment - Enhance RAG system
+const analysis = $json;
+
+// Determine how this content enriches the RAG system
+const ragEnrichment = {
+  // Knowledge Graph Updates
+  new_entities: extractEntities(analysis.documentation),
+  new_relationships: extractRelationships(analysis.documentation),
+  
+  // Capability Expansion
+  new_workflows: analysis.documentation.workflows.identified_workflows.length,
+  new_frameworks: analysis.documentation.frameworks.mental_models.length,
+  new_insights: analysis.documentation.insights.key_insights.length,
+  
+  // Quality Metrics
+  knowledge_quality: analysis.documentation.assessment.credibility_score,
+  implementation_value: analysis.documentation.assessment.practicality_score,
+  innovation_level: analysis.documentation.assessment.innovation_score,
+  
+  // RAG System Impact
+  enhances_departments: identifyDepartmentImpact(analysis.documentation),
+  adds_expertise_in: identifyExpertiseAreas(analysis.documentation),
+  enables_new_queries: identifyNewQueryCapabilities(analysis.documentation)
+};
+
+function extractEntities(doc) {
+  const entities = [];
+  
+  // Extract experts as entities
+  doc.expertise.identified_experts.forEach(expert => {
+    entities.push({
+      type: 'person',
+      name: expert.name,
+      role: 'expert',
+      expertise: expert.credentials
+    });
+  });
+  
+  // Extract frameworks as entities
+  doc.frameworks.mental_models.forEach(model => {
+    entities.push({
+      type: 'framework',
+      name: model.name,
+      category: 'mental_model'
+    });
+  });
+  
+  // Extract workflows as entities
+  doc.workflows.identified_workflows.forEach(workflow => {
+    entities.push({
+      type: 'workflow',
+      name: workflow.name,
+      automation_potential: workflow.automation_potential
+    });
+  });
+  
+  return entities;
+}
+
+function extractRelationships(doc) {
+  const relationships = [];
+  
+  // Connect concepts
+  doc.connections.related_concepts.forEach(concept => {
+    relationships.push({
+      type: 'relates_to',
+      source: doc.identification.title,
+      target: concept
+    });
+  });
+  
+  // Prerequisites
+  doc.connections.prerequisite_knowledge.forEach(prereq => {
+    relationships.push({
+      type: 'requires',
+      source: doc.identification.title,
+      target: prereq
+    });
+  });
+  
+  return relationships;
+}
+
+function identifyDepartmentImpact(doc) {
+  const departments = new Set();
+  
+  doc.workflows.identified_workflows.forEach(workflow => {
+    workflow.departments.forEach(dept => departments.add(dept));
+  });
+  
+  doc.applications.immediate_applications.forEach(app => {
+    departments.add(app.department);
+  });
+  
+  return Array.from(departments);
+}
+
+function identifyExpertiseAreas(doc) {
+  return [
+    ...doc.identification.tags,
+    ...doc.navigation.searchable_topics
+  ].filter(unique);
+}
+
+function identifyNewQueryCapabilities(doc) {
+  return [
+    `How to implement ${doc.identification.title}`,
+    `What are the best practices for ${doc.summary.key_message}`,
+    `Show me workflows related to ${doc.identification.tags.join(', ')}`,
+    `What frameworks apply to ${doc.identification.content_category}`
+  ];
+}
+
+function unique(value, index, self) {
+  return self.indexOf(value) === index;
+}
+
+return {
+  rag_enrichment: ragEnrichment,
+  notification: {
+    message: `New ${analysis.documentation.identification.type} content added to RAG system`,
+    title: analysis.documentation.identification.title,
+    quality: analysis.documentation.assessment.credibility_score,
+    new_capabilities: ragEnrichment.new_workflows + ragEnrichment.new_frameworks,
+    priority: analysis.documentation.assessment.priority_level
+  }
+};
+```
+
+#### Node 12: Store Analysis in Backblaze B2
+
+```javascript
+// Store Processed Analysis in Backblaze B2
+const analysis = $node['Universal Content Documentation Generator'].json;
+const enrichment = $node['Knowledge Base Enrichment'].json;
+const originalFile = $node['File Type Detection & Routing'].json;
+
+// Generate structured folder path
+const generateB2Path = (doc) => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  // Structure: /processed/{content_type}/{year}/{month}/{day}/{filename}
+  const contentType = doc.documentation.identification.type;
+  const originalName = doc.documentation.identification.title
+    .replace(/[^a-z0-9]/gi, '_')
+    .toLowerCase();
+  
+  return `processed/${contentType}/${year}/${month}/${day}/${originalName}_${Date.now()}`;
+};
+
+// Prepare complete analysis document
+const completeAnalysis = {
+  // Metadata
+  metadata: {
+    processed_date: new Date().toISOString(),
+    original_filename: originalFile.filename,
+    content_category: analysis.documentation.identification.content_category,
+    processing_version: "v1.0",
+    storage_location: "backblaze_b2"
+  },
+  
+  // Full Analysis
+  analysis: analysis.documentation,
+  
+  // RAG Enhancement Details
+  rag_impact: enrichment.rag_enrichment,
+  
+  // Storage Instructions
+  storage: analysis.storage_instructions,
+  
+  // Processing Stats
+  stats: {
+    insights_extracted: analysis.documentation.insights.key_insights.length,
+    workflows_identified: analysis.documentation.workflows.identified_workflows.length,
+    frameworks_found: analysis.documentation.frameworks.mental_models.length,
+    experts_identified: analysis.documentation.expertise.identified_experts.length,
+    quality_score: analysis.documentation.assessment.credibility_score,
+    priority: analysis.documentation.assessment.priority_level
+  }
+};
+
+// Generate filenames for different formats
+const basePath = generateB2Path(analysis);
+const files = [
+  {
+    path: `${basePath}/analysis.json`,
+    content: JSON.stringify(completeAnalysis, null, 2),
+    type: 'application/json'
+  },
+  {
+    path: `${basePath}/summary.md`,
+    content: generateMarkdownSummary(completeAnalysis),
+    type: 'text/markdown'
+  },
+  {
+    path: `${basePath}/insights.json`,
+    content: JSON.stringify(analysis.documentation.insights, null, 2),
+    type: 'application/json'
+  }
+];
+
+// Helper function to generate markdown summary
+function generateMarkdownSummary(data) {
+  const doc = data.analysis;
+  return `# ${doc.identification.title}
+
+## Executive Summary
+${doc.summary.executive_summary}
+
+### Key Message
+${doc.summary.key_message}
+
+## Top Insights
+${doc.insights.key_insights.slice(0, 5).map(i => `- ${i.insight}`).join('\n')}
+
+## Identified Workflows
+${doc.workflows.identified_workflows.map(w => `- **${w.name}**: ${w.description}`).join('\n')}
+
+## Frameworks & Mental Models
+${doc.frameworks.mental_models.map(m => `- **${m.name}**: ${m.description}`).join('\n')}
+
+## Quick Wins
+${doc.implementation.quick_wins.map(w => `- ${w.action} (${w.effort} effort, ${w.impact} impact)`).join('\n')}
+
+## Quality Assessment
+- Credibility: ${doc.assessment.credibility_score}/10
+- Relevance: ${doc.assessment.relevance_score}/10
+- Innovation: ${doc.assessment.innovation_score}/10
+- Practicality: ${doc.assessment.practicality_score}/10
+
+## Processing Details
+- Date: ${data.metadata.processed_date}
+- Original File: ${data.metadata.original_filename}
+- Category: ${doc.identification.content_category}
+- Priority: ${doc.assessment.priority_level}
+`;
+}
+
+return files;
+```
+
+#### Node 13: Backblaze B2 Upload
+
+```yaml
+B2_Storage:
+  type: "n8n-nodes-base.s3"
+  name: "Save to Backblaze B2"
+  parameters:
+    bucketName: "ai-empire-documents"
+    operation: "upload"
+    
+    # For each file from Node 12
+    fileName: "{{$json.path}}"
+    fileContent: "{{$json.content}}"
+    
+    additionalFields:
+      acl: "private"
+      storageClass: "STANDARD"
+      serverSideEncryption: "AES256"
+      
+      metadata:
+        processed_date: "{{$now.toISO()}}"
+        content_type: "{{$json.type}}"
+        analysis_version: "v1.0"
+        quality_score: "{{$node['Universal Content Documentation Generator'].json.documentation.assessment.credibility_score}}"
+        
+      tags:
+        - Key: "content_type"
+          Value: "{{$node['File Type Detection & Routing'].json.contentCategory}}"
+        - Key: "processing_status"
+          Value: "completed"
+        - Key: "priority"
+          Value: "{{$node['Universal Content Documentation Generator'].json.documentation.assessment.priority_level}}"
+```
+
+#### Node 14: Update Processing Log
+
+```javascript
+// Log successful processing to database
+const b2Results = items;
+const analysis = $node['Universal Content Documentation Generator'].json;
+
+const logEntry = {
+  // Processing Record
+  document_id: $node['File Type Detection & Routing'].json.hash || generateDocumentId(),
+  processed_timestamp: new Date().toISOString(),
+  
+  // Storage Locations
+  b2_paths: b2Results.map(r => r.json.path),
+  pinecone_namespace: analysis.storage_instructions.pinecone_vectors ? 'course_vectors' : null,
+  supabase_record_id: null, // Will be set if stored in Supabase
+  
+  // Analysis Summary
+  content_type: analysis.documentation.identification.type,
+  content_category: analysis.documentation.identification.content_category,
+  title: analysis.documentation.identification.title,
+  author: analysis.documentation.identification.author,
+  
+  // Metrics
+  insights_count: analysis.documentation.insights.key_insights.length,
+  workflows_count: analysis.documentation.workflows.identified_workflows.length,
+  frameworks_count: analysis.documentation.frameworks.mental_models.length,
+  quality_score: analysis.documentation.assessment.credibility_score,
+  
+  // Status
+  processing_status: 'completed',
+  processing_time_ms: Date.now() - $node['webhook_intake'].json.timestamp,
+  errors: [],
+  
+  // RAG Impact
+  new_capabilities_added: $node['Knowledge Base Enrichment'].json.rag_enrichment.new_workflows + 
+                          $node['Knowledge Base Enrichment'].json.rag_enrichment.new_frameworks,
+  departments_impacted: $node['Knowledge Base Enrichment'].json.rag_enrichment.enhances_departments
+};
+
+function generateDocumentId() {
+  return `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+return logEntry;
+```
+
+### 10.5.4 Testing Checklist
+
+- [ ] Process educational content (course, tutorial)
+- [ ] Process research paper or whitepaper
+- [ ] Process blog post or article
+- [ ] Process video or podcast
+- [ ] Process business framework
+- [ ] Extract insights successfully
+- [ ] Identify workflows and processes
+- [ ] Extract frameworks and mental models
+- [ ] Generate implementation guide
+- [ ] Store in appropriate locations
+- [ ] Verify knowledge graph updates
+- [ ] Test RAG enhancement
+- [ ] Verify Backblaze B2 storage structure
+- [ ] Check processing logs in database
+- [ ] Validate markdown summary generation
+
+### 10.5.5 Success Criteria
+
+- Content type correctly identified
+- Key insights extracted (>5 per document)
+- Workflows identified and documented
+- Frameworks extracted and categorized
+- Expert knowledge attributed
+- Implementation guide generated
+- Knowledge graph enriched
+- RAG capabilities enhanced
+- Quality scores accurate
+- Processing time <3 minutes
+- Files stored in correct B2 structure
+- All formats (JSON, Markdown) generated
+- Database logs complete and accurate
+
+### 10.5.6 Implementation Benefits
+
+**Content Diversity:**
+- Handles ANY valuable content type
+- Adapts to different formats automatically
+- Extracts value from all sources
+
+**Knowledge Extraction:**
+- Breakthrough ideas and innovations
+- Actionable workflows
+- Reusable frameworks
+- Expert attribution
+- Data-driven insights
+
+**RAG Enhancement:**
+- Builds comprehensive knowledge base
+- Creates entity relationships
+- Enables new query types
+- Maps to department needs
+- Prioritizes high-value content
+
+**Storage Organization:**
+- Date-based folder structure in Backblaze B2
+- Content type categorization
+- Multiple output formats for flexibility
+- Complete processing audit trail
+- Easy retrieval and browsing
+
+**Practical Value:**
+- Quick wins for immediate implementation
+- Phased approaches for complex changes
+- Resource requirements clearly defined
+- Success criteria established
+- ROI examples provided
+
+## 10.6 Milestone 5: Multi-Agent Orchestration
+
+### 10.6.1 Objectives
+- Set up CrewAI integration
+- Implement agent coordination
+- Create analysis workflows
+- Test multi-agent tasks
+- Monitor agent performance
+
+### 10.6.2 n8n Workflow Components
+
+```yaml
+Milestone_5_Workflow:
+  name: "Multi_Agent_Analysis"
+  
+  nodes:
+    1_analysis_trigger:
+      type: "n8n-nodes-base.webhook"
+      parameters:
+        path: "analyze-document"
+        method: "POST"
+    
+    2_retrieve_context:
+      type: "n8n-nodes-base.executeWorkflow"
+      workflowId: "milestone_3_retrieval"
+      parameters:
+        documentId: "{{$json.documentId}}"
+        topK: 20
+    
+    3_agent_task_definition:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Define agent tasks based on document type
+        const docType = $json.documentType;
+        const tasks = [];
+        
+        if (docType === 'financial') {
+          tasks.push({
+            agent: 'financial_analyst',
+            task: 'analyze_trends',
+            priority: 1
+          });
+        }
+        
+        if (docType === 'technical') {
+          tasks.push({
+            agent: 'technical_reviewer',
+            task: 'code_review',
+            priority: 2
+          });
+        }
+        
+        tasks.push({
+          agent: 'summarizer',
+          task: 'create_summary',
+          priority: 3
+        });
+        
+        return tasks;
+    
+    4_crew_ai_orchestration:
+      type: "n8n-nodes-base.httpRequest"
+      parameters:
+        url: "https://crewai.onrender.com/api/crew/execute"
+        method: "POST"
+        sendBody: true
+        bodyParameters:
+          crew_id: "ai-empire-crew"
+          tasks: "{{$json.tasks}}"
+          context: "{{$json.context}}"
+          max_agents: 5
+          timeout: 300000
+    
+    5_local_agent_processing:
+      type: "n8n-nodes-base.httpRequest"
+      parameters:
+        url: "http://mac-studio.local:8000/v1/agent"
+        method: "POST"
+        bodyParameters:
+          model: "llama-3.3-70b"
+          agent_type: "{{$json.agent}}"
+          task: "{{$json.task}}"
+          context: "{{$json.context}}"
+    
+    6_aggregate_results:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Aggregate results from all agents
+        const results = items.map(item => item.json);
+        
+        return {
+          documentId: $json.documentId,
+          timestamp: new Date().toISOString(),
+          agents: results.map(r => r.agent),
+          findings: mergeFindngs(results),
+          recommendations: extractRecommendations(results),
+          summary: generateExecutiveSummary(results)
+        };
+    
+    7_store_analysis:
+      type: "n8n-nodes-base.postgres"
+      operation: "insert"
+      table: "document_analysis"
+      columns:
+        - document_id
+        - analysis_timestamp
+        - agent_results
+        - recommendations
+        - summary
+```
+
+### 10.6.3 Testing Checklist
+
+- [ ] Define agent tasks
+- [ ] Test CrewAI connectivity
+- [ ] Execute multi-agent workflow
+- [ ] Test local agent processing
+- [ ] Verify result aggregation
+- [ ] Monitor agent coordination
+- [ ] Test timeout handling
+- [ ] Check result quality
+- [ ] Measure processing time
+- [ ] Validate recommendations
+
+### 10.6.4 Success Criteria
+
+- Agents coordinate effectively
+- Tasks completed successfully
+- Results properly aggregated
+- Local agents functional
+- Processing time <5 minutes
+- Quality insights generated
+- Error handling robust
+
+## 10.7 Milestone 6: Cost Tracking and Optimization
+
+### 10.7.1 Objectives
 - Implement cost monitoring
 - Track API usage
 - Optimize routing decisions
 - Generate cost reports
 - Alert on budget thresholds
 
-### 10.8.2 Updated Cost Tracking for v6.0
+### 10.7.2 n8n Workflow Components
 
 ```yaml
-Milestone_7_Workflow:
+Milestone_6_Workflow:
   name: "Cost_Optimization_Tracking"
   
   nodes:
     1_cost_interceptor:
       type: "n8n-nodes-base.function"
-      description: "Track all API calls for cost tracking"
+      description: "Intercept all API calls for cost tracking"
       code: |
         // Track every API call
         const operation = $json.operation;
         const service = $json.service;
         
         const costs = {
-          'claude_api': 0.003 * $json.input_tokens / 1000 + 0.015 * $json.output_tokens / 1000,
-          'claude_batch': 0.0003 * $json.input_tokens / 1000 + 0.0015 * $json.output_tokens / 1000,
+          'hyperbolic_llm': 0.0005 * $json.tokens / 1000,
           'mistral_ocr': 0.01 * $json.pages,
           'soniox': 0.05 * $json.minutes,
-          'supabase_vector': 0, // Included in $25/month
-          'crewai': 0, // Fixed $15-20/month
-          'mem_agent': 0  // Local on Mac Studio
+          'pinecone': 0.00001 * $json.vectors,
+          'local_llama': 0, // FREE!
+          'local_qwen': 0,  // FREE!
+          'local_embed': 0  // FREE!
         };
         
         return {
           ...items[0].json,
           cost: costs[service] || 0,
-          optimizations: {
-            batch_savings: $json.is_batch ? costs['claude_api'] * 0.9 : 0,
-            cache_savings: $json.cached_tokens * 0.0015 / 1000
-          }
+          savedVsCloud: calculateSavings(service, operation)
         };
+    
+    2_cost_aggregator:
+      type: "n8n-nodes-base.postgres"
+      operation: "insert"
+      table: "cost_tracking"
+      columns:
+        - timestamp
+        - service
+        - operation
+        - cost
+        - saved_amount
+        - document_id
+        - workflow_id
+    
+    3_daily_cost_check:
+      type: "n8n-nodes-base.postgres"
+      operation: "executeQuery"
+      query: |
+        SELECT 
+          DATE(timestamp) as date,
+          SUM(cost) as daily_cost,
+          SUM(saved_amount) as daily_savings
+        FROM cost_tracking
+        WHERE DATE(timestamp) = CURRENT_DATE
+        GROUP BY DATE(timestamp)
+    
+    4_budget_alert:
+      type: "n8n-nodes-base.if"
+      conditions:
+        - expression: "{{$json.daily_cost > 6.50}}"
+          output: "send_alert"
+    
+    5_optimization_router:
+      type: "n8n-nodes-base.switch"
+      rules:
+        - rule: "budget_ok"
+          condition: "{{$json.monthly_spend < 150}}"
+          route: "normal_processing"
+        - rule: "budget_warning"
+          condition: "{{$json.monthly_spend < 180}}"
+          route: "prefer_local"
+        - rule: "budget_critical"
+          condition: "{{$json.monthly_spend >= 180}}"
+          route: "local_only"
+    
+    6_roi_calculator:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Calculate ROI metrics
+        const macStudioCost = 3999;
+        const monthlyCloudSavings = $json.total_savings;
+        const monthsElapsed = $json.months_since_purchase;
+        
+        return {
+          totalSaved: monthlyCloudSavings * monthsElapsed,
+          roiPercentage: (monthlyCloudSavings * monthsElapsed / macStudioCost) * 100,
+          paybackRemaining: Math.max(0, macStudioCost - (monthlyCloudSavings * monthsElapsed)),
+          projectedPaybackMonths: macStudioCost / monthlyCloudSavings
+        };
+    
+    7_cost_report:
+      type: "n8n-nodes-base.emailSend"
+      parameters:
+        toEmail: "admin@example.com"
+        subject: "Daily Cost Report - {{$today}}"
+        emailType: "html"
+        message: |
+          <h2>AI Empire Cost Report</h2>
+          <p>Date: {{$json.date}}</p>
+          <p>Daily Cost: ${{$json.daily_cost}}</p>
+          <p>Daily Savings: ${{$json.daily_savings}}</p>
+          <p>Monthly Total: ${{$json.monthly_total}}</p>
+          <p>ROI Progress: {{$json.roi_percentage}}%</p>
 ```
 
-### 10.8.3 Success Criteria
+### 10.7.3 Testing Checklist
+
+- [ ] Track API calls accurately
+- [ ] Calculate costs correctly
+- [ ] Monitor local vs cloud ratio
+- [ ] Test budget alerts
+- [ ] Verify optimization routing
+- [ ] Calculate ROI metrics
+- [ ] Generate daily reports
+- [ ] Test cost aggregation
+- [ ] Monitor savings tracking
+- [ ] Validate thresholds
+
+### 10.7.4 Success Criteria
 
 - All costs tracked accurately
 - Budget alerts functional
-- Monthly costs <$165 (updated for v6.0)
-- Batch processing achieving 90% savings
-- Cache effectiveness >50%
+- ROI calculated correctly
+- Reports generated daily
+- Optimization routing works
+- Monthly costs <$195
+- Local processing >98%
+- Savings visible
 
-[Continue with remaining milestones 8-14 from original, keeping all content but ensuring no Llama references remain]
+## 10.8 Milestone 7: Error Handling and Recovery
+
+### 10.8.1 Objectives
+- Implement comprehensive error handling
+- Create recovery workflows
+- Set up circuit breakers
+- Build retry mechanisms
+- Test disaster scenarios
+
+### 10.8.2 n8n Workflow Components
+
+```yaml
+Milestone_7_Workflow:
+  name: "Error_Recovery_System"
+  
+  nodes:
+    1_error_catcher:
+      type: "n8n-nodes-base.errorTrigger"
+      parameters:
+        errorWorkflow: true
+    
+    2_error_classifier:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Classify error types
+        const error = $json.error;
+        
+        const errorTypes = {
+          'ECONNREFUSED': 'network_error',
+          'ETIMEDOUT': 'timeout',
+          'ENOTFOUND': 'dns_error',
+          '429': 'rate_limit',
+          '500': 'server_error',
+          '503': 'service_unavailable',
+          'OutOfMemory': 'memory_error'
+        };
+        
+        return {
+          errorType: detectErrorType(error),
+          severity: calculateSeverity(error),
+          retryable: isRetryable(error),
+          fallbackAvailable: hasFallback(error)
+        };
+    
+    3_circuit_breaker:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Implement circuit breaker pattern
+        const service = $json.service;
+        const failures = await getFailureCount(service);
+        
+        if (failures >= 5) {
+          return {
+            circuitState: 'OPEN',
+            service: service,
+            resetTime: Date.now() + 60000,
+            action: 'use_fallback'
+          };
+        }
+        
+        return {
+          circuitState: 'CLOSED',
+          service: service,
+          action: 'retry'
+        };
+    
+    4_retry_logic:
+      type: "n8n-nodes-base.wait"
+      parameters:
+        amount: "={{$json.retryDelay}}"
+        unit: "seconds"
+      options:
+        maxRetries: 3
+        backoffMultiplier: 2
+    
+    5_fallback_router:
+      type: "n8n-nodes-base.switch"
+      rules:
+        - rule: "mac_studio_down"
+          condition: "{{$json.service === 'mac_studio'}}"
+          route: "cloud_fallback"
+        - rule: "cloud_api_down"
+          condition: "{{$json.service === 'cloud_api'}}"
+          route: "local_processing"
+        - rule: "database_down"
+          condition: "{{$json.service === 'database'}}"
+          route: "cache_mode"
+    
+    6_recovery_actions:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Execute recovery procedures
+        const recoverySteps = [];
+        
+        if ($json.errorType === 'memory_error') {
+          recoverySteps.push('clear_cache');
+          recoverySteps.push('restart_service');
+        }
+        
+        if ($json.errorType === 'network_error') {
+          recoverySteps.push('check_connectivity');
+          recoverySteps.push('switch_to_offline');
+        }
+        
+        return executeRecovery(recoverySteps);
+    
+    7_dead_letter_queue:
+      type: "n8n-nodes-base.postgres"
+      operation: "insert"
+      table: "dead_letter_queue"
+      columns:
+        - error_timestamp
+        - workflow_id
+        - error_type
+        - error_message
+        - retry_count
+        - document_data
+```
+
+### 10.8.3 Testing Checklist
+
+- [ ] Simulate Mac Studio offline
+- [ ] Test cloud service failures
+- [ ] Trigger rate limits
+- [ ] Force timeout errors
+- [ ] Test circuit breaker
+- [ ] Verify retry logic
+- [ ] Test fallback routes
+- [ ] Check dead letter queue
+- [ ] Monitor recovery success
+- [ ] Validate error logging
+
+### 10.8.4 Success Criteria
+
+- Errors caught and classified
+- Circuit breaker prevents cascades
+- Retries work with backoff
+- Fallbacks activate correctly
+- Recovery procedures execute
+- Dead letter queue captures failures
+- System remains stable
+- No data loss
+
+## 10.9 Milestone 8: Monitoring and Observability
+
+### 10.9.1 Objectives
+- Set up comprehensive monitoring
+- Create performance dashboards
+- Implement alerting system
+- Track workflow metrics
+- Monitor system health
+
+### 10.9.2 n8n Workflow Components
+
+```yaml
+Milestone_8_Workflow:
+  name: "Monitoring_Observability"
+  
+  nodes:
+    1_metrics_collector:
+      type: "n8n-nodes-base.interval"
+      parameters:
+        interval: 60  # Every minute
+    
+    2_system_health_check:
+      type: "n8n-nodes-base.httpRequest"
+      parameters:
+        url: "http://mac-studio.local:9090/metrics"
+        method: "GET"
+      continueOnFail: true
+    
+    3_performance_metrics:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Collect performance metrics
+        return {
+          timestamp: new Date().toISOString(),
+          metrics: {
+            // Mac Studio Metrics
+            llm_tokens_per_second: $json.llm_speed,
+            gpu_utilization: $json.gpu_usage,
+            memory_usage: $json.memory_used,
+            cache_hit_rate: $json.cache_hits,
+            
+            // Processing Metrics
+            documents_processed: $json.doc_count,
+            average_latency: $json.avg_latency,
+            error_rate: $json.error_percentage,
+            
+            // Cost Metrics
+            daily_cost: $json.cost_today,
+            local_processing_ratio: $json.local_ratio,
+            api_calls_saved: $json.saved_calls
+          }
+        };
+    
+    4_store_metrics:
+      type: "n8n-nodes-base.timescaledb"
+      operation: "insert"
+      table: "system_metrics"
+      hypertable: true
+    
+    5_anomaly_detection:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Detect anomalies in metrics
+        const anomalies = [];
+        
+        if ($json.llm_speed < 25) {
+          anomalies.push({
+            type: 'performance',
+            metric: 'llm_speed',
+            value: $json.llm_speed,
+            threshold: 25,
+            severity: 'high'
+          });
+        }
+        
+        if ($json.error_rate > 0.05) {
+          anomalies.push({
+            type: 'reliability',
+            metric: 'error_rate',
+            value: $json.error_rate,
+            threshold: 0.05,
+            severity: 'medium'
+          });
+        }
+        
+        return anomalies;
+    
+    6_alert_dispatcher:
+      type: "n8n-nodes-base.switch"
+      rules:
+        - rule: "critical"
+          condition: "{{$json.severity === 'critical'}}"
+          route: "immediate_alert"
+        - rule: "high"
+          condition: "{{$json.severity === 'high'}}"
+          route: "standard_alert"
+        - rule: "medium"
+          condition: "{{$json.severity === 'medium'}}"
+          route: "log_only"
+    
+    7_grafana_push:
+      type: "n8n-nodes-base.httpRequest"
+      parameters:
+        url: "http://localhost:3000/api/datasources/proxy/1/api/v1/push"
+        method: "POST"
+        sendBody: true
+        bodyParameters: "{{$json.metrics}}"
+```
+
+### 10.9.3 Testing Checklist
+
+- [ ] Verify metrics collection
+- [ ] Test health checks
+- [ ] Monitor Mac Studio stats
+- [ ] Track performance metrics
+- [ ] Test anomaly detection
+- [ ] Verify alert routing
+- [ ] Check Grafana dashboards
+- [ ] Test metric storage
+- [ ] Monitor trends
+- [ ] Validate thresholds
+
+### 10.9.4 Success Criteria
+
+- All metrics collected
+- Health checks functional
+- Anomalies detected
+- Alerts dispatched correctly
+- Dashboards updated
+- Historical data stored
+- Trends visible
+- System observable
+
+## 10.10 Milestone 9: Complete Integration Testing
+
+### 10.10.1 Objectives
+- Test end-to-end workflows
+- Validate all integrations
+- Stress test system
+- Document performance
+- Certify production ready
+
+### 10.10.2 Integration Test Scenarios
+
+```yaml
+Test_Scenarios:
+  
+  scenario_1_simple_document:
+    description: "Process simple text document"
+    steps:
+      - Upload text file
+      - Classify as fast-track
+      - Process locally
+      - Generate embeddings
+      - Store vectors
+      - Retrieve and verify
+    expected_time: "<30 seconds"
+    expected_cost: "$0.00"
+    
+  scenario_2_complex_pdf:
+    description: "Process complex PDF with images"
+    steps:
+      - Upload large PDF
+      - Detect complexity
+      - Route to Mistral OCR
+      - Process with Llama 70B
+      - Extract images
+      - Process with Qwen-VL
+      - Store all results
+    expected_time: "<2 minutes"
+    expected_cost: "<$0.20"
+    
+  scenario_3_video_processing:
+    description: "Process video with transcription"
+    steps:
+      - Upload video file
+      - Extract frames
+      - Process with Qwen-VL
+      - Transcribe with Soniox
+      - Generate summary
+      - Store results
+    expected_time: "<5 minutes"
+    expected_cost: "<$0.50"
+    
+  scenario_4_universal_content:
+    description: "Process diverse content with universal analysis"
+    steps:
+      - Upload course material
+      - Detect as educational content
+      - Extract insights and frameworks
+      - Identify workflows
+      - Map to departments
+      - Generate implementation guide
+      - Store in Backblaze B2
+      - Update knowledge graph
+    expected_time: "<3 minutes"
+    expected_cost: "<$0.10"
+    
+  scenario_5_multi_agent_analysis:
+    description: "Complex multi-agent task"
+    steps:
+      - Submit analysis request
+      - Spawn 5 agents
+      - Coordinate via CrewAI
+      - Process with local LLM
+      - Aggregate results
+      - Generate report
+    expected_time: "<10 minutes"
+    expected_cost: "<$0.30"
+    
+  scenario_6_stress_test:
+    description: "Parallel processing stress test"
+    steps:
+      - Upload 50 documents
+      - Process in parallel
+      - Monitor resource usage
+      - Track completion times
+      - Verify all results
+    expected_time: "<30 minutes"
+    expected_cost: "<$5.00"
+```
+
+### 10.10.3 Testing Checklist
+
+- [ ] Run all test scenarios
+- [ ] Verify expected outcomes
+- [ ] Monitor resource usage
+- [ ] Track actual costs
+- [ ] Measure performance
+- [ ] Test error scenarios
+- [ ] Validate data integrity
+- [ ] Check backup systems
+- [ ] Test recovery procedures
+- [ ] Document results
+
+### 10.10.4 Success Criteria
+
+- All scenarios pass
+- Performance meets targets
+- Costs within budget
+- No data loss
+- Error recovery works
+- System stable under load
+- Ready for production
+
+## 10.11 Production Deployment Checklist
+
+### 10.11.1 Pre-Deployment
+
+- [ ] All milestones completed
+- [ ] Testing passed
+- [ ] Documentation updated
+- [ ] Backup systems verified
+- [ ] Monitoring configured
+- [ ] Alerts set up
+- [ ] Cost tracking active
+- [ ] Security reviewed
+
+### 10.11.2 Deployment Steps
+
+1. **Mac Studio Configuration**
+   - [ ] Ollama installed and models loaded
+   - [ ] Open WebUI configured
+   - [ ] LiteLLM API running
+   - [ ] mem-agent active
+   - [ ] Monitoring agents deployed
+
+2. **n8n Configuration**
+   - [ ] All workflows imported
+   - [ ] Credentials configured
+   - [ ] Webhooks activated
+   - [ ] Error workflows enabled
+   - [ ] Monitoring workflows running
+
+3. **Cloud Services**
+   - [ ] Supabase pgvector extension enabled
+   - [ ] Supabase vector tables and indexes created
+   - [ ] B2 buckets configured
+   - [ ] CrewAI agents deployed
+   - [ ] API keys secured
+
+4. **Validation**
+   - [ ] End-to-end test
+   - [ ] Performance verification
+   - [ ] Cost tracking confirmed
+   - [ ] Backup test
+   - [ ] Recovery drill
+
+### 10.11.3 Post-Deployment
+
+- [ ] Monitor first 24 hours
+- [ ] Review performance metrics
+- [ ] Check error logs
+- [ ] Verify cost tracking
+- [ ] Gather feedback
+- [ ] Document issues
+- [ ] Plan optimizations
+
+## 10.12 Workflow Templates
+
+### 10.12.1 Template Structure
+
+Each milestone includes exportable n8n workflow templates that can be imported directly:
+
+```json
+{
+  "name": "AI_Empire_Milestone_X",
+  "nodes": [...],
+  "connections": {...},
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "timezone": "America/New_York"
+  },
+  "staticData": null,
+  "tags": ["ai-empire", "v5.0", "milestone-x"],
+  "updatedAt": "2025-10-14T00:00:00.000Z"
+}
+```
+
+### 10.12.2 Import Instructions
+
+1. Open n8n dashboard
+2. Navigate to Workflows
+3. Click "Import from File"
+4. Select milestone template
+5. Review and adjust settings
+6. Update credentials
+7. Test with sample data
+8. Activate workflow
+
+## 10.13 Troubleshooting Guide
+
+### Common Issues and Solutions
+
+**Issue: Mac Studio not responding**
+- Check network connectivity
+- Verify services running
+- Check firewall settings
+- Test with curl command
+- Review error logs
+
+**Issue: High latency**
+- Check Mac Studio load
+- Verify model loaded in memory
+- Check network latency
+- Review queue depth
+- Consider batch sizing
+
+**Issue: Cost overrun**
+- Review routing logic
+- Check fallback triggers
+- Verify cache hit rate
+- Analyze API usage
+- Adjust thresholds
+
+**Issue: Poor quality results**
+- Check model parameters
+- Verify prompt engineering
+- Review context window
+- Test temperature settings
+- Validate preprocessing
+
+**Issue: Workflow failures**
+- Check error workflows
+- Review circuit breaker state
+- Verify credentials
+- Test individual nodes
+- Check rate limits
+
+## 10.14 Performance Optimization Tips
+
+1. **Batch Processing**
+   - Group similar documents
+   - Use micro-batching
+   - Optimize batch sizes
+   - Monitor memory usage
+
+2. **Caching Strategy**
+   - Cache embeddings aggressively
+   - Store frequent queries
+   - Implement TTL properly
+   - Monitor hit rates
+
+3. **Model Optimization**
+   - Keep models loaded
+   - Use appropriate quantization
+   - Monitor token usage
+   - Optimize prompts
+
+4. **Cost Optimization**
+   - Prioritize local processing
+   - Use fallbacks sparingly
+   - Monitor API usage
+   - Set strict budgets
+
+5. **Workflow Efficiency**
+   - Minimize node count
+   - Use parallel processing
+   - Implement proper error handling
+   - Monitor execution times
 
 ## 10.15 Next Steps
 
 After completing all milestones:
 
-1. **Deploy Chat UI** (URGENT)
-   - Choose Gradio for quick deployment
-   - Connect to existing infrastructure
-   - Enable department agent queries
+1. **Documentation**
+   - Update operational procedures
+   - Create user guides
+   - Document API endpoints
+   - Maintain changelog
 
-2. **Verify CrewAI Integration**
-   - Ensure Content Analyzer is active
-   - Test course documentation generation
-   - Validate department mapping
+2. **Optimization**
+   - Analyze performance data
+   - Identify bottlenecks
+   - Implement improvements
+   - Test optimizations
 
-3. **Documentation Updates**
-   - Update all sections to v6.0
-   - Remove outdated references
-   - Clarify CrewAI as essential
+3. **Scaling**
+   - Plan for growth
+   - Consider additional Mac Studios
+   - Evaluate cloud burst options
+   - Design multi-tenant support
 
-4. **Performance Optimization**
-   - Monitor Claude API usage
-   - Optimize batch processing
-   - Maximize prompt caching
+4. **Maintenance**
+   - Schedule regular updates
+   - Plan model refreshes
+   - Review security patches
+   - Conduct disaster recovery drills
 
 ---
 
-This milestone-based approach ensures systematic implementation and testing of the AI Empire v6.0 system, with the ESSENTIAL Chat UI and CrewAI components properly integrated for a complete, functional knowledge base system.
+This milestone-based approach ensures systematic implementation and testing of the AI Empire v5.0 system, with each component validated before moving to the next stage. The Universal Content Analysis Workflow (Milestone 4) adds powerful capabilities to extract value from any content type, building a comprehensive RAG system from the brightest minds across all domains.
