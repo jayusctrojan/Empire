@@ -2,7 +2,7 @@
 
 ## 10.1 Overview
 
-This section provides a practical, milestone-based approach to implementing the AI Empire v5.0 workflow orchestration using n8n. Each milestone represents a testable, independent component that builds upon the previous one, allowing for systematic validation before proceeding to the next stage.
+This section provides a practical, milestone-based approach to implementing the AI Empire v6.0 workflow orchestration using n8n. Each milestone represents a testable, independent component that builds upon the previous one, allowing for systematic validation before proceeding to the next stage.
 
 ### 10.1.1 Implementation Philosophy
 
@@ -10,22 +10,30 @@ This section provides a practical, milestone-based approach to implementing the 
 - **Incremental Development:** Build and test one component at a time
 - **Milestone-Based:** Each milestone is independently functional
 - **Test-First:** Validate each component before integration
-- **Local-First:** Prioritize Mac Studio processing in every workflow
+- **API-First:** Prioritize Claude Sonnet 4.5 API for all AI processing
+- **Cost-Optimized:** Use batch processing and prompt caching for 90%+ savings
 - **Fail-Safe:** Include error handling from the beginning
 - **Observable:** Add logging and monitoring at each step
 
-### 10.1.2 n8n Architecture for v5.0
+### 10.1.2 n8n Architecture for v6.0
 
 ```
 n8n Instance (Render - $15-30/month)
 ├── Webhook Endpoints (Entry Points)
 ├── Workflow Engine (Orchestration)
 ├── Node Types:
-│   ├── Mac Studio Nodes (Local Processing)
-│   ├── Cloud Service Nodes (Minimal Use)
+│   ├── Claude API Nodes (Primary AI Processing)
+│   ├── CrewAI Nodes (ESSENTIAL Content Analysis)
+│   ├── Supabase pgvector (Unified Database)
 │   ├── Router Nodes (Intelligence)
 │   └── Utility Nodes (Support)
 └── Monitoring & Logging
+
+Mac Studio Role:
+├── mem-agent MCP (8GB persistent memory)
+├── Development environment
+├── Testing and validation
+└── NOT for production LLM inference
 ```
 
 ## 10.2 Milestone 1: Document Intake and Classification
@@ -73,6 +81,7 @@ Milestone_1_Workflow:
       query: |
         SELECT id FROM documents 
         WHERE file_hash = '{{$node["file_validation"].json["hash"]}}'
+      credentials: "supabase_postgres"
     
     4_classification_router:
       type: "n8n-nodes-base.switch"
@@ -99,6 +108,7 @@ Milestone_1_Workflow:
       type: "n8n-nodes-base.postgres"
       operation: "insert"
       table: "document_intake_log"
+      credentials: "supabase_postgres"
       columns:
         - document_id
         - intake_timestamp
@@ -113,9 +123,9 @@ Milestone_1_Workflow:
 - [ ] Upload PDF document
 - [ ] Upload image file
 - [ ] Upload video file
-- [ ] Test duplicate detection
+- [ ] Test duplicate detection in Supabase
 - [ ] Verify B2 storage
-- [ ] Check database logging
+- [ ] Check Supabase logging
 - [ ] Test error handling
 - [ ] Validate webhook response
 - [ ] Monitor performance metrics
@@ -125,83 +135,117 @@ Milestone_1_Workflow:
 - Files correctly classified by type
 - Duplicates detected and skipped
 - All files stored in B2
-- Metadata logged to database
+- Metadata logged to Supabase
 - Response time <2 seconds
 - Error rate <1%
 
-## 10.3 Milestone 2: Mac Studio Local Processing Integration
+## 10.3 Milestone 2: Claude API Processing Integration
 
 ### 10.3.1 Objectives
-- Connect to Mac Studio endpoints
-- Implement local LLM processing
-- Set up vision model integration
-- Create fallback mechanisms
-- Test local-first routing
+- Configure Claude Sonnet 4.5 API endpoints
+- Implement batch processing for cost optimization
+- Set up prompt caching for 50% savings
+- Create structured output schemas
+- Test API-first routing
 
 ### 10.3.2 n8n Workflow Components
 
 ```yaml
 Milestone_2_Workflow:
-  name: "Mac_Studio_Processing"
+  name: "Claude_API_Processing"
   
   nodes:
     1_receive_document:
       type: "n8n-nodes-base.executeWorkflow"
       workflowId: "milestone_1_output"
     
-    2_privacy_check:
-      type: "n8n-nodes-base.function"
-      code: |
-        // Detect PII and sensitive content
-        const content = $json.content;
-        const hasPII = detectPII(content);
-        const hasFinancial = detectFinancialData(content);
-        const hasHealthcare = detectHealthcareData(content);
-        
-        return {
-          ...items[0].json,
-          requiresLocal: hasPII || hasFinancial || hasHealthcare,
-          privacyLevel: calculatePrivacyLevel(content)
-        };
-    
-    3_mac_studio_router:
-      type: "n8n-nodes-base.if"
-      conditions:
-        - requiresLocal: true
-          route: "mac_studio_only"
-        - else:
-          route: "hybrid_processing"
-    
-    4_llama_processing:
+    2_extract_text_markitdown:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "http://mac-studio.local:8000/v1/completions"
+        url: "http://mac-studio.local:8001/markitdown/extract"
         method: "POST"
-        authentication: "apiKey"
         sendBody: true
         bodyParameters:
-          model: "llama-3.3-70b"
-          prompt: "{{$json.content}}"
-          temperature: 0.7
-          max_tokens: 2000
+          file: "{{$json.fileData}}"
+          format: "{{$json.mimeType}}"
+    
+    3_prepare_claude_prompt:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Prepare optimized prompt for Claude
+        const content = $json.extractedText;
+        
+        const systemPrompt = `You are an expert document analyzer. Extract structured data, 
+        categorize content, generate summaries, and identify key insights. 
+        Output clean JSON following the provided schema.`;
+        
+        const userPrompt = `Analyze this document and extract:
+        1. Key entities and metadata
+        2. Document category and tags
+        3. Executive summary (max 200 words)
+        4. Main insights and actionable items
+        5. Quality score (1-10)
+        
+        Document content:
+        ${content}`;
+        
+        return {
+          systemPrompt,
+          userPrompt,
+          useBatch: content.length > 5000,
+          enableCache: true
+        };
+    
+    4_claude_api_call:
+      type: "n8n-nodes-base.httpRequest"
+      parameters:
+        url: "https://api.anthropic.com/v1/messages"
+        method: "POST"
+        authentication: "apiKey"
+        sendHeaders: true
+        headerParameters:
+          "x-api-key": "{{$credentials.claude_api_key}}"
+          "anthropic-version": "2023-06-01"
+          "anthropic-beta": "prompt-caching-2024-07-31"
+        sendBody: true
+        bodyParameters:
+          model: "claude-3-5-sonnet-20241022"
+          system: "{{$json.systemPrompt}}"
+          messages: [{
+            role: "user",
+            content: "{{$json.userPrompt}}"
+          }]
+          max_tokens: 4000
+          temperature: 0.3
+          cache_control: {
+            type: "ephemeral"
+          }
       options:
         timeout: 30000
         retry:
           maxTries: 3
-          waitBetweenTries: 1000
+          waitBetweenTries: 2000
     
-    5_qwen_vision:
+    5_batch_processor:
+      type: "n8n-nodes-base.if"
+      conditions:
+        - useBatch: true
+          route: "batch_api"
+        - else:
+          route: "standard_api"
+    
+    6_claude_batch_api:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "http://mac-studio.local:8000/v1/vision"
+        url: "https://api.anthropic.com/v1/messages/batches"
         method: "POST"
+        authentication: "apiKey"
         sendBody: true
         bodyParameters:
-          model: "qwen2.5-vl-7b"
-          image: "{{$json.imageData}}"
-          prompt: "Analyze this image"
+          requests: "{{$json.batchRequests}}"
+      description: "90% cost savings for non-urgent processing"
     
-    6_mem_agent_store:
+    7_mem_agent_store:
       type: "n8n-nodes-base.httpRequest"
       parameters:
         url: "http://mac-studio.local:8001/memory/store"
@@ -211,41 +255,62 @@ Milestone_2_Workflow:
           content: "{{$json.processedContent}}"
           metadata: "{{$json.metadata}}"
     
-    7_fallback_handler:
-      type: "n8n-nodes-base.errorTrigger"
-      parameters:
-        errorWorkflow: true
-        continueOnFail: true
-        alternativeRoute: "hyperbolic_backup"
+    8_cost_tracker:
+      type: "n8n-nodes-base.function"
+      code: |
+        // Track Claude API costs
+        const inputTokens = $json.usage.input_tokens;
+        const outputTokens = $json.usage.output_tokens;
+        const cached = $json.usage.cache_creation_input_tokens || 0;
+        const cacheHit = $json.usage.cache_read_input_tokens || 0;
+        
+        // Claude Sonnet 4.5 pricing with optimizations
+        const costs = {
+          input: inputTokens * 0.003 / 1000,  // $3 per 1M tokens
+          output: outputTokens * 0.015 / 1000, // $15 per 1M tokens
+          cached: cached * 0.00375 / 1000,     // Cache write
+          cacheHit: cacheHit * 0.0003 / 1000,  // Cache read (90% off)
+          batch_discount: $json.useBatch ? 0.9 : 0 // 90% off for batch
+        };
+        
+        const totalCost = (costs.input + costs.output) * (1 - costs.batch_discount);
+        
+        return {
+          cost: totalCost,
+          savings: costs.batch_discount > 0 ? totalCost * 10 : 0,
+          tokens_processed: inputTokens + outputTokens,
+          cache_efficiency: cacheHit / (inputTokens || 1)
+        };
 ```
 
 ### 10.3.3 Testing Checklist
 
-- [ ] Test Mac Studio connectivity
-- [ ] Process document with Llama 70B
-- [ ] Process image with Qwen-VL
+- [ ] Test Claude API connectivity
+- [ ] Process document with Claude Sonnet 4.5
+- [ ] Verify batch processing for large docs
+- [ ] Test prompt caching effectiveness
 - [ ] Store memory with mem-agent
-- [ ] Test PII detection routing
-- [ ] Verify local-only processing
-- [ ] Test fallback to cloud
-- [ ] Monitor token generation speed
-- [ ] Check memory usage
+- [ ] Verify structured output generation
+- [ ] Test cost tracking accuracy
+- [ ] Monitor API rate limits
+- [ ] Check response quality
 - [ ] Validate error recovery
 
 ### 10.3.4 Success Criteria
 
-- Mac Studio endpoints accessible
-- 32 tokens/second achieved
-- Vision processing functional
+- Claude API endpoints accessible
+- 97-99% extraction accuracy achieved
+- Batch processing saves 90% on costs
+- Prompt caching reduces costs by 50%+
 - Memory storage working
-- Privacy routing accurate
-- Fallback mechanism tested
-- Local processing >95%
+- Cost tracking accurate
+- API processing reliable
+- Monthly costs <$50
 
 ## 10.4 Milestone 3: Vector Storage and RAG Pipeline
 
 ### 10.4.1 Objectives
-- Generate embeddings locally with nomic-embed-text (768 dimensions)
+- Generate embeddings using Claude or dedicated embedding API
 - Store vectors in Supabase pgvector (unified database architecture)
 - Implement semantic search with HNSW indexing
 - Set up hybrid retrieval combining vector similarity with metadata filtering
@@ -259,7 +324,7 @@ Milestone_2_Workflow:
 - **Cost Effective**: No separate vector database service needed
 - **Unlimited Metadata**: Store rich JSONB metadata with each vector
 - **SQL Power**: Combine vector search with complex SQL queries and joins
-- **Local-First Ready**: Perfect for Mac Studio embeddings → Supabase workflow
+- **Claude-Ready**: Perfect for Claude API → Supabase workflow
 
 **Setup Steps:**
 
@@ -272,10 +337,11 @@ CREATE TABLE documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   content TEXT NOT NULL,
   metadata JSONB DEFAULT '{}',
-  embedding vector(768),  -- nomic-embed-text dimensions
+  embedding vector(1536),  -- OpenAI/Claude embedding dimensions
   quality_score DECIMAL(3,2),
   semantic_density DECIMAL(3,2),
   coherence_score DECIMAL(3,2),
+  processing_model TEXT DEFAULT 'claude-3-5-sonnet',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -290,7 +356,7 @@ CREATE INDEX ON documents USING gin (metadata);
 
 -- Step 5: Create hybrid search function
 CREATE OR REPLACE FUNCTION match_documents(
-  query_embedding vector(768),
+  query_embedding vector(1536),
   match_threshold float DEFAULT 0.5,
   match_count int DEFAULT 10,
   filter jsonb DEFAULT '{}'
@@ -336,7 +402,7 @@ Milestone_3_Workflow:
         // Intelligent chunking with overlap
         const chunks = [];
         const text = $json.processedContent;
-        const chunkSize = 1000;
+        const chunkSize = 1500; // Optimal for Claude
         const overlap = 200;
         
         for (let i = 0; i < text.length; i += chunkSize - overlap) {
@@ -350,28 +416,33 @@ Milestone_3_Workflow:
         
         return chunks;
     
-    3_local_embeddings:
+    3_embedding_generation:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "http://mac-studio.local:8000/v1/embeddings"
+        url: "https://api.openai.com/v1/embeddings"
         method: "POST"
+        authentication: "apiKey"
+        sendHeaders: true
+        headerParameters:
+          "Authorization": "Bearer {{$credentials.openai_api_key}}"
         sendBody: true
         bodyParameters:
-          model: "nomic-embed-text"
+          model: "text-embedding-3-small"
           input: "{{$json.chunks}}"
-        options:
-          batchSize: 100
-          batchInterval: 100
+          encoding_format: "float"
+      options:
+        batchSize: 100
+        batchInterval: 100
     
     4_quality_scoring:
       type: "n8n-nodes-base.function"
       code: |
-        // Calculate chunk quality scores
+        // Calculate chunk quality scores using Claude's assessment
         return items.map(item => ({
           ...item.json,
-          qualityScore: calculateQualityScore(item.json.content),
+          qualityScore: item.json.claude_quality_score || 0.7,
           semanticDensity: calculateSemanticDensity(item.json.content),
-          coherenceScore: calculateCoherence(item.json.content)
+          coherenceScore: item.json.claude_coherence || 0.8
         }));
     
     5_supabase_vector_upsert:
@@ -385,14 +456,16 @@ Milestone_3_Workflow:
           embedding,
           quality_score,
           semantic_density,
-          coherence_score
+          coherence_score,
+          processing_model
         ) VALUES (
           '{{$json.content}}',
           '{{$json.metadata}}'::jsonb,
           '{{$json.embedding}}'::vector,
           {{$json.qualityScore}},
           {{$json.semanticDensity}},
-          {{$json.coherenceScore}}
+          {{$json.coherenceScore}},
+          'claude-3-5-sonnet'
         )
         ON CONFLICT (id) DO UPDATE SET
           embedding = EXCLUDED.embedding,
@@ -422,47 +495,49 @@ Milestone_3_Workflow:
           match_count := 10,
           filter := '{{$json.metadataFilter}}'::jsonb
         );
-  
+    
     8_hierarchical_structure_extraction:
-    type: "n8n-nodes-base.function"
-    code: |
-      // Extract document hierarchy
-      const hierarchy = extractHeadings(text);
-      const chunkMapping = mapChunksToSections(chunks, hierarchy);
-      return {
-        hierarchy: hierarchy,
-        chunk_ranges: chunkMapping,
-        parent_child_relationships: buildRelationships(hierarchy)
-      };
-  
+      type: "n8n-nodes-base.function"
+      code: |
+        // Extract document hierarchy
+        const hierarchy = extractHeadings(text);
+        const chunkMapping = mapChunksToSections(chunks, hierarchy);
+        return {
+          hierarchy: hierarchy,
+          chunk_ranges: chunkMapping,
+          parent_child_relationships: buildRelationships(hierarchy)
+        };
+    
     9_store_hierarchy:
-    type: "n8n-nodes-base.postgres"
-    operation: "insert"
-    table: "document_hierarchies"
-    columns:
-      - document_id
-      - hierarchical_index
-      - chunk_mappings
-  
+      type: "n8n-nodes-base.postgres"
+      operation: "insert"
+      table: "document_hierarchies"
+      credentials: "supabase_postgres"
+      columns:
+        - document_id
+        - hierarchical_index
+        - chunk_mappings
+    
     10_context_expansion_edge_function:
-    type: "n8n-nodes-base.httpRequest"
-    parameters:
-      url: "{{$env.SUPABASE_URL}}/functions/v1/context-expansion"
-      method: "POST"
-      bodyParameters:
-        doc_id: "{{$json.document_id}}"
-        chunk_ranges: "{{$json.expansion_ranges}}"
+      type: "n8n-nodes-base.httpRequest"
+      parameters:
+        url: "{{$env.SUPABASE_URL}}/functions/v1/context-expansion"
+        method: "POST"
+        bodyParameters:
+          doc_id: "{{$json.document_id}}"
+          chunk_ranges: "{{$json.expansion_ranges}}"
 ```
+
 ### 10.4.4 Testing Checklist
 
 - [ ] Chunk document correctly with semantic overlap
-- [ ] Generate embeddings locally with nomic-embed-text (768 dims)
+- [ ] Generate embeddings via API (1536 dims)
 - [ ] Calculate quality scores for each chunk
 - [ ] Store vectors in Supabase with metadata
 - [ ] Cache frequently accessed vectors
 - [ ] Test semantic search with cosine similarity
 - [ ] Verify retrieval accuracy with test queries
-- [ ] Monitor embedding generation speed
+- [ ] Monitor embedding generation costs
 - [ ] Test metadata filtering with JSONB queries
 - [ ] Verify batch upsert performance
 - [ ] Check vector dimensions
@@ -470,7 +545,7 @@ Milestone_3_Workflow:
 
 ### 10.4.5 Success Criteria
 
-- Embeddings generated locally with nomic-embed-text
+- Embeddings generated successfully
 - Vectors stored successfully in Supabase
 - Semantic search returns highly relevant results
 - Quality scores provide meaningful ranking
@@ -547,9 +622,9 @@ CrewAI_Universal_Analysis:
     task_type: "universal_content_analysis"
     
     content:
-      original_text: "{{ $node['LlamaIndex Response Processor'].json.langExtractPayload.original_content }}"
-      chunks: "{{ JSON.stringify($node['LlamaIndex Response Processor'].json.langExtractPayload.chunks) }}"
-      metadata: "{{ JSON.stringify($node['LlamaIndex Response Processor'].json.langExtractPayload.document_metadata) }}"
+      original_text: "{{ $node['Claude API Processing'].json.extractedContent }}"
+      chunks: "{{ JSON.stringify($node['Semantic Chunking'].json.chunks) }}"
+      metadata: "{{ JSON.stringify($node['Claude API Processing'].json.metadata) }}"
       content_type: "{{ $node['File Type Detection & Routing'].json.contentCategory }}"
       source_url: "{{ $json.source_url || 'direct_upload' }}"
     
@@ -592,7 +667,7 @@ CrewAI_Universal_Analysis:
 // Universal Content Documentation Generator
 const crewAIAnalysis = $json;
 const originalData = $node['File Type Detection & Routing'].json;
-const llamaData = $node['LlamaIndex Response Processor'].json;
+const claudeData = $node['Claude API Processing'].json;
 
 // Determine content type and structure documentation
 const contentType = detectContentType(originalData);
@@ -630,7 +705,8 @@ const contentDocumentation = {
     processing_date: new Date().toISOString(),
     original_format: originalData.fileExtension,
     content_category: originalData.course || 'General Knowledge',
-    tags: crewAIAnalysis.auto_tags || []
+    tags: crewAIAnalysis.auto_tags || [],
+    processing_model: 'claude-3-5-sonnet-20241022'
   },
   
   // 2. Executive Summary
@@ -801,7 +877,7 @@ return {
   filename: `${contentType}_${Date.now()}.json`,
   storage_instructions: {
     backblaze_path: generateStoragePath(contentType, contentDocumentation.identification.content_category),
-    pinecone_vectors: true,
+    supabase_vectors: true,
     supabase_metadata: true,
     priority: contentDocumentation.assessment.priority_level
   },
@@ -976,7 +1052,8 @@ const completeAnalysis = {
     processed_date: new Date().toISOString(),
     original_filename: originalFile.filename,
     content_category: analysis.documentation.identification.content_category,
-    processing_version: "v1.0",
+    processing_version: "v6.0",
+    processing_model: "claude-3-5-sonnet-20241022",
     storage_location: "backblaze_b2"
   },
   
@@ -1054,6 +1131,7 @@ ${doc.implementation.quick_wins.map(w => `- ${w.action} (${w.effort} effort, ${w
 - Original File: ${data.metadata.original_filename}
 - Category: ${doc.identification.content_category}
 - Priority: ${doc.assessment.priority_level}
+- Model: Claude 3.5 Sonnet
 `;
 }
 
@@ -1082,7 +1160,8 @@ B2_Storage:
       metadata:
         processed_date: "{{$now.toISO()}}"
         content_type: "{{$json.type}}"
-        analysis_version: "v1.0"
+        analysis_version: "v6.0"
+        processing_model: "claude-3-5-sonnet"
         quality_score: "{{$node['Universal Content Documentation Generator'].json.documentation.assessment.credibility_score}}"
         
       tags:
@@ -1108,7 +1187,7 @@ const logEntry = {
   
   // Storage Locations
   b2_paths: b2Results.map(r => r.json.path),
-  pinecone_namespace: analysis.storage_instructions.pinecone_vectors ? 'course_vectors' : null,
+  supabase_vector_ids: analysis.storage_instructions.supabase_vectors ? 'stored' : null,
   supabase_record_id: null, // Will be set if stored in Supabase
   
   // Analysis Summary
@@ -1116,6 +1195,7 @@ const logEntry = {
   content_category: analysis.documentation.identification.content_category,
   title: analysis.documentation.identification.title,
   author: analysis.documentation.identification.author,
+  processing_model: 'claude-3-5-sonnet-20241022',
   
   // Metrics
   insights_count: analysis.documentation.insights.key_insights.length,
@@ -1273,7 +1353,7 @@ Milestone_5_Workflow:
     4_crew_ai_orchestration:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "https://crewai.onrender.com/api/crew/execute"
+        url: "https://jb-crewai.onrender.com/api/crew/execute"
         method: "POST"
         sendBody: true
         bodyParameters:
@@ -1283,16 +1363,21 @@ Milestone_5_Workflow:
           max_agents: 5
           timeout: 300000
     
-    5_local_agent_processing:
+    5_claude_agent_processing:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "http://mac-studio.local:8000/v1/agent"
+        url: "https://api.anthropic.com/v1/messages"
         method: "POST"
+        authentication: "apiKey"
+        sendBody: true
         bodyParameters:
-          model: "llama-3.3-70b"
-          agent_type: "{{$json.agent}}"
-          task: "{{$json.task}}"
-          context: "{{$json.context}}"
+          model: "claude-3-5-sonnet-20241022"
+          system: "You are a {{$json.agent_type}} agent"
+          messages: [{
+            role: "user",
+            content: "{{$json.task}}: {{$json.context}}"
+          }]
+          max_tokens: 4000
     
     6_aggregate_results:
       type: "n8n-nodes-base.function"
@@ -1304,7 +1389,7 @@ Milestone_5_Workflow:
           documentId: $json.documentId,
           timestamp: new Date().toISOString(),
           agents: results.map(r => r.agent),
-          findings: mergeFindngs(results),
+          findings: mergeFindings(results),
           recommendations: extractRecommendations(results),
           summary: generateExecutiveSummary(results)
         };
@@ -1313,6 +1398,7 @@ Milestone_5_Workflow:
       type: "n8n-nodes-base.postgres"
       operation: "insert"
       table: "document_analysis"
+      credentials: "supabase_postgres"
       columns:
         - document_id
         - analysis_timestamp
@@ -1326,7 +1412,7 @@ Milestone_5_Workflow:
 - [ ] Define agent tasks
 - [ ] Test CrewAI connectivity
 - [ ] Execute multi-agent workflow
-- [ ] Test local agent processing
+- [ ] Test Claude agent processing
 - [ ] Verify result aggregation
 - [ ] Monitor agent coordination
 - [ ] Test timeout handling
@@ -1339,7 +1425,7 @@ Milestone_5_Workflow:
 - Agents coordinate effectively
 - Tasks completed successfully
 - Results properly aggregated
-- Local agents functional
+- Claude agents functional
 - Processing time <5 minutes
 - Quality insights generated
 - Error handling robust
@@ -1364,30 +1450,44 @@ Milestone_6_Workflow:
       type: "n8n-nodes-base.function"
       description: "Intercept all API calls for cost tracking"
       code: |
-        // Track every API call
+        // Track every API call with v6.0 pricing
         const operation = $json.operation;
         const service = $json.service;
         
         const costs = {
-          'hyperbolic_llm': 0.0005 * $json.tokens / 1000,
+          'claude_api': calculateClaudeCost($json),
+          'claude_batch': calculateClaudeCost($json) * 0.1, // 90% off
           'mistral_ocr': 0.01 * $json.pages,
           'soniox': 0.05 * $json.minutes,
-          'pinecone': 0.00001 * $json.vectors,
-          'local_llama': 0, // FREE!
-          'local_qwen': 0,  // FREE!
-          'local_embed': 0  // FREE!
+          'openai_embed': 0.00013 * $json.tokens / 1000,
+          'supabase': 0, // Included in $25/month
+          'crewai': 0, // Included in $15-20/month
+          'mem_agent': 0  // FREE on Mac Studio
         };
+        
+        function calculateClaudeCost(data) {
+          const inputTokens = data.input_tokens || 0;
+          const outputTokens = data.output_tokens || 0;
+          const cacheWrite = data.cache_write_tokens || 0;
+          const cacheRead = data.cache_read_tokens || 0;
+          
+          return (inputTokens * 0.003 / 1000) + 
+                 (outputTokens * 0.015 / 1000) +
+                 (cacheWrite * 0.00375 / 1000) +
+                 (cacheRead * 0.0003 / 1000);
+        }
         
         return {
           ...items[0].json,
           cost: costs[service] || 0,
-          savedVsCloud: calculateSavings(service, operation)
+          savedWithOptimizations: calculateSavings(service, operation)
         };
     
     2_cost_aggregator:
       type: "n8n-nodes-base.postgres"
       operation: "insert"
       table: "cost_tracking"
+      credentials: "supabase_postgres"
       columns:
         - timestamp
         - service
@@ -1400,11 +1500,13 @@ Milestone_6_Workflow:
     3_daily_cost_check:
       type: "n8n-nodes-base.postgres"
       operation: "executeQuery"
+      credentials: "supabase_postgres"
       query: |
         SELECT 
           DATE(timestamp) as date,
           SUM(cost) as daily_cost,
-          SUM(saved_amount) as daily_savings
+          SUM(saved_amount) as daily_savings,
+          COUNT(DISTINCT document_id) as docs_processed
         FROM cost_tracking
         WHERE DATE(timestamp) = CURRENT_DATE
         GROUP BY DATE(timestamp)
@@ -1412,35 +1514,37 @@ Milestone_6_Workflow:
     4_budget_alert:
       type: "n8n-nodes-base.if"
       conditions:
-        - expression: "{{$json.daily_cost > 6.50}}"
+        - expression: "{{$json.daily_cost > 2.00}}"
           output: "send_alert"
     
     5_optimization_router:
       type: "n8n-nodes-base.switch"
       rules:
         - rule: "budget_ok"
-          condition: "{{$json.monthly_spend < 150}}"
+          condition: "{{$json.monthly_spend < 40}}"
           route: "normal_processing"
         - rule: "budget_warning"
-          condition: "{{$json.monthly_spend < 180}}"
-          route: "prefer_local"
+          condition: "{{$json.monthly_spend < 45}}"
+          route: "prefer_batch"
         - rule: "budget_critical"
-          condition: "{{$json.monthly_spend >= 180}}"
-          route: "local_only"
+          condition: "{{$json.monthly_spend >= 50}}"
+          route: "batch_only"
     
     6_roi_calculator:
       type: "n8n-nodes-base.function"
       code: |
-        // Calculate ROI metrics
-        const macStudioCost = 3999;
-        const monthlyCloudSavings = $json.total_savings;
-        const monthsElapsed = $json.months_since_purchase;
+        // Calculate ROI metrics for v6.0
+        const monthlyClaudeCost = $json.monthly_spend;
+        const documentsProcessed = $json.total_documents;
+        const costPerDoc = monthlyClaudeCost / documentsProcessed;
         
         return {
-          totalSaved: monthlyCloudSavings * monthsElapsed,
-          roiPercentage: (monthlyCloudSavings * monthsElapsed / macStudioCost) * 100,
-          paybackRemaining: Math.max(0, macStudioCost - (monthlyCloudSavings * monthsElapsed)),
-          projectedPaybackMonths: macStudioCost / monthlyCloudSavings
+          monthlyApiCost: monthlyClaudeCost,
+          documentsProcessed: documentsProcessed,
+          costPerDocument: costPerDoc,
+          comparisonToGPT4: costPerDoc * 3, // Claude is ~3x cheaper
+          savingsWithBatch: monthlyClaudeCost * 9, // 90% savings
+          savingsWithCache: monthlyClaudeCost * 0.5 // 50% savings
         };
     
     7_cost_report:
@@ -1450,22 +1554,24 @@ Milestone_6_Workflow:
         subject: "Daily Cost Report - {{$today}}"
         emailType: "html"
         message: |
-          <h2>AI Empire Cost Report</h2>
+          <h2>AI Empire v6.0 Cost Report</h2>
           <p>Date: {{$json.date}}</p>
           <p>Daily Cost: ${{$json.daily_cost}}</p>
-          <p>Daily Savings: ${{$json.daily_savings}}</p>
+          <p>Documents Processed: {{$json.docs_processed}}</p>
+          <p>Cost per Document: ${{$json.cost_per_doc}}</p>
           <p>Monthly Total: ${{$json.monthly_total}}</p>
-          <p>ROI Progress: {{$json.roi_percentage}}%</p>
+          <p>Budget Status: {{$json.budget_status}}</p>
+          <p>Processing Model: Claude 3.5 Sonnet</p>
 ```
 
 ### 10.7.3 Testing Checklist
 
-- [ ] Track API calls accurately
+- [ ] Track Claude API calls accurately
 - [ ] Calculate costs correctly
-- [ ] Monitor local vs cloud ratio
+- [ ] Monitor batch vs standard ratio
 - [ ] Test budget alerts
 - [ ] Verify optimization routing
-- [ ] Calculate ROI metrics
+- [ ] Calculate cost per document
 - [ ] Generate daily reports
 - [ ] Test cost aggregation
 - [ ] Monitor savings tracking
@@ -1475,12 +1581,12 @@ Milestone_6_Workflow:
 
 - All costs tracked accurately
 - Budget alerts functional
-- ROI calculated correctly
+- Cost per doc <$0.25
 - Reports generated daily
 - Optimization routing works
-- Monthly costs <$195
-- Local processing >98%
-- Savings visible
+- Monthly costs <$50
+- Batch processing >80%
+- Cache hit rate >50%
 
 ## 10.8 Milestone 7: Error Handling and Recovery
 
@@ -1506,7 +1612,7 @@ Milestone_7_Workflow:
     2_error_classifier:
       type: "n8n-nodes-base.function"
       code: |
-        // Classify error types
+        // Classify error types for v6.0 architecture
         const error = $json.error;
         
         const errorTypes = {
@@ -1516,7 +1622,8 @@ Milestone_7_Workflow:
           '429': 'rate_limit',
           '500': 'server_error',
           '503': 'service_unavailable',
-          'OutOfMemory': 'memory_error'
+          '529': 'claude_overloaded',
+          'insufficient_quota': 'budget_exceeded'
         };
         
         return {
@@ -1560,30 +1667,30 @@ Milestone_7_Workflow:
     5_fallback_router:
       type: "n8n-nodes-base.switch"
       rules:
-        - rule: "mac_studio_down"
-          condition: "{{$json.service === 'mac_studio'}}"
-          route: "cloud_fallback"
-        - rule: "cloud_api_down"
-          condition: "{{$json.service === 'cloud_api'}}"
-          route: "local_processing"
+        - rule: "claude_down"
+          condition: "{{$json.service === 'claude_api'}}"
+          route: "queue_for_batch"
+        - rule: "crewai_down"
+          condition: "{{$json.service === 'crewai'}}"
+          route: "skip_analysis"
         - rule: "database_down"
-          condition: "{{$json.service === 'database'}}"
+          condition: "{{$json.service === 'supabase'}}"
           route: "cache_mode"
     
     6_recovery_actions:
       type: "n8n-nodes-base.function"
       code: |
-        // Execute recovery procedures
+        // Execute recovery procedures for v6.0
         const recoverySteps = [];
         
-        if ($json.errorType === 'memory_error') {
-          recoverySteps.push('clear_cache');
-          recoverySteps.push('restart_service');
+        if ($json.errorType === 'rate_limit') {
+          recoverySteps.push('switch_to_batch');
+          recoverySteps.push('enable_aggressive_caching');
         }
         
-        if ($json.errorType === 'network_error') {
-          recoverySteps.push('check_connectivity');
-          recoverySteps.push('switch_to_offline');
+        if ($json.errorType === 'budget_exceeded') {
+          recoverySteps.push('pause_processing');
+          recoverySteps.push('send_budget_alert');
         }
         
         return executeRecovery(recoverySteps);
@@ -1592,6 +1699,7 @@ Milestone_7_Workflow:
       type: "n8n-nodes-base.postgres"
       operation: "insert"
       table: "dead_letter_queue"
+      credentials: "supabase_postgres"
       columns:
         - error_timestamp
         - workflow_id
@@ -1603,8 +1711,8 @@ Milestone_7_Workflow:
 
 ### 10.8.3 Testing Checklist
 
-- [ ] Simulate Mac Studio offline
-- [ ] Test cloud service failures
+- [ ] Simulate Claude API outage
+- [ ] Test CrewAI failures
 - [ ] Trigger rate limits
 - [ ] Force timeout errors
 - [ ] Test circuit breaker
@@ -1649,64 +1757,76 @@ Milestone_8_Workflow:
     2_system_health_check:
       type: "n8n-nodes-base.httpRequest"
       parameters:
-        url: "http://mac-studio.local:9090/metrics"
+        url: "https://api.anthropic.com/v1/health"
         method: "GET"
       continueOnFail: true
     
     3_performance_metrics:
       type: "n8n-nodes-base.function"
       code: |
-        // Collect performance metrics
+        // Collect v6.0 performance metrics
         return {
           timestamp: new Date().toISOString(),
           metrics: {
-            // Mac Studio Metrics
-            llm_tokens_per_second: $json.llm_speed,
-            gpu_utilization: $json.gpu_usage,
-            memory_usage: $json.memory_used,
+            // Claude API Metrics
+            api_response_time: $json.claude_latency,
+            tokens_per_second: $json.generation_speed,
             cache_hit_rate: $json.cache_hits,
+            batch_queue_size: $json.batch_pending,
             
             // Processing Metrics
             documents_processed: $json.doc_count,
             average_latency: $json.avg_latency,
             error_rate: $json.error_percentage,
+            extraction_accuracy: $json.accuracy,
             
             // Cost Metrics
             daily_cost: $json.cost_today,
-            local_processing_ratio: $json.local_ratio,
-            api_calls_saved: $json.saved_calls
+            cost_per_document: $json.avg_doc_cost,
+            api_calls_count: $json.api_calls
           }
         };
     
     4_store_metrics:
-      type: "n8n-nodes-base.timescaledb"
+      type: "n8n-nodes-base.postgres"
       operation: "insert"
       table: "system_metrics"
+      credentials: "supabase_postgres"
       hypertable: true
     
     5_anomaly_detection:
       type: "n8n-nodes-base.function"
       code: |
-        // Detect anomalies in metrics
+        // Detect anomalies in v6.0 metrics
         const anomalies = [];
         
-        if ($json.llm_speed < 25) {
+        if ($json.api_response_time > 5000) {
           anomalies.push({
             type: 'performance',
-            metric: 'llm_speed',
-            value: $json.llm_speed,
-            threshold: 25,
+            metric: 'api_latency',
+            value: $json.api_response_time,
+            threshold: 5000,
             severity: 'high'
           });
         }
         
-        if ($json.error_rate > 0.05) {
+        if ($json.error_rate > 0.02) {
           anomalies.push({
             type: 'reliability',
             metric: 'error_rate',
             value: $json.error_rate,
-            threshold: 0.05,
+            threshold: 0.02,
             severity: 'medium'
+          });
+        }
+        
+        if ($json.daily_cost > 2.00) {
+          anomalies.push({
+            type: 'cost',
+            metric: 'daily_spend',
+            value: $json.daily_cost,
+            threshold: 2.00,
+            severity: 'high'
           });
         }
         
@@ -1738,7 +1858,7 @@ Milestone_8_Workflow:
 
 - [ ] Verify metrics collection
 - [ ] Test health checks
-- [ ] Monitor Mac Studio stats
+- [ ] Monitor Claude API stats
 - [ ] Track performance metrics
 - [ ] Test anomaly detection
 - [ ] Verify alert routing
@@ -1773,37 +1893,35 @@ Milestone_8_Workflow:
 Test_Scenarios:
   
   scenario_1_simple_document:
-    description: "Process simple text document"
+    description: "Process simple text document with Claude API"
     steps:
       - Upload text file
-      - Classify as fast-track
-      - Process locally
+      - Extract with MarkItDown
+      - Process with Claude Sonnet 4.5
       - Generate embeddings
-      - Store vectors
+      - Store in Supabase pgvector
       - Retrieve and verify
     expected_time: "<30 seconds"
-    expected_cost: "$0.00"
+    expected_cost: "$0.02"
     
   scenario_2_complex_pdf:
     description: "Process complex PDF with images"
     steps:
       - Upload large PDF
       - Detect complexity
-      - Route to Mistral OCR
-      - Process with Llama 70B
-      - Extract images
-      - Process with Qwen-VL
-      - Store all results
+      - Route to Mistral OCR if needed
+      - Process with Claude API
+      - Extract structured data
+      - Store results
     expected_time: "<2 minutes"
-    expected_cost: "<$0.20"
+    expected_cost: "<$0.30"
     
   scenario_3_video_processing:
     description: "Process video with transcription"
     steps:
       - Upload video file
-      - Extract frames
-      - Process with Qwen-VL
       - Transcribe with Soniox
+      - Process transcript with Claude
       - Generate summary
       - Store results
     expected_time: "<5 minutes"
@@ -1813,38 +1931,36 @@ Test_Scenarios:
     description: "Process diverse content with universal analysis"
     steps:
       - Upload course material
-      - Detect as educational content
+      - Extract with MarkItDown
+      - Process with Claude API
+      - Analyze with CrewAI
       - Extract insights and frameworks
-      - Identify workflows
       - Map to departments
-      - Generate implementation guide
       - Store in Backblaze B2
-      - Update knowledge graph
+      - Update Supabase vectors
     expected_time: "<3 minutes"
-    expected_cost: "<$0.10"
+    expected_cost: "<$0.15"
     
   scenario_5_multi_agent_analysis:
     description: "Complex multi-agent task"
     steps:
       - Submit analysis request
-      - Spawn 5 agents
-      - Coordinate via CrewAI
-      - Process with local LLM
+      - Spawn CrewAI agents
+      - Process with Claude API
       - Aggregate results
       - Generate report
-    expected_time: "<10 minutes"
-    expected_cost: "<$0.30"
+    expected_time: "<5 minutes"
+    expected_cost: "<$0.25"
     
-  scenario_6_stress_test:
-    description: "Parallel processing stress test"
+  scenario_6_batch_processing:
+    description: "Batch processing for cost optimization"
     steps:
-      - Upload 50 documents
-      - Process in parallel
-      - Monitor resource usage
-      - Track completion times
+      - Queue 50 documents
+      - Process via Claude Batch API
+      - 90% cost reduction
       - Verify all results
-    expected_time: "<30 minutes"
-    expected_cost: "<$5.00"
+    expected_time: "<4 hours"
+    expected_cost: "<$1.00"
 ```
 
 ### 10.10.3 Testing Checklist
@@ -1886,25 +2002,27 @@ Test_Scenarios:
 ### 10.11.2 Deployment Steps
 
 1. **Mac Studio Configuration**
-   - [ ] Ollama installed and models loaded
-   - [ ] Open WebUI configured
-   - [ ] LiteLLM API running
-   - [ ] mem-agent active
+   - [ ] mem-agent MCP installed and running
+   - [ ] MarkItDown MCP configured
+   - [ ] Development environment ready
    - [ ] Monitoring agents deployed
+   - [ ] NOT running production LLMs
 
 2. **n8n Configuration**
    - [ ] All workflows imported
-   - [ ] Credentials configured
+   - [ ] Claude API credentials configured
+   - [ ] Supabase credentials set
    - [ ] Webhooks activated
    - [ ] Error workflows enabled
    - [ ] Monitoring workflows running
 
 3. **Cloud Services**
+   - [ ] Claude API key active
    - [ ] Supabase pgvector extension enabled
    - [ ] Supabase vector tables and indexes created
    - [ ] B2 buckets configured
    - [ ] CrewAI agents deployed
-   - [ ] API keys secured
+   - [ ] All API keys secured
 
 4. **Validation**
    - [ ] End-to-end test
@@ -1931,7 +2049,7 @@ Each milestone includes exportable n8n workflow templates that can be imported d
 
 ```json
 {
-  "name": "AI_Empire_Milestone_X",
+  "name": "AI_Empire_v6_Milestone_X",
   "nodes": [...],
   "connections": {...},
   "settings": {
@@ -1942,8 +2060,8 @@ Each milestone includes exportable n8n workflow templates that can be imported d
     "timezone": "America/New_York"
   },
   "staticData": null,
-  "tags": ["ai-empire", "v5.0", "milestone-x"],
-  "updatedAt": "2025-10-14T00:00:00.000Z"
+  "tags": ["ai-empire", "v6.0", "claude-api", "milestone-x"],
+  "updatedAt": "2025-10-21T00:00:00.000Z"
 }
 ```
 
@@ -1954,7 +2072,7 @@ Each milestone includes exportable n8n workflow templates that can be imported d
 3. Click "Import from File"
 4. Select milestone template
 5. Review and adjust settings
-6. Update credentials
+6. Update credentials (Claude API, Supabase, etc.)
 7. Test with sample data
 8. Activate workflow
 
@@ -1962,101 +2080,113 @@ Each milestone includes exportable n8n workflow templates that can be imported d
 
 ### Common Issues and Solutions
 
-**Issue: Mac Studio not responding**
-- Check network connectivity
-- Verify services running
-- Check firewall settings
-- Test with curl command
-- Review error logs
+**Issue: Claude API rate limits**
+- Switch to batch processing
+- Enable aggressive caching
+- Implement request queuing
+- Monitor rate limit headers
+- Use exponential backoff
 
-**Issue: High latency**
-- Check Mac Studio load
-- Verify model loaded in memory
-- Check network latency
-- Review queue depth
-- Consider batch sizing
+**Issue: High API costs**
+- Verify batch processing enabled
+- Check cache hit rates
+- Review prompt optimization
+- Monitor token usage
+- Adjust processing frequency
 
-**Issue: Cost overrun**
-- Review routing logic
-- Check fallback triggers
-- Verify cache hit rate
-- Analyze API usage
-- Adjust thresholds
+**Issue: Poor extraction accuracy**
+- Review prompt engineering
+- Check temperature settings
+- Validate structured output schema
+- Test with different models
+- Improve preprocessing
 
-**Issue: Poor quality results**
-- Check model parameters
-- Verify prompt engineering
-- Review context window
-- Test temperature settings
-- Validate preprocessing
+**Issue: Slow response times**
+- Check API latency
+- Review payload sizes
+- Optimize prompt length
+- Consider batch processing
+- Monitor network latency
 
 **Issue: Workflow failures**
 - Check error workflows
 - Review circuit breaker state
 - Verify credentials
 - Test individual nodes
-- Check rate limits
+- Check service status
 
 ## 10.14 Performance Optimization Tips
 
-1. **Batch Processing**
-   - Group similar documents
-   - Use micro-batching
-   - Optimize batch sizes
-   - Monitor memory usage
-
-2. **Caching Strategy**
-   - Cache embeddings aggressively
-   - Store frequent queries
-   - Implement TTL properly
-   - Monitor hit rates
-
-3. **Model Optimization**
-   - Keep models loaded
-   - Use appropriate quantization
+1. **Claude API Optimization**
+   - Use batch API for 90% savings
+   - Enable prompt caching
+   - Optimize prompt length
+   - Use structured outputs
    - Monitor token usage
-   - Optimize prompts
 
-4. **Cost Optimization**
-   - Prioritize local processing
-   - Use fallbacks sparingly
-   - Monitor API usage
+2. **Cost Optimization**
+   - Batch non-urgent processing
+   - Maximize cache hits
+   - Use appropriate model sizes
+   - Monitor cost per document
    - Set strict budgets
 
-5. **Workflow Efficiency**
+3. **Database Optimization**
+   - Use HNSW indexes for vectors
+   - Batch inserts when possible
+   - Optimize JSONB queries
+   - Regular vacuum operations
+   - Monitor query performance
+
+4. **Workflow Efficiency**
    - Minimize node count
    - Use parallel processing
    - Implement proper error handling
    - Monitor execution times
+   - Regular performance audits
+
+5. **System Optimization**
+   - Keep services updated
+   - Monitor resource usage
+   - Regular backup verification
+   - Performance testing
+   - Capacity planning
 
 ## 10.15 Next Steps
 
 After completing all milestones:
 
-1. **Documentation**
+1. **Deploy Chat UI (URGENT)**
+   - Deploy Gradio/Streamlit interface
+   - Connect to Supabase RAG
+   - Enable department agents
+   - Cost: $7-15/month
+   - Timeline: 1-2 days
+
+2. **Documentation**
    - Update operational procedures
    - Create user guides
    - Document API endpoints
    - Maintain changelog
 
-2. **Optimization**
+3. **Optimization**
    - Analyze performance data
    - Identify bottlenecks
    - Implement improvements
    - Test optimizations
 
-3. **Scaling**
+4. **Scaling**
    - Plan for growth
-   - Consider additional Mac Studios
-   - Evaluate cloud burst options
+   - Evaluate additional services
    - Design multi-tenant support
+   - Consider enterprise features
 
-4. **Maintenance**
+5. **Maintenance**
    - Schedule regular updates
-   - Plan model refreshes
+   - Monitor Claude API updates
    - Review security patches
    - Conduct disaster recovery drills
 
 ---
 
-This milestone-based approach ensures systematic implementation and testing of the AI Empire v5.0 system, with each component validated before moving to the next stage. The Universal Content Analysis Workflow (Milestone 4) adds powerful capabilities to extract value from any content type, building a comprehensive RAG system from the brightest minds across all domains.
+This milestone-based approach ensures systematic implementation and testing of the AI Empire v6.0 system with Claude Sonnet 4.5 API as the primary AI processing engine, achieving 97-99% accuracy at $30-50/month with optimizations. The Universal Content Analysis Workflow (Milestone 4) combined with CrewAI adds powerful capabilities to extract value from any content type, building a comprehensive RAG system from the brightest minds across all domains.
