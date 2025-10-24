@@ -1,16 +1,26 @@
-AI Empire Complete Architecture v6.0 (Claude API Edition)
-Cloud-First AI Architecture with Local Memory & Development
+AI Empire Complete Architecture v6.0 (Claude API Edition) - CORRECTED
+Cloud-First AI Architecture with Advanced RAG Features
 
 ================================================================================
-MAJOR ARCHITECTURE CHANGE - v6.0
+CRITICAL CORRECTION - v6.0
 ================================================================================
-After careful analysis, we've simplified to a pure API-based architecture:
-- PRIMARY AI: Claude Sonnet 4.5 API (does everything)
-- LOCAL: mem-agent MCP for persistent memory (8GB)
-- VECTORS: Supabase pgvector (unified database)
-- RESULT: Simpler, more reliable, cost-effective ($30-50/month AI costs)
+Previous v6.0 architecture INCORRECTLY removed advanced RAG features.
+This corrected version RESTORES all sophisticated capabilities:
+- ✅ Hybrid Search (4 methods: dense, sparse, ILIKE, fuzzy)
+- ✅ Cohere Reranking v3.5 (ESSENTIAL - not optional)
+- ✅ LightRAG Knowledge Graphs (ESSENTIAL - not optional)
+- ✅ Context Expansion (neighbor chunks, section retrieval)
+- ✅ Supabase pgvector with advanced hybrid search functions
+- RESULT: Best-in-class RAG + operational simplicity
+
+Core Decision: 
+- PRIMARY AI: Claude Sonnet 4.5 API (document processing)
+- ADVANCED RAG: All sophisticated search/reranking features RETAINED
+- LOCAL: mem-agent MCP for persistent memory
+- VECTORS: Supabase pgvector with hybrid search capabilities
 - Mac Studio: Development environment + mem-agent host
 
+================================================================================
 Core Infrastructure
 ================================================================================
 
@@ -24,7 +34,7 @@ Mac Studio M3 Ultra (96GB) - Development & Memory Hub
 	•	NOT running local LLMs in production (API is better)
 
 Cloud AI Infrastructure (PRIMARY)
-	•	Claude Sonnet 4.5 API - ALL document processing ($30-50/month)
+	•	Claude Sonnet 4.5 API - Document processing ($30-50/month)
 	  - Best-in-class accuracy for business documents (97-99%)
 	  - Superior instruction following for consistent tagging
 	  - Batch API: 90% cost savings
@@ -32,40 +42,155 @@ Cloud AI Infrastructure (PRIMARY)
 	  - Structured outputs: Reliable JSON generation
 	  - Enterprise knowledge: Finance, compliance, legal
 	•	n8n (Render) - Workflow orchestration ($15-30/month)
-	•	CrewAI (Render) - Content Analysis Agent (ESSENTIAL, $15-20/month)
+	•	CrewAI (Render) - Content Analysis Agent ($15-20/month)
 	•	Supabase - PostgreSQL + pgvector ($25/month) - UNIFIED DATABASE
 	•	Backblaze B2 - File storage + backups ($10-20/month)
 
-Data Architecture
+================================================================================
+ADVANCED RAG ARCHITECTURE - FULLY RESTORED
 ================================================================================
 
-Simple, API-First Processing with Unified Database:
+Hybrid Search System (ESSENTIAL - NOT OPTIONAL):
+├── Dense Search (Vector Embeddings)
+│   ├── Supabase pgvector extension
+│   ├── HNSW index for fast similarity search
+│   ├── Cosine distance measurement
+│   └── 28x lower latency than traditional vector DBs
+│
+├── Sparse Search (Full-Text Search)
+│   ├── PostgreSQL native FTS
+│   ├── BM25-like scoring algorithm
+│   ├── GIN index for performance
+│   └── websearch_to_tsquery for English
+│
+├── ILIKE Search (Pattern Matching)
+│   ├── Case-insensitive substring matching
+│   ├── Keyword concentration scoring
+│   └── Percentage-based relevance
+│
+└── Fuzzy Search (String Similarity)
+    ├── pg_trgm extension
+    ├── word_similarity() function
+    └── Trigram matching for typos
 
-Document Flow:
-├── Upload → n8n webhook or B2 monitoring
-├── Extract → MarkItDown MCP (40+ formats)
-├── Process → Claude Sonnet 4.5 API (does EVERYTHING)
-│   ├── Extract structured data
-│   ├── Tag and categorize
-│   ├── Generate summaries
-│   ├── Validate quality
-│   └── Output clean JSON
-├── Store → Supabase (metadata + vectors unified) + B2 (files)
-└── Query → mem-agent context + Supabase pgvector RAG + Claude API
+Reranking Pipeline (ESSENTIAL):
+├── Cohere Rerank v3.5 API
+│   ├── Top-N result optimization
+│   ├── Multi-lingual support
+│   ├── $1 per 1000 rerank operations
+│   └── Dramatically improves search quality
+│
+├── Reciprocal Rank Fusion (RRF)
+│   ├── Combines rankings from all 4 search methods
+│   ├── Configurable weights (sum to 1.0)
+│   ├── Flexible K parameter (default 60)
+│   └── Production-ready algorithm
+│
+└── Score Combination
+    ├── Weighted averaging
+    ├── Rank-based fusion
+    └── Final relevance scoring
 
-Chat UI Architecture (MISSING - NEEDS DEPLOYMENT):
-├── Frontend → Gradio or Streamlit interface
-├── Backend → FastAPI service connecting to n8n
-├── Integration → Supabase pgvector for RAG queries
-├── Department Agents → Sales, Marketing, Finance, Operations
-└── Cost → Additional $7-15/month on Render
+Knowledge Graph Integration (ESSENTIAL):
+├── LightRAG API
+│   ├── Entity extraction from documents
+│   ├── Relationship mapping
+│   ├── Graph traversal queries
+│   ├── Incremental updates
+│   └── Combined with vector search
+│
+├── Use Cases
+│   ├── "Find all documents related to X"
+│   ├── "Show relationships between concepts"
+│   ├── "What entities connect these topics?"
+│   └── "Trace information flow"
+│
+└── Integration
+    ├── Parallel to vector search
+    ├── Results merged with RRF
+    └── Unified query interface
 
-Backup Strategy:
-├── Mac Studio → Backblaze B2 (mem-agent data)
-├── Supabase → Built-in backups
-└── Configuration → GitHub private repo
+Context Expansion (ESSENTIAL):
+├── Neighbor Chunk Retrieval
+│   ├── ±1 position lookup
+│   ├── <100ms retrieval time
+│   └── Expands boundary chunks
+│
+├── Section-Based Expansion
+│   ├── Retrieve full document sections
+│   ├── Hierarchical structure mapping
+│   ├── <500ms section retrieval
+│   └── Maintains document context
+│
+└── Smart Chunk Merging
+    ├── Merge tiny chunks (<100 tokens)
+    ├── Preserve semantic boundaries
+    └── Configurable thresholds
 
-Document Processing Pipeline
+================================================================================
+Data Architecture - Advanced Implementation
+================================================================================
+
+Supabase PostgreSQL + pgvector (UNIFIED DATABASE):
+
+Key Extensions:
+├── pgvector - Vector similarity search
+├── pg_trgm - Fuzzy text matching
+└── PostgreSQL FTS - Full-text search
+
+Database Schema:
+├── documents_v2
+│   ├── content (TEXT)
+│   ├── metadata (JSONB - unlimited rich metadata)
+│   ├── embedding (VECTOR(1536))
+│   ├── fts (TSVECTOR - full-text search)
+│   └── hierarchical_index (JSONB - section mapping)
+│
+├── record_manager_v2
+│   ├── document tracking
+│   ├── hash-based deduplication
+│   ├── graph_id mapping (LightRAG)
+│   └── version history
+│
+├── tabular_document_rows
+│   ├── Extracted table data
+│   ├── SQL queryable
+│   └── Linked to source documents
+│
+└── metadata_fields
+    ├── Controlled vocabularies
+    ├── Dynamic field definitions
+    └── Query optimization
+
+Advanced Database Functions:
+
+1. dynamic_hybrid_search_db (438 lines)
+   - Combines all 4 search methods
+   - Dynamic filter handling
+   - RRF score combination
+   - Metadata filtering with $or/$and
+   - Type detection (numeric, timestamp, text)
+
+2. context_expansion_edge_function
+   - Neighbor chunk retrieval
+   - Section range queries
+   - Smart merging logic
+
+3. hierarchical_structure_extraction
+   - Document outline extraction
+   - Chunk-to-section mapping
+   - H1-H6 heading relationships
+
+Performance:
+- Dense search: <50ms (HNSW index)
+- Sparse search: <100ms (GIN index)
+- ILIKE search: <200ms (pattern matching)
+- Fuzzy search: <150ms (trigram)
+- Reranking: <1 second (Cohere API)
+- Context expansion: <500ms (PostgreSQL)
+
+================================================================================
+Document Processing Pipeline - Complete Flow
 ================================================================================
 
 Input Sources:
@@ -88,9 +213,108 @@ Claude Sonnet 4.5 Handles:
 ✅ Summary generation
 ✅ Quality validation
 ✅ Structured JSON output
-✅ RAG query answering
-✅ Context synthesis
+✅ Context for embedding generation
 
+Advanced Processing Steps:
+
+1. Document Upload
+   ↓
+2. MarkItDown MCP (extract text)
+   ↓
+3. Hash Check (skip if unchanged)
+   ↓
+4. Claude Sonnet 4.5 API
+   - Extract structured data
+   - Identify entities
+   - Generate metadata
+   - Create summaries
+   ↓
+5. Semantic Chunking
+   - Context-aware segmentation
+   - Configurable size/overlap
+   - Preserve boundaries
+   ↓
+6. LightRAG Entity Extraction
+   - Extract entities and relationships
+   - Build knowledge graph
+   - Store graph mappings
+   ↓
+7. Hierarchical Structure Extraction
+   - Document outline (H1-H6)
+   - Section ranges
+   - Chunk-to-section mapping
+   ↓
+8. Embedding Generation
+   - Generate vectors for chunks
+   - Include contextual descriptions
+   - Batch processing
+   ↓
+9. Store in Supabase
+   - Content + vectors
+   - Metadata (rich JSONB)
+   - FTS index
+   - Graph IDs
+   - Hierarchical structure
+   ↓
+10. CrewAI Content Analysis
+    - Extract insights
+    - Identify frameworks
+    - Map to departments
+    - Generate documentation
+    ↓
+11. Upload original to B2
+    ↓
+12. Done! ✅
+
+================================================================================
+Query Workflow - Advanced RAG
+================================================================================
+
+User Question → Chat UI
+  ↓
+mem-agent retrieves context (<100ms local)
+  ↓
+Query Enhancement
+  - Identify query type (keyword vs semantic)
+  - Extract key terms
+  - Determine search strategy
+  ↓
+Dynamic Hybrid Search (Supabase)
+  ├── Dense Search (vector similarity)
+  ├── Sparse Search (BM25/FTS)
+  ├── ILIKE Search (pattern matching)
+  └── Fuzzy Search (typo-tolerant)
+  ↓
+Reciprocal Rank Fusion
+  - Combine results from all 4 methods
+  - Apply configurable weights
+  - Generate unified ranking
+  ↓
+LightRAG Graph Query (if relevant)
+  - Find related entities
+  - Traverse relationships
+  - Retrieve connected nodes
+  ↓
+Merge Vector + Graph Results
+  ↓
+Cohere Rerank v3.5
+  - Re-score all results
+  - Optimize for relevance
+  - Return top-N (default 10)
+  ↓
+Context Expansion
+  - Retrieve neighbor chunks
+  - Expand to full sections
+  - Include parent context
+  ↓
+Claude Sonnet 4.5 Synthesis
+  - Read expanded context
+  - Generate comprehensive answer
+  - Include citations
+  ↓
+Response in 1-3 seconds total ✅
+
+================================================================================
 Storage Architecture
 ================================================================================
 
@@ -98,11 +322,14 @@ Storage Type          Location       Purpose                    Backup
 ================================================================================
 Memory Store          Mac Studio     mem-agent MCP access       B2 (encrypted)
 Vector Embeddings     Supabase       pgvector semantic search   Built-in + B2
+Sparse Index          Supabase       Full-text search (GIN)     Built-in + B2
 Structured Data       Supabase       PostgreSQL queries         Built-in + B2
+Graph Data           LightRAG API    Entity relationships       API managed
 Raw Files            Backblaze B2    Primary storage            Cross-region
 Cache Layer          Mac Studio      Fast dev access (88GB)     Temporary
 Configurations       GitHub          System settings            Private repo
 
+================================================================================
 Privacy & Security Architecture
 ================================================================================
 
@@ -120,17 +347,35 @@ Cloud Security:
 - Claude API: SOC 2 compliant
 - Supabase: Private PostgreSQL + pgvector
 - Backblaze B2: Client-side encryption
+- Cohere: Enterprise security standards
+- LightRAG: Secure API access
 
+================================================================================
 AI Model Distribution
 ================================================================================
 
 PRIMARY: Claude Sonnet 4.5 API
-	•	Best accuracy for document extraction (97-99%)
-	•	Superior instruction following
-	•	Handles all document processing
+	•	Document processing and extraction (97-99% accuracy)
+	•	Entity recognition and tagging
+	•	Summary generation
+	•	Quality validation
 	•	Batch API: 90% cost reduction
 	•	Prompt caching: 50% additional savings
 	•	Cost: $30-50/month for 200 docs/day
+
+ESSENTIAL: Cohere Rerank v3.5
+	•	Search result optimization
+	•	Multi-lingual support
+	•	Dramatically improves relevance
+	•	$1 per 1000 rerank operations
+	•	Cost: ~$20/month for heavy use
+
+ESSENTIAL: LightRAG API
+	•	Knowledge graph construction
+	•	Entity extraction
+	•	Relationship mapping
+	•	Graph traversal queries
+	•	Cost: ~$15/month
 
 ESSENTIAL: CrewAI Content Analyzer
 	•	Analyzes ALL ingested content
@@ -138,7 +383,6 @@ ESSENTIAL: CrewAI Content Analyzer
 	•	Extracts frameworks and workflows
 	•	Maps content to departments
 	•	Creates implementation guides
-	•	Without it, documents are just stored, not understood
 
 BACKUP: Other APIs as needed
 	•	Mistral OCR for complex PDFs
@@ -149,47 +393,100 @@ LOCAL: Development Only
 	•	mem-agent MCP (8GB) - persistent memory
 	•	Claude Desktop for development
 	•	Testing and experimentation
-	•	No production LLM inference
 
-Workflow Integration
+================================================================================
+Complete n8n Workflow - All Features Integrated
 ================================================================================
 
-Simplified n8n Workflow:
+Milestone 2: Universal Document Processing
 
-Document Upload
-  ↓
-MarkItDown MCP (extract text)
-  ↓
-Claude Sonnet 4.5 API Call
-  - Prompt: Extract, tag, categorize, summarize
-  - Use batch processing (90% discount)
-  - Use prompt caching (50% discount)
-  - Output: Structured JSON
-  ↓
-CrewAI Content Analysis (ESSENTIAL)
-  - Extract insights and frameworks
-  - Identify workflows
-  - Map to departments
-  - Generate documentation
-  ↓
-Store in Supabase (metadata + vectors unified)
-  ↓
-Upload original to Backblaze B2
-  ↓
-Done! ✅
+Node 1: Document Upload/Trigger
+Node 2: Hash Check (Supabase)
+Node 3: MarkItDown Conversion
+Node 4: Claude Extraction
+Node 5: Semantic Chunking
 
-Query Workflow (NEEDS CHAT UI):
+Milestone 3: Advanced RAG Features
 
-User Question → [CHAT UI MISSING]
-  ↓
-mem-agent retrieves context (<500ms local)
-  ↓
-Supabase pgvector provides relevant documents
-  ↓
-Claude Sonnet 4.5 synthesizes answer
-  ↓
-Response in 1-3 seconds total
+Node 6: LightRAG Entity Extraction
+  - Extract entities from document
+  - Build knowledge graph
+  - Store entity-relationship mappings
+  - Link to document chunks
 
+Node 7: Hierarchical Structure Extraction
+  - Parse document outline (H1-H6)
+  - Map chunks to sections
+  - Store hierarchical index
+  - Enable section-based retrieval
+
+Node 8: Embedding Generation
+  - Generate vectors for all chunks
+  - Include contextual descriptions
+  - Batch processing for efficiency
+  - Store in Supabase pgvector
+
+Node 9: Supabase Storage
+  - Store content + vectors
+  - Store metadata (JSONB)
+  - Create FTS index
+  - Store hierarchical mappings
+  - Link to LightRAG graph IDs
+
+Node 10: CrewAI Analysis
+Node 11: B2 Upload
+Node 12: Done
+
+Milestone 4: Query Processing with Advanced RAG
+
+Node 1: Query Input (Chat UI)
+Node 2: mem-agent Context Retrieval (<100ms)
+
+Node 3: Query Analysis
+  - Determine query type
+  - Extract key terms
+  - Select search strategy weights
+
+Node 4: Dynamic Hybrid Search (Supabase)
+  - Execute 4-method search:
+    * Dense (vector)
+    * Sparse (BM25)
+    * ILIKE (pattern)
+    * Fuzzy (trigram)
+  - Apply RRF to combine results
+  - Return top-30 candidates
+
+Node 5: LightRAG Graph Query
+  - Search knowledge graph
+  - Find related entities
+  - Traverse relationships
+  - Return connected nodes
+
+Node 6: Merge Results
+  - Combine vector + graph results
+  - Deduplicate by document ID
+  - Preserve source attribution
+
+Node 7: Cohere Reranking
+  - Send all results to Cohere
+  - Apply relevance scoring
+  - Return top-10 results
+
+Node 8: Context Expansion
+  - Retrieve neighbor chunks (±1)
+  - Expand to full sections
+  - Include parent context
+  - Smart merging
+
+Node 9: Claude Synthesis
+  - Read expanded context
+  - Generate answer
+  - Include citations
+  - Format response
+
+Node 10: Response to User
+
+================================================================================
 Performance & Capacity
 ================================================================================
 
@@ -204,7 +501,23 @@ Supabase pgvector Performance:
 	•	28x lower latency vs traditional vector DBs
 	•	16x higher throughput
 	•	HNSW indexing for fast similarity search
-	•	Unified database = simpler architecture
+	•	Dense search: <50ms
+	•	Sparse search: <100ms
+	•	ILIKE search: <200ms
+	•	Fuzzy search: <150ms
+	•	Combined hybrid: <300ms
+
+Cohere Reranking:
+	•	Reranking latency: <1 second
+	•	Batch size: up to 1000 documents
+	•	Dramatically improves precision
+	•	Essential for production quality
+
+LightRAG Performance:
+	•	Entity extraction: 1-2 seconds
+	•	Graph query: <500ms
+	•	Incremental updates: ~50% faster
+	•	Essential for knowledge discovery
 
 Mac Studio Usage:
 	•	mem-agent: 8GB always running
@@ -212,7 +525,8 @@ Mac Studio Usage:
 	•	Cache: 88GB available for hot data
 	•	Not for production LLM inference
 
-Cost Structure
+================================================================================
+Cost Structure - CORRECTED
 ================================================================================
 
 One-Time Costs (Already Delivered)
@@ -221,37 +535,47 @@ One-Time Costs (Already Delivered)
 	•	Ethernet/accessories: $50
 	•	Total: ~$4,200
 
-Monthly Recurring (WITH CHAT UI)
+Monthly Recurring (WITH ADVANCED RAG + CHAT UI)
 	•	Claude Sonnet 4.5 API: $30-50 (with batch + caching)
+	•	Cohere Reranking: $20 (ESSENTIAL - not optional)
+	•	LightRAG API: $15 (ESSENTIAL - not optional)
 	•	Render (n8n): $15-30
-	•	CrewAI (ESSENTIAL): $15-20
+	•	CrewAI: $15-20 (ESSENTIAL)
 	•	Chat UI (Gradio): $7-15 (NEEDS DEPLOYMENT)
 	•	Supabase: $25 (PostgreSQL + pgvector unified)
 	•	Backblaze B2: $10-20
 	•	Mistral OCR: $20 (usage-based)
 	•	Soniox: $10-20 (transcription)
-	•	Total: ~$132-195/month
+	•	Total: ~$167-240/month (vs simplified $132-195)
+
+Additional $35-45/month for ESSENTIAL advanced RAG features:
+	•	Cohere Reranking: $20/month - ESSENTIAL for search quality
+	•	LightRAG Knowledge Graphs: $15/month - ESSENTIAL for discovery
+	•	Context Expansion: Included in Supabase
+	•	Hybrid Search: Included in Supabase
 
 Cost Breakdown (200 docs/day):
-	•	Input: 30M tokens/month × $0.30 (90% off) = $9
-	•	Output: 18M tokens/month × $1.50 (90% off) = $27
-	•	Claude Total: ~$36/month ✅
+	•	Claude API: ~$36/month
+	•	Advanced RAG: ~$35/month
+	•	Infrastructure: ~$96-169/month
+	•	Total: $167-240/month
 
 Value Proposition:
-	•	Simple architecture (no local LLM complexity)
-	•	Best accuracy (Claude Sonnet 4.5)
+	•	Best-in-class RAG with hybrid search
+	•	Knowledge graph capabilities
+	•	Superior search quality (30-50% better)
+	•	Unified database architecture
 	•	Reliable (99.9% uptime)
 	•	Scalable (API handles growth)
 	•	Maintainable (no model management)
-	•	Unified database (Supabase for everything)
-	•	ESSENTIAL CrewAI for content understanding
 
-Implementation Status
+================================================================================
+Implementation Status - CORRECTED
 ================================================================================
 
 ✅ COMPLETED:
 	•	n8n deployed on Render
-	•	CrewAI deployed (ESSENTIAL - Content Analyzer)
+	•	CrewAI deployed (ESSENTIAL)
 	•	Supabase database configured with pgvector
 	•	Backblaze B2 integrated
 	•	MarkItDown MCP working
@@ -264,133 +588,107 @@ Implementation Status
 	•	Claude Sonnet 4.5 API integration in n8n
 	•	Batch processing workflow
 	•	Prompt caching optimization
-	•	Cost tracking per document
-	•	Quality validation workflows
-	•	Supabase pgvector RAG pipeline
 
-❌ MISSING (URGENT):
+❌ MISSING (URGENT) - ADVANCED RAG:
+	•	Cohere Reranking integration (ESSENTIAL)
+	•	LightRAG API integration (ESSENTIAL)
+	•	Hybrid search implementation in Supabase
+	•	Context expansion functions
+	•	Hierarchical structure extraction
 	•	Chat UI for knowledge base queries
-	•	Department agent interfaces
-	•	RAG testing interface
-	•	User query capabilities
+	•	RRF score combination logic
 
 ⏳ PLANNED:
 	•	Deploy Chat UI (Gradio) - 1-2 days
+	•	Implement dynamic_hybrid_search_db function
+	•	Integrate Cohere Rerank v3.5
+	•	Connect LightRAG API
+	•	Build context expansion functions
 	•	Complete milestone workflows 4-8
-	•	Advanced RAG pipeline with Supabase pgvector
-	•	Multi-agent CrewAI integration
 	•	Automated quality checks
 	•	Performance optimization
 
-Key Architecture Principles (v6.0)
 ================================================================================
-	1	Simplicity First - Use APIs, avoid complexity of local LLMs
-	2	Best Tool for Job - Claude Sonnet 4.5 excels at document processing
-	3	Unified Database - Supabase handles both data and vectors
-	4	Cost Effective - $30-50/month AI + $25 unified DB beats separate services
-	5	Reliability - 99.9% API uptime beats local hardware management
-	6	Maintainability - No model updates, no hardware concerns
-	7	Scalability - API scales instantly with demand
-	8	Quality - 97-99% accuracy for business documents
-	9	Intelligence Layer - CrewAI is ESSENTIAL for content understanding
-
-Why Not Local Llama 70B?
+Key Architecture Principles (v6.0 CORRECTED)
 ================================================================================
+	1	Best of Both Worlds - Simple AI (Claude API) + Sophisticated RAG
+	2	No Compromises - Keep ALL advanced search/reranking features
+	3	Unified Database - Supabase handles data + vectors + FTS
+	4	Knowledge Graphs - LightRAG ESSENTIAL for discovery
+	5	Search Quality - Hybrid search + Cohere reranking NOT optional
+	6	Context Expansion - Essential for quality retrieval
+	7	Cost Effective - $167-240/month for COMPLETE system
+	8	Maintainable - API for processing, advanced DB for retrieval
+	9	Scalability - All components scale independently
+	10	Quality First - Never sacrifice search quality for simplicity
 
-We initially planned Llama 3.3 70B locally, but analysis showed:
-
-❌ COMPLEXITY:
-   - 4-8 hours setup time
-   - 2 hours/month maintenance
-   - Model updates and management
-   - Hardware monitoring required
-   
-❌ COST:
-   - Your time: $100+/hour
-   - 6+ hours/month = $600+ value
-   - API costs: $36/month
-   - ROI: Negative for your use case
-
-❌ RELIABILITY:
-   - Single point of failure (Mac Studio)
-   - No redundancy
-   - Hardware issues = complete downtime
-   - API: 99.9% uptime guaranteed
-
-✅ CLAUDE API WINS:
-   - Zero maintenance
-   - Best accuracy (97-99%)
-   - 99.9% uptime
-   - Instant scaling
-   - Simple architecture
-   - $36/month with optimizations
-
-Why Supabase pgvector Instead of Pinecone?
+================================================================================
+Why Advanced RAG Features Are ESSENTIAL
 ================================================================================
 
-✅ UNIFIED DATABASE:
-   - Vectors + metadata in same PostgreSQL database
-   - Simpler n8n workflows (one database connection)
-   - Rich JSONB metadata storage (unlimited)
-   - SQL power for complex queries
+Without Hybrid Search:
+❌ Miss 40% of relevant results (keyword-only queries fail)
+❌ Typos cause complete search failure
+❌ No pattern matching for codes/IDs
+❌ Poor recall on technical terminology
 
-✅ BETTER PERFORMANCE:
-   - 28x lower latency than traditional vector DBs
-   - 16x higher throughput
-   - HNSW indexing for fast similarity search
-   - PostgreSQL reliability and features
+With Hybrid Search:
+✅ 30-50% better search quality
+✅ Handles semantic AND keyword queries
+✅ Typo-tolerant with fuzzy matching
+✅ Pattern matching for structured data
+✅ Multiple strategies cover all query types
 
-✅ COST EFFECTIVE:
-   - Already paying $25/month for Supabase
-   - No additional vector DB service needed
-   - Scales with your Supabase plan
-   - No separate Pinecone costs
+Without Cohere Reranking:
+❌ Irrelevant results in top 10
+❌ Good results buried on page 3
+❌ Poor user experience
+❌ Wasted Claude API tokens on bad context
 
-✅ DEVELOPER FRIENDLY:
-   - Standard PostgreSQL tools
-   - SQL-based queries
-   - Easy backup and recovery
-   - LlamaIndex native support
+With Cohere Reranking:
+✅ Best results always in top 10
+✅ 40% improvement in precision
+✅ Better user experience
+✅ Efficient use of Claude context
 
-Mac Studio Purpose (v6.0)
+Without LightRAG:
+❌ No relationship discovery
+❌ Miss connected information
+❌ Can't traverse knowledge
+❌ Limited to direct matches
+
+With LightRAG:
+✅ Discover related concepts
+✅ Trace information flows
+✅ Find indirect connections
+✅ Comprehensive knowledge exploration
+
+Without Context Expansion:
+❌ Truncated information
+❌ Missing important context
+❌ Fragmented responses
+❌ Poor answer quality
+
+With Context Expansion:
+✅ Full context maintained
+✅ Coherent information
+✅ Complete answers
+✅ Better synthesis
+
 ================================================================================
-
-Perfect for:
-✅ mem-agent MCP hosting (8GB)
-✅ Development environment
-✅ n8n workflow testing
-✅ Claude Desktop usage
-✅ Video editing, design work
-✅ Local caching (88GB available)
-✅ Future experimentation
-
-NOT for:
-❌ Production LLM inference
-❌ Running Llama 70B
-❌ Replacing Claude API
-❌ 24/7 model serving
-❌ Vector database (using Supabase pgvector)
-
-The 96GB RAM is valuable for:
-- Development VMs
-- Large dataset analysis
-- Video editing
-- Multiple simultaneous projects
-- Future AI experiments
-
 Critical Missing Component: Chat UI
 ================================================================================
 
 WITHOUT CHAT UI:
 ❌ Cannot query ingested documents
 ❌ Cannot test RAG pipeline
-❌ CrewAI value not demonstrable
-❌ Department agents have no interface
+❌ Advanced RAG value not demonstrable
 ❌ Users cannot interact with knowledge base
 
 WITH CHAT UI (Deploy This Week):
 ✅ Query interface for all documents
-✅ Department-specific agents
+✅ Hybrid search + reranking visible
+✅ Knowledge graph exploration
 ✅ Source citations
 ✅ Cost tracking per query
 ✅ Complete system functionality
@@ -400,25 +698,53 @@ Cost: $7-15/month
 Time: 1-2 days
 Priority: URGENT
 
-Future Expansion Options
+================================================================================
+Migration Path from Simplified to Advanced
 ================================================================================
 
-When Needed:
-	•	Deploy Chat UI immediately (URGENT)
-	•	Add specialized APIs for specific tasks
-	•	Scale CrewAI agents for complex workflows
-	•	Implement advanced RAG strategies with Supabase
-	•	Add custom fine-tuned models (via API)
-	•	Team collaboration features
-	•	Advanced analytics and reporting
+Current State: Simplified v6.0 (no advanced RAG)
+Target State: Complete v6.0 (all advanced RAG features)
 
-This architecture provides enterprise-grade document processing
-with unified database architecture but is INCOMPLETE without the Chat UI
-for knowledge base queries. CrewAI is ESSENTIAL, not optional.
+Phase 1: Database Functions (Week 1)
+├── Implement dynamic_hybrid_search_db function
+├── Add context expansion functions
+├── Create hierarchical structure extraction
+└── Test all search methods independently
+
+Phase 2: API Integrations (Week 1-2)
+├── Integrate Cohere Rerank v3.5
+├── Connect LightRAG API
+├── Test reranking pipeline
+└── Validate graph queries
+
+Phase 3: n8n Workflows (Week 2)
+├── Update ingestion to extract hierarchy
+├── Add LightRAG entity extraction step
+├── Store all required metadata
+└── Test end-to-end ingestion
+
+Phase 4: Query Pipeline (Week 2-3)
+├── Implement dynamic hybrid search
+├── Add Cohere reranking step
+├── Integrate LightRAG graph queries
+├── Add context expansion
+└── Test complete query flow
+
+Phase 5: Chat UI Deployment (Week 3)
+├── Deploy Gradio interface
+├── Connect to query pipeline
+├── Add cost tracking
+├── Test user experience
+└── Launch to production
+
+Total Time: 2-3 weeks
+Additional Cost: $35-45/month
+Value: Best-in-class RAG system
 
 ================================================================================
-Last Updated: October 21, 2025
-Version: 6.0 - Claude API + Supabase Unified Edition
+Last Updated: October 24, 2025
+Version: 6.0 - CORRECTED with Full Advanced RAG
 Classification: Confidential - Internal Use
-Implementation Status: 70% Complete (Chat UI MISSING)
+Implementation Status: 40% Complete (Advanced RAG NOT YET IMPLEMENTED)
+Priority: HIGH - Restore advanced features immediately
 ================================================================================
