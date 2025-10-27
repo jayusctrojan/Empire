@@ -126,6 +126,46 @@ def assessPDFComplexity(file):
 *Priority: Medium*
 *Status: Active - All Versions*
 
+#### 3.1.1.4 LangExtract Integration (NEW - v7.0)
+
+**FR-015A:** The system SHALL integrate LangExtract for precise information extraction alongside LlamaIndex
+
+*Priority: High*
+*Description: Gemini-powered extraction library for precise grounding*
+*Status: Active - v7.0+*
+
+**FR-015B:** The system SHALL use LangExtract for structured data extraction from documents
+
+*Priority: High*
+*Processing: Gemini-powered extraction with schema validation*
+*Accuracy: >95% extraction accuracy for structured fields*
+*Status: Active - v7.0+*
+
+**FR-015C:** The system SHALL validate extracted information against LlamaIndex document processing
+
+*Priority: High*
+*Description: Cross-validation between LangExtract and LlamaIndex for grounding precision*
+*Status: Active - v7.0+*
+
+**FR-015D:** The system SHALL support custom extraction schemas for domain-specific needs
+
+*Priority: Medium*
+*Configuration: YAML/JSON schema definitions*
+*Status: Active - v7.0+*
+
+**FR-015E:** The system SHALL provide extraction confidence scores for validation
+
+*Priority: Medium*
+*Threshold: >0.85 confidence for auto-acceptance*
+*Status: Active - v7.0+*
+
+**LangExtract Use Cases:**
+- **Entity Extraction:** Precise identification of people, organizations, dates, locations
+- **Relationship Mapping:** Extract relationships between entities
+- **Structured Fields:** Pull specific fields (dates, amounts, IDs) with high precision
+- **Citation Grounding:** Validate extracted information against source documents
+- **Schema Compliance:** Ensure extracted data matches expected formats
+
 ### 3.1.2 Multimedia Processing Requirements (All Versions)
 
 #### 3.1.2.1 YouTube Content Extraction
@@ -886,6 +926,481 @@ def assessPDFComplexity(file):
 *Priority: Essential*
 *Result: Backblaze cannot decrypt user data*
 *Status: Active - v5.0*
+
+### 3.1.11 Advanced Search Requirements (NEW - v7.0)
+
+#### 3.1.11.1 Hybrid Search Implementation
+
+**SRC-001:** The system SHALL implement dynamic hybrid search combining multiple retrieval methods
+
+*Priority: Essential*
+*Description: Four-method hybrid search for superior relevance*
+*Methods: Dense (vector), Sparse (full-text), ILIKE (pattern), Fuzzy (trigram)*
+*Fusion: Reciprocal Rank Fusion (RRF)*
+*Impact: 30-50% improvement in search relevance*
+*Status: Active - v7.0*
+
+**SRC-002:** The system SHALL support dense vector search using nomic-embed-text embeddings
+
+*Priority: Essential*
+*Dimensions: 768*
+*Similarity: Cosine distance*
+*Index: HNSW with m=16, ef_construction=64*
+*Status: Active - v7.0*
+
+**SRC-003:** The system SHALL support sparse full-text search using PostgreSQL FTS
+
+*Priority: Essential*
+*Method: websearch_to_tsquery with English dictionary*
+*Index: GIN index on tsvector*
+*Ranking: ts_rank for relevance scoring*
+*Status: Active - v7.0*
+
+**SRC-004:** The system SHALL support pattern matching search (ILIKE)
+
+*Priority: High*
+*Use Case: Exact phrase matching, wildcards*
+*Scoring: Frequency-based relevance*
+*Status: Active - v7.0*
+
+**SRC-005:** The system SHALL support fuzzy search using trigram similarity
+
+*Priority: High*
+*Extension: pg_trgm*
+*Use Case: Typo tolerance, approximate matching*
+*Threshold: Configurable (default 0.3)*
+*Status: Active - v7.0*
+
+**SRC-006:** The system SHALL combine search results using Reciprocal Rank Fusion
+
+*Priority: Essential*
+*Algorithm: RRF with configurable k parameter (default 60)*
+*Weights: Configurable per method (dense: 0.4, sparse: 0.3, ilike: 0.15, fuzzy: 0.15)*
+*Output: Unified ranking with individual method scores*
+*Status: Active - v7.0*
+
+**SRC-007:** The system SHALL support advanced metadata filtering in hybrid search
+
+*Priority: Essential*
+*Operators: =, !=, >, <, >=, <=, IN, NOT IN*
+*Logic: $and, $or operators*
+*Types: Text, numeric, timestamp, array*
+*Status: Active - v7.0*
+
+#### 3.1.11.2 Reranking Requirements
+
+**RRK-001:** The system SHALL implement Cohere reranking for result optimization
+
+*Priority: High*
+*Model: rerank-english-v3.5*
+*Application: Applied after hybrid search, before context expansion*
+*Impact: 20-30% improvement in result ordering*
+*Cost: ~$0.03 per 1000 searches*
+*Status: Active - v7.0*
+
+**RRK-002:** The system SHALL rerank top N results based on query relevance
+
+*Priority: High*
+*Default: Rerank top 20, return top 10*
+*Threshold: Configurable relevance threshold (default 0.7)*
+*Status: Active - v7.0*
+
+**RRK-003:** The system SHALL preserve diversity in reranked results
+
+*Priority: Medium*
+*Method: Maximum marginal relevance (MMR)*
+*Balance: Relevance vs diversity*
+*Status: Active - v7.0*
+
+#### 3.1.11.3 Query Enhancement Requirements
+
+**QRY-001:** The system SHALL enhance queries before search execution
+
+*Priority: High*
+*Pipeline: Spell correction → Synonym expansion → Entity extraction → Intent classification*
+*Impact: Improved query understanding and recall*
+*Status: Active - v7.0*
+
+**QRY-002:** The system SHALL perform spell correction on user queries
+
+*Priority: Medium*
+*Method: Claude API-based correction*
+*Fallback: User confirmation for significant changes*
+*Status: Active - v7.0*
+
+**QRY-003:** The system SHALL expand queries with relevant synonyms
+
+*Priority: Medium*
+*Source: Claude API semantic understanding*
+*Limit: Max 3 synonyms per key term*
+*Status: Active - v7.0*
+
+**QRY-004:** The system SHALL extract entities from queries
+
+*Priority: High*
+*Types: Person, Organization, Location, Date, Technology, Concept*
+*Use: Entity-based filtering and graph traversal*
+*Status: Active - v7.0*
+
+**QRY-005:** The system SHALL classify query intent
+
+*Priority: High*
+*Categories: Factual, Analytical, Comparative, Multi-hop, Ambiguous*
+*Use: Adaptive search strategy selection*
+*Status: Active - v7.0*
+
+#### 3.1.11.4 Semantic Caching Requirements
+
+**CHE-001:** The system SHALL implement semantic caching for query results
+
+*Priority: High*
+*Method: Embedding-based similarity matching*
+*Threshold: 0.85 cosine similarity*
+*Storage: Redis with TTL*
+*Impact: 60-80% cache hit rate for common queries*
+*Status: Active - v7.0*
+
+**CHE-002:** The system SHALL cache query embeddings for similarity comparison
+
+*Priority: High*
+*Storage: Redis hash with embedding vectors*
+*TTL: 1 hour for query cache, 24 hours for result cache*
+*Status: Active - v7.0*
+
+**CHE-003:** The system SHALL invalidate cache on document updates
+
+*Priority: Essential*
+*Strategy: Document-based invalidation*
+*Granularity: Per-document or global flush*
+*Status: Active - v7.0*
+
+### 3.1.12 Knowledge Graph Requirements (NEW - v7.0)
+
+#### 3.1.12.1 LightRAG Integration
+
+**KG-001:** The system SHALL integrate LightRAG for knowledge graph capabilities
+
+*Priority: High*
+*API: LightRAG HTTP API*
+*Cost: $15-30/month*
+*Impact: 20-40% better context understanding for entity-rich queries*
+*Status: Active - v7.0*
+
+**KG-002:** The system SHALL extract entities and relationships from documents
+
+*Priority: High*
+*Extraction: During document ingestion*
+*Types: Entities (Person, Organization, Technology, Concept, Event)*
+*Relationships: (uses, created_by, related_to, part_of, occurred_at)*
+*Status: Active - v7.0*
+
+**KG-003:** The system SHALL store knowledge graph data in Supabase
+
+*Priority: Essential*
+*Tables: knowledge_entities, knowledge_relationships*
+*Indexing: B-tree on entity values, JSONB GIN on properties*
+*Status: Active - v7.0*
+
+**KG-004:** The system SHALL support graph traversal queries
+
+*Priority: High*
+*Max Hops: Configurable (default 3)*
+*Filtering: By entity type and relationship type*
+*Scoring: Path relevance based on relationship strength*
+*Status: Active - v7.0*
+
+**KG-005:** The system SHALL combine graph results with vector search
+
+*Priority: High*
+*Integration: Graph traversal → Expand to related documents → Hybrid search*
+*Weighting: Graph results boosted by relationship proximity*
+*Status: Active - v7.0*
+
+#### 3.1.12.2 Entity Management
+
+**ENT-001:** The system SHALL maintain entity embeddings for similarity search
+
+*Priority: High*
+*Model: nomic-embed-text (768 dimensions)*
+*Use: Entity disambiguation and linking*
+*Status: Active - v7.0*
+
+**ENT-002:** The system SHALL deduplicate entities automatically
+
+*Priority: Medium*
+*Method: Embedding similarity + name matching*
+*Threshold: 0.9 similarity for merge*
+*Status: Active - v7.0*
+
+**ENT-003:** The system SHALL track entity confidence scores
+
+*Priority: Medium*
+*Range: 0.0-1.0*
+*Use: Filtering low-confidence entities*
+*Status: Active - v7.0*
+
+### 3.1.13 Memory System Requirements (NEW - v7.0)
+
+#### 3.1.13.1 mem-agent MCP Integration
+
+**MEM-001:** The system SHALL integrate mem-agent MCP for conversation memory
+
+*Priority: Essential*
+*Server: mem-agent MCP server (local)*
+*Storage: Local vector database*
+*Purpose: Long-term conversation context and user preferences*
+*Status: Active - v7.0*
+
+**MEM-002:** The system SHALL store conversation summaries in mem-agent
+
+*Priority: Essential*
+*Granularity: Per-conversation summary*
+*Storage: Automatic after conversation end or every 10 messages*
+*Retention: Indefinite with periodic cleanup*
+*Status: Active - v7.0*
+
+**MEM-003:** The system SHALL extract and store user facts from conversations
+
+*Priority: High*
+*Types: Preferences, personal information, project context, domain knowledge*
+*Extraction: Claude API-based fact extraction*
+*Verification: User confirmation for critical facts*
+*Status: Active - v7.0*
+
+**MEM-004:** The system SHALL retrieve relevant memories during query processing
+
+*Priority: Essential*
+*Trigger: Every RAG query*
+*Limit: Top 5 relevant memories*
+*Integration: Memories appended to system prompt*
+*Status: Active - v7.0*
+
+**MEM-005:** The system SHALL support memory search and management
+
+*Priority: Medium*
+*Operations: Search, view, edit, delete memories*
+*Interface: Chat commands and UI*
+*Status: Active - v7.0*
+
+#### 3.1.13.2 Session Management
+
+**SES-001:** The system SHALL maintain session-based chat history
+
+*Priority: Essential*
+*Storage: Supabase n8n_chat_histories table*
+*Retention: 90 days*
+*Status: Active - v7.0*
+
+**SES-002:** The system SHALL support multi-session management per user
+
+*Priority: High*
+*Sessions: Unlimited concurrent sessions*
+*Isolation: Complete session isolation*
+*Status: Active - v7.0*
+
+**SES-003:** The system SHALL preserve context within sessions
+
+*Priority: Essential*
+*Window: Last 10 messages or 8000 tokens*
+*Compression: Automatic summarization for long conversations*
+*Status: Active - v7.0*
+
+### 3.1.14 Structured Data Requirements (NEW - v7.0)
+
+#### 3.1.14.1 Tabular Data Processing
+
+**TAB-001:** The system SHALL process CSV and Excel files as structured data
+
+*Priority: High*
+*Formats: CSV, TSV, XLSX, XLS*
+*Preservation: Column headers, data types, relationships*
+*Status: Active - v7.0*
+
+**TAB-002:** The system SHALL store tabular data in dedicated schema
+
+*Priority: High*
+*Table: tabular_document_rows*
+*Format: JSONB for flexible schema*
+*Indexing: GIN index on row_data*
+*Status: Active - v7.0*
+
+**TAB-003:** The system SHALL support structured queries on tabular data
+
+*Priority: Medium*
+*Query Types: Filter, aggregate, join*
+*Interface: Natural language to SQL translation*
+*Status: Active - v7.0*
+
+**TAB-004:** The system SHALL preserve table relationships and metadata
+
+*Priority: Medium*
+*Metadata: Column names, types, statistics*
+*Relationships: Foreign key detection*
+*Status: Active - v7.0*
+
+#### 3.1.14.2 Schema Inference
+
+**SCH-001:** The system SHALL automatically infer schema from structured data
+
+*Priority: High*
+*Detection: Column types (string, number, date, boolean)*
+*Validation: Sample-based validation*
+*Status: Active - v7.0*
+
+**SCH-002:** The system SHALL detect and preserve data relationships
+
+*Priority: Medium*
+*Detection: Foreign key patterns, hierarchical structures*
+*Use: Enhanced query planning*
+*Status: Active - v7.0*
+
+### 3.1.15 Multi-Modal Processing Requirements (NEW - v7.0)
+
+#### 3.1.15.1 Image Processing
+
+**IMG-001:** The system SHALL process images using Claude Vision API
+
+*Priority: High*
+*Formats: JPG, PNG, GIF, BMP, TIFF, WEBP*
+*Extraction: Text (OCR), objects, descriptions, captions*
+*Status: Active - v7.0*
+
+**IMG-002:** The system SHALL generate descriptive embeddings for images
+
+*Priority: High*
+*Method: Text description → nomic-embed-text*
+*Storage: Standard vector storage with image metadata*
+*Status: Active - v7.0*
+
+**IMG-003:** The system SHALL support image-text cross-modal search
+
+*Priority: Medium*
+*Query: Text query retrieves relevant images*
+*Ranking: Semantic similarity of descriptions*
+*Status: Active - v7.0*
+
+#### 3.1.15.2 Audio Processing
+
+**AUD-001:** The system SHALL transcribe audio files using Soniox API
+
+*Priority: Medium*
+*Formats: MP3, WAV, M4A, FLAC*
+*Features: Speaker diarization, timestamps*
+*Cost: $0.005 per minute*
+*Status: Active - v7.0*
+
+**AUD-002:** The system SHALL process transcriptions as text documents
+
+*Priority: Medium*
+*Enrichment: Speaker labels, timing metadata*
+*Chunking: By speaker turns or time segments*
+*Status: Active - v7.0*
+
+#### 3.1.15.3 Video Processing
+
+**VID-001:** The system SHALL extract keyframes from video files
+
+*Priority: Low*
+*Method: 1 frame per 10 seconds*
+*Processing: Each frame as image (Claude Vision)*
+*Status: Future - v8.0*
+
+**VID-002:** The system SHALL extract audio tracks for transcription
+
+*Priority: Low*
+*Method: FFmpeg audio extraction → Soniox*
+*Integration: Synchronized transcript with keyframes*
+*Status: Future - v8.0*
+
+### 3.1.16 Advanced Context Expansion Requirements (NEW - v7.0)
+
+#### 3.1.16.1 Chunk Expansion
+
+**CTX-001:** The system SHALL expand retrieved chunks with neighboring context
+
+*Priority: High*
+*Range: Configurable (default ±2 chunks)*
+*Limit: Maximum 8000 tokens total*
+*Status: Active - v7.0*
+
+**CTX-002:** The system SHALL merge overlapping expanded chunks
+
+*Priority: High*
+*Method: Deduplication by chunk ID*
+*Ordering: Document order preservation*
+*Status: Active - v7.0*
+
+**CTX-003:** The system SHALL prioritize expansion based on relevance scores
+
+*Priority: Medium*
+*Strategy: Expand high-scoring chunks more than low-scoring*
+*Weighting: Score-based expansion radius*
+*Status: Active - v7.0*
+
+#### 3.1.16.2 Hierarchical Context
+
+**CTX-004:** The system SHALL maintain hierarchical document structure
+
+*Priority: Medium*
+*Hierarchy: Document → Section → Subsection → Chunk*
+*Storage: Metadata fields for parent/child relationships*
+*Status: Active - v7.0*
+
+**CTX-005:** The system SHALL expand to parent context when relevant
+
+*Priority: Medium*
+*Trigger: High relevance score or missing context*
+*Expansion: Include section headers and summaries*
+*Status: Active - v7.0*
+
+### 3.1.17 Observability Requirements (NEW - v7.0)
+
+#### 3.1.17.1 Metrics and Monitoring
+
+**OBS-001:** The system SHALL track and expose key performance metrics
+
+*Priority: High*
+*Metrics: Query latency, search quality, token usage, cost per query, error rate*
+*Collection: Prometheus metrics*
+*Visualization: Grafana dashboards*
+*Status: Active - v7.0*
+
+**OBS-002:** The system SHALL log all API calls and searches
+
+*Priority: Essential*
+*Format: Structured JSON logs*
+*Storage: Elasticsearch or file-based*
+*Retention: 90 days*
+*Status: Active - v7.0*
+
+**OBS-003:** The system SHALL implement distributed tracing
+
+*Priority: Medium*
+*Framework: OpenTelemetry*
+*Tracing: Request flow through all components*
+*Storage: Jaeger*
+*Status: Active - v7.0*
+
+#### 3.1.17.2 Alerting
+
+**ALT-001:** The system SHALL alert on error rate thresholds
+
+*Priority: High*
+*Threshold: >5% error rate for 5 minutes*
+*Delivery: Email, Slack, PagerDuty*
+*Status: Active - v7.0*
+
+**ALT-002:** The system SHALL alert on performance degradation
+
+*Priority: High*
+*Thresholds: P95 latency >3s, search quality <70%*
+*Status: Active - v7.0*
+
+**ALT-003:** The system SHALL alert on cost anomalies
+
+*Priority: Medium*
+*Threshold: >$10/hour token usage*
+*Status: Active - v7.0*
 
 ## 3.2 Non-Functional Requirements
 
