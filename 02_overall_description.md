@@ -149,6 +149,8 @@ The system integrates with multiple services, prioritizing simplicity and reliab
   - Vectors and metadata in same database
   - HNSW indexing for fast search
   - Rich JSONB metadata support
+  - Edge Functions for HTTP API access to database functions
+  - Built-in authentication and RLS
 - **Chat UI:** Knowledge base query interface - MISSING ($7-15/month)
   - Required for users to query documents
   - Enables RAG testing
