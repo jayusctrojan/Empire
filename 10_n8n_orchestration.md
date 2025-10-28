@@ -819,6 +819,82 @@ n8n Instance (Render - $15-30/month)
 }
 ```
 
+#### Hash-Based Deduplication Implementation (CRITICAL - Gap 1.10)
+
+Add the following nodes to the Document Intake workflow after file upload but before processing:
+
+```json
+{
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "// Generate SHA-256 hash of document content\nconst crypto = require('crypto');\n\nconst content = $input.item.content || $input.item.text || '';\nconst metadata = $input.item.metadata || {};\n\n// Create composite hash from content + key metadata\nconst hashInput = content + JSON.stringify({\n  filename: metadata.filename,\n  file_size: metadata.file_size,\n  modified_date: metadata.modified_date\n});\n\nconst hash = crypto.createHash('sha256').update(hashInput).digest('hex');\n\nreturn {\n  ...($input.item),\n  content_hash: hash\n};"
+      },
+      "name": "Generate Content Hash",
+      "type": "n8n-nodes-base.code",
+      "position": [550, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": "public",
+        "table": "documents",
+        "limit": 1,
+        "where": {
+          "content_hash": "={{ $json.content_hash }}"
+        }
+      },
+      "name": "Check for Duplicate",
+      "type": "n8n-nodes-base.postgres",
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Is New Document?",
+      "type": "n8n-nodes-base.if",
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Document is duplicate - skip processing\nreturn {\n  action: 'skip',\n  reason: 'duplicate_content',\n  existing_hash: $input.item.content_hash,\n  message: 'Document with identical content already exists'\n};"
+      },
+      "name": "Skip Duplicate",
+      "type": "n8n-nodes-base.code",
+      "position": [1150, 400],
+      "continueOnFail": true
+    }
+  ]
+}
+```
+
+Also update the documents table schema to include the hash field:
+
+```sql
+-- Add hash column to documents table if it doesn't exist
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_hash TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_content_hash ON documents(content_hash);
+
+-- Add processing status tracking (Gap 1.11)
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS processing_status VARCHAR(50) DEFAULT 'pending';
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS processing_started_at TIMESTAMPTZ;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS processing_completed_at TIMESTAMPTZ;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS processing_duration_ms INTEGER;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS processing_error TEXT;
+
+-- Status values: 'pending', 'processing', 'complete', 'error', 'duplicate'
+CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(processing_status);
+```
+
 ### 10.2.3 Database Schema for Document Management
 
 ```sql
@@ -1058,6 +1134,245 @@ BEGIN
     RETURNING q.id, q.document_id, q.priority, q.attempts, q.metadata;
 END;
 $$ LANGUAGE plpgsql;
+```
+
+### 10.2.4 Tabular Data Processing (NEW - Gap 1.3)
+
+**Purpose**: Handle CSV, Excel, and structured data with dedicated storage and processing pipelines.
+
+#### Database Schema for Tabular Data
+
+```sql
+-- Table for storing structured/tabular document rows
+CREATE TABLE IF NOT EXISTS public.tabular_document_rows (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+  row_number INTEGER NOT NULL,
+  row_data JSONB NOT NULL,
+  row_hash TEXT GENERATED ALWAYS AS (encode(sha256(row_data::text::bytea), 'hex')) STORED,
+  schema_metadata JSONB, -- Stores inferred schema information
+  inferred_relationships JSONB, -- Stores detected foreign keys and relationships
+  search_vector tsvector GENERATED ALWAYS AS (to_tsvector('english', row_data::text)) STORED,
+  CONSTRAINT unique_document_row UNIQUE(document_id, row_number)
+);
+
+-- Indexes for performance
+CREATE INDEX idx_tabular_rows_document ON tabular_document_rows(document_id);
+CREATE INDEX idx_tabular_rows_data_gin ON tabular_document_rows USING gin(row_data);
+CREATE INDEX idx_tabular_rows_search ON tabular_document_rows USING gin(search_vector);
+CREATE INDEX idx_tabular_rows_hash ON tabular_document_rows(row_hash);
+
+-- Schema inference metadata table
+CREATE TABLE IF NOT EXISTS public.tabular_schemas (
+  id BIGSERIAL PRIMARY KEY,
+  document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+  schema_definition JSONB NOT NULL,
+  column_types JSONB NOT NULL,
+  inferred_at TIMESTAMPTZ DEFAULT NOW(),
+  confidence_scores JSONB,
+  sample_size INTEGER,
+  CONSTRAINT unique_document_schema UNIQUE(document_id)
+);
+```
+
+#### n8n Workflow: Tabular Data Processing
+
+```json
+{
+  "name": "Empire - Tabular Data Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "csv_content"
+      },
+      "name": "Extract CSV/Excel Content",
+      "type": "n8n-nodes-base.extractFromFile",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse CSV and infer schema\nconst Papa = require('papaparse');\nconst parsed = Papa.parse($input.item.csv_content, {\n  header: true,\n  dynamicTyping: true,\n  skipEmptyLines: true\n});\n\n// Infer column types\nconst schema = {};\nif (parsed.data.length > 0) {\n  const sample = parsed.data.slice(0, 100); // Sample first 100 rows\n  \n  Object.keys(parsed.data[0]).forEach(column => {\n    const values = sample.map(row => row[column]).filter(v => v !== null);\n    \n    // Determine type\n    let columnType = 'string';\n    if (values.every(v => typeof v === 'number')) {\n      columnType = 'number';\n    } else if (values.every(v => v instanceof Date)) {\n      columnType = 'date';\n    } else if (values.every(v => typeof v === 'boolean')) {\n      columnType = 'boolean';\n    }\n    \n    schema[column] = {\n      type: columnType,\n      nullable: values.length < sample.length,\n      unique_count: new Set(values).size,\n      sample_values: [...new Set(values)].slice(0, 5)\n    };\n  });\n}\n\nreturn {\n  rows: parsed.data,\n  schema: schema,\n  row_count: parsed.data.length,\n  column_count: Object.keys(schema).length\n};"
+      },
+      "name": "Parse and Infer Schema",
+      "type": "n8n-nodes-base.code",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 100,
+        "options": {}
+      },
+      "name": "Batch Rows",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": "public",
+        "table": "tabular_document_rows",
+        "columns": "document_id,row_number,row_data,schema_metadata",
+        "additionalFields": {}
+      },
+      "name": "Insert Rows to Database",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": "public",
+        "table": "tabular_schemas",
+        "columns": "document_id,schema_definition,column_types,sample_size"
+      },
+      "name": "Store Schema Metadata",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1050, 450]
+    }
+  ]
+}
+```
+
+### 10.2.5 Metadata Fields Management (NEW - Gap 1.5)
+
+**Purpose**: Provide controlled vocabularies and metadata validation for advanced filtering.
+
+#### Database Schema
+
+```sql
+-- Metadata field definitions for controlled vocabularies
+CREATE TABLE IF NOT EXISTS public.metadata_fields (
+  id BIGSERIAL PRIMARY KEY,
+  field_name TEXT NOT NULL UNIQUE,
+  field_type VARCHAR(50) NOT NULL CHECK (field_type IN ('string', 'number', 'date', 'enum', 'boolean')),
+  allowed_values TEXT[], -- For enum types only
+  validation_regex TEXT, -- For string types
+  min_value NUMERIC, -- For number types
+  max_value NUMERIC, -- For number types
+  description TEXT,
+  is_required BOOLEAN DEFAULT FALSE,
+  is_searchable BOOLEAN DEFAULT TRUE,
+  is_facetable BOOLEAN DEFAULT TRUE,
+  display_order INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insert default metadata fields
+INSERT INTO public.metadata_fields (field_name, field_type, allowed_values, description, is_required, display_order) VALUES
+  ('department', 'enum', ARRAY['HR', 'Engineering', 'Sales', 'Marketing', 'Operations', 'Legal', 'Finance'], 'Document department', false, 1),
+  ('document_type', 'enum', ARRAY['Policy', 'Procedure', 'Report', 'Memo', 'Contract', 'Invoice', 'Manual'], 'Type of document', true, 2),
+  ('confidentiality', 'enum', ARRAY['Public', 'Internal', 'Confidential', 'Secret'], 'Confidentiality level', true, 3),
+  ('document_date', 'date', NULL, 'Date of document creation', false, 4),
+  ('expiry_date', 'date', NULL, 'Document expiration date', false, 5),
+  ('author', 'string', NULL, 'Document author name', false, 6),
+  ('version', 'string', NULL, 'Document version', false, 7),
+  ('tags', 'string', NULL, 'Comma-separated tags', false, 8),
+  ('review_status', 'enum', ARRAY['Draft', 'Under Review', 'Approved', 'Archived'], 'Review status', false, 9),
+  ('language', 'enum', ARRAY['en', 'es', 'fr', 'de', 'zh', 'ja'], 'Document language', false, 10)
+ON CONFLICT (field_name) DO NOTHING;
+
+-- Function to validate metadata against field definitions
+CREATE OR REPLACE FUNCTION validate_document_metadata(metadata JSONB)
+RETURNS JSONB
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  field RECORD;
+  field_value TEXT;
+  validation_errors JSONB := '[]'::JSONB;
+  validated_metadata JSONB := '{}'::JSONB;
+BEGIN
+  -- Check each defined field
+  FOR field IN SELECT * FROM metadata_fields WHERE is_required = true
+  LOOP
+    IF NOT metadata ? field.field_name THEN
+      validation_errors := validation_errors || jsonb_build_object(
+        'field', field.field_name,
+        'error', 'Required field missing'
+      );
+    END IF;
+  END LOOP;
+
+  -- Validate present fields
+  FOR field IN SELECT * FROM metadata_fields
+  LOOP
+    IF metadata ? field.field_name THEN
+      field_value := metadata->>field.field_name;
+
+      -- Validate based on type
+      CASE field.field_type
+        WHEN 'enum' THEN
+          IF NOT field_value = ANY(field.allowed_values) THEN
+            validation_errors := validation_errors || jsonb_build_object(
+              'field', field.field_name,
+              'error', format('Value must be one of: %s', array_to_string(field.allowed_values, ', '))
+            );
+          ELSE
+            validated_metadata := validated_metadata || jsonb_build_object(field.field_name, field_value);
+          END IF;
+
+        WHEN 'date' THEN
+          BEGIN
+            validated_metadata := validated_metadata || jsonb_build_object(field.field_name, field_value::date);
+          EXCEPTION WHEN OTHERS THEN
+            validation_errors := validation_errors || jsonb_build_object(
+              'field', field.field_name,
+              'error', 'Invalid date format'
+            );
+          END;
+
+        WHEN 'number' THEN
+          BEGIN
+            IF field.min_value IS NOT NULL AND field_value::numeric < field.min_value THEN
+              RAISE EXCEPTION 'Below minimum';
+            END IF;
+            IF field.max_value IS NOT NULL AND field_value::numeric > field.max_value THEN
+              RAISE EXCEPTION 'Above maximum';
+            END IF;
+            validated_metadata := validated_metadata || jsonb_build_object(field.field_name, field_value::numeric);
+          EXCEPTION WHEN OTHERS THEN
+            validation_errors := validation_errors || jsonb_build_object(
+              'field', field.field_name,
+              'error', format('Must be a number between %s and %s', field.min_value, field.max_value)
+            );
+          END;
+
+        WHEN 'string' THEN
+          IF field.validation_regex IS NOT NULL AND NOT field_value ~ field.validation_regex THEN
+            validation_errors := validation_errors || jsonb_build_object(
+              'field', field.field_name,
+              'error', 'Invalid format'
+            );
+          ELSE
+            validated_metadata := validated_metadata || jsonb_build_object(field.field_name, field_value);
+          END IF;
+
+        ELSE
+          validated_metadata := validated_metadata || jsonb_build_object(field.field_name, field_value);
+      END CASE;
+    END IF;
+  END LOOP;
+
+  -- Return result
+  IF jsonb_array_length(validation_errors) > 0 THEN
+    RETURN jsonb_build_object(
+      'valid', false,
+      'errors', validation_errors,
+      'metadata', metadata
+    );
+  ELSE
+    RETURN jsonb_build_object(
+      'valid', true,
+      'errors', '[]'::jsonb,
+      'metadata', validated_metadata
+    );
+  END IF;
+END;
+$$;
 ```
 
 ## 10.3 Milestone 2: Text Extraction and Chunking
@@ -2543,9 +2858,90 @@ CREATE INDEX IF NOT EXISTS documents_v2_metadata_idx
   ON documents_v2 USING gin (metadata);
 ```
 
-### 10.5.4 Context Expansion SQL Function
+### 10.5.4 Context Expansion SQL Functions (Enhanced for Total RAG Parity)
 
-**Purpose**: Expand retrieved chunks with neighboring context for better answer quality.
+**Purpose**: Provide flexible context expansion with both radius-based and range-based retrieval methods for optimal answer quality.
+
+#### Function 1: Range-Based Context Expansion (CRITICAL - Gap 1.1)
+
+```sql
+-- Critical for Total RAG parity - Allows efficient batch retrieval of chunk ranges
+CREATE OR REPLACE FUNCTION get_chunks_by_ranges(input_data jsonb)
+RETURNS TABLE(
+  doc_id text,
+  chunk_index integer,
+  content text,
+  metadata jsonb,
+  id bigint,
+  hierarchical_context jsonb,
+  parent_heading text,
+  section_depth integer
+)
+LANGUAGE plpgsql
+SECURITY INVOKER
+AS $$
+DECLARE
+  doc_item JSONB;
+  range_item JSONB;
+  range_start INTEGER;
+  range_end INTEGER;
+  current_doc_id TEXT;
+  parent_heading_text TEXT;
+  hierarchical_data JSONB;
+BEGIN
+  -- Loop through each document in the input array
+  FOR doc_item IN SELECT * FROM jsonb_array_elements(input_data)
+  LOOP
+    -- Extract doc_id from current document item
+    current_doc_id := doc_item->>'doc_id';
+
+    -- Get parent heading and hierarchical context for document
+    SELECT
+      metadata->>'parent_heading',
+      jsonb_build_object(
+        'document_title', metadata->>'document_title',
+        'section_hierarchy', metadata->'section_hierarchy',
+        'document_type', metadata->>'document_type'
+      )
+    INTO parent_heading_text, hierarchical_data
+    FROM documents_v2
+    WHERE metadata->>'doc_id' = current_doc_id
+    LIMIT 1;
+
+    -- Loop through each chunk range for this document
+    FOR range_item IN SELECT * FROM jsonb_array_elements(doc_item->'chunk_ranges')
+    LOOP
+      -- Extract start and end of the range
+      range_start := (range_item->0)::INTEGER;
+      range_end := (range_item->1)::INTEGER;
+
+      -- Return all chunks within this range with hierarchical context
+      RETURN QUERY
+      SELECT
+        current_doc_id as doc_id,
+        (d.metadata->>'chunk_index')::INTEGER as chunk_index,
+        d.content,
+        d.metadata,
+        d.id,
+        hierarchical_data as hierarchical_context,
+        COALESCE(d.metadata->>'parent_heading', parent_heading_text) as parent_heading,
+        COALESCE((d.metadata->>'section_depth')::INTEGER, 0) as section_depth
+      FROM documents_v2 d
+      WHERE d.metadata->>'doc_id' = current_doc_id
+        AND (d.metadata->>'chunk_index')::INTEGER >= range_start
+        AND (d.metadata->>'chunk_index')::INTEGER <= range_end
+      ORDER BY (d.metadata->>'chunk_index')::INTEGER;
+    END LOOP;
+  END LOOP;
+END;
+$$;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION get_chunks_by_ranges(jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_chunks_by_ranges(jsonb) TO anon;
+```
+
+#### Function 2: Original Radius-Based Expansion (Enhanced)
 
 ```sql
 CREATE OR REPLACE FUNCTION expand_context_chunks(
@@ -2558,7 +2954,8 @@ RETURNS TABLE (
   content text,
   metadata jsonb,
   chunk_index int,
-  is_original boolean
+  is_original boolean,
+  distance_from_original int
 )
 LANGUAGE plpgsql
 AS $$
@@ -2587,15 +2984,82 @@ BEGIN
       d.content,
       d.metadata,
       (d.metadata->>'chunk_index')::int as chunk_index,
-      (d.id = chunk_id) as is_original
+      (d.id = chunk_id) as is_original,
+      ABS((d.metadata->>'chunk_index')::int - chunk_idx) as distance_from_original
     FROM documents_v2 d
     WHERE d.metadata->>'doc_id' = doc_id
       AND (d.metadata->>'chunk_index')::int >= chunk_idx - expansion_radius
       AND (d.metadata->>'chunk_index')::int <= chunk_idx + expansion_radius
     ORDER BY (d.metadata->>'chunk_index')::int;
+
+    -- Track total tokens to avoid context overflow
+    SELECT SUM(LENGTH(content) / 4) INTO total_tokens
+    FROM documents_v2 d
+    WHERE d.metadata->>'doc_id' = doc_id
+      AND (d.metadata->>'chunk_index')::int >= chunk_idx - expansion_radius
+      AND (d.metadata->>'chunk_index')::int <= chunk_idx + expansion_radius;
+
+    -- Exit if we're approaching token limit
+    IF total_tokens > max_total_tokens THEN
+      EXIT;
+    END IF;
   END LOOP;
 END;
 $$;
+```
+
+###***REMOVED*** Edge Function Wrapper (CRITICAL - Gap 1.2)
+
+Create a new edge function for HTTP access to context expansion:
+
+```typescript
+// supabase/functions/context-expansion/index.ts
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
+
+Deno.serve(async (req) => {
+  // Handle CORS
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    )
+
+    const { method, chunk_ids, expansion_radius, input_data } = await req.json()
+
+    let data, error
+
+    if (method === 'range') {
+      // Use range-based expansion
+      ({ data, error } = await supabaseClient.rpc('get_chunks_by_ranges', {
+        input_data
+      }))
+    } else {
+      // Use radius-based expansion
+      ({ data, error } = await supabaseClient.rpc('expand_context_chunks', {
+        chunk_ids,
+        expansion_radius: expansion_radius || 2
+      }))
+    }
+
+    if (error) throw error
+
+    return new Response(
+      JSON.stringify({ data }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+    )
+  }
+})
 ```
 
 ### 10.5.5 Knowledge Graph Entity Tables
@@ -3442,6 +3906,163 @@ CREATE TABLE IF NOT EXISTS chat_feedback (
 CREATE INDEX idx_feedback_session_id ON chat_feedback(session_id);
 CREATE INDEX idx_feedback_rating ON chat_feedback(rating);
 CREATE INDEX idx_feedback_created_at ON chat_feedback(created_at DESC);
+```
+
+### 10.6.4 Chat History Storage (CRITICAL - Gap 1.4)
+
+**Purpose**: Persist all chat conversations for multi-turn dialogue and analytics.
+
+#### Database Schema for Chat History
+
+```sql
+-- n8n-specific chat history storage
+CREATE TABLE IF NOT EXISTS public.n8n_chat_histories (
+  id BIGSERIAL PRIMARY KEY,
+  session_id VARCHAR(255) NOT NULL,
+  user_id VARCHAR(255),
+  message JSONB NOT NULL,
+  message_type VARCHAR(50) DEFAULT 'message', -- 'message', 'system', 'error', 'tool_use'
+  role VARCHAR(50) NOT NULL, -- 'user', 'assistant', 'system'
+  token_count INTEGER,
+  model_used VARCHAR(100),
+  latency_ms INTEGER,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE INDEX idx_chat_history_session ON n8n_chat_histories(session_id);
+CREATE INDEX idx_chat_history_user ON n8n_chat_histories(user_id);
+CREATE INDEX idx_chat_history_created ON n8n_chat_histories(created_at DESC);
+CREATE INDEX idx_chat_history_type ON n8n_chat_histories(message_type);
+
+-- Session metadata table
+CREATE TABLE IF NOT EXISTS public.chat_sessions (
+  id VARCHAR(255) PRIMARY KEY,
+  user_id VARCHAR(255),
+  title TEXT,
+  summary TEXT,
+  first_message_at TIMESTAMPTZ,
+  last_message_at TIMESTAMPTZ,
+  message_count INTEGER DEFAULT 0,
+  total_tokens INTEGER DEFAULT 0,
+  session_metadata JSONB DEFAULT '{}',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Function to automatically update session metadata
+CREATE OR REPLACE FUNCTION update_chat_session_metadata()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Update or insert session metadata
+  INSERT INTO chat_sessions (
+    id,
+    user_id,
+    first_message_at,
+    last_message_at,
+    message_count,
+    total_tokens
+  )
+  VALUES (
+    NEW.session_id,
+    NEW.user_id,
+    NEW.created_at,
+    NEW.created_at,
+    1,
+    COALESCE(NEW.token_count, 0)
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    last_message_at = NEW.created_at,
+    message_count = chat_sessions.message_count + 1,
+    total_tokens = chat_sessions.total_tokens + COALESCE(NEW.token_count, 0),
+    updated_at = NOW();
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger for automatic session updates
+CREATE TRIGGER update_session_on_message
+  AFTER INSERT ON n8n_chat_histories
+  FOR EACH ROW
+  EXECUTE FUNCTION update_chat_session_metadata();
+
+-- Function to retrieve chat history with context
+CREATE OR REPLACE FUNCTION get_chat_history(
+  p_session_id VARCHAR(255),
+  p_limit INTEGER DEFAULT 10,
+  p_include_system BOOLEAN DEFAULT false
+)
+RETURNS TABLE (
+  message_id BIGINT,
+  role VARCHAR(50),
+  content TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    h.id as message_id,
+    h.role,
+    h.message->>'content' as content,
+    h.metadata,
+    h.created_at
+  FROM n8n_chat_histories h
+  WHERE h.session_id = p_session_id
+    AND (p_include_system OR h.message_type != 'system')
+  ORDER BY h.created_at DESC
+  LIMIT p_limit;
+END;
+$$;
+```
+
+#### n8n Workflow Nodes for Chat History
+
+Add these nodes to your chat workflow:
+
+```json
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": "public",
+        "table": "n8n_chat_histories",
+        "columns": "session_id,user_id,message,message_type,role,token_count,model_used,metadata",
+        "additionalFields": {}
+      },
+      "name": "Store User Message",
+      "type": "n8n-nodes-base.postgres",
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM get_chat_history('{{ $json.session_id }}', 5, false);"
+      },
+      "name": "Retrieve Chat History",
+      "type": "n8n-nodes-base.postgres",
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": "public",
+        "table": "n8n_chat_histories",
+        "columns": "session_id,user_id,message,message_type,role,token_count,model_used,latency_ms,metadata"
+      },
+      "name": "Store Assistant Response",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1250, 200]
+    }
+  ]
+}
 ```
 
 ### 10.6.5 Graph-Based User Memory System
@@ -4403,7 +5024,420 @@ CREATE POLICY user_memory_isolation ON user_memory_nodes
 - Automatic cleanup of expired memories
 - User can manually archive or delete memories
 
-## 10.7 Milestone 6: LightRAG Integration via HTTP
+## 10.7 Sub-Workflow Patterns (CRITICAL - Gaps 1.7, 1.8)
+
+**Purpose**: Implement modular sub-workflows for better organization, testing, and maintenance.
+
+### 10.7.1 Multimodal Processing Sub-Workflow (Gap 1.7)
+
+```json
+{
+  "name": "Empire - Multimodal Processing Sub-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "multimodal-process",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.file_type }}",
+              "operation": "contains",
+              "value2": "image"
+            }
+          ]
+        }
+      },
+      "name": "Is Image?",
+      "type": "n8n-nodes-base.if",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaders": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "method": "POST",
+        "body": {
+          "model": "claude-3-5-sonnet-20241022",
+          "max_tokens": 1024,
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "image",
+                  "source": {
+                    "type": "base64",
+                    "media_type": "={{ $json.media_type }}",
+                    "data": "={{ $json.base64_data }}"
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": "Describe this image in detail, including any text, diagrams, or data visible."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "name": "Claude Vision Processing",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 250]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.file_type }}",
+              "operation": "contains",
+              "value2": "audio"
+            }
+          ]
+        }
+      },
+      "name": "Is Audio?",
+      "type": "n8n-nodes-base.if",
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://api.soniox.com/transcribe",
+        "authentication": "genericCredentialType",
+        "method": "POST",
+        "body": {
+          "audio": "={{ $json.audio_data }}",
+          "model": "precision",
+          "include_timestamps": true
+        }
+      },
+      "name": "Soniox Transcription",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 450]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Combine and format multimodal results\nconst results = {};\n\nif ($input.item.vision_result) {\n  results.visual_description = $input.item.vision_result.content;\n  results.detected_text = $input.item.vision_result.extracted_text || null;\n}\n\nif ($input.item.audio_result) {\n  results.transcript = $input.item.audio_result.transcript;\n  results.timestamps = $input.item.audio_result.timestamps || [];\n}\n\nresults.processing_type = $input.item.file_type;\nresults.processed_at = new Date().toISOString();\n\nreturn results;"
+      },
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "position": [850, 350]
+    }
+  ]
+}
+```
+
+### 10.7.2 Knowledge Graph Sub-Workflow (Gap 1.8)
+
+```json
+{
+  "name": "Empire - Knowledge Graph Sub-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kg-process",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.operation }}",
+              "operation": "equals",
+              "value2": "insert"
+            }
+          ]
+        }
+      },
+      "name": "Operation Router",
+      "type": "n8n-nodes-base.switch",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://lightrag-api.dria.co/documents",
+        "method": "POST",
+        "body": {
+          "doc_id": "={{ $json.doc_id }}",
+          "content": "={{ $json.content }}",
+          "metadata": "={{ $json.metadata }}"
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Insert to LightRAG",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 250]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "name": "Wait for Processing",
+      "type": "n8n-nodes-base.wait",
+      "position": [850, 250]
+    },
+    {
+      "parameters": {
+        "url": "https://lightrag-api.dria.co/documents/{{ $json.doc_id }}/status",
+        "method": "GET",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Check Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1050, 250]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "operation": "notEqual",
+              "value2": "complete"
+            }
+          ]
+        }
+      },
+      "name": "Is Complete?",
+      "type": "n8n-nodes-base.if",
+      "position": [1250, 250]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": "public",
+        "table": "documents",
+        "updateKey": "id",
+        "columns": "graph_id,graph_status,graph_processed_at"
+      },
+      "name": "Update Document with Graph ID",
+      "type": "n8n-nodes-base.postgres",
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Maximum retry attempts\nconst maxRetries = 10;\nconst currentRetry = $input.item.retry_count || 0;\n\nif (currentRetry >= maxRetries) {\n  return {\n    status: 'timeout',\n    message: 'Knowledge graph processing timed out',\n    doc_id: $input.item.doc_id\n  };\n}\n\nreturn {\n  ...$input.item,\n  retry_count: currentRetry + 1,\n  continue_polling: true\n};"
+      },
+      "name": "Check Retry Count",
+      "type": "n8n-nodes-base.code",
+      "position": [1250, 350]
+    }
+  ]
+}
+```
+
+## 10.8 Document Lifecycle Management (CRITICAL - Gap 1.13)
+
+**Purpose**: Handle complete document lifecycle including updates, versioning, and deletion.
+
+### 10.8.1 Document Deletion Workflow
+
+```json
+{
+  "name": "Empire - Document Deletion Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "DELETE",
+        "path": "document/:id",
+        "options": {}
+      },
+      "name": "Delete Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n-- Store deletion record for audit\nINSERT INTO audit_log (action, resource_type, resource_id, metadata)\nVALUES ('delete', 'document', '{{ $json.params.id }}', \n  jsonb_build_object('deleted_by', '{{ $json.headers.user_id }}', 'deleted_at', NOW()));\n\n-- Delete from vector storage (cascades to chunks)\nDELETE FROM documents_v2 WHERE metadata->>'doc_id' = '{{ $json.params.id }}';\n\n-- Delete from tabular data if exists\nDELETE FROM tabular_document_rows WHERE document_id = '{{ $json.params.id }}';\n\n-- Delete from main documents table\nDELETE FROM documents WHERE id = '{{ $json.params.id }}';\n\nCOMMIT;"
+      },
+      "name": "Delete from Database",
+      "type": "n8n-nodes-base.postgres",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://lightrag-api.dria.co/documents/{{ $json.params.id }}",
+        "method": "DELETE",
+        "options": {
+          "ignoreResponseStatusErrors": true
+        }
+      },
+      "name": "Delete from LightRAG",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 250]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "bucketName": "empire-documents",
+        "fileKey": "={{ $json.params.id }}"
+      },
+      "name": "Delete from B2 Storage",
+      "type": "n8n-nodes-base.s3",
+      "position": [650, 350]
+    },
+    {
+      "parameters": {
+        "functionCode": "return {\n  success: true,\n  deleted_id: $input.item.params.id,\n  deleted_at: new Date().toISOString(),\n  components_deleted: [\n    'database_records',\n    'vector_embeddings',\n    'knowledge_graph',\n    'object_storage'\n  ]\n};"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "position": [850, 300]
+    }
+  ]
+}
+```
+
+### 10.8.2 Document Update Detection
+
+```sql
+-- Add versioning support to documents table
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS version_number INTEGER DEFAULT 1;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS previous_version_id UUID REFERENCES documents(id);
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_current_version BOOLEAN DEFAULT true;
+
+-- Trigger for version management
+CREATE OR REPLACE FUNCTION handle_document_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.content_hash != NEW.content_hash THEN
+    -- Archive old version
+    UPDATE documents
+    SET is_current_version = false
+    WHERE id = OLD.id;
+
+    -- Create new version
+    INSERT INTO documents (
+      document_id,
+      previous_version_id,
+      version_number,
+      content_hash,
+      is_current_version
+    ) VALUES (
+      OLD.document_id,
+      OLD.id,
+      OLD.version_number + 1,
+      NEW.content_hash,
+      true
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+## 10.9 Asynchronous Processing Patterns (CRITICAL - Gap 2.2)
+
+**Purpose**: Handle long-running operations with proper wait and polling patterns.
+
+### 10.9.1 Wait and Polling Patterns
+
+```json
+{
+  "name": "Empire - Async Processing Pattern",
+  "nodes": [
+    {
+      "parameters": {
+        "functionCode": "// Initialize polling state\nreturn {\n  job_id: $input.item.job_id,\n  status: 'pending',\n  poll_count: 0,\n  max_polls: 20,\n  poll_interval: 5000, // 5 seconds\n  started_at: new Date().toISOString()\n};"
+      },
+      "name": "Initialize Polling",
+      "type": "n8n-nodes-base.code",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.poll_interval }}",
+        "unit": "milliseconds"
+      },
+      "name": "Wait Before Poll",
+      "type": "n8n-nodes-base.wait",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.example.com/jobs/{{ $json.job_id }}/status",
+        "method": "GET"
+      },
+      "name": "Check Job Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "value": "={{ $json.status }}",
+        "rules": {
+          "rules": [
+            {
+              "operation": "equals",
+              "value": "complete",
+              "output": 0
+            },
+            {
+              "operation": "equals",
+              "value": "error",
+              "output": 1
+            },
+            {
+              "operation": "equals",
+              "value": "pending",
+              "output": 2
+            },
+            {
+              "operation": "equals",
+              "value": "processing",
+              "output": 2
+            }
+          ]
+        }
+      },
+      "name": "Status Router",
+      "type": "n8n-nodes-base.switch",
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Check if we should continue polling\nconst pollCount = $input.item.poll_count + 1;\nconst maxPolls = $input.item.max_polls;\n\nif (pollCount >= maxPolls) {\n  return {\n    status: 'timeout',\n    message: 'Job polling timeout exceeded',\n    job_id: $input.item.job_id,\n    poll_count: pollCount\n  };\n}\n\n// Continue polling with exponential backoff\nconst nextInterval = Math.min($input.item.poll_interval * 1.5, 30000); // Max 30 seconds\n\nreturn {\n  ...$input.item,\n  poll_count: pollCount,\n  poll_interval: nextInterval,\n  continue: true\n};"
+      },
+      "name": "Continue Polling?",
+      "type": "n8n-nodes-base.code",
+      "position": [1050, 400]
+    }
+  ]
+}
+```
+
+## 10.10 Milestone 6: LightRAG Integration via HTTP
 
 ### 10.7.1 Objectives
 - Implement HTTP wrapper for LightRAG API
@@ -6244,7 +7278,7 @@ This comprehensive Section 10 implementation guide provides:
 ### Monitoring Dashboard Metrics
 [Complete monitoring configuration...]
 
-## 10.17 LlamaIndex + LangExtract Integration Workflow (NEW - v7.0)
+## 10.21 LlamaIndex + LangExtract Integration Workflow (NEW - v7.0)
 
 ### 10.17.1 Precision Extraction Pipeline
 
@@ -6516,9 +7550,9 @@ curl -X POST https://n8n-d21p.onrender.com/webhook/precision-extraction \
 }
 ```
 
-## 10.18 Complete Multi-Modal Processing Workflow (NEW - v7.0)
+## 10.22 Complete Multi-Modal Processing Workflow (NEW - v7.0)
 
-### 10.18.1 Multi-Modal Document Pipeline
+### 10.22.1 Multi-Modal Document Pipeline
 
 This workflow handles text, images, audio, and structured data with specialized processing for each type.
 
@@ -6851,9 +7885,9 @@ FROM multimodal_documents
 WHERE document_type IN ('audio', 'video');
 ```
 
-## 10.19 Redis Semantic Caching Workflow (NEW - v7.0)
+## 10.23 Redis Semantic Caching Workflow (NEW - v7.0)
 
-### 10.19.1 Complete Caching Pipeline
+### 10.23.1 Complete Caching Pipeline
 
 This workflow implements semantic caching with Redis to achieve 60-80% cache hit rates and <50ms cached query responses.
 
@@ -8370,10 +9404,742 @@ CREATE TABLE IF NOT EXISTS batch_processing_log (
 CREATE INDEX idx_batch_log_date ON batch_processing_log(batch_date DESC);
 ```
 
-## 10.21 Conclusion
+## 10.25 Advanced n8n Node Patterns (Gap Resolution)
+
+### 10.25.1 Extract From File Node Pattern
+
+The Extract From File node enables direct extraction of content from files without external dependencies:
+
+```json
+{
+  "name": "Extract From File",
+  "type": "n8n-nodes-base.extractFromFile",
+  "parameters": {
+    "operation": "text",
+    "options": {
+      "stripHTML": true,
+      "simplifyWhitespace": true
+    }
+  },
+  "position": [1000, 300]
+}
+```
+
+**Use Cases:**
+- Direct text extraction from PDFs
+- HTML to text conversion
+- Simple document parsing
+- Fallback for MarkItDown failures
+
+### 10.25.2 Mistral OCR Upload Pattern
+
+For complex PDFs requiring advanced OCR:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Upload to Mistral OCR",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/files",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "purpose",
+              "value": "ocr"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "name": "Wait for OCR Processing",
+      "type": "n8n-nodes-base.wait",
+      "parameters": {
+        "resume": "timeInterval",
+        "interval": 10,
+        "unit": "seconds"
+      }
+    },
+    {
+      "name": "Check OCR Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.file_id }}/status",
+        "authentication": "genericCredentialType"
+      }
+    },
+    {
+      "name": "Retrieve OCR Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.file_id }}/content",
+        "authentication": "genericCredentialType"
+      }
+    }
+  ]
+}
+```
+
+### 10.25.3 Cohere Reranking Workflow
+
+Complete implementation for Cohere reranking integration:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Hybrid Search",
+      "type": "n8n-nodes-base.postgres",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM dynamic_hybrid_search_db($1, $2, $3)",
+        "queryParameters": "={{ JSON.stringify({query: $json.query, match_count: 20}) }}"
+      }
+    },
+    {
+      "name": "Prepare for Reranking",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "code": "const documents = $input.all().map(item => ({\n  text: item.json.content,\n  id: item.json.chunk_id\n}));\n\nreturn {\n  query: $('Webhook').first().json.query,\n  documents: documents,\n  model: 'rerank-english-v3.5',\n  top_n: 10\n};"
+      }
+    },
+    {
+      "name": "Cohere Rerank API",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cohere.ai/v1/rerank",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$credentials.cohereApiKey}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": "={{ $json }}"
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "name": "Map Reranked Results",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "code": "const reranked = $json.results;\nconst originalDocs = $('Hybrid Search').all();\n\nreturn reranked.map(result => {\n  const original = originalDocs.find(doc => \n    doc.json.chunk_id === result.document.id\n  );\n  return {\n    ...original.json,\n    rerank_score: result.relevance_score,\n    original_rank: result.index\n  };\n});"
+      }
+    }
+  ]
+}
+```
+
+### 10.25.4 Document ID Generation Pattern
+
+UUID-based document ID generation:
+
+```json
+{
+  "name": "Generate Document ID",
+  "type": "n8n-nodes-base.code",
+  "parameters": {
+    "code": "const crypto = require('crypto');\n\n// Generate UUID v4\nconst generateUUID = () => {\n  return crypto.randomUUID();\n};\n\n// Alternative: Generate from content hash + timestamp\nconst generateDeterministicId = (content, filename) => {\n  const hash = crypto.createHash('sha256');\n  hash.update(content + filename + Date.now());\n  return hash.digest('hex').substring(0, 32);\n};\n\nreturn {\n  document_id: generateUUID(),\n  alternative_id: generateDeterministicId($json.content, $json.filename),\n  timestamp: new Date().toISOString()\n};"
+  }
+}
+```
+
+### 10.25.5 Loop Node Pattern
+
+Processing arrays with the Loop node:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.loop",
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "name": "Process Each Item",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "code": "// Process individual item\nconst item = $json;\n\n// Add processing logic\nitem.processed = true;\nitem.processedAt = new Date().toISOString();\n\n// Optional: Add delay to avoid rate limiting\nawait new Promise(resolve => setTimeout(resolve, 1000));\n\nreturn item;"
+      }
+    },
+    {
+      "name": "Check Loop Completion",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $itemIndex }}",
+              "operation": "smaller",
+              "value2": "={{ $items('Split In Batches').length }}"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+### 10.25.6 Set Node Pattern
+
+Data transformation with the Set node:
+
+```json
+{
+  "name": "Set/Transform Data",
+  "type": "n8n-nodes-base.set",
+  "parameters": {
+    "values": {
+      "string": [
+        {
+          "name": "document_id",
+          "value": "={{ $json.id || $json.document_id }}"
+        },
+        {
+          "name": "status",
+          "value": "processing"
+        },
+        {
+          "name": "source",
+          "value": "={{ $json.source || 'manual_upload' }}"
+        }
+      ],
+      "number": [
+        {
+          "name": "chunk_size",
+          "value": 1000
+        },
+        {
+          "name": "overlap",
+          "value": 200
+        }
+      ],
+      "boolean": [
+        {
+          "name": "is_processed",
+          "value": false
+        }
+      ]
+    },
+    "options": {
+      "dotNotation": true
+    }
+  }
+}
+```
+
+### 10.25.7 Merge Node Pattern
+
+Combining data from multiple sources:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByKey",
+        "options": {
+          "propertyName1": "document_id",
+          "propertyName2": "document_id",
+          "overwrite": "always"
+        }
+      }
+    },
+    {
+      "name": "Merge Multiple Sources",
+      "type": "n8n-nodes-base.merge",
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex",
+        "options": {}
+      }
+    },
+    {
+      "name": "Append Results",
+      "type": "n8n-nodes-base.merge",
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      }
+    }
+  ]
+}
+```
+
+### 10.25.8 Wait/Poll Pattern for Async Operations
+
+For long-running external operations like LightRAG or OCR:
+
+```json
+{
+  "name": "Wait and Poll Pattern",
+  "nodes": [
+    {
+      "name": "Start Async Operation",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.lightrag.com/process",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "document", "value": "={{ $json.content }}"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "Initialize Poll State",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "values": {
+          "string": [
+            {"name": "job_id", "value": "={{ $json.job_id }}"},
+            {"name": "status", "value": "pending"}
+          ],
+          "number": [
+            {"name": "poll_count", "value": 0},
+            {"name": "max_polls", "value": 20}
+          ]
+        }
+      }
+    },
+    {
+      "name": "Wait Before Poll",
+      "type": "n8n-nodes-base.wait",
+      "parameters": {
+        "resume": "timeInterval",
+        "interval": 5,
+        "unit": "seconds"
+      }
+    },
+    {
+      "name": "Check Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://api.lightrag.com/status/' + $json.job_id }}"
+      }
+    },
+    {
+      "name": "Exponential Backoff",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// Calculate next wait interval with exponential backoff\nconst pollCount = $json.poll_count || 0;\nconst baseInterval = 5; // seconds\nconst maxInterval = 30; // seconds\nconst backoffFactor = 1.5;\n\nconst nextInterval = Math.min(\n  baseInterval * Math.pow(backoffFactor, pollCount),\n  maxInterval\n);\n\nreturn [{\n  json: {\n    ...$json,\n    poll_count: pollCount + 1,\n    next_interval: nextInterval\n  }\n}];"
+      }
+    },
+    {
+      "name": "Route by Status",
+      "type": "n8n-nodes-base.switch",
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [{
+                  "leftValue": "={{ $json.status }}",
+                  "rightValue": "completed",
+                  "operator": {"operation": "equals"}
+                }]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [{
+                  "leftValue": "={{ $json.status }}",
+                  "rightValue": "error",
+                  "operator": {"operation": "equals"}
+                }]
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [{
+                  "leftValue": "={{ $json.poll_count }}",
+                  "rightValue": "={{ $json.max_polls }}",
+                  "operator": {"operation": "larger"}
+                }]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+### 10.25.9 Response Cleaning Patterns
+
+Clean up responses from external services:
+
+```json
+{
+  "name": "Clean Response",
+  "type": "n8n-nodes-base.code",
+  "parameters": {
+    "jsCode": "// Clean LightRAG or other service responses\nfor (const item of $input.all()) {\n  let response = item.json.response || item.json.text || '';\n  \n  // Remove internal markers\n  response = response.replace(/-----Document Chunks\\(DC\\)-----[\\s\\S]*/g, '');\n  response = response.replace(/-----.*-----/g, '');\n  \n  // Remove excessive whitespace\n  response = response.replace(/\\n{3,}/g, '\\n\\n');\n  response = response.trim();\n  \n  // Add cleaned response\n  item.json.cleaned_response = response;\n  \n  // Extract metadata if present\n  const metadataMatch = response.match(/<<<METADATA:(.+?)>>>/s);\n  if (metadataMatch) {\n    try {\n      item.json.extracted_metadata = JSON.parse(metadataMatch[1]);\n      response = response.replace(/<<<METADATA:.+?>>>/s, '');\n    } catch (e) {\n      // Invalid metadata format\n    }\n  }\n  \n  item.json.final_response = response;\n}\n\nreturn $input.all();"
+  }
+}
+```
+
+### 10.25.10 Complete Pattern Integration Example
+
+Here's how these patterns work together in a complete workflow:
+
+```json
+{
+  "name": "Complete Document Processing with All Patterns",
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "process-document",
+        "method": "POST"
+      },
+      "position": [200, 300]
+    },
+    {
+      "name": "Generate Document ID",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "code": "const crypto = require('crypto');\nreturn {\n  ...
+$json,\n  document_id: crypto.randomUUID()\n};"
+      },
+      "position": [400, 300]
+    },
+    {
+      "name": "Extract From File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "parameters": {
+        "operation": "text"
+      },
+      "position": [600, 200]
+    },
+    {
+      "name": "Set Processing Status",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "values": {
+          "string": [
+            {"name": "status", "value": "processing"}
+          ]
+        }
+      },
+      "position": [600, 400]
+    },
+    {
+      "name": "Loop Over Chunks",
+      "type": "n8n-nodes-base.loop",
+      "parameters": {},
+      "position": [800, 300]
+    },
+    {
+      "name": "Process with Mistral OCR",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mistral.ai/v1/files"
+      },
+      "position": [1000, 200]
+    },
+    {
+      "name": "Hybrid Search",
+      "type": "n8n-nodes-base.postgres",
+      "parameters": {
+        "operation": "executeQuery"
+      },
+      "position": [1000, 400]
+    },
+    {
+      "name": "Cohere Rerank",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://api.cohere.ai/v1/rerank"
+      },
+      "position": [1200, 400]
+    },
+    {
+      "name": "Merge All Results",
+      "type": "n8n-nodes-base.merge",
+      "parameters": {
+        "mode": "combine"
+      },
+      "position": [1400, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{"node": "Generate Document ID", "type": "main", "index": 0}]
+      ]
+    },
+    "Generate Document ID": {
+      "main": [
+        [
+          {"node": "Extract From File", "type": "main", "index": 0},
+          {"node": "Set Processing Status", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Extract From File": {
+      "main": [
+        [{"node": "Loop Over Chunks", "type": "main", "index": 0}]
+      ]
+    },
+    "Set Processing Status": {
+      "main": [
+        [{"node": "Hybrid Search", "type": "main", "index": 0}]
+      ]
+    },
+    "Loop Over Chunks": {
+      "main": [
+        [{"node": "Process with Mistral OCR", "type": "main", "index": 0}]
+      ]
+    },
+    "Hybrid Search": {
+      "main": [
+        [{"node": "Cohere Rerank", "type": "main", "index": 0}]
+      ]
+    },
+    "Process with Mistral OCR": {
+      "main": [
+        [{"node": "Merge All Results", "type": "main", "index": 0}]
+      ]
+    },
+    "Cohere Rerank": {
+      "main": [
+        [{"node": "Merge All Results", "type": "main", "index": 1}]
+      ]
+    }
+  }
+}
+```
+
+## 10.26 Complete Database Setup Script (All Tables Combined)
+
+For easy deployment, here's a single script that creates all required tables and indexes:
+
+```sql
+-- Empire v7.0 Complete Database Setup
+-- Run this script once to create all required tables and indexes
+
+BEGIN;
+
+-- 1. Chat History Table (Gap 1.4)
+CREATE TABLE IF NOT EXISTS public.n8n_chat_histories (
+  id BIGSERIAL PRIMARY KEY,
+  session_id VARCHAR(255) NOT NULL,
+  user_id VARCHAR(255),
+  message JSONB NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Tabular Document Rows (Gap 1.3)
+CREATE TABLE IF NOT EXISTS public.tabular_document_rows (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  record_manager_id BIGINT REFERENCES documents(id) ON DELETE CASCADE,
+  row_data JSONB NOT NULL,
+  schema_metadata JSONB,
+  inferred_relationships JSONB
+);
+
+-- 3. Metadata Fields Management (Gap 1.5)
+CREATE TABLE IF NOT EXISTS public.metadata_fields (
+  id BIGSERIAL PRIMARY KEY,
+  field_name TEXT NOT NULL UNIQUE,
+  field_type VARCHAR(50) NOT NULL,
+  allowed_values TEXT[],
+  validation_regex TEXT,
+  description TEXT,
+  is_required BOOLEAN DEFAULT FALSE,
+  display_order INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Knowledge Graph Entities (Local storage)
+CREATE TABLE IF NOT EXISTS public.knowledge_entities (
+  id BIGSERIAL PRIMARY KEY,
+  entity_name TEXT NOT NULL,
+  entity_type VARCHAR(100),
+  properties JSONB DEFAULT '{}',
+  relationships JSONB DEFAULT '[]',
+  document_ids TEXT[] DEFAULT '{}',
+  confidence_score FLOAT DEFAULT 0.0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Graph Relationships
+CREATE TABLE IF NOT EXISTS public.graph_relationships (
+  id BIGSERIAL PRIMARY KEY,
+  source_entity_id BIGINT REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+  target_entity_id BIGINT REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+  relationship_type VARCHAR(100),
+  properties JSONB DEFAULT '{}',
+  confidence_score FLOAT DEFAULT 0.0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. User Memory Graph
+CREATE TABLE IF NOT EXISTS public.user_memory_graph (
+  id BIGSERIAL PRIMARY KEY,
+  user_id VARCHAR(255) NOT NULL,
+  fact_text TEXT NOT NULL,
+  fact_embedding vector(768),
+  entity_refs TEXT[] DEFAULT '{}',
+  confidence_score FLOAT DEFAULT 0.8,
+  importance_score FLOAT DEFAULT 0.5,
+  access_count INTEGER DEFAULT 0,
+  last_accessed TIMESTAMPTZ,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 7. Memory Relationships
+CREATE TABLE IF NOT EXISTS public.memory_relationships (
+  id BIGSERIAL PRIMARY KEY,
+  source_memory_id BIGINT REFERENCES user_memory_graph(id) ON DELETE CASCADE,
+  target_memory_id BIGINT REFERENCES user_memory_graph(id) ON DELETE CASCADE,
+  relationship_type VARCHAR(50),
+  confidence FLOAT DEFAULT 0.5,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. Batch Processing Log
+CREATE TABLE IF NOT EXISTS public.batch_processing_log (
+  id BIGSERIAL PRIMARY KEY,
+  batch_id UUID DEFAULT gen_random_uuid(),
+  batch_date DATE NOT NULL,
+  total_documents INTEGER NOT NULL,
+  processed_documents INTEGER DEFAULT 0,
+  failed_documents INTEGER DEFAULT 0,
+  processing_status VARCHAR(50) DEFAULT 'pending',
+  error_details JSONB DEFAULT '[]',
+  processing_time_ms BIGINT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 9. Document Status Tracking
+CREATE TABLE IF NOT EXISTS public.document_status (
+  id BIGSERIAL PRIMARY KEY,
+  document_id BIGINT REFERENCES documents(id) ON DELETE CASCADE,
+  status VARCHAR(50) NOT NULL,
+  status_details JSONB DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 10. Add missing columns to existing tables
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_hash TEXT;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS version_number INTEGER DEFAULT 1;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS previous_version_id BIGINT REFERENCES documents(id);
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_current_version BOOLEAN DEFAULT TRUE;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS graph_id TEXT;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS hierarchical_index JSONB;
+
+-- 11. Create all indexes for performance
+CREATE INDEX IF NOT EXISTS idx_chat_history_session ON n8n_chat_histories(session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_history_user ON n8n_chat_histories(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_history_created ON n8n_chat_histories(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_tabular_rows_data ON tabular_document_rows USING gin(row_data);
+CREATE INDEX IF NOT EXISTS idx_tabular_rows_manager ON tabular_document_rows(record_manager_id);
+
+CREATE INDEX IF NOT EXISTS idx_metadata_fields_name ON metadata_fields(field_name);
+CREATE INDEX IF NOT EXISTS idx_metadata_fields_type ON metadata_fields(field_type);
+
+CREATE INDEX IF NOT EXISTS idx_document_hash ON documents(content_hash);
+CREATE INDEX IF NOT EXISTS idx_document_version ON documents(version_number, is_current_version);
+CREATE INDEX IF NOT EXISTS idx_document_graph ON documents(graph_id);
+CREATE INDEX IF NOT EXISTS idx_document_hierarchy ON documents USING gin(hierarchical_index);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_entities_name ON knowledge_entities(entity_name);
+CREATE INDEX IF NOT EXISTS idx_knowledge_entities_type ON knowledge_entities(entity_type);
+CREATE INDEX IF NOT EXISTS idx_knowledge_entities_docs ON knowledge_entities USING gin(document_ids);
+
+CREATE INDEX IF NOT EXISTS idx_user_memory_user ON user_memory_graph(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_memory_embedding ON user_memory_graph USING hnsw(fact_embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_user_memory_importance ON user_memory_graph(importance_score DESC);
+
+CREATE INDEX IF NOT EXISTS idx_batch_log_date ON batch_processing_log(batch_date DESC);
+CREATE INDEX IF NOT EXISTS idx_batch_log_status ON batch_processing_log(processing_status);
+
+CREATE INDEX IF NOT EXISTS idx_document_status ON document_status(document_id, status);
+
+-- 12. Insert default metadata fields
+INSERT INTO metadata_fields (field_name, field_type, description, is_required, display_order) VALUES
+  ('department', 'enum', 'Department or category', true, 1),
+  ('course_code', 'string', 'Course identifier', false, 2),
+  ('academic_level', 'enum', 'Academic level', false, 3),
+  ('content_type', 'enum', 'Type of content', true, 4),
+  ('keywords', 'string', 'Comma-separated keywords', false, 5),
+  ('author', 'string', 'Content author', false, 6),
+  ('date_created', 'date', 'Creation date', false, 7),
+  ('language', 'enum', 'Content language', false, 8)
+ON CONFLICT (field_name) DO NOTHING;
+
+-- 13. Grant appropriate permissions
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+
+COMMIT;
+
+-- Verify all tables were created
+SELECT table_name,
+       pg_size_pretty(pg_total_relation_size(quote_ident(table_name)::regclass)) as size
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_type = 'BASE TABLE'
+ORDER BY table_name;
+```
+
+## 10.27 Conclusion
 
 This comprehensive implementation guide provides:
-- ✅ **8,300+ lines of production-ready guidance** (updated for v7.0)
+- ✅ **9,800+ lines of production-ready guidance** (updated for v7.0 with all gaps resolved)
 - ✅ **All original content preserved and corrected**
 - ✅ **Complete workflow JSONs ready for import**
 - ✅ **Verified node availability and compatibility**

@@ -2419,6 +2419,190 @@ Cost: $5-10/month
 *Priority: Essential*
 *Status: Active - v5.0*
 
+### 3.1.22 Sub-Workflow Architecture Requirements (NEW - v7.0)
+
+**SWF-001:** The system SHALL implement modular sub-workflows for complex processing tasks
+
+*Priority: High*
+*Purpose: Improve maintainability, testability, and reusability*
+*Patterns: Multimodal processing, knowledge graph operations, memory management*
+*Status: New - v7.0*
+
+**SWF-002:** The system SHALL implement a dedicated multimodal processing sub-workflow with:
+- Image processing via Claude Vision API
+- Audio transcription via Soniox
+- Binary data handling
+- Result format standardization
+
+*Priority: High*
+*Workflow Name: Empire - Multimodal Processing Sub-Workflow*
+*Trigger: HTTP POST /multimodal-process*
+*Status: New - v7.0*
+
+**SWF-003:** The system SHALL implement a knowledge graph sub-workflow with:
+- LightRAG API integration
+- Async processing with wait/poll patterns
+- Status checking and retry logic
+- Graph ID mapping to documents table
+
+*Priority: High*
+*Workflow Name: Empire - Knowledge Graph Sub-Workflow*
+*Trigger: HTTP POST /kg-process*
+*Max Retries: 10*
+*Status: New - v7.0*
+
+**SWF-004:** Sub-workflows SHALL be callable from main workflows via Execute Workflow nodes
+
+*Priority: Medium*
+*Benefits: Modularity, independent testing, parallel execution*
+*Status: New - v7.0*
+
+**SWF-005:** Sub-workflows SHALL return standardized result objects with:
+- status (success/error/timeout)
+- data (processed results)
+- error (error details if applicable)
+- metadata (processing metrics)
+
+*Priority: Medium*
+*Format: JSON*
+*Status: New - v7.0*
+
+### 3.1.23 Document Lifecycle Management Requirements (NEW - v7.0)
+
+**DLC-001:** The system SHALL support complete document deletion with cascade operations
+
+*Priority: High*
+*Cascade Targets: Vector embeddings, tabular data, knowledge graph, object storage*
+*Audit: All deletions logged to audit_log table*
+*Status: New - v7.0*
+
+**DLC-002:** The system SHALL implement document versioning with:
+- version_number (integer, auto-increment)
+- previous_version_id (UUID reference)
+- is_current_version (boolean flag)
+
+*Priority: Medium*
+*Trigger: Content hash change detection*
+*Retention: All versions preserved unless manually purged*
+*Status: New - v7.0*
+
+**DLC-003:** The system SHALL support document update detection via content hash comparison
+
+*Priority: High*
+*Method: SHA-256 hash comparison*
+*Action: Create new version, archive old version*
+*Status: New - v7.0*
+
+**DLC-004:** Document deletion SHALL be exposed via DELETE /document/:id webhook
+
+*Priority: Medium*
+*Authentication: Required*
+*Authorization: User must own document or have admin role*
+*Status: New - v7.0*
+
+**DLC-005:** The system SHALL preserve deleted document metadata for compliance:
+- deletion timestamp
+- deleted_by user ID
+- retention period (configurable, default 90 days)
+
+*Priority: Medium*
+*Compliance: GDPR right to be forgotten with audit trail*
+*Status: New - v7.0*
+
+### 3.1.24 Asynchronous Processing Pattern Requirements (NEW - v7.0)
+
+**ASY-001:** The system SHALL implement wait/poll patterns for long-running operations
+
+*Priority: High*
+*Use Cases: LightRAG processing, OCR jobs, batch operations*
+*Pattern: Initialize → Wait → Poll → Check Status → Continue/Complete*
+*Status: New - v7.0*
+
+**ASY-002:** Async polling SHALL use exponential backoff with:
+- Initial interval: 5 seconds
+- Max interval: 30 seconds
+- Backoff factor: 1.5x
+- Max retries: 20
+
+*Priority: High*
+*Purpose: Reduce API load, improve reliability*
+*Status: New - v7.0*
+
+**ASY-003:** The system SHALL implement timeout handling for async operations:
+- Default timeout: 10 minutes (configurable)
+- Graceful degradation on timeout
+- Error logging with context
+
+*Priority: Medium*
+*Timeout Action: Mark as failed, notify user, log for manual review*
+*Status: New - v7.0*
+
+**ASY-004:** Async job status SHALL be tracked with states:
+- pending (initial state)
+- processing (in progress)
+- complete (successfully finished)
+- error (failed with details)
+- timeout (exceeded max wait time)
+
+*Priority: High*
+*Storage: Workflow variables + database status field*
+*Status: New - v7.0*
+
+**ASY-005:** The system SHALL support async result retrieval via status endpoints
+
+*Priority: Medium*
+*Pattern: GET /jobs/:id/status*
+*Response: {status, progress, result, error}*
+*Status: New - v7.0*
+
+### 3.1.25 Error Handling and Retry Requirements (NEW - v7.0)
+
+**ERR-001:** Critical HTTP request nodes SHALL implement retry configuration:
+- retryOnFail: true
+- maxTries: 3
+- waitBetweenTries: 2000ms
+- backoffFactor: 2
+
+*Priority: High*
+*Applies To: External API calls, database operations, file operations*
+*Status: New - v7.0*
+
+**ERR-002:** The system SHALL distinguish between retryable and non-retryable errors:
+- Retryable: ETIMEDOUT, ECONNRESET, 502, 503, 504
+- Non-retryable: 400, 401, 403, 404, 422
+
+*Priority: High*
+*Action: Retry retryable errors, fail immediately on non-retryable*
+*Status: New - v7.0*
+
+**ERR-003:** Nodes that may return empty results SHALL set alwaysOutputData: true
+
+*Priority: Medium*
+*Purpose: Prevent workflow halts on empty query results*
+*Examples: Database lookups, API searches, filter operations*
+*Status: New - v7.0*
+
+**ERR-004:** The system SHALL log all errors with structured format:
+- timestamp (ISO8601)
+- error_type (code/status)
+- error_message (detailed description)
+- context (workflow, node, input data)
+- stack_trace (for debugging)
+
+*Priority: High*
+*Storage: error_logs table in Supabase*
+*Retention: 90 days*
+*Status: New - v7.0*
+
+**ERR-005:** Critical errors SHALL trigger notifications via:
+- n8n error workflow
+- Email alerts (configurable)
+- Webhook to monitoring system
+
+*Priority: Medium*
+*Threshold: 5 errors in 10 minutes*
+*Status: New - v7.0*
+
 ## 3.8 Deprecated Requirements (Historical Reference)
 
 ### 3.8.1 Deprecated in v5.0

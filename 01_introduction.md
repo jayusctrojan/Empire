@@ -2,26 +2,26 @@
 
 ## 1.1 Purpose
 
-This Software Requirements Specification (SRS) document provides a complete description of all functions and specifications for the AI Empire File Processing System, version 5.0 Mac Studio Edition. This document is intended for all project stakeholders including developers, system architects, quality assurance teams, project managers, and business stakeholders involved in the development, deployment, and maintenance of the AI Empire intelligent document processing and retrieval-augmented generation platform.
+This Software Requirements Specification (SRS) document provides a complete description of all functions and specifications for the AI Empire File Processing System, version 7.0 Advanced RAG Production Edition. This document is intended for all project stakeholders including developers, system architects, quality assurance teams, project managers, and business stakeholders involved in the development, deployment, and maintenance of the AI Empire intelligent document processing and retrieval-augmented generation platform.
 
-Version 5.0 represents a revolutionary shift to LOCAL-FIRST AI processing with the Mac Studio M3 Ultra serving as the primary compute engine, achieving 98% on-device inference while maintaining enterprise-grade capabilities and complete data sovereignty.
+Version 7.0 represents a production-grade RAG architecture with hybrid search, knowledge graphs, and advanced observability, leveraging Claude Sonnet 4.5 API for core intelligence while maintaining the Mac Studio M3 Ultra for development and mem-agent MCP hosting.
 
 ### Document Objectives
 
-- **Define** all functional and non-functional requirements for AI Empire v5.0
+- **Define** all functional and non-functional requirements for AI Empire v7.0
 - **Establish** the basis for agreement between customers and contractors
 - **Reduce** development effort and project risks through clear specification
 - **Provide** a basis for estimating costs and schedules
 - **Facilitate** transfer to new personnel or teams
 - **Serve** as a basis for future enhancements
-- **Document** the Mac Studio M3 Ultra local-first architecture with 32-core Neural Engine
-- **Specify** 98% local AI inference capabilities with Llama 3.3 70B
-- **Detail** complete privacy architecture with zero-knowledge backups
-- **Outline** dramatic cost reduction from $200-300 to $100-195/month
-- **Define** Infrastructure as Code automation for rapid deployment and recovery
+- **Document** the production-grade RAG architecture with hybrid search and knowledge graphs
+- **Specify** 4-method hybrid search with RRF fusion and Cohere reranking
+- **Detail** sub-workflow architecture patterns for modular n8n implementations
+- **Outline** asynchronous processing patterns with exponential backoff
+- **Define** complete document lifecycle management with versioning and cascade deletion
 - **Ensure** SOC 2 Type II compliance for all cloud service vendors
-- **Demonstrate** API replacement value of $200-300/month through local processing
-- **Enable** faster-than-cloud-API performance with 32 tokens/second local inference
+- **Demonstrate** 30-50% search quality improvement over traditional RAG
+- **Enable** <500ms query latency with 60-80% semantic cache hit rate
 
 ## 1.2 Scope
 
@@ -29,29 +29,30 @@ Version 5.0 represents a revolutionary shift to LOCAL-FIRST AI processing with t
 **AI Empire File Processing System**
 
 ### Product Version
-**5.0 - Mac Studio Edition (Local-First AI Architecture)**
+**7.0 - Advanced RAG Production Edition**
 
 ### Product Description
 
-The AI Empire File Processing System v5.0 is a revolutionary LOCAL-FIRST AI platform that processes diverse document formats, multimedia content, and web resources using on-device Large Language Models, achieving GPT-4 quality inference at 32 tokens/second (faster than most cloud APIs) while maintaining complete data privacy. The system leverages Mac Studio M3 Ultra's 96GB unified memory and 800 GB/s memory bandwidth to run Llama 3.3 70B locally, eliminating per-token costs and ensuring sensitive data never leaves the user's control.
+The AI Empire File Processing System v7.0 is a production-grade RAG platform that processes diverse document formats, multimedia content, and web resources using Claude Sonnet 4.5 API with hybrid search, knowledge graphs, and full observability. The system combines 4-method hybrid search (dense, sparse, ILIKE, fuzzy) with Cohere reranking, achieving 30-50% better relevance than traditional RAG. It leverages modular sub-workflows for multimodal processing, asynchronous patterns for long-running operations, and comprehensive lifecycle management for documents.
 
 ### Core Capabilities
 
-#### Version 5.0 NEW - Mac Studio Local AI (Primary Processing)
-- **Llama 3.3 70B** running locally at 32 tokens/second (GPT-4 quality, faster than cloud APIs)
-- **Qwen2.5-VL-7B** for on-device vision and image analysis
-- **mem-agent MCP** for persistent memory (<500ms retrieval)
-- **nomic-embed-text** for local embedding generation
-- **BGE-reranker** for local search optimization
-- **98% of all inference** happens on Mac Studio
-- **Complete offline capability** for core functions
-- **500+ documents/day** processing capacity
-- **10+ concurrent workflows** support
-- **Zero per-token costs** - unlimited LLM usage
-- **Complete data sovereignty** - sensitive data never leaves hardware
-- **API replacement value** of ~$200-300/month
-- **800 GB/s memory bandwidth** for ultra-fast inference
-- **32-core Neural Engine** acceleration for ML operations
+#### Version 7.0 NEW - Production-Grade RAG Features
+- **Hybrid Search** - 4-method search (dense, sparse, ILIKE, fuzzy) with RRF fusion
+- **Cohere Reranking** - 20-30% better result ordering with v3.5 model
+- **LightRAG Knowledge Graph** - Entity relationships and graph traversal
+- **Sub-Workflow Architecture** - Modular n8n workflows for multimodal, KG, memory
+- **Asynchronous Processing** - Wait/poll patterns with exponential backoff
+- **Document Lifecycle** - Complete CRUD with versioning, cascade deletion, audit trails
+- **Hash-Based Deduplication** - SHA-256 content hashing prevents redundant processing
+- **Error Handling & Retry** - Configurable retry with retryable vs non-retryable classification
+- **Semantic Caching** - 60-80% hit rate, <50ms cached queries via Redis
+- **mem-agent MCP** - Persistent conversation memory (<500ms retrieval)
+- **Multi-Modal Support** - Images (Claude Vision), audio (Soniox), structured data
+- **Dynamic Metadata** - Flexible schema management with metadata_fields table
+- **500+ documents/day** processing capacity with batch optimization
+- **<500ms query latency** with semantic caching
+- **30-50% search quality improvement** over traditional RAG
 
 #### From Version 2.9-4.0 (All Capabilities Maintained)
 - Unified document processing supporting 40+ file formats via MarkItDown MCP
@@ -78,26 +79,26 @@ The AI Empire File Processing System v5.0 is a revolutionary LOCAL-FIRST AI plat
 
 ### System Objectives
 
-1. **Enable** GPT-4 quality AI inference locally at 32 tokens/second (faster than cloud APIs)
-2. **Ensure** 98% of processing happens on Mac Studio for complete privacy
-3. **Process** 500+ documents daily with consistent performance
-4. **Maintain** <500ms memory retrieval through local mem-agent
-5. **Reduce** monthly costs to $100-195 (40% reduction from v4.0)
-6. **Eliminate** per-token LLM costs through local inference
-7. **Guarantee** sensitive data never leaves user's hardware
-8. **Support** complete offline operation for critical functions
-9. **Provide** zero-knowledge encrypted backups to B2
-10. **Enable** 10+ concurrent workflow processing
-11. **Achieve** 1-3 second end-to-end latency (2-5x faster than cloud)
-12. **Maintain** 99.5% uptime with local hardware
-13. **Support** unlimited LLM usage without rate limits
-14. **Deliver** vision analysis through local Qwen model
-15. **Ensure** 4-hour disaster recovery capability
-16. **Optimize** for single-user/small team deployment
-17. **Provide** API compatibility through LiteLLM
-18. **Enable** secure remote access via Tailscale VPN
-19. **Leverage** 800 GB/s memory bandwidth for superior performance
-20. **Execute** quarterly disaster recovery drills for operational readiness
+1. **Achieve** 30-50% better search quality through hybrid search and reranking
+2. **Enable** <500ms query latency with 60-80% semantic cache hit rate
+3. **Process** 500+ documents daily with hash-based deduplication
+4. **Maintain** <500ms memory retrieval through mem-agent MCP
+5. **Implement** modular sub-workflows for multimodal, knowledge graph, and memory operations
+6. **Support** asynchronous processing with wait/poll patterns and exponential backoff
+7. **Provide** complete document lifecycle management with versioning and cascade deletion
+8. **Ensure** robust error handling with configurable retry logic
+9. **Enable** 4-method hybrid search with RRF fusion
+10. **Integrate** LightRAG knowledge graphs for entity relationships
+11. **Deliver** multi-modal support (text, images, audio, structured data)
+12. **Maintain** 99.9% uptime through production-grade infrastructure
+13. **Support** 1000+ queries/day with semantic caching
+14. **Provide** full observability with Prometheus, Grafana, OpenTelemetry
+15. **Ensure** SOC 2 Type II compliance for all cloud services
+16. **Optimize** costs to $375-550/month for production features
+17. **Enable** dynamic metadata management with flexible schemas
+18. **Implement** batch processing with splitInBatches patterns
+19. **Provide** Supabase Edge Functions for HTTP API access
+20. **Execute** comprehensive testing and validation for all workflows
 21. **Maintain** Infrastructure as Code for automated deployment
 22. **Ensure** all cloud vendors maintain SOC 2 Type II compliance
 23. **Deliver** 14-20 month ROI with 5-year savings of $10,000-15,000
