@@ -7,20 +7,29 @@ This directory contains the complete Software Requirements Specification (SRS) f
 
 ### Current Status (Planning Phase - October 2025)
 - **Phase:** Architecture Planning and SRS Documentation
-- **Requirements:** 320+ Specifications Defined (70+ new in v7.0)
+- **Requirements:** 340+ Specifications Defined (90+ new in v7.0)
 - **Architecture:** Production-Ready RAG with Advanced Features
 - **Search Quality Target:** 90-95% (30-50% improvement vs v6.0)
+- **Documentation:** 8,300+ lines of implementation guidance
 - **Monthly Cost:** $375-550 (production-grade)
 
 ### v7.0 New Capabilities
 - ✅ **Hybrid Search** - 4-method search (dense, sparse, ILIKE, fuzzy) with RRF fusion
 - ✅ **Cohere Reranking v3.5** - 20-30% better result ordering
 - ✅ **LightRAG Knowledge Graph** - Entity relationships and traversal
-- ✅ **mem-agent MCP** - Persistent conversation memory (NOT Zep)
+- ✅ **Graph-Based User Memory** - Production memory with relationships, multi-hop traversal, personalization
+- ✅ **mem-agent MCP** - Developer-only tool for local testing (NOT for production workflows)
 - ✅ **Multi-Modal** - Images (Claude Vision), audio (Soniox)
 - ✅ **Structured Data** - CSV/Excel with schema inference
 - ✅ **Semantic Caching** - 60-80% hit rate, <50ms cached queries
 - ✅ **Observability** - Prometheus, Grafana, OpenTelemetry, alerts
+- ✅ **Supabase Edge Functions** - HTTP API wrappers for database functions with JWT auth
+- ✅ **Advanced Context Expansion** - get_chunks_by_ranges() with hierarchical context
+- ✅ **Dynamic Metadata** - metadata_fields table for flexible schema management
+- ✅ **Document Deletion** - Cascade deletion workflow with audit logging
+- ✅ **Batch Processing** - Scheduled processing with retry logic and metrics tracking
+- ✅ **Dynamic Weight Tuning** - Auto-adjust search weights based on query type (10-15% better results)
+- ✅ **Natural Language to SQL** - Query CSV/Excel data with plain English
 
 ### Active Services (v7.0 Architecture)
 
@@ -255,6 +264,16 @@ Mac Studio M3 Ultra (96GB)
 - **LightRAG Knowledge Graphs:** Entity relationships
 - **Semantic Caching (Redis):** 60-80% hit rate
 - **Context Expansion:** Neighboring chunks (±2 default)
+- **Dynamic Weight Tuning:** Auto-adjusts search weights by query type
+  - Exact match → ILIKE boost
+  - Short query → Fuzzy boost
+  - Semantic → Dense vector boost
+  - Long query → Sparse BM25 boost
+  - 10-15% improvement in result quality
+- **Natural Language to SQL:** Query CSV/Excel with plain English
+  - "Show customers from CA with revenue > $100k"
+  - Claude-powered SQL generation
+  - <3 second response time
 
 ### Storage & Retrieval (v7.0 - Enhanced!) ✅
 - **Backblaze B2:** File storage
@@ -265,10 +284,45 @@ Mac Studio M3 Ultra (96GB)
   - Local entity storage for knowledge graphs
   - HNSW indexing for fast similarity search
   - 28x lower latency vs traditional vector DBs
+  - **Advanced Database Functions:**
+    - `dynamic_hybrid_search_db` (438 lines) - 4-method search with RRF
+    - `get_chunks_by_ranges()` - Batch context expansion with hierarchical context
+    - `hierarchical_structure_extraction` - Document outline and section mapping
+  - **Supabase Edge Functions (NEW v7.0):**
+    - HTTP API wrappers (TypeScript/Deno)
+    - `/functions/v1/hybrid-search` - Web-accessible search endpoint
+    - `/functions/v1/context-expansion` - Batch chunk retrieval
+    - `/functions/v1/graph-query` - Knowledge graph queries
+    - JWT authentication with RLS enforcement
+  - **Enhanced Tables:**
+    - `metadata_fields` - Dynamic schema management
+    - `record_manager_v2` - Document tracking with graph_id and hierarchical_index
+    - `tabular_document_rows` - Structured data from CSV/Excel
 - **Redis (Upstash):** Semantic caching layer
 
 ### Memory & Intelligence (v7.0 - NEW!) ✅
-- **mem-agent MCP:** Persistent conversation context (8GB)
+
+**Two Distinct Memory Systems:**
+
+1. **Developer Memory (Local Only):**
+   - **mem-agent MCP:** Local development tool for Claude Desktop integration
+   - **Purpose:** Developer context during local testing (NOT for production)
+   - **Location:** Mac Studio (8GB), NOT accessible in n8n workflows
+
+2. **Production User Memory (Graph-Based):**
+   - **Architecture:** Three-layer graph (User Memory + Document Knowledge + Hybrid)
+   - **Storage:** Supabase PostgreSQL with pgvector embeddings
+   - **Features:**
+     - Graph-based memory with relationships (causes, relates_to, supports, etc.)
+     - Multi-hop graph traversal (2 hops, <100ms)
+     - Automatic fact extraction via Claude API
+     - Confidence/importance scoring with temporal decay
+     - LightRAG hybrid graph integration
+     - Personalized document recommendations
+     - Row-level security and privacy isolation
+   - **Performance:** <300ms context retrieval, ~3.5KB per memory node
+
+**Other Intelligence Features:**
 - **LightRAG:** Knowledge graph with entity traversal
 - **Multi-Modal:** Claude Vision, Soniox audio
 - **Structured Data:** CSV/Excel with schema inference
@@ -281,7 +335,16 @@ Mac Studio M3 Ultra (96GB)
 
 ### Workflow Orchestration ✅
 - n8n platform deployed
-- 4 milestone workflows created
+- 9+ production workflows implemented:
+  - Document intake with hash deduplication
+  - Multi-modal processing pipeline
+  - Hybrid RAG query with context expansion
+  - LlamaIndex + LangExtract integration
+  - Redis semantic caching
+  - Complete observability stack
+  - **Document deletion with cascade** (NEW v7.0)
+  - **Batch processing with retry logic** (NEW v7.0)
+  - Knowledge graph integration
 - Claude API integration ready
 - Supabase nodes configured
 - Cost tracking implemented

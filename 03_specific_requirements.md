@@ -676,16 +676,19 @@ def assessPDFComplexity(file):
 
 #### 3.1.7.1 Long-term Memory Management (v5.0)
 
-**MEM-001:** The system SHALL use mem-agent MCP for persistent memory management
+**IMPORTANT NOTE:** This section describes **mem-agent MCP**, which is a **developer-only tool** for local development and testing. It runs on the Mac Studio, integrates with Claude Desktop via Model Context Protocol, and is **NOT used in production n8n workflows**. For production end-user memory requirements, see Section 3.1.13: Memory System Requirements.
+
+**MEM-001:** The system SHALL use mem-agent MCP for persistent memory management (DEVELOPER ONLY)
 
 *Priority: Essential*
-*Description: Maintains persistent user context*
+*Description: Maintains persistent developer context during local development*
 *Backend: mem-agent (4B model) on Mac Studio*
 *Features: Context retrieval, memory updates, relevance scoring*
 *Performance: <100ms local retrieval time*
 *Model: 4B parameters, 3GB memory usage*
 *Location: Mac Studio local*
-*Replaces: Zep cloud service*
+*Usage: Developer tool for Claude Desktop integration, NOT for production workflows*
+*Replaces: Zep cloud service (for developer use)*
 *Status: Active - v5.0*
 
 **MEM-002:** The system SHALL retrieve memories in <500ms locally
@@ -1139,47 +1142,136 @@ def assessPDFComplexity(file):
 *Use: Filtering low-confidence entities*
 *Status: Active - v7.0*
 
-### 3.1.13 Memory System Requirements (NEW - v7.0)
+### 3.1.13 Production User Memory System Requirements (NEW - v7.0)
 
-#### 3.1.13.1 mem-agent MCP Integration
+**IMPORTANT NOTE:** This section describes the **production user memory system** using Supabase graph-based architecture. This is distinct from mem-agent MCP (Section 3.1.7.1), which is a developer-only tool. Production user memory is implemented in n8n workflows and provides graph-based memory with relationships for all end users.
 
-**MEM-001:** The system SHALL integrate mem-agent MCP for conversation memory
+#### 3.1.13.1 Graph-Based User Memory
 
-*Priority: Essential*
-*Server: mem-agent MCP server (local)*
-*Storage: Local vector database*
-*Purpose: Long-term conversation context and user preferences*
-*Status: Active - v7.0*
-
-**MEM-002:** The system SHALL store conversation summaries in mem-agent
+**MEM-001:** The system SHALL implement graph-based user memory storage in Supabase
 
 *Priority: Essential*
-*Granularity: Per-conversation summary*
-*Storage: Automatic after conversation end or every 10 messages*
-*Retention: Indefinite with periodic cleanup*
+*Architecture: Three-layer graph (User Memory, Document Knowledge, Hybrid)*
+*Storage: Supabase PostgreSQL with pgvector extension*
+*Tables: user_memory_nodes, user_memory_edges, user_document_connections*
+*Purpose: Production user memory with graph relationships*
 *Status: Active - v7.0*
 
-**MEM-003:** The system SHALL extract and store user facts from conversations
+**MEM-002:** The system SHALL store user memory nodes with embeddings
+
+*Priority: Essential*
+*Node Types: fact, preference, goal, context, skill, interest*
+*Embeddings: 768-dim nomic-embed-text vectors*
+*Metadata: confidence_score, importance_score, source_type*
+*Lifecycle: Active/inactive status, optional expiration*
+*Status: Active - v7.0*
+
+**MEM-003:** The system SHALL maintain graph edges between memory nodes
+
+*Priority: Essential*
+*Relationship Types: causes, relates_to, contradicts, supports, precedes, enables*
+*Edge Metadata: strength (0.0-1.0), directionality, observation_count*
+*Purpose: Multi-hop graph traversal for context enrichment*
+*Status: Active - v7.0*
+
+**MEM-004:** The system SHALL extract user facts using Claude API
 
 *Priority: High*
-*Types: Preferences, personal information, project context, domain knowledge*
-*Extraction: Claude API-based fact extraction*
-*Verification: User confirmation for critical facts*
+*Extraction: Automatic from conversation context (last 10 messages)*
+*Types: Facts, preferences, goals, context, skills, interests*
+*Confidence: 0.0-1.0 confidence scoring per memory*
+*Trigger: After each user message in chat interface*
 *Status: Active - v7.0*
 
-**MEM-004:** The system SHALL retrieve relevant memories during query processing
+**MEM-005:** The system SHALL retrieve user memory context with graph traversal
 
 *Priority: Essential*
-*Trigger: Every RAG query*
-*Limit: Top 5 relevant memories*
-*Integration: Memories appended to system prompt*
+*Retrieval: SQL function get_user_memory_context() with recursive CTEs*
+*Traversal Depth: 2 hops (configurable 1-3)*
+*Performance: <100ms for graph traversal*
+*Similarity: Vector similarity threshold 0.7 for seed nodes*
 *Status: Active - v7.0*
 
-**MEM-005:** The system SHALL support memory search and management
+**MEM-006:** The system SHALL create hybrid graph connections to LightRAG entities
+
+*Priority: High*
+*Purpose: Link user memories to document knowledge graph entities*
+*Connection Types: related_to, expert_in, interested_in, worked_on*
+*Benefits: Personalized document recommendations, expertise matching*
+*Storage: user_document_connections table*
+*Status: Active - v7.0*
+
+**MEM-007:** The system SHALL enrich queries with personalized user context
+
+*Priority: Essential*
+*Integration: Before RAG pipeline execution*
+*Context: Top 10 relevant memories with relationship paths*
+*Personalization: Related LightRAG entities based on user interests*
+*Performance: <300ms total for memory retrieval and enrichment*
+*Status: Active - v7.0*
+
+**MEM-008:** The system SHALL implement memory decay for stale information
 
 *Priority: Medium*
-*Operations: Search, view, edit, delete memories*
-*Interface: Chat commands and UI*
+*Function: decay_user_memories() executed daily*
+*Threshold: 30 days of inactivity*
+*Decay Rate: 10% confidence reduction per period*
+*Purpose: Prevent outdated information from polluting context*
+*Status: Active - v7.0*
+
+**MEM-009:** The system SHALL detect contradicting memories
+
+*Priority: Medium*
+*Detection: High embedding similarity (>0.85) with contradictory patterns*
+*Function: detect_contradicting_memories() during extraction*
+*Resolution: Flag for review, prefer higher confidence scores*
+*Purpose: Maintain memory consistency*
+*Status: Active - v7.0*
+
+**MEM-010:** The system SHALL enforce row-level security on memory tables
+
+*Priority: Essential*
+*Security: User-specific memory isolation*
+*Implementation: PostgreSQL RLS policies*
+*Privacy: User memories not visible across accounts*
+*GDPR: Support for full memory deletion on request*
+*Status: Active - v7.0*
+
+**MEM-011:** The system SHALL support personalized document entity recommendations
+
+*Priority: High*
+*Function: get_personalized_document_entities() with relevance scoring*
+*Scoring: Combines user memory connections, access frequency, relevance*
+*Use Case: "Show documents related to my expertise/interests"*
+*Performance: <50ms for entity retrieval*
+*Status: Active - v7.0*
+
+**MEM-012:** The system SHALL maintain temporal tracking for memories
+
+*Priority: Medium*
+*Tracking: first_mentioned_at, last_mentioned_at, mention_count*
+*Purpose: Identify frequently referenced vs. one-time facts*
+*Decay: Used for automatic confidence decay of stale information*
+*Analytics: Memory usage patterns and user engagement*
+*Status: Active - v7.0*
+
+**MEM-013:** The system SHALL support memory importance and confidence scoring
+
+*Priority: High*
+*Importance: 0.0-1.0 score for prioritization (explicit vs. casual mentions)*
+*Confidence: 0.0-1.0 score for reliability (explicit vs. inferred)*
+*Source Types: explicit (directly stated), inferred (implied), conversation*
+*Ranking: Combined scoring for context retrieval prioritization*
+*Status: Active - v7.0*
+
+**MEM-014:** The system SHALL implement multi-hop graph traversal for context
+
+*Priority: Essential*
+*Algorithm: Recursive CTEs in PostgreSQL*
+*Depth Control: Configurable 1-3 hops (default 2)*
+*Cycle Prevention: Track visited nodes, prevent infinite loops*
+*Scoring: Decay similarity by edge strength at each hop*
+*Performance: <100ms for 2-hop traversal with 10 seed nodes*
 *Status: Active - v7.0*
 
 #### 3.1.13.2 Session Management
@@ -1253,6 +1345,56 @@ def assessPDFComplexity(file):
 *Detection: Foreign key patterns, hierarchical structures*
 *Use: Enhanced query planning*
 *Status: Active - v7.0*
+
+#### 3.1.14.3 Metadata Fields Management (NEW - v7.0)
+
+**MDF-001:** The system SHALL maintain a metadata_fields table for dynamic schema management
+
+*Priority: High*
+*Purpose: Track available metadata fields, types, and validation rules*
+*Schema: field_name, field_type, allowed_values, validation_regex, description*
+*Status: New - v7.0*
+
+**MDF-002:** The system SHALL support multiple field types:
+- `string`: Text fields with optional regex validation
+- `number`: Numeric fields with range validation
+- `date`: ISO8601 date/timestamp fields
+- `boolean`: True/false fields
+- `enum`: Restricted value set from allowed_values array
+- `array`: Multi-value fields
+
+*Priority: High*
+*Validation: Type checking enforced at ingestion*
+*Status: New - v7.0*
+
+**MDF-003:** The system SHALL enforce field validation rules:
+- Required fields must be present
+- Enum fields must match allowed_values
+- Regex patterns must match for validated fields
+- Type coercion with error handling
+
+*Priority: Medium*
+*Error Handling: Graceful degradation with warnings*
+*Status: New - v7.0*
+
+**MDF-004:** The system SHALL support field ordering and display configuration:
+- display_order integer for UI rendering
+- is_searchable flag for search index inclusion
+- is_required flag for validation
+- default_value for missing fields
+
+*Priority: Medium*
+*Use Case: Dynamic form generation, search filtering*
+*Status: New - v7.0*
+
+**MDF-005:** The system SHALL allow runtime metadata field registration:
+- Add new fields without schema migration
+- Update field definitions dynamically
+- Backwards compatible with existing documents
+
+*Priority: Medium*
+*Flexibility: Schema evolution without downtime*
+*Status: New - v7.0*
 
 ### 3.1.15 Multi-Modal Processing Requirements (NEW - v7.0)
 
@@ -1353,6 +1495,22 @@ def assessPDFComplexity(file):
 *Expansion: Include section headers and summaries*
 *Status: Active - v7.0*
 
+**CTX-006:** The system SHALL provide batch context expansion via get_chunks_by_ranges() function
+
+*Priority: High*
+*Input: JSON array of range specifications [{doc_id, start, end}]*
+*Output: Chunks with hierarchical_context and graph_entities*
+*Performance: <300ms for ≤10 ranges*
+*Status: New - v7.0*
+
+**CTX-007:** The system SHALL include knowledge graph entity references in expanded context
+
+*Priority: Medium*
+*Integration: LightRAG knowledge_entities table*
+*Enrichment: Entity names linked to retrieved chunks*
+*Use: Graph-enhanced RAG traversal*
+*Status: New - v7.0*
+
 ### 3.1.17 Observability Requirements (NEW - v7.0)
 
 #### 3.1.17.1 Metrics and Monitoring
@@ -1401,6 +1559,124 @@ def assessPDFComplexity(file):
 *Priority: Medium*
 *Threshold: >$10/hour token usage*
 *Status: Active - v7.0*
+
+### 3.1.18 Edge Functions and API Requirements (NEW - v7.0)
+
+**API-001:** The system SHALL provide HTTP-accessible Edge Functions for all core database operations
+
+*Implementation: Supabase Edge Functions (TypeScript/Deno)*
+*Integration: n8n HTTP Request nodes, web clients, mobile apps*
+*Status: New - v7.0*
+
+**API-002:** The system SHALL implement Edge Function for hybrid search with the following capabilities:
+- Accept JSON payload: `{query, top_k, rerank_enabled, user_id}`
+- Return structured results with metadata
+- Support CORS for browser access
+- Validate JWT authentication
+- Handle errors gracefully
+
+*Endpoint: `/functions/v1/hybrid-search`*
+*Response Time: <500ms for cached, <2s for new queries*
+*Status: New - v7.0*
+
+**API-003:** The system SHALL implement Edge Function for context expansion:
+- Accept range specifications: `{ranges: [{doc_id, start, end}]}`
+- Return chunks with hierarchical context
+- Include knowledge graph entity references
+- Support batch processing of multiple ranges
+
+*Endpoint: `/functions/v1/context-expansion`*
+*Response Time: <300ms for ≤10 ranges*
+*Status: New - v7.0*
+
+**API-004:** The system SHALL implement Edge Function for knowledge graph queries:
+- Entity lookup by name
+- Relationship traversal
+- Support filtering by relationship type
+- Return graph structure as JSON
+
+*Endpoint: `/functions/v1/graph-query`*
+*Response Time: <400ms*
+*Status: New - v7.0*
+
+**API-005:** All Edge Functions SHALL implement CORS headers for web client access:
+- `Access-Control-Allow-Origin: *` (or specific domains for production)
+- `Access-Control-Allow-Headers: authorization, x-client-info, apikey, content-type`
+- Handle OPTIONS preflight requests
+
+*Security: RLS enforced, JWT validation automatic*
+*Status: New - v7.0*
+
+**API-006:** Edge Functions SHALL use Supabase Service Role Key for internal operations:
+- Full database access within Edge Function context
+- Automatic RLS bypass when needed
+- Secure secret management via Supabase CLI
+
+*Security Level: Service role key accessible only server-side*
+*Status: New - v7.0*
+
+**API-007:** The system SHALL support three authentication levels:
+1. **Anon Key**: Rate-limited, RLS enforced, client-safe
+2. **Service Role Key**: Full access, Edge Functions only
+3. **User JWT**: Per-user authentication, automatic RLS
+
+*Implementation: Supabase Auth integration*
+*Status: New - v7.0*
+
+**API-008:** Edge Functions SHALL return standardized JSON responses:
+```json
+{
+  "success": true|false,
+  "data": {...},
+  "error": "error message if applicable",
+  "metadata": {
+    "count": N,
+    "query_time_ms": N
+  }
+}
+```
+
+*Consistency: All endpoints follow same pattern*
+*Status: New - v7.0*
+
+**API-009:** The system SHALL support local Edge Function testing via Supabase CLI:
+- `supabase functions serve` for local development
+- Hot reload during development
+- Local database connection
+
+*Developer Experience: <5 minute setup*
+*Status: New - v7.0*
+
+**API-010:** Edge Functions SHALL be deployable with single command:
+- `supabase functions deploy [name]`
+- Automatic TypeScript compilation
+- Environment variable management via `supabase secrets`
+
+*Deployment Time: <2 minutes per function*
+*Status: New - v7.0*
+
+**API-011:** The system SHALL implement RLS policies for all user-accessible tables:
+- Users can only access their own documents
+- Service role bypasses RLS for system operations
+- Automatic auth.uid() filtering
+
+*Security: Zero-trust model, policy enforcement at database level*
+*Status: New - v7.0*
+
+**API-012:** Edge Functions SHALL log all errors with structured format:
+```typescript
+{
+  timestamp: ISO8601,
+  function_name: string,
+  error_type: string,
+  error_message: string,
+  request_payload: object,
+  user_id: string
+}
+```
+
+*Monitoring: Integrated with Supabase Logs*
+*Status: New - v7.0*
 
 ## 3.2 Non-Functional Requirements
 

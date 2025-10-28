@@ -135,32 +135,67 @@ Context Expansion (ESSENTIAL):
     └── Configurable thresholds
 
 Memory System (ESSENTIAL - v7.0):
-├── mem-agent MCP Integration
-│   ├── Local MCP server on Mac Studio
-│   ├── Runs continuously in development environment
+
+IMPORTANT: Empire has TWO DISTINCT memory systems:
+1. Developer Memory: mem-agent MCP (local development only)
+2. Production User Memory: Supabase graph-based (end-user workflows)
+
+├── Developer Memory: mem-agent MCP (NOT FOR PRODUCTION)
+│   ├── Purpose: Local development and testing ONLY
+│   ├── Integration: Claude Desktop via Model Context Protocol
+│   ├── Location: Mac Studio local environment
 │   ├── ~8GB memory footprint
 │   ├── <500ms retrieval latency
-│   └── Integration with Claude Desktop
+│   ├── Usage: Developer tool, NOT used in n8n production workflows
+│   └── NOT accessible to end users
 │
-├── Persistent Conversation Memory
-│   ├── Conversation summaries (auto-saved every 10 messages)
-│   ├── User fact extraction and storage
-│   ├── Preference learning and tracking
-│   ├── Project context preservation
-│   └── Indefinite retention with cleanup
+├── Production User Memory: Supabase Graph-Based (v7.0)
+│   ├── Purpose: End-user memory in production n8n workflows
+│   ├── Architecture: Three-layer graph system
+│   │   ├── User Memory Graph: facts, preferences, goals, context
+│   │   ├── Document Knowledge Graph: LightRAG entities/relationships
+│   │   └── Hybrid Graph: user memories ↔ document entities
+│   ├── Storage: Supabase PostgreSQL + pgvector
+│   ├── Tables: user_memory_nodes, user_memory_edges, user_document_connections
+│   ├── Embeddings: 768-dim nomic-embed-text vectors
+│   └── Privacy: Row-level security, per-user isolation
 │
-├── Memory Retrieval
-│   ├── Automatic query-time retrieval
-│   ├── Top 5 relevant memories per query
-│   ├── Embedded in system prompt
-│   ├── Semantic similarity matching
-│   └── Temporal weighting (recent = higher priority)
+├── Graph-Based Memory Features (Production)
+│   ├── Memory Extraction
+│   │   ├── Automatic extraction via Claude API (1-2 seconds)
+│   │   ├── Types: fact, preference, goal, context, skill, interest
+│   │   ├── Confidence scoring (0.0-1.0)
+│   │   ├── Importance scoring (0.0-1.0)
+│   │   └── Source tracking (explicit, inferred, conversation)
+│   ├── Graph Relationships
+│   │   ├── Relationship types: causes, relates_to, contradicts, supports
+│   │   ├── Edge strength (0.0-1.0)
+│   │   ├── Multi-hop traversal (2 hops default, configurable 1-3)
+│   │   └── Cycle prevention in recursive queries
+│   ├── Memory Retrieval
+│   │   ├── Vector similarity search for seed nodes (threshold 0.7)
+│   │   ├── Graph traversal via recursive CTEs (<100ms)
+│   │   ├── Personalized entity recommendations (<50ms)
+│   │   ├── Top 10 relevant memories with relationship paths
+│   │   └── Total retrieval: <300ms including enrichment
+│   └── Memory Lifecycle
+│       ├── Temporal tracking (first/last mentioned, mention count)
+│       ├── Confidence decay for stale memories (30-day threshold)
+│       ├── Contradiction detection (>0.85 similarity)
+│       └── Optional expiration for time-sensitive facts
 │
-└── Memory Management
-    ├── Search, view, edit, delete operations
-    ├── Chat command interface
-    ├── Manual override capability
-    └── Privacy-preserving (local storage)
+├── LightRAG Integration (Hybrid Graph)
+│   ├── User-document connections table
+│   ├── Link user skills/interests to document entities
+│   ├── Connection types: expert_in, interested_in, worked_on
+│   ├── Enables personalized document recommendations
+│   └── "Show me documents related to my expertise" queries
+│
+└── Performance Characteristics
+    ├── Memory extraction: <3 seconds (typical 3-5 memories)
+    ├── Graph traversal: <100ms (2-hop, 10 seed nodes)
+    ├── Context retrieval: <300ms (complete enrichment)
+    └── Storage: ~3.5KB per memory node (with embedding)
 
 Multi-Modal Processing (NEW - v7.0):
 ├── Image Processing
@@ -310,15 +345,80 @@ Advanced Database Functions:
    - Metadata filtering with $or/$and
    - Type detection (numeric, timestamp, text)
 
-2. context_expansion_edge_function
-   - Neighbor chunk retrieval
-   - Section range queries
-   - Smart merging logic
+2. get_chunks_by_ranges() (NEW - v7.0)
+   - Batch context expansion for multiple ranges
+   - Input: JSON array [{doc_id, start, end}]
+   - Returns: chunks with hierarchical_context and graph_entities
+   - Builds parent/child relationships automatically
+   - Links to knowledge graph entities from LightRAG
+   - Performance: <300ms for ≤10 ranges
 
 3. hierarchical_structure_extraction
    - Document outline extraction
    - Chunk-to-section mapping
    - H1-H6 heading relationships
+
+Supabase Edge Functions (HTTP API - NEW v7.0):
+
+1. hybrid-search (TypeScript/Deno)
+   - HTTP wrapper for dynamic_hybrid_search_db
+   - Endpoint: /functions/v1/hybrid-search
+   - CORS support for web clients
+   - JWT authentication via Supabase Auth
+   - Returns: JSON with success/error/results
+
+2. context-expansion (TypeScript/Deno)
+   - HTTP wrapper for get_chunks_by_ranges()
+   - Endpoint: /functions/v1/context-expansion
+   - Batch processing of chunk ranges
+   - Returns: chunks with hierarchical context
+
+3. graph-query (TypeScript/Deno)
+   - Knowledge graph entity and relationship queries
+   - Endpoint: /functions/v1/graph-query
+   - Queries local knowledge_entities/relationships tables
+   - Returns: entity + related relationships
+
+Authentication Levels:
+├── Anon Key: Rate-limited, RLS enforced, client-safe
+├── Service Role Key: Full access, Edge Functions only (server-side)
+└── User JWT: Per-user auth, automatic RLS filtering
+
+Deployment:
+- supabase functions deploy [name]
+- supabase secrets set for API keys
+- Local testing: supabase functions serve
+
+Query Optimization Features (NEW - v7.0):
+
+1. Dynamic Weight Adjustment
+   - Analyzes query characteristics before search
+   - Automatically tunes search method weights
+   - Query type detection:
+     * Exact match (contains "exactly", quotes) → boost ILIKE (40%)
+     * Short queries (<3 words) → boost fuzzy (30%)
+     * Semantic (contains "similar", "like") → boost dense vector (60%)
+     * Long queries (>8 words) → boost sparse BM25 (40%)
+     * Contains numbers/years → boost pattern matching (35%)
+   - Performance: <10ms overhead, 10-15% better results
+   - Tracked in query_performance_log with query_type
+
+2. Natural Language to SQL Translation
+   - LLM-powered SQL generation for tabular data
+   - Enables natural language queries on CSV/Excel uploads
+   - Example queries:
+     * "Show customers from CA with revenue > $100k"
+     * "What's the average revenue by state?"
+     * "List top 10 products by sales"
+   - Implementation:
+     * Detects structured query keywords (show, list, filter, count, avg)
+     * Retrieves table schemas from record_manager_v2
+     * Claude generates PostgreSQL with JSONB operators
+     * Executes read-only SELECT queries
+   - Security: 100-row limit, 30s timeout, no DROP/DELETE/UPDATE
+   - Performance: <3 seconds total (schema + LLM + execution)
+   - Fallback: Reverts to semantic search on SQL errors
+   - Combines: Can merge structured results with semantic search
 
 Performance:
 - Dense search: <50ms (HNSW index)
@@ -638,6 +738,73 @@ Node 9: Claude Synthesis
   - Format response
 
 Node 10: Response to User
+
+Milestone 8: Document Lifecycle Management (NEW - v7.0)
+
+Node 1: Delete Document Webhook (/document/:document_id)
+  - Accept DELETE requests with document_id
+  - Extract deletion metadata (user, reason)
+  - Validate document exists
+
+Node 2-8: Cascade Deletion Sequence
+  - Delete from documents_v2 (vectors)
+  - Delete from tabular_document_rows (structured data)
+  - Delete from knowledge_entities (graph nodes)
+  - Delete from record_manager_v2 (tracking)
+  - Delete from documents (main record)
+  - Delete from Backblaze B2 (source file)
+  - Delete from LightRAG API (knowledge graph)
+
+Node 9: Audit Logging
+  - Record deletion event
+  - Preserve metadata for compliance
+  - Track deletion reason and user
+
+Node 10: Soft Delete Alternative
+  - Mark as deleted (status = 'deleted')
+  - Preserve data for retention period
+  - Auto-cleanup after 90 days
+
+Milestone 9: Batch Operations (NEW - v7.0)
+
+Node 1: Scheduled Trigger (2 AM Daily)
+  - Cron expression: 0 2 * * *
+  - Off-peak processing hours
+
+Node 2: Get Pending Documents
+  - Query processing_status = 'pending'
+  - Include failed docs with retry_count < 3
+  - Limit 100 documents per batch
+
+Node 3: Split Into Batches
+  - Batch size: 10 concurrent documents
+  - Parallel execution with resource limits
+  - Loop until all processed
+
+Node 4: Mark as Processing
+  - Update status to 'processing'
+  - Increment retry_count
+  - Record processing_started_at
+
+Node 5: Execute Document Processing
+  - Call main processing workflow
+  - Pass document metadata
+  - Handle success/failure
+
+Node 6-7: Status Updates
+  - Mark as 'complete' on success
+  - Mark as 'error' on failure
+  - Track processing duration
+
+Node 8: Aggregate Batch Results
+  - Count successful/failed
+  - Calculate processing time
+  - Generate batch summary
+
+Node 9: Log Batch Summary
+  - Store in batch_processing_log table
+  - Track metrics over time
+  - Enable performance analysis
 
 ================================================================================
 Performance & Capacity
