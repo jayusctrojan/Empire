@@ -1,5 +1,39 @@
 # 5. Version 3.1 Solopreneur Optimizations (Enhanced v5.0)
 
+## V7.1 Cost Optimization Updates
+
+**Version 7.1 introduces significant cost optimizations beyond v3.1:**
+
+### Cost Improvements ($40-70/month savings)
+- **BGE-Reranker-v2 on Mac Studio:** $0 cost (replaces $30-50/month Cohere)
+  - 299M parameter model runs locally at 10-20ms latency
+  - Same quality as Cohere but 10x faster
+
+- **BGE-M3 Embeddings:** Better performance, same cost
+  - 1024-dim vectors (3-5% quality improvement)
+  - Built-in sparse vectors eliminate separate FTS index
+
+- **LlamaCloud/LlamaParse Free Tier:** $0 cost (replaces $20/month Mistral OCR)
+  - 10,000 pages/month free tier
+  - Perfect for standard document volumes
+
+- **Claude Haiku Query Expansion:** $1.50-9/month (minimal cost)
+  - 15-30% better recall via 4-5 query variations
+  - Sub-100ms latency addition
+
+- **Tiered Semantic Caching:** Better hit rates
+  - 0.98+: Direct cache hit (<50ms)
+  - 0.93-0.97: Return with "similar answer" note
+  - 60-80% overall hit rate for cost reduction
+
+### Overall Impact
+- **Previous (v5.0):** $375-550/month
+- **Version 7.1:** $335-480/month
+- **Monthly Savings:** $40-70 (10-15% reduction)
+- **Quality:** 40-60% better retrieval (up from 30-50%)
+
+---
+
 ## 5.1 Fast Track Processing (Enhanced v5.0)
 
 ### 5.1.1 Fast Track Requirements

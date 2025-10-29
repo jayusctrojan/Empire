@@ -1,10 +1,25 @@
 # 9. Orchestrator and Scheduler Requirements
 
-## 9.0 Mac Studio Local Orchestration (v5.0 NEW)
+## V7.1 Orchestration Enhancements
+
+**Version 7.1 adds advanced orchestration for RAG components:**
+
+### V7.1 Orchestration Improvements
+- **Query Expansion Sub-Workflow:** Claude Haiku generates 4-5 variations in parallel
+- **Hybrid Search Orchestration:** Dynamic switching between dense, sparse, ILIKE, fuzzy search
+- **BGE-Reranker Integration:** 10-20ms local reranking in orchestration flow
+- **Adaptive Chunking Workflow:** Document-type detection and routing
+- **Semantic Cache Checking:** Tiered threshold evaluation (0.98+/0.93-0.97/0.88-0.92)
+- **LightRAG Graph Integration:** Knowledge graph queries in parallel with vector search
+- **Error Recovery:** Automatic fallback to LlamaCloud/LlamaParse if OCR needed
+
+---
+
+## 9.0 Mac Studio Local Orchestration (v7.1 - Enhanced)
 
 ### 9.0.1 Local-First Workflow Architecture
 
-The v5.0 architecture enables LOCAL workflow orchestration on Mac Studio, ensuring sensitive workflows never leave the hardware while maintaining enterprise-grade orchestration capabilities.
+The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with integrated RAG components, ensuring sensitive workflows never leave the hardware while maintaining enterprise-grade orchestration capabilities.
 
 **Core Capabilities:**
 - **98% of workflows** execute locally on Mac Studio
@@ -358,7 +373,7 @@ The v5.0 architecture enables LOCAL workflow orchestration on Mac Studio, ensuri
 - 800 GB/s memory bandwidth
 - 10+ concurrent workflows
 
-## 9.9 Orchestration Metrics (v5.0)
+## 9.9 Orchestration Metrics (v7.1)
 
 ### 9.9.1 Performance Targets
 

@@ -2,26 +2,26 @@
 
 ## 1.1 Purpose
 
-This Software Requirements Specification (SRS) document provides a complete description of all functions and specifications for the AI Empire File Processing System, version 7.0 Advanced RAG Production Edition. This document is intended for all project stakeholders including developers, system architects, quality assurance teams, project managers, and business stakeholders involved in the development, deployment, and maintenance of the AI Empire intelligent document processing and retrieval-augmented generation platform.
+This Software Requirements Specification (SRS) document provides a complete description of all functions and specifications for the AI Empire File Processing System, version 7.1 State-of-the-Art RAG Edition. This document is intended for all project stakeholders including developers, system architects, quality assurance teams, project managers, and business stakeholders involved in the development, deployment, and maintenance of the AI Empire intelligent document processing and retrieval-augmented generation platform.
 
-Version 7.0 represents a production-grade RAG architecture with hybrid search, knowledge graphs, and advanced observability, leveraging Claude Sonnet 4.5 API for core intelligence while maintaining the Mac Studio M3 Ultra for development and mem-agent MCP hosting.
+Version 7.1 represents a state-of-the-art RAG architecture achieving 40-60% better retrieval quality at lower cost, featuring BGE-M3 embeddings with built-in sparse vectors, Claude Haiku query expansion, BGE-Reranker-v2 on Mac Studio, adaptive document-type chunking, and tiered semantic caching, all while reducing monthly costs to $335-480 (down from $375-550 in v7.0).
 
 ### Document Objectives
 
-- **Define** all functional and non-functional requirements for AI Empire v7.0
+- **Define** all functional and non-functional requirements for AI Empire v7.1
 - **Establish** the basis for agreement between customers and contractors
 - **Reduce** development effort and project risks through clear specification
 - **Provide** a basis for estimating costs and schedules
 - **Facilitate** transfer to new personnel or teams
 - **Serve** as a basis for future enhancements
-- **Document** the production-grade RAG architecture with hybrid search and knowledge graphs
-- **Specify** 4-method hybrid search with RRF fusion and Cohere reranking
+- **Document** the state-of-the-art RAG architecture with hybrid search and knowledge graphs
+- **Specify** 4-method hybrid search with RRF fusion and BGE-Reranker-v2 local reranking
 - **Detail** sub-workflow architecture patterns for modular n8n implementations
 - **Outline** asynchronous processing patterns with exponential backoff
 - **Define** complete document lifecycle management with versioning and cascade deletion
 - **Ensure** SOC 2 Type II compliance for all cloud service vendors
-- **Demonstrate** 30-50% search quality improvement over traditional RAG
-- **Enable** <500ms query latency with 60-80% semantic cache hit rate
+- **Demonstrate** 40-60% search quality improvement over traditional RAG
+- **Enable** <100ms query latency with tiered semantic cache (0.98+ direct, 0.93-0.97 similar, 0.88-0.92 suggestion)
 
 ## 1.2 Scope
 
@@ -29,30 +29,33 @@ Version 7.0 represents a production-grade RAG architecture with hybrid search, k
 **AI Empire File Processing System**
 
 ### Product Version
-**7.0 - Advanced RAG Production Edition**
+**7.1 - State-of-the-Art RAG Edition**
 
 ### Product Description
 
-The AI Empire File Processing System v7.0 is a production-grade RAG platform that processes diverse document formats, multimedia content, and web resources using Claude Sonnet 4.5 API with hybrid search, knowledge graphs, and full observability. The system combines 4-method hybrid search (dense, sparse, ILIKE, fuzzy) with Cohere reranking, achieving 30-50% better relevance than traditional RAG. It leverages modular sub-workflows for multimodal processing, asynchronous patterns for long-running operations, and comprehensive lifecycle management for documents.
+The AI Empire File Processing System v7.1 is a state-of-the-art RAG platform that processes diverse document formats, multimedia content, and web resources using Claude Sonnet 4.5 API with BGE-M3 embeddings, query expansion via Claude Haiku, and BGE-Reranker-v2 local reranking. The system combines 4-method hybrid search (BGE-M3 dense with built-in sparse vectors, ILIKE, fuzzy) with local BGE-Reranker-v2 on Mac Studio, achieving 40-60% better relevance than traditional RAG. It leverages adaptive document-type chunking for 15-25% better precision, tiered semantic caching for sub-100ms responses, and comprehensive lifecycle management for documents.
 
 ### Core Capabilities
 
-#### Version 7.0 NEW - Production-Grade RAG Features
-- **Hybrid Search** - 4-method search (dense, sparse, ILIKE, fuzzy) with RRF fusion
-- **Cohere Reranking** - 20-30% better result ordering with v3.5 model
+#### Version 7.1 NEW - State-of-the-Art RAG Features
+- **BGE-M3 Embeddings** - 1024-dim vectors with built-in sparse vectors (superior to BM25)
+- **Query Expansion** - Claude Haiku generates 4-5 query variations (15-30% better recall, $1.50-9/month)
+- **BGE-Reranker-v2** - Local reranking on Mac Studio via Tailscale (saves $30-50/month vs Cohere)
+- **Adaptive Chunking** - Document-type-aware chunking (15-25% better precision)
+- **Tiered Semantic Caching** - 0.98+ direct hit, 0.93-0.97 similar answer, 0.88-0.92 suggestion
+- **Hybrid Search** - BGE-M3 dense + built-in sparse + ILIKE + fuzzy with RRF fusion
 - **LightRAG Knowledge Graph** - Entity relationships and graph traversal
 - **Sub-Workflow Architecture** - Modular n8n workflows for multimodal, KG, memory
 - **Asynchronous Processing** - Wait/poll patterns with exponential backoff
 - **Document Lifecycle** - Complete CRUD with versioning, cascade deletion, audit trails
 - **Hash-Based Deduplication** - SHA-256 content hashing prevents redundant processing
 - **Error Handling & Retry** - Configurable retry with retryable vs non-retryable classification
-- **Semantic Caching** - 60-80% hit rate, <50ms cached queries via Redis
-- **mem-agent MCP** - Persistent conversation memory (<500ms retrieval)
+- **mem-agent MCP** - Persistent conversation memory (<100ms retrieval)
 - **Multi-Modal Support** - Images (Claude Vision), audio (Soniox), structured data
-- **Dynamic Metadata** - Flexible schema management with metadata_fields table
-- **500+ documents/day** processing capacity with batch optimization
-- **<500ms query latency** with semantic caching
-- **30-50% search quality improvement** over traditional RAG
+- **LlamaCloud/LlamaParse** - Free tier OCR (10K pages/month) replacing Mistral
+- **1000+ documents/day** processing capacity with batch optimization
+- **<100ms query latency** with tiered semantic caching
+- **40-60% search quality improvement** over traditional RAG
 
 #### From Version 2.9-4.0 (All Capabilities Maintained)
 - Unified document processing supporting 40+ file formats via MarkItDown MCP
@@ -79,25 +82,26 @@ The AI Empire File Processing System v7.0 is a production-grade RAG platform tha
 
 ### System Objectives
 
-1. **Achieve** 30-50% better search quality through hybrid search and reranking
-2. **Enable** <500ms query latency with 60-80% semantic cache hit rate
-3. **Process** 500+ documents daily with hash-based deduplication
-4. **Maintain** <500ms memory retrieval through mem-agent MCP
-5. **Implement** modular sub-workflows for multimodal, knowledge graph, and memory operations
-6. **Support** asynchronous processing with wait/poll patterns and exponential backoff
-7. **Provide** complete document lifecycle management with versioning and cascade deletion
-8. **Ensure** robust error handling with configurable retry logic
-9. **Enable** 4-method hybrid search with RRF fusion
-10. **Integrate** LightRAG knowledge graphs for entity relationships
-11. **Deliver** multi-modal support (text, images, audio, structured data)
-12. **Maintain** 99.9% uptime through production-grade infrastructure
-13. **Support** 1000+ queries/day with semantic caching
-14. **Provide** full observability with Prometheus, Grafana, OpenTelemetry
-15. **Ensure** SOC 2 Type II compliance for all cloud services
-16. **Optimize** costs to $375-550/month for production features
-17. **Enable** dynamic metadata management with flexible schemas
-18. **Implement** batch processing with splitInBatches patterns
-19. **Provide** Supabase Edge Functions for HTTP API access
+1. **Achieve** 40-60% better search quality through BGE-M3 embeddings, query expansion, and local reranking
+2. **Enable** <100ms query latency with tiered semantic cache (0.98+ direct, 0.93-0.97 similar, 0.88-0.92 suggestion)
+3. **Process** 1000+ documents daily with hash-based deduplication
+4. **Maintain** <100ms memory retrieval through mem-agent MCP
+5. **Implement** BGE-M3 1024-dim embeddings with built-in sparse vectors
+6. **Deploy** Claude Haiku query expansion for 15-30% better recall
+7. **Run** BGE-Reranker-v2 locally on Mac Studio (saves $30-50/month)
+8. **Apply** adaptive document-type chunking for 15-25% better precision
+9. **Support** asynchronous processing with wait/poll patterns and exponential backoff
+10. **Provide** complete document lifecycle management with versioning and cascade deletion
+11. **Ensure** robust error handling with configurable retry logic
+12. **Enable** 4-method hybrid search with RRF fusion
+13. **Integrate** LightRAG knowledge graphs for entity relationships
+14. **Deliver** multi-modal support (text, images, audio, structured data)
+15. **Maintain** 99.9% uptime through production-grade infrastructure
+16. **Support** 5000+ queries/day with tiered semantic caching
+17. **Provide** full observability with Prometheus, Grafana, OpenTelemetry
+18. **Ensure** SOC 2 Type II compliance for all cloud services
+19. **Optimize** costs to $335-480/month (reduced from $375-550)
+20. **Leverage** LlamaCloud free tier for OCR (10K pages/month)
 20. **Execute** comprehensive testing and validation for all workflows
 21. **Maintain** Infrastructure as Code for automated deployment
 22. **Ensure** all cloud vendors maintain SOC 2 Type II compliance

@@ -1,5 +1,28 @@
 # 6. Supporting Information & Appendices (Updated v5.0)
 
+## V7.1 Architecture Components
+
+**Version 7.1 unifies the following components in the Empire architecture:**
+
+### Core Components (v7.1)
+- **BGE-M3 Embeddings:** 1024-dim vectors with built-in sparse vectors (Supabase pgvector)
+- **Query Expansion:** Claude Haiku generates 4-5 semantic variations (15-30% recall improvement)
+- **BGE-Reranker-v2:** Mac Studio local reranking via Tailscale (replaces Cohere, $30-50/month savings)
+- **Adaptive Chunking:** Document-type-aware (contracts 300, policies 400, technical 512 tokens)
+- **Tiered Caching:** Redis semantic cache with 0.98+/0.93-0.97/0.88-0.92 thresholds
+- **LlamaCloud/LlamaParse:** Free tier OCR (10K pages/month, replaces Mistral)
+- **LightRAG:** Knowledge graph for entity relationships and traversal
+- **mem-agent MCP:** Developer memory on Mac Studio (8GB, <500ms latency)
+- **Observability:** Prometheus, Grafana, OpenTelemetry stack
+
+### Performance Gains (v7.1)
+- **Retrieval Quality:** 40-60% improvement (up from 30-50%)
+- **Query Latency:** <100ms with tiered caching
+- **Reranking Latency:** 10-20ms (vs 1000ms+ Cohere)
+- **Cost:** $335-480/month (down from $375-550)
+
+---
+
 ## 6.1 Appendix A: Business Rules
 
 ### Core Processing Rules (All Versions)
@@ -40,8 +63,8 @@
 *Status: Active - All Versions*
 
 **BR-012:** Reranking SHALL be applied to all search results
-*Note: v5.0 - Primary local BGE-reranker, Cohere as fallback*
-*Status: Enhanced - v5.0*
+*Note: v7.1 - BGE-Reranker-v2 on Mac Studio (10-20ms latency)*
+*Status: Enhanced - v7.1*
 
 **BR-013:** Memories SHALL be user-specific
 *Note: v5.0 - mem-agent replaces Zep*

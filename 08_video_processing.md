@@ -1,10 +1,10 @@
 # 8. Advanced Video Processing Requirements
 
-## 8.0 Mac Studio Video Processing Architecture (v5.0)
+## 8.0 Mac Studio Video Processing Architecture (v7.1)
 
 ### 8.0.1 Local-First Video Processing
 
-The v5.0 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCAL video processing, eliminating cloud vision API costs and ensuring complete privacy for sensitive video content.
+The v7.1 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCAL video processing, eliminating cloud vision API costs and ensuring complete privacy for sensitive video content. Video processing capabilities are compatible with all v7.1 RAG improvements including BGE-M3 embeddings and tiered semantic caching.
 
 **Core Capabilities:**
 - **Qwen2.5-VL-7B** running locally for all vision tasks (5GB memory)
@@ -247,7 +247,7 @@ The v5.0 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 6. Results encrypted and backed to B2
 7. Zero cloud exposure for sensitive videos
 
-## 8.7 Performance Benchmarks (v5.0 Specific)
+## 8.7 Performance Benchmarks (v7.1 - Video Processing)
 
 ### 8.7.1 Mac Studio Performance Targets
 

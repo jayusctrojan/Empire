@@ -126,38 +126,57 @@ def assessPDFComplexity(file):
 *Priority: Medium*
 *Status: Active - All Versions*
 
+#### 3.1.1.3b LlamaCloud/LlamaParse OCR (NEW - v7.1)
+
+**FR-015C:** The system SHALL use LlamaCloud/LlamaParse for OCR processing
+
+*Priority: Essential*
+*Provider: LlamaCloud (free tier)*
+*Capacity: 10,000 pages/month free tier*
+*Cost: $0 for standard volume (replaces $20/month Mistral OCR)*
+*Formats: PDF, PNG, JPG, BMP, GIF*
+*Routing: Primary OCR provider, fallback to Mistral if needed*
+*Status: Active - v7.1*
+
+**FR-015D:** The system SHALL automatically route PDFs to LlamaParse when > 5MB or complex
+
+*Priority: High*
+*Method: File size + complexity detection*
+*Performance: 10-30s per document*
+*Status: Active - v7.1*
+
 #### 3.1.1.4 LangExtract Integration (NEW - v7.0)
 
 **FR-015A:** The system SHALL integrate LangExtract for precise information extraction alongside LlamaIndex
 
 *Priority: High*
 *Description: Gemini-powered extraction library for precise grounding*
-*Status: Active - v7.0+*
+*Status: Active - v7.1+*
 
 **FR-015B:** The system SHALL use LangExtract for structured data extraction from documents
 
 *Priority: High*
 *Processing: Gemini-powered extraction with schema validation*
 *Accuracy: >95% extraction accuracy for structured fields*
-*Status: Active - v7.0+*
+*Status: Active - v7.1+*
 
 **FR-015C:** The system SHALL validate extracted information against LlamaIndex document processing
 
 *Priority: High*
 *Description: Cross-validation between LangExtract and LlamaIndex for grounding precision*
-*Status: Active - v7.0+*
+*Status: Active - v7.1+*
 
 **FR-015D:** The system SHALL support custom extraction schemas for domain-specific needs
 
 *Priority: Medium*
 *Configuration: YAML/JSON schema definitions*
-*Status: Active - v7.0+*
+*Status: Active - v7.1+*
 
 **FR-015E:** The system SHALL provide extraction confidence scores for validation
 
 *Priority: Medium*
 *Threshold: >0.85 confidence for auto-acceptance*
-*Status: Active - v7.0+*
+*Status: Active - v7.1+*
 
 **LangExtract Use Cases:**
 - **Entity Extraction:** Precise identification of people, organizations, dates, locations
@@ -453,11 +472,11 @@ def assessPDFComplexity(file):
 **HR-001:** The system SHALL perform semantic vector searches
 
 *Priority: Essential*
-*Backend: Pinecone vector database*
-*Embeddings: Local nomic-embed generation (v5.0)*
+*Backend: Supabase pgvector database*
+*Embeddings: BGE-M3 1024-dim vectors with built-in sparse vectors (v7.1)*
 *Features: Similarity search, filtering, metadata queries*
-*Performance: <500ms query response time*
-*Status: Active - All Versions*
+*Performance: <50ms dense, <100ms sparse query response time*
+*Status: Active - v7.1*
 
 **HR-002:** The system SHALL maintain and query knowledge graphs
 
@@ -478,10 +497,11 @@ def assessPDFComplexity(file):
 **HR-004:** The system SHALL combine multiple search strategies with reranking
 
 *Priority: Essential*
-*Components: Vector + Keyword + Graph search*
-*Reranking: Local BGE-reranker primary, Cohere fallback (v5.0)*
+*Components: Dense Vector + Sparse + ILIKE + Fuzzy search*
+*Reranking: BGE-Reranker-v2 on Mac Studio (v7.1, replaces Cohere)*
+*Fusion: Reciprocal Rank Fusion (RRF) for result combining*
 *Optimization: Dynamic weight adjustment based on query type*
-*Status: Active - All Versions*
+*Status: Active - v7.1*
 
 #### 3.1.5.2 Hash-Based Change Detection
 
@@ -554,6 +574,47 @@ def assessPDFComplexity(file):
 
 *Priority: Low*
 *Status: Active - All Versions*
+
+#### 3.1.5.3 Adaptive Chunking Strategy (NEW - v7.1)
+
+**CHK-001:** The system SHALL implement adaptive document-type-aware chunking
+
+*Priority: Essential*
+*Description: Optimize chunk size based on document type*
+*Status: Active - v7.1*
+
+**CHK-002:** The system SHALL detect document type via Claude Vision
+
+*Priority: High*
+*Method: Analyze document structure and format*
+*Types: Contract, Policy, Technical, Narrative, Mixed*
+*Status: Active - v7.1*
+
+**CHK-003:** The system SHALL apply document-type-specific chunk sizes
+
+*Priority: Essential*
+*Chunk Sizes (v7.1 - NEW):*
+  - *Contracts: 300 tokens, 25% overlap (precision focus)*
+  - *Policies: 400 tokens, 20% overlap (balanced)*
+  - *Technical: 512 tokens, 20% overlap (context focus)*
+  - *Transcripts: 300 tokens, speaker-aware*
+  - *Default: 400 tokens, semantic boundaries*
+*Status: Active - v7.1*
+
+**CHK-004:** The system SHALL preserve document structure during chunking
+
+*Priority: High*
+*Method: Semantic boundary detection*
+*Preservation: Tables, images, code blocks, sections*
+*Impact: 15-25% better semantic coherence*
+*Status: Active - v7.1*
+
+**CHK-005:** The system SHALL provide one-time preprocessing for chunking
+
+*Priority: Medium*
+*Execution: During document ingestion*
+*Caching: Results reused for query processing*
+*Status: Active - v7.1*
 
 ### 3.1.6 Content Intelligence Requirements (UPDATED v5.0)
 
@@ -940,31 +1001,31 @@ def assessPDFComplexity(file):
 *Description: Four-method hybrid search for superior relevance*
 *Methods: Dense (vector), Sparse (full-text), ILIKE (pattern), Fuzzy (trigram)*
 *Fusion: Reciprocal Rank Fusion (RRF)*
-*Impact: 30-50% improvement in search relevance*
-*Status: Active - v7.0*
+*Impact: 40-60% improvement in search relevance*
+*Status: Active - v7.1*
 
-**SRC-002:** The system SHALL support dense vector search using nomic-embed-text embeddings
+**SRC-002:** The system SHALL support dense vector search using BGE-M3 embeddings
 
 *Priority: Essential*
-*Dimensions: 768*
+*Dimensions: 1024*
 *Similarity: Cosine distance*
 *Index: HNSW with m=16, ef_construction=64*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
-**SRC-003:** The system SHALL support sparse full-text search using PostgreSQL FTS
+**SRC-003:** The system SHALL support sparse full-text search using BGE-M3 built-in sparse vectors
 
 *Priority: Essential*
-*Method: websearch_to_tsquery with English dictionary*
-*Index: GIN index on tsvector*
-*Ranking: ts_rank for relevance scoring*
-*Status: Active - v7.0*
+*Method: BGE-M3 native sparse vectors (superior to traditional BM25)*
+*Index: GIN index on JSONB sparse vector column*
+*Ranking: Sparse relevance scoring*
+*Status: Active - v7.1*
 
 **SRC-004:** The system SHALL support pattern matching search (ILIKE)
 
 *Priority: High*
 *Use Case: Exact phrase matching, wildcards*
 *Scoring: Frequency-based relevance*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **SRC-005:** The system SHALL support fuzzy search using trigram similarity
 
@@ -972,7 +1033,7 @@ def assessPDFComplexity(file):
 *Extension: pg_trgm*
 *Use Case: Typo tolerance, approximate matching*
 *Threshold: Configurable (default 0.3)*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **SRC-006:** The system SHALL combine search results using Reciprocal Rank Fusion
 
@@ -980,7 +1041,7 @@ def assessPDFComplexity(file):
 *Algorithm: RRF with configurable k parameter (default 60)*
 *Weights: Configurable per method (dense: 0.4, sparse: 0.3, ilike: 0.15, fuzzy: 0.15)*
 *Output: Unified ranking with individual method scores*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **SRC-007:** The system SHALL support advanced metadata filtering in hybrid search
 
@@ -988,94 +1049,113 @@ def assessPDFComplexity(file):
 *Operators: =, !=, >, <, >=, <=, IN, NOT IN*
 *Logic: $and, $or operators*
 *Types: Text, numeric, timestamp, array*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.11.2 Reranking Requirements
 
-**RRK-001:** The system SHALL implement Cohere reranking for result optimization
+**RRK-001:** The system SHALL implement BGE-Reranker-v2 for result optimization
 
 *Priority: High*
-*Model: rerank-english-v3.5*
+*Model: BGE-Reranker-v2 (299M parameters, ~1.5GB RAM)*
+*Deployment: Mac Studio via Tailscale secure connection*
 *Application: Applied after hybrid search, before context expansion*
-*Impact: 20-30% improvement in result ordering*
-*Cost: ~$0.03 per 1000 searches*
-*Status: Active - v7.0*
+*Impact: 25-35% improvement in result ordering*
+*Cost: $0 (self-hosted on Mac Studio, saved $30-50/month vs Cohere)*
+*Latency: 10-20ms per batch*
+*Status: Active - v7.1*
 
 **RRK-002:** The system SHALL rerank top N results based on query relevance
 
 *Priority: High*
 *Default: Rerank top 20, return top 10*
 *Threshold: Configurable relevance threshold (default 0.7)*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **RRK-003:** The system SHALL preserve diversity in reranked results
 
 *Priority: Medium*
 *Method: Maximum marginal relevance (MMR)*
 *Balance: Relevance vs diversity*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.11.3 Query Enhancement Requirements
 
 **QRY-001:** The system SHALL enhance queries before search execution
 
 *Priority: High*
-*Pipeline: Spell correction → Synonym expansion → Entity extraction → Intent classification*
-*Impact: Improved query understanding and recall*
-*Status: Active - v7.0*
+*Pipeline: Query expansion → Spell correction → Entity extraction → Intent classification*
+*Impact: 15-30% better recall with query expansion*
+*Status: Active - v7.1*
+
+**QRY-001a:** The system SHALL generate query variations using Claude Haiku (NEW - v7.1)
+
+*Priority: Essential*
+*Method: Claude Haiku API generates 4-5 semantic variations*
+*Execution: Parallel expansion before hybrid search*
+*Cost: ~$1.50-9/month*
+*Latency: Sub-100ms expansion time*
+*UI: Toggle for "Enhanced Search" mode*
+*Strategies: Synonym expansion, step variations, concept expansion*
+*Status: Active - v7.1*
 
 **QRY-002:** The system SHALL perform spell correction on user queries
 
 *Priority: Medium*
 *Method: Claude API-based correction*
 *Fallback: User confirmation for significant changes*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **QRY-003:** The system SHALL expand queries with relevant synonyms
 
 *Priority: Medium*
-*Source: Claude API semantic understanding*
-*Limit: Max 3 synonyms per key term*
-*Status: Active - v7.0*
+*Source: Claude Haiku API semantic understanding*
+*Limit: 4-5 variations total*
+*Status: Active - v7.1*
 
 **QRY-004:** The system SHALL extract entities from queries
 
 *Priority: High*
 *Types: Person, Organization, Location, Date, Technology, Concept*
 *Use: Entity-based filtering and graph traversal*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **QRY-005:** The system SHALL classify query intent
 
 *Priority: High*
 *Categories: Factual, Analytical, Comparative, Multi-hop, Ambiguous*
 *Use: Adaptive search strategy selection*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
-#### 3.1.11.4 Semantic Caching Requirements
+#### 3.1.11.4 Semantic Caching Requirements (OPTIMIZED - v7.1)
 
-**CHE-001:** The system SHALL implement semantic caching for query results
+**CHE-001:** The system SHALL implement tiered semantic caching for query results
 
 *Priority: High*
-*Method: Embedding-based similarity matching*
-*Threshold: 0.85 cosine similarity*
-*Storage: Redis with TTL*
+*Method: BGE-M3 embedding-based similarity matching*
+*Tiered Thresholds (v7.1 - NEW):*
+  - *0.98+: Direct cache hit (return cached result)*
+  - *0.93-0.97: Return with "similar answer found" note*
+  - *0.88-0.92: Show as suggestion, allow bypass*
+  - *<0.88: Execute full pipeline*
+*Storage: Upstash Redis with adaptive TTL*
 *Impact: 60-80% cache hit rate for common queries*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **CHE-002:** The system SHALL cache query embeddings for similarity comparison
 
 *Priority: High*
-*Storage: Redis hash with embedding vectors*
+*Storage: Redis hash with BGE-M3 1024-dim embedding vectors*
 *TTL: 1 hour for query cache, 24 hours for result cache*
-*Status: Active - v7.0*
+*Adaptive: Document-type-aware TTL (policies 24h, real-time 5m)*
+*Status: Active - v7.1*
 
 **CHE-003:** The system SHALL invalidate cache on document updates
 
 *Priority: Essential*
 *Strategy: Document-based invalidation*
 *Granularity: Per-document or global flush*
-*Status: Active - v7.0*
+*UI: Manual refresh button to bypass cache*
+*Status: Active - v7.1*
 
 ### 3.1.12 Knowledge Graph Requirements (NEW - v7.0)
 
@@ -1087,7 +1167,7 @@ def assessPDFComplexity(file):
 *API: LightRAG HTTP API*
 *Cost: $15-30/month*
 *Impact: 20-40% better context understanding for entity-rich queries*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **KG-002:** The system SHALL extract entities and relationships from documents
 
@@ -1095,14 +1175,14 @@ def assessPDFComplexity(file):
 *Extraction: During document ingestion*
 *Types: Entities (Person, Organization, Technology, Concept, Event)*
 *Relationships: (uses, created_by, related_to, part_of, occurred_at)*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **KG-003:** The system SHALL store knowledge graph data in Supabase
 
 *Priority: Essential*
 *Tables: knowledge_entities, knowledge_relationships*
 *Indexing: B-tree on entity values, JSONB GIN on properties*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **KG-004:** The system SHALL support graph traversal queries
 
@@ -1110,37 +1190,37 @@ def assessPDFComplexity(file):
 *Max Hops: Configurable (default 3)*
 *Filtering: By entity type and relationship type*
 *Scoring: Path relevance based on relationship strength*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **KG-005:** The system SHALL combine graph results with vector search
 
 *Priority: High*
 *Integration: Graph traversal → Expand to related documents → Hybrid search*
 *Weighting: Graph results boosted by relationship proximity*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.12.2 Entity Management
 
 **ENT-001:** The system SHALL maintain entity embeddings for similarity search
 
 *Priority: High*
-*Model: nomic-embed-text (768 dimensions)*
+*Model: BGE-M3 (1024 dimensions with built-in sparse vectors)*
 *Use: Entity disambiguation and linking*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **ENT-002:** The system SHALL deduplicate entities automatically
 
 *Priority: Medium*
 *Method: Embedding similarity + name matching*
 *Threshold: 0.9 similarity for merge*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **ENT-003:** The system SHALL track entity confidence scores
 
 *Priority: Medium*
 *Range: 0.0-1.0*
 *Use: Filtering low-confidence entities*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 ### 3.1.13 Production User Memory System Requirements (NEW - v7.0)
 
@@ -1155,16 +1235,16 @@ def assessPDFComplexity(file):
 *Storage: Supabase PostgreSQL with pgvector extension*
 *Tables: user_memory_nodes, user_memory_edges, user_document_connections*
 *Purpose: Production user memory with graph relationships*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-002:** The system SHALL store user memory nodes with embeddings
 
 *Priority: Essential*
 *Node Types: fact, preference, goal, context, skill, interest*
-*Embeddings: 768-dim nomic-embed-text vectors*
+*Embeddings: 1024-dim BGE-M3 vectors (upgraded from 768-dim)*
 *Metadata: confidence_score, importance_score, source_type*
 *Lifecycle: Active/inactive status, optional expiration*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-003:** The system SHALL maintain graph edges between memory nodes
 
@@ -1172,7 +1252,7 @@ def assessPDFComplexity(file):
 *Relationship Types: causes, relates_to, contradicts, supports, precedes, enables*
 *Edge Metadata: strength (0.0-1.0), directionality, observation_count*
 *Purpose: Multi-hop graph traversal for context enrichment*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-004:** The system SHALL extract user facts using Claude API
 
@@ -1181,7 +1261,7 @@ def assessPDFComplexity(file):
 *Types: Facts, preferences, goals, context, skills, interests*
 *Confidence: 0.0-1.0 confidence scoring per memory*
 *Trigger: After each user message in chat interface*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-005:** The system SHALL retrieve user memory context with graph traversal
 
@@ -1190,7 +1270,7 @@ def assessPDFComplexity(file):
 *Traversal Depth: 2 hops (configurable 1-3)*
 *Performance: <100ms for graph traversal*
 *Similarity: Vector similarity threshold 0.7 for seed nodes*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-006:** The system SHALL create hybrid graph connections to LightRAG entities
 
@@ -1199,7 +1279,7 @@ def assessPDFComplexity(file):
 *Connection Types: related_to, expert_in, interested_in, worked_on*
 *Benefits: Personalized document recommendations, expertise matching*
 *Storage: user_document_connections table*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-007:** The system SHALL enrich queries with personalized user context
 
@@ -1208,7 +1288,7 @@ def assessPDFComplexity(file):
 *Context: Top 10 relevant memories with relationship paths*
 *Personalization: Related LightRAG entities based on user interests*
 *Performance: <300ms total for memory retrieval and enrichment*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-008:** The system SHALL implement memory decay for stale information
 
@@ -1217,7 +1297,7 @@ def assessPDFComplexity(file):
 *Threshold: 30 days of inactivity*
 *Decay Rate: 10% confidence reduction per period*
 *Purpose: Prevent outdated information from polluting context*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-009:** The system SHALL detect contradicting memories
 
@@ -1226,7 +1306,7 @@ def assessPDFComplexity(file):
 *Function: detect_contradicting_memories() during extraction*
 *Resolution: Flag for review, prefer higher confidence scores*
 *Purpose: Maintain memory consistency*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-010:** The system SHALL enforce row-level security on memory tables
 
@@ -1235,7 +1315,7 @@ def assessPDFComplexity(file):
 *Implementation: PostgreSQL RLS policies*
 *Privacy: User memories not visible across accounts*
 *GDPR: Support for full memory deletion on request*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-011:** The system SHALL support personalized document entity recommendations
 
@@ -1244,7 +1324,7 @@ def assessPDFComplexity(file):
 *Scoring: Combines user memory connections, access frequency, relevance*
 *Use Case: "Show documents related to my expertise/interests"*
 *Performance: <50ms for entity retrieval*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-012:** The system SHALL maintain temporal tracking for memories
 
@@ -1253,7 +1333,7 @@ def assessPDFComplexity(file):
 *Purpose: Identify frequently referenced vs. one-time facts*
 *Decay: Used for automatic confidence decay of stale information*
 *Analytics: Memory usage patterns and user engagement*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-013:** The system SHALL support memory importance and confidence scoring
 
@@ -1262,7 +1342,7 @@ def assessPDFComplexity(file):
 *Confidence: 0.0-1.0 score for reliability (explicit vs. inferred)*
 *Source Types: explicit (directly stated), inferred (implied), conversation*
 *Ranking: Combined scoring for context retrieval prioritization*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **MEM-014:** The system SHALL implement multi-hop graph traversal for context
 
@@ -1272,7 +1352,7 @@ def assessPDFComplexity(file):
 *Cycle Prevention: Track visited nodes, prevent infinite loops*
 *Scoring: Decay similarity by edge strength at each hop*
 *Performance: <100ms for 2-hop traversal with 10 seed nodes*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.13.2 Session Management
 
@@ -1281,21 +1361,21 @@ def assessPDFComplexity(file):
 *Priority: Essential*
 *Storage: Supabase n8n_chat_histories table*
 *Retention: 90 days*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **SES-002:** The system SHALL support multi-session management per user
 
 *Priority: High*
 *Sessions: Unlimited concurrent sessions*
 *Isolation: Complete session isolation*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **SES-003:** The system SHALL preserve context within sessions
 
 *Priority: Essential*
 *Window: Last 10 messages or 8000 tokens*
 *Compression: Automatic summarization for long conversations*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 ### 3.1.14 Structured Data Requirements (NEW - v7.0)
 
@@ -1306,7 +1386,7 @@ def assessPDFComplexity(file):
 *Priority: High*
 *Formats: CSV, TSV, XLSX, XLS*
 *Preservation: Column headers, data types, relationships*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **TAB-002:** The system SHALL store tabular data in dedicated schema
 
@@ -1314,21 +1394,21 @@ def assessPDFComplexity(file):
 *Table: tabular_document_rows*
 *Format: JSONB for flexible schema*
 *Indexing: GIN index on row_data*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **TAB-003:** The system SHALL support structured queries on tabular data
 
 *Priority: Medium*
 *Query Types: Filter, aggregate, join*
 *Interface: Natural language to SQL translation*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **TAB-004:** The system SHALL preserve table relationships and metadata
 
 *Priority: Medium*
 *Metadata: Column names, types, statistics*
 *Relationships: Foreign key detection*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.14.2 Schema Inference
 
@@ -1337,14 +1417,14 @@ def assessPDFComplexity(file):
 *Priority: High*
 *Detection: Column types (string, number, date, boolean)*
 *Validation: Sample-based validation*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **SCH-002:** The system SHALL detect and preserve data relationships
 
 *Priority: Medium*
 *Detection: Foreign key patterns, hierarchical structures*
 *Use: Enhanced query planning*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.14.3 Metadata Fields Management (NEW - v7.0)
 
@@ -1405,21 +1485,21 @@ def assessPDFComplexity(file):
 *Priority: High*
 *Formats: JPG, PNG, GIF, BMP, TIFF, WEBP*
 *Extraction: Text (OCR), objects, descriptions, captions*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **IMG-002:** The system SHALL generate descriptive embeddings for images
 
 *Priority: High*
 *Method: Text description → nomic-embed-text*
 *Storage: Standard vector storage with image metadata*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **IMG-003:** The system SHALL support image-text cross-modal search
 
 *Priority: Medium*
 *Query: Text query retrieves relevant images*
 *Ranking: Semantic similarity of descriptions*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.15.2 Audio Processing
 
@@ -1429,14 +1509,14 @@ def assessPDFComplexity(file):
 *Formats: MP3, WAV, M4A, FLAC*
 *Features: Speaker diarization, timestamps*
 *Cost: $0.005 per minute*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **AUD-002:** The system SHALL process transcriptions as text documents
 
 *Priority: Medium*
 *Enrichment: Speaker labels, timing metadata*
 *Chunking: By speaker turns or time segments*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.15.3 Video Processing
 
@@ -1463,21 +1543,21 @@ def assessPDFComplexity(file):
 *Priority: High*
 *Range: Configurable (default ±2 chunks)*
 *Limit: Maximum 8000 tokens total*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **CTX-002:** The system SHALL merge overlapping expanded chunks
 
 *Priority: High*
 *Method: Deduplication by chunk ID*
 *Ordering: Document order preservation*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **CTX-003:** The system SHALL prioritize expansion based on relevance scores
 
 *Priority: Medium*
 *Strategy: Expand high-scoring chunks more than low-scoring*
 *Weighting: Score-based expansion radius*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.16.2 Hierarchical Context
 
@@ -1486,14 +1566,14 @@ def assessPDFComplexity(file):
 *Priority: Medium*
 *Hierarchy: Document → Section → Subsection → Chunk*
 *Storage: Metadata fields for parent/child relationships*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **CTX-005:** The system SHALL expand to parent context when relevant
 
 *Priority: Medium*
 *Trigger: High relevance score or missing context*
 *Expansion: Include section headers and summaries*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **CTX-006:** The system SHALL provide batch context expansion via get_chunks_by_ranges() function
 
@@ -1521,7 +1601,7 @@ def assessPDFComplexity(file):
 *Metrics: Query latency, search quality, token usage, cost per query, error rate*
 *Collection: Prometheus metrics*
 *Visualization: Grafana dashboards*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **OBS-002:** The system SHALL log all API calls and searches
 
@@ -1529,7 +1609,7 @@ def assessPDFComplexity(file):
 *Format: Structured JSON logs*
 *Storage: Elasticsearch or file-based*
 *Retention: 90 days*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **OBS-003:** The system SHALL implement distributed tracing
 
@@ -1537,7 +1617,7 @@ def assessPDFComplexity(file):
 *Framework: OpenTelemetry*
 *Tracing: Request flow through all components*
 *Storage: Jaeger*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 #### 3.1.17.2 Alerting
 
@@ -1546,19 +1626,19 @@ def assessPDFComplexity(file):
 *Priority: High*
 *Threshold: >5% error rate for 5 minutes*
 *Delivery: Email, Slack, PagerDuty*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **ALT-002:** The system SHALL alert on performance degradation
 
 *Priority: High*
 *Thresholds: P95 latency >3s, search quality <70%*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 **ALT-003:** The system SHALL alert on cost anomalies
 
 *Priority: Medium*
 *Threshold: >$10/hour token usage*
-*Status: Active - v7.0*
+*Status: Active - v7.1*
 
 ### 3.1.18 Edge Functions and API Requirements (NEW - v7.0)
 
