@@ -1,5 +1,20 @@
 # 4. Version 3.0 Enhancements (Enhanced for v5.0 Mac Studio)
 
+## IMPORTANT: Version 7.1 Supersedes This Document
+
+**Version 7.1** represents a complete architectural evolution that supersedes v3.0 enhancements with:
+- **BGE-M3 Embeddings:** 1024-dim vectors replacing 768-dim nomic-embed-text (3-5% quality improvement)
+- **Query Expansion:** Claude Haiku generates 4-5 variations (15-30% better recall)
+- **BGE-Reranker-v2:** Local reranking on Mac Studio replacing Cohere ($30-50/month savings)
+- **Adaptive Chunking:** Document-type-aware (15-25% better precision)
+- **Tiered Caching:** 0.98+ direct hit, 0.93-0.97 similar answer thresholds
+- **Performance:** 40-60% better retrieval quality (up from 30-50%)
+- **Cost:** $335-480/month (reduced from $375-550)
+
+For current implementation guidance, refer to **Section 3 (Specific Requirements)** and **Section 7-10** for v7.1 details.
+
+---
+
 ## 4.1 Parallel Processing Engine
 
 ### 4.1.1 Architecture Overview
