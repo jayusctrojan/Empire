@@ -1,10 +1,10 @@
 # 8. Advanced Video Processing Requirements
 
-## 8.0 Mac Studio Video Processing Architecture (v7.1)
+## 8.0 Mac Studio Video Processing Architecture (v7.2)
 
-### 8.0.1 Local-First Video Processing
+### 8.0.1 Local-First Video Processing with Graph Integration
 
-The v7.1 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCAL video processing, eliminating cloud vision API costs and ensuring complete privacy for sensitive video content. Video processing capabilities are compatible with all v7.1 RAG improvements including BGE-M3 embeddings and tiered semantic caching.
+The v7.2 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCAL video processing, eliminating cloud vision API costs and ensuring complete privacy for sensitive video content. Video processing capabilities integrate with Neo4j for entity/relationship extraction and all v7.1 RAG improvements including BGE-M3 embeddings and tiered semantic caching.
 
 **Core Capabilities:**
 - **Qwen2.5-VL-7B** running locally for all vision tasks (5GB memory)
