@@ -1,17 +1,29 @@
 # 6. Supporting Information & Appendices (Updated v5.0)
 
-## V7.1 Architecture Components
+## V7.2 Revolutionary Architecture Components
 
-**Version 7.1 unifies the following components in the Empire architecture:**
+**Version 7.2 introduces a breakthrough dual-interface architecture with graph-native intelligence:**
 
-### Core Components (v7.1)
+### v7.2 NEW - Dual-Interface & Graph Database
+- **Neo4j Graph Database:** FREE on Mac Studio Docker
+  - 10-100x faster relationship queries than SQL
+  - Multi-hop traversal, pathfinding, centrality analysis
+  - Automatic Supabase ↔ Neo4j bi-directional sync
+- **Neo4j MCP Server:** Direct Claude Desktop/Code integration
+  - Natural language → Cypher translation via Claude Sonnet
+  - Graph query tools (neo4j_query, entity_search, graph_traverse, path_find)
+- **Chat UI Interface:** Gradio/Streamlit on Render ($15-20/month)
+  - End-user access with both vector AND graph query support
+  - Hybrid search combining semantic + relationship intelligence
+
+### Core Components (v7.1 MAINTAINED in v7.2)
 - **BGE-M3 Embeddings:** 1024-dim vectors with built-in sparse vectors (Supabase pgvector)
 - **Query Expansion:** Claude Haiku generates 4-5 semantic variations (15-30% recall improvement)
 - **BGE-Reranker-v2:** Mac Studio local reranking via Tailscale (replaces Cohere, $30-50/month savings)
 - **Adaptive Chunking:** Document-type-aware (contracts 300, policies 400, technical 512 tokens)
 - **Tiered Caching:** Redis semantic cache with 0.98+/0.93-0.97/0.88-0.92 thresholds
 - **LlamaCloud/LlamaParse:** Free tier OCR (10K pages/month, replaces Mistral)
-- **LightRAG:** Knowledge graph for entity relationships and traversal
+- **LightRAG:** Knowledge graph enhanced with Neo4j backend for entity relationships
 - **mem-agent MCP:** Developer memory on Mac Studio (8GB, <500ms latency)
 - **Observability:** Prometheus, Grafana, OpenTelemetry stack
 

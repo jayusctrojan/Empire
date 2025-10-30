@@ -1,10 +1,17 @@
 # 7. Performance and Scaling Optimizations (v7.1 Mac Studio)
 
-## V7.1 Performance Enhancements
+## V7.2 Performance Enhancements with Graph Database
 
-**Version 7.1 delivers state-of-the-art retrieval quality and performance:**
+**Version 7.2 adds graph-native performance for relationship-heavy queries:**
 
-### Retrieval Quality Improvements
+### NEW v7.2 - Graph Query Performance
+- **Graph Query Speed:** 10-100x faster than SQL joins for relationships
+- **Multi-hop Traversal:** <100ms for simple paths, <500ms for complex analysis
+- **Community Detection:** Identifies entity clusters and relationship patterns
+- **Centrality Analysis:** Ranks entities by influence in knowledge graph
+- **Neo4j Caching:** In-memory graph caching for <50ms latencies
+
+### V7.1 Retrieval Quality Improvements (MAINTAINED)
 - **Overall Improvement:** 40-60% better retrieval (up from 30-50%)
 - **BGE-M3 Embeddings:** 1024-dim with built-in sparse vectors (+3-5%)
 - **Query Expansion:** Claude Haiku 4-5 variations (+15-30% recall)

@@ -1,5 +1,85 @@
 # 3. Specific Requirements
 
+## 3.0 v7.2 NEW - Graph Database & Dual-Interface Requirements
+
+### 3.0.1 Neo4j Graph Database Requirements
+
+**FR-NEO-001:** The system SHALL run Neo4j Graph Database locally on Mac Studio via Docker
+
+*Priority: Critical*
+*Cost Benefit: Eliminates ~$100+/month cloud GraphDB costs*
+*Status: v7.2 NEW*
+
+**FR-NEO-002:** The system SHALL support natural language to Cypher query translation
+
+*Priority: Critical*
+*Description: Convert user natural language queries to Cypher via Claude Sonnet*
+*Accuracy Target: >90% correct Cypher generation*
+*Status: v7.2 NEW*
+
+**FR-NEO-003:** The system SHALL provide Neo4j MCP Server for Claude Desktop/Code integration
+
+*Priority: Critical*
+*Interface: Claude Desktop + Claude Code direct graph access*
+*Response Latency: <100ms for simple queries, <500ms for complex traversal*
+*Status: v7.2 NEW*
+
+**FR-NEO-004:** The system SHALL implement bi-directional Supabase ↔ Neo4j synchronization
+
+*Priority: High*
+*Description: Automatic sync of entities and relationships between relational and graph databases*
+*Sync Latency: <5 minutes for eventual consistency*
+*Status: v7.2 NEW*
+
+**FR-NEO-005:** The system SHALL support advanced graph traversal capabilities
+
+*Priority: High*
+*Features: Multi-hop pathfinding, community detection, centrality analysis*
+*Max Hops: 5 levels with configurable depth*
+*Status: v7.2 NEW*
+
+**FR-NEO-006:** The system SHALL implement semantic entity resolution
+
+*Priority: Medium*
+*Description: ML-based entity matching and deduplication across graphs*
+*Accuracy Target: >95% entity consolidation*
+*Status: v7.2 NEW*
+
+### 3.0.2 Chat UI Requirements
+
+**FR-CHAT-001:** The system SHALL provide a Gradio/Streamlit Chat UI interface
+
+*Priority: Critical*
+*Deployment: Render cloud platform*
+*Cost: $15-20/month*
+*Availability: 24/7 public access*
+*Status: v7.2 NEW*
+
+**FR-CHAT-002:** The system SHALL support both vector search AND graph queries through Chat UI
+
+*Priority: High*
+*Description: Unified query interface supporting hybrid searches*
+*Status: v7.2 NEW*
+
+**FR-CHAT-003:** The system SHALL display search results with relevance scores and source citations
+
+*Priority: High*
+*Status: v7.2 NEW*
+
+### 3.0.3 MCP Requirements
+
+**FR-MCP-001:** The system SHALL provide Neo4j MCP tools for Claude agents
+
+*Priority: Critical*
+*Tools: neo4j_query, entity_search, graph_traverse, path_find*
+*Status: v7.2 NEW*
+
+**FR-MCP-002:** The system SHALL enable natural language graph analysis in Claude Code
+
+*Priority: High*
+*Description: Direct Cypher generation from user intent*
+*Status: v7.2 NEW*
+
 ## 3.1 Functional Requirements
 
 ### 3.1.1 Document Processing Requirements (Core - All Versions)

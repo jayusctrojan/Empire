@@ -1,16 +1,24 @@
 # 9. Orchestrator and Scheduler Requirements
 
-## V7.1 Orchestration Enhancements
+## V7.2 Orchestration with Dual-Interface Routing
 
-**Version 7.1 adds advanced orchestration for RAG components:**
+**Version 7.2 adds intelligent routing between vector search, graph queries, and dual interfaces:**
 
-### V7.1 Orchestration Improvements
+### V7.2 NEW - Dual-Interface Orchestration
+- **Query Type Detection:** Classify queries as semantic, relational, or hybrid
+- **Vector → Graph Router:** Route relational queries to Neo4j for 10-100x speed improvement
+- **Interface Selector:** Route to Chat UI for end-users or Neo4j MCP for developers
+- **Bi-directional Sync Orchestration:** Automatic Supabase ↔ Neo4j synchronization in workflow
+- **Cypher Generation:** Claude Sonnet translates natural language to Cypher in real-time
+- **Hybrid Result Merging:** Combine vector semantic results with graph relationship results
+
+### V7.1 Orchestration Improvements (MAINTAINED)
 - **Query Expansion Sub-Workflow:** Claude Haiku generates 4-5 variations in parallel
 - **Hybrid Search Orchestration:** Dynamic switching between dense, sparse, ILIKE, fuzzy search
 - **BGE-Reranker Integration:** 10-20ms local reranking in orchestration flow
 - **Adaptive Chunking Workflow:** Document-type detection and routing
 - **Semantic Cache Checking:** Tiered threshold evaluation (0.98+/0.93-0.97/0.88-0.92)
-- **LightRAG Graph Integration:** Knowledge graph queries in parallel with vector search
+- **LightRAG Graph Integration:** Knowledge graph queries enhanced with Neo4j
 - **Error Recovery:** Automatic fallback to LlamaCloud/LlamaParse if OCR needed
 
 ---
