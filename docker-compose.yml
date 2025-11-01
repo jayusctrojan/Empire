@@ -20,3 +20,18 @@ services:
       - ./neo4j/logs:/logs
       - ./neo4j/import:/import
       - ./neo4j/plugins:/plugins
+
+  redis:
+    image: redis:7-alpine
+    container_name: empire-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"  # Redis default port
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - ./redis/data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
