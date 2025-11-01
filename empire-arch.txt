@@ -24,13 +24,14 @@ Core Architecture Decisions:
 - PRIMARY AI: Claude Sonnet 4.5 API (synthesis) + Claude Haiku (expansion)
 - EMBEDDINGS: BGE-M3 (1024-dim with built-in sparse vectors)
 - RERANKING: BGE-Reranker-v2 on Mac Studio via Tailscale
-- MEMORY: mem-agent MCP for persistent conversation context
 - DUAL STORAGE: Supabase pgvector + Neo4j Graph Database (synced)
 - DUAL INTERFACE: Neo4j MCP (Claude Desktop) + Chat UI (Gradio)
+- DOCUMENT PROCESSING: LlamaIndex on Render (srv-d2nl1lre5dus73atm9u0)
+- ORCHESTRATION: CrewAI on Render (srv-d2n0hh3uibrs73buafo0)
 - KNOWLEDGE: LightRAG + Neo4j for graph relationships
 - MULTI-MODAL: Claude Vision for images, Soniox for audio transcription
 - CACHING: Redis semantic cache with tiered similarity thresholds
-- Mac Studio: Development + mem-agent MCP + BGE-Reranker-v2 + Neo4j
+- Mac Studio: Development + BGE-Reranker-v2 + Neo4j Docker
 
 ================================================================================
 DUAL-INTERFACE ARCHITECTURE (NEW v7.2)
@@ -72,20 +73,73 @@ Data Architecture:
 │   └── Free (Community Edition on Mac Studio)
 │
 └── Synchronization
-    ├── n8n workflow for bi-directional sync
+    ├── FastAPI service for bi-directional sync
     ├── 5-minute intervals
     └── Conflict resolution: Supabase as source of truth
+
+================================================================================
+Render Services (Already Deployed)
+================================================================================
+
+Workspace ID: tea-d1vtdtre5dus73a4rb4g
+
+LlamaIndex Service (Active):
+├── Service ID: srv-d2nl1lre5dus73atm9u0
+├── URL: https://jb-llamaindex.onrender.com
+├── Purpose: Document parsing, indexing, and vector retrieval
+├── Integration:
+│   ├── Parses PDFs, Word docs, contracts, policies
+│   ├── Creates searchable vector indexes
+│   ├── Integrates with Supabase pgvector
+│   ├── Coordinates with Neo4j for entity storage
+│   └── Works with CrewAI for multi-document processing
+├── API Endpoints:
+│   ├── POST /parse - Parse documents
+│   ├── POST /index/create - Create vector index
+│   ├── POST /index/{id}/query - Query index
+│   └── GET /health - Health check
+└── Cost: $7-21/month (Starter to Standard tier)
+
+CrewAI Service (Active):
+├── Service ID: srv-d2n0hh3uibrs73buafo0
+├── URL: https://jb-crewai.onrender.com
+├── Purpose: Multi-agent AI orchestration for complex workflows
+├── Integration:
+│   ├── Coordinates multiple AI agents for complex tasks
+│   ├── Uses LlamaIndex for document retrieval
+│   ├── Queries Neo4j for entity relationships
+│   ├── Synthesizes results with Claude Sonnet
+│   └── Manages parallel document analysis
+├── Agent Types:
+│   ├── Document Parser Agent (uses LlamaIndex)
+│   ├── Entity Extractor Agent (uses Neo4j)
+│   ├── Research Agent (uses hybrid search)
+│   ├── Synthesizer Agent (uses Claude)
+│   └── Quality Validator Agent
+├── API Endpoints:
+│   ├── POST /run-crew - Execute multi-agent task
+│   ├── POST /analyze-documents - Batch document analysis
+│   ├── GET /crew-status/{id} - Check task status
+│   └── GET /health - Health check
+└── Cost: $7-21/month (Starter to Standard tier)
+
+Workflow Integration:
+1. Document Upload → LlamaIndex parses and chunks
+2. LlamaIndex generates embeddings via BGE-M3
+3. Store in Supabase + sync entities to Neo4j
+4. Complex queries → CrewAI orchestrates multi-agent search
+5. CrewAI coordinates: LlamaIndex (retrieval) + Neo4j (graph) + Claude (synthesis)
 
 ================================================================================
 Core Infrastructure
 ================================================================================
 
-Mac Studio M3 Ultra (96GB) - Development & Production Services Hub
+Mac Studio M3 Ultra (96GB) - Development & Local Services Hub
 	•	28-core CPU, 60-core GPU, 32-core Neural Engine
 	•	800 GB/s memory bandwidth
-	•	PRIMARY USE: Development + mem-agent + BGE-Reranker-v2 + Neo4j
+	•	PRIMARY USE: Development + BGE-Reranker-v2 + Neo4j + Ollama
 	•	Neo4j Graph Database: Running in Docker (~4GB)
-	•	mem-agent MCP: Always running for memory management (~8GB)
+	•	Ollama (BGE-M3 + BGE-Reranker-v2): Local AI models (~8-12GB)
 	•	BGE-Reranker-v2: Production reranking API via Tailscale (~1.5GB)
 	•	Claude Desktop + Claude Code: AI interfaces with MCP integration
 	•	Docker Desktop: Running Neo4j and MCP servers
@@ -170,9 +224,9 @@ Cloud AI Infrastructure (PRIMARY)
 	  - $0.25 per 1M input tokens
 	  - Sub-100ms latency
 	  - Optional UI toggle for "Enhanced Search"
-	•	n8n (Render) - Workflow orchestration ($15-30/month)
-	•	CrewAI (Render) - Content Analysis Agent ($15-20/month)
-	•	Supabase - PostgreSQL + pgvector ($25/month) - UNIFIED DATABASE
+	•	LlamaIndex (Render: srv-d2nl1lre5dus73atm9u0) - Document processing ($7-21/month)
+	•	CrewAI (Render: srv-d2n0hh3uibrs73buafo0) - Multi-agent orchestration ($7-21/month)
+	•	Supabase - PostgreSQL + pgvector ($15/month SMALL tier) - UNIFIED DATABASE
 	•	Backblaze B2 - File storage + backups ($10-20/month)
 
 ================================================================================
@@ -674,7 +728,8 @@ Input Sources:
 
 Processing Services:
 ├── MarkItDown MCP → 40+ format conversion to Markdown
-├── LlamaIndex (Render) → Document processing & UI ($15-20/month)
+├── LlamaIndex (Render: srv-d2nl1lre5dus73atm9u0) → Document processing & indexing ($7-21/month)
+├── CrewAI (Render: srv-d2n0hh3uibrs73buafo0) → Multi-agent orchestration ($7-21/month)
 ├── LangExtract → Gemini-powered extraction for precise grounding ($10-20/month)
 ├── Mistral OCR → Complex PDFs only ($20/month)
 ├── Soniox → Audio/video transcription ($10-20/month)
@@ -851,12 +906,17 @@ ESSENTIAL: LightRAG API
 	•	Graph traversal queries
 	•	Cost: ~$15/month
 
-ESSENTIAL: CrewAI Content Analyzer
+ESSENTIAL: CrewAI Content Analyzer (Render)
+	•	Service ID: srv-d2n0hh3uibrs73buafo0
+	•	URL: https://jb-crewai.onrender.com
+	•	Workspace: tea-d1vtdtre5dus73a4rb4g
+	•	Multi-agent AI orchestration for complex workflows
 	•	Analyzes ALL ingested content
 	•	Generates course documentation
 	•	Extracts frameworks and workflows
 	•	Maps content to departments
 	•	Creates implementation guides
+	•	Cost: ~$7-21/month (Starter to Standard tier)
 
 BACKUP: Other APIs as needed
 	•	Mistral OCR for complex PDFs
@@ -864,10 +924,16 @@ BACKUP: Other APIs as needed
 	•	Minimal usage, task-specific
 
 PRECISION EXTRACTION: LlamaIndex + LangExtract
-	•	LlamaIndex (Render): Document processing & UI ($15-20/month)
-	  - Document ingestion and indexing
+	•	LlamaIndex (Render): Document processing, indexing & retrieval
+	  - Service ID: srv-d2nl1lre5dus73atm9u0
+	  - URL: https://jb-llamaindex.onrender.com
+	  - Workspace: tea-d1vtdtre5dus73a4rb4g
+	  - Document ingestion and parsing
+	  - Vector index creation and management
 	  - Query interface and retrieval
-	  - Integration with pgvector
+	  - Integration with pgvector and Neo4j
+	  - Coordinates with CrewAI for multi-agent processing
+	  - Cost: ~$7-21/month (Starter to Standard tier)
 	•	LangExtract: Gemini-powered extraction ($10-20/month)
 	  - Precise information extraction with schemas
 	  - Entity and relationship extraction
@@ -876,7 +942,6 @@ PRECISION EXTRACTION: LlamaIndex + LangExtract
 	  - >95% extraction accuracy with confidence scores
 
 LOCAL: Development Only
-	•	mem-agent MCP (8GB) - persistent memory
 	•	Claude Desktop for development
 	•	Testing and experimentation
 
