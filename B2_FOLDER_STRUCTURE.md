@@ -704,6 +704,204 @@ Respond in JSON format:
 
 ---
 
-**Last Updated**: 2025-01-01
-**Empire Version**: v7.2
-**Status**: Complete 10-department taxonomy with detailed AI classification context
+## CrewAI Suggestions & Production Structure
+
+### CrewAI Suggestions Folder Structure
+
+When CrewAI analyzes course content, it generates actionable suggestions stored in `processed/crewai-suggestions/`:
+
+```
+processed/crewai-suggestions/
+│
+├── claude-skills/                   # YAML skill definitions for Claude Code
+│   ├── drafts/                     # Newly generated, needs review
+│   └── approved/                   # Reviewed and ready for production
+│
+├── claude-commands/                 # Markdown slash commands
+│   ├── drafts/
+│   └── approved/
+│
+├── agents/                          # CrewAI agent definitions
+│   ├── drafts/
+│   └── approved/
+│
+├── prompts/                         # AI prompts and templates (NEW)
+│   ├── drafts/
+│   └── approved/
+│
+└── workflows/                       # n8n workflow definitions (NEW)
+    ├── drafts/
+    └── approved/
+```
+
+**Asset Types Explained:**
+
+1. **`claude-skills/`** - YAML skill definitions that extend Claude Code capabilities
+   - Example: `project-charter-generator.yaml`
+   - Used for: Automating common tasks in Claude Code
+
+2. **`claude-commands/`** - Markdown slash commands for quick actions
+   - Example: `review-pr.md`, `analyze-metrics.md`
+   - Used for: Custom `/commands` in Claude Desktop
+
+3. **`agents/`** - CrewAI agent configurations for multi-agent workflows
+   - Example: `sales-agent-config.yaml`, `finance-analyst.yaml`
+   - Used for: Deploying specialized AI agents per department
+
+4. **`prompts/`** - AI prompt templates and engineering patterns (NEW)
+   - Example: `sales-proposal-template.md`, `code-review-prompt.yaml`
+   - Used for: Consistent, high-quality AI interactions
+
+5. **`workflows/`** - n8n workflow JSON definitions (NEW)
+   - Example: `document-intake-enhanced.json`, `course-analysis.json`
+   - Used for: Automating document processing pipelines
+
+### Production Folder Structure (Department-based)
+
+Once suggestions are approved, they're promoted to `production/` for active use:
+
+```
+production/
+│
+├── _global/                         # Cross-department assets
+│   ├── claude-skills/
+│   ├── claude-commands/
+│   ├── crewai-agents/
+│   ├── prompts/
+│   └── workflows/
+│
+├── _versions/                       # Rollback backups
+│   └── [timestamped backups]
+│
+├── it-engineering/                  # Department-specific assets
+│   ├── claude-skills/
+│   ├── claude-commands/
+│   ├── crewai-agents/
+│   ├── prompts/
+│   └── workflows/
+│
+├── sales-marketing/
+│   ├── claude-skills/
+│   ├── claude-commands/
+│   ├── crewai-agents/
+│   ├── prompts/
+│   └── workflows/
+│
+├── customer-support/
+│   └── [same structure]
+│
+├── operations-hr-supply/
+│   └── [same structure]
+│
+├── finance-accounting/
+│   └── [same structure]
+│
+├── project-management/
+│   └── [same structure]
+│
+├── real-estate/
+│   └── [same structure]
+│
+├── private-equity-ma/
+│   └── [same structure]
+│
+├── consulting/
+│   └── [same structure]
+│
+└── personal-continuing-ed/
+    └── [same structure]
+```
+
+### Promotion Workflow
+
+```mermaid
+1. CrewAI analyzes course content
+   ↓
+2. Generates suggestions → `drafts/`
+   ↓
+3. You review and test → Move to `approved/`
+   ↓
+4. Ready for production? → Run promotion script
+   ↓
+5. Asset copied to `production/{department}/`
+   ↓
+6. n8n workflows and Claude Code read from production
+   ↓
+7. Old version backed up to `production/_versions/`
+```
+
+**Example: Promoting a Project Charter Skill**
+
+```bash
+# Step 1: CrewAI generates suggestion
+processed/crewai-suggestions/claude-skills/drafts/project-charter-generator.yaml
+
+# Step 2: You review and approve
+mv drafts/project-charter-generator.yaml approved/project-charter-generator.yaml
+
+# Step 3: Promote to production
+python scripts/promote_to_production.py
+
+# Interactive prompts:
+#   Asset type: claude-skills
+#   File: project-charter-generator.yaml
+#   Destination: project-management (or _global)
+
+# Step 4: Now in production!
+production/project-management/claude-skills/project-charter-generator.yaml
+
+# Your workflows can now use it:
+# - Claude Code loads skills from production/
+# - n8n reads from production/{dept}/ folders
+```
+
+### Production Asset Management
+
+**Versioning:**
+- Every production update creates a timestamped backup in `production/_versions/`
+- Rollback: Copy previous version back from `_versions/`
+
+**Global vs. Department-specific:**
+- **`_global/`** - Assets used across all departments (e.g., "Meeting Summarizer")
+- **`{department}/`** - Department-specific assets (e.g., "Sales Proposal Generator" in `sales-marketing/`)
+
+**Scripts Available:**
+1. **`scripts/setup_b2_production_structure.py`** - Creates all production folders
+2. **`scripts/promote_to_production.py`** - Interactive promotion tool
+
+### Integration with Workflows
+
+**n8n Workflow Example:**
+
+```javascript
+// Load production skills for department
+const department = "sales-marketing";
+const assetType = "claude-skills";
+const b2Path = `production/${department}/${assetType}/`;
+
+// List all production skills
+const skills = await b2.listFiles(b2Path);
+
+// Load and execute skill
+for (const skill of skills) {
+  const skillContent = await b2.downloadFile(skill.fileName);
+  // Use skill in your workflow
+}
+```
+
+**Claude Code Integration:**
+
+```yaml
+# claude_desktop_config.json
+{
+  "skills": {
+    "source": "b2://JB-Course-KB/production/_global/claude-skills/"
+  }
+}
+```
+
+---
+
+**Last Updated**: 2025-01-02
+**Empire Version**: v7.2 Enhanced
+**Status**: Complete with production structure + CrewAI suggestions (5 asset types)
