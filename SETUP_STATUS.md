@@ -171,6 +171,57 @@ tailscale ip -4  # Should show: 100.119.86.6
 
 ---
 
+### 9. **Backblaze B2 - File Storage** ✅ CONFIGURED
+- **Status**: ACTIVE
+- **Bucket**: `JB-Course-KB`
+- **Bucket ID**: `77b14e205f0ee9e9998a051b`
+- **Purpose**: Primary file storage and backups
+
+**Folder Structure**:
+```
+JB-Course-KB/
+├── content/course/       - Course materials
+├── pending/              - Documents awaiting processing
+├── processed/            - Successfully processed documents
+├── failed/               - Failed processing attempts
+└── youtube-content/      - YouTube transcripts
+```
+
+**Test Command**:
+```bash
+python3 -c "from b2sdk.v2 import *; api = B2Api(InMemoryAccountInfo()); api.authorize_account('production', '$B2_APPLICATION_KEY_ID', '$B2_APPLICATION_KEY'); print('✅ B2 Connected')"
+```
+
+---
+
+### 10. **Soniox - Audio Transcription** ✅ CONFIGURED
+- **Status**: KEY SET
+- **API Key**: Configured in `.env`
+- **Purpose**: Audio/video transcription for course content
+- **Cost**: ~$10-20/month (usage-based, $0.015/min)
+
+---
+
+### 11. **Mistral OCR** ⏳ NEEDS API KEY
+- **Status**: NOT CONFIGURED
+- **Purpose**: Complex PDF and scanned document OCR
+- **Get Key**: https://console.mistral.ai/
+- **Cost**: ~$20/month (usage-based)
+- **Required for**: Scanned insurance policies, poor-quality PDFs
+
+---
+
+### 12. **LangExtract / Gemini** ⏳ NEEDS API KEY
+- **Status**: NOT CONFIGURED
+- **Purpose**: Structured data extraction (policy #, dates, amounts)
+- **Get Key**:
+  - LangExtract: https://langextract.com/
+  - Google Gemini: https://ai.google.dev/
+- **Cost**: ~$10-20/month
+- **Required for**: High-accuracy field extraction
+
+---
+
 ## 📊 Infrastructure Summary
 
 | Service | Status | Port | Memory | Cost |
@@ -183,8 +234,12 @@ tailscale ip -4  # Should show: 100.119.86.6
 | **LlamaCloud** | ✅ Configured | - | - | $50/mo |
 | **LlamaIndex** | ✅ Active | - | - | $7-21/mo |
 | **CrewAI** | ✅ Active | - | - | $7-21/mo |
+| **Backblaze B2** | ✅ Configured | - | - | $10-20/mo |
+| **Soniox** | ✅ Configured | - | - | $10-20/mo |
+| **Mistral OCR** | ⏳ Needs Key | - | - | $20/mo |
+| **LangExtract** | ⏳ Needs Key | - | - | $10-20/mo |
 | **Tailscale** | ✅ Connected | - | - | FREE |
-| **TOTAL** | | | ~10-12GB | **$329-407/mo** |
+| **TOTAL** | | | ~10-12GB | **$389-487/mo** |
 
 ---
 
