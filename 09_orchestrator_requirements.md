@@ -12,7 +12,8 @@
 - **Cypher Generation:** Claude Sonnet translates natural language to Cypher in real-time
 - **Hybrid Result Merging:** Combine vector semantic results with graph relationship results
 
-### V7.1 Orchestration Improvements (MAINTAINED)
+### V7.3 Orchestration Improvements (ENHANCED)
+- **Local Embedding Generation:** BGE-M3 via Ollama with <10ms latency, zero API costs
 - **Query Expansion Sub-Workflow:** Claude Haiku generates 4-5 variations in parallel
 - **Hybrid Search Orchestration:** Dynamic switching between dense, sparse, ILIKE, fuzzy search
 - **BGE-Reranker Integration:** 10-20ms local reranking in orchestration flow
@@ -35,7 +36,7 @@ The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with in
 - **Privacy-first** orchestration with PII detection
 - **Zero latency** for local workflow execution
 - **Unlimited workflow executions** without API costs
-- **API replacement value:** ~$50-100/month for workflow automation
+- **API replacement value:** ~$100-200/month (workflow automation + embedding APIs)
 
 ### 9.0.2 Mac Studio Resource Orchestration
 

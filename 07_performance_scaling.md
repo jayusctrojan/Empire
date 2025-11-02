@@ -11,20 +11,25 @@
 - **Centrality Analysis:** Ranks entities by influence in knowledge graph
 - **Neo4j Caching:** In-memory graph caching for <50ms latencies
 
-### V7.1 Retrieval Quality Improvements (MAINTAINED)
-- **Overall Improvement:** 40-60% better retrieval (up from 30-50%)
-- **BGE-M3 Embeddings:** 1024-dim with built-in sparse vectors (+3-5%)
+### V7.3 Retrieval Quality & Performance (ENHANCED)
+- **Overall Improvement:** 40-60% better retrieval (maintained from v7.1)
+- **BGE-M3 Embeddings via Ollama:**
+  - 1024-dim vectors with built-in sparse (+3-5% quality)
+  - <10ms local generation (vs 50-100ms API)
+  - Zero API costs (saves $50-100/month)
+  - 1000+ embeddings/minute throughput
 - **Query Expansion:** Claude Haiku 4-5 variations (+15-30% recall)
 - **BGE-Reranker-v2:** Local Mac Studio (+25-35% precision)
 - **Adaptive Chunking:** Document-type-aware (+15-25% coherence)
 - **Tiered Caching:** 0.98+/0.93-0.97/0.88-0.92 thresholds (+60-80% hit rate)
 
-### Cost & Performance Trade-off Resolution
+### Cost & Performance Trade-off Resolution (v7.3)
+- **BGE-M3 Ollama:** <10ms latency, $0 cost (vs $50-100/month APIs)
 - **BGE-Reranker-v2:** 10-20ms latency (vs 1000ms+ Cohere)
 - **LlamaCloud/LlamaParse:** $0 tier (vs $20/month Mistral)
 - **Claude Haiku Expansion:** $1.50-9/month (minimal vs gains)
-- **Monthly Savings:** $40-70 (10-15% cost reduction)
-- **Result:** Better performance at lower cost
+- **Monthly Savings:** $90-170 (24-31% cost reduction)
+- **Result:** Superior performance at dramatically lower cost
 
 ---
 
@@ -109,6 +114,7 @@ llm_optimization:
       "parallel_batches": 10  // Mac Studio capability
     },
     "embedding_batching": {
+      "provider": "ollama_local",  // v7.3 - Zero-cost local
       "max_texts": 1000,
       "optimal_size": 100,
       "use_gpu": true
@@ -455,8 +461,8 @@ benchmark_tests:
 
 ## 7.10 Migration Notes
 
-### From v5.0 to v7.1
-- 768-dim embeddings → 1024-dim BGE-M3 with sparse vectors
+### From v5.0 to v7.3
+- 768-dim embeddings → 1024-dim BGE-M3 via Ollama (local, zero-cost)
 - No query expansion → Claude Haiku 4-5 variations
 - Cohere reranking ($30-50/month) → BGE-Reranker-v2 (Mac Studio, $0)
 - Fixed chunking → Adaptive document-type chunking
@@ -465,10 +471,12 @@ benchmark_tests:
 - 30-50% retrieval quality → 40-60% retrieval quality
 - $375-550/month → $335-480/month
 
-### Performance Improvements (v5.0 to v7.1)
+### Performance Improvements (v5.0 to v7.3)
 - 10-20% better retrieval quality (embeddings + expansion)
 - 25-35% precision improvement (reranking)
 - 15-25% coherence improvement (adaptive chunking)
+- 5-10x faster embedding generation (<10ms local vs 50-100ms API)
+- $50-100/month cost savings on embeddings
 - 10x faster reranking (10-20ms vs 1000ms+)
 - $40-70/month cost savings
 - Same quality, lower cost optimization

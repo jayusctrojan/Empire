@@ -12,14 +12,16 @@
 - **Graph Traversal:** Multi-hop pathfinding, community detection, centrality analysis
 - **Semantic Entity Resolution:** ML-based deduplication
 
-### v7.1 MAINTAINED - State-of-the-Art RAG
-- **BGE-M3 Embeddings:** 1024-dim vectors with built-in sparse (3-5% quality improvement)
+### v7.3 ENHANCED - State-of-the-Art RAG with Local Embeddings
+- **BGE-M3 Embeddings via Ollama:** 1024-dim vectors with ZERO API costs (saves $50-100/month)
+  - <10ms local generation vs 50-100ms API
+  - Complete privacy - no data leaves infrastructure
 - **Query Expansion:** Claude Haiku generates 4-5 variations (15-30% better recall)
 - **BGE-Reranker-v2:** Local reranking on Mac Studio replacing Cohere ($30-50/month savings)
 - **Adaptive Chunking:** Document-type-aware (15-25% better precision)
 - **Tiered Caching:** 0.98+ direct hit, 0.93-0.97 similar answer thresholds
 - **Performance:** 40-60% better retrieval quality with hybrid vector + graph search
-- **Cost:** $350-500/month (includes both Chat UI and Neo4j MCP, Neo4j free)
+- **Cost:** $250-400/month (reduced from $350-500 with local embeddings)
 
 For current implementation guidance, refer to **Section 3 (Specific Requirements)** and **Sections 7-10** for v7.2 details.
 

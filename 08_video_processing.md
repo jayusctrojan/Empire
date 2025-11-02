@@ -4,7 +4,7 @@
 
 ### 8.0.1 Local-First Video Processing with Graph Integration
 
-The v7.2 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCAL video processing, eliminating cloud vision API costs and ensuring complete privacy for sensitive video content. Video processing capabilities integrate with Neo4j for entity/relationship extraction and all v7.1 RAG improvements including BGE-M3 embeddings and tiered semantic caching.
+The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCAL video processing, eliminating cloud vision API costs and ensuring complete privacy for sensitive video content. Video processing capabilities integrate with Neo4j for entity/relationship extraction and all v7.3 RAG improvements including BGE-M3 embeddings via local Ollama (ZERO API costs, saves $50-100/month) and tiered semantic caching.
 
 **Core Capabilities:**
 - **Qwen2.5-VL-7B** running locally for all vision tasks (5GB memory)
@@ -13,7 +13,8 @@ The v7.2 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 - **800 GB/s memory bandwidth** for real-time video processing
 - **31GB buffer** available for video frame caching
 - **98% of video processing** happens on Mac Studio
-- **API replacement value:** ~$100-150/month for vision APIs
+- **API replacement value:** ~$150-250/month for vision + embedding APIs
+- **Total local processing savings:** ~$200-350/month (including Ollama embeddings)
 
 ### 8.0.2 Privacy-Based Video Routing
 

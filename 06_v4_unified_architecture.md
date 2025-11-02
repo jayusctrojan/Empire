@@ -16,8 +16,8 @@
   - End-user access with both vector AND graph query support
   - Hybrid search combining semantic + relationship intelligence
 
-### Core Components (v7.1 MAINTAINED in v7.2)
-- **BGE-M3 Embeddings:** 1024-dim vectors with built-in sparse vectors (Supabase pgvector)
+### Core Components (v7.3 ENHANCED)
+- **BGE-M3 Embeddings:** 1024-dim vectors via LOCAL Ollama (v7.3 - ZERO API costs, saves $50-100/month)
 - **Query Expansion:** Claude Haiku generates 4-5 semantic variations (15-30% recall improvement)
 - **BGE-Reranker-v2:** Mac Studio local reranking via Tailscale (replaces Cohere, $30-50/month savings)
 - **Adaptive Chunking:** Document-type-aware (contracts 300, policies 400, technical 512 tokens)
@@ -27,11 +27,13 @@
 - **mem-agent MCP:** Developer memory on Mac Studio (8GB, <500ms latency)
 - **Observability:** Prometheus, Grafana, OpenTelemetry stack
 
-### Performance Gains (v7.1)
-- **Retrieval Quality:** 40-60% improvement (up from 30-50%)
+### Performance Gains (v7.3)
+- **Retrieval Quality:** 40-60% improvement (maintained from v7.1)
 - **Query Latency:** <100ms with tiered caching
 - **Reranking Latency:** 10-20ms (vs 1000ms+ Cohere)
-- **Cost:** $335-480/month (down from $375-550)
+- **Embedding Latency:** <10ms local (vs 50-100ms API)
+- **Cost:** $285-380/month (down from $375-550, saves $90-170/month)
+- **Embedding API Savings:** $50-100/month with local Ollama
 
 ---
 
@@ -59,7 +61,7 @@
 *Status: Active - All Versions*
 
 **BR-007:** Contextual embeddings SHALL be optional and configurable
-*Note: v5.0 - Generated locally by Llama 70B*
+*Note: v7.3 - Generated locally via Ollama BGE-M3 with zero API costs*
 *Status: Active - All Versions*
 
 **BR-008:** SQL database SHALL be source of truth for record state

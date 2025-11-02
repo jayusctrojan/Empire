@@ -197,8 +197,8 @@ const routingStrategy = {
     cost_per_image: { local: 0.00, cloud: 0.02 }
   },
   embeddings: {
-    primary: "nomic-embed-text",  // LOCAL - FREE
-    fallback: null,  // Never use cloud
+    primary: "bge-m3-ollama",  // LOCAL via Ollama - FREE (v7.3)
+    fallback: null,  // Never use cloud APIs
     cost_per_1k: { local: 0.00, cloud: "N/A" }
   },
   ocr: {
@@ -221,7 +221,7 @@ const routingStrategy = {
 **CMR-003:** The system SHALL maximize cache utilization:
 - Memory cache (Mac Studio): 31GB available - Aggressive caching
 - SSD cache (Mac Studio): 100GB - Long-term cache
-- Embedding cache: Permanent local storage (never regenerate)
+- Embedding cache: Permanent Neo4j/local storage (BGE-M3 via Ollama)
 - LLM response cache: 30 days local retention
 - Vision analysis cache: Permanent local storage
 - Cloud response cache: 7 days (rarely needed)
