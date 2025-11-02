@@ -11,7 +11,7 @@ The AI Empire File Processing System v7.2 operates as a revolutionary dual-inter
 3. **Hybrid Intelligence** - Graph-native relationship queries (10-100x faster than SQL) + vector semantic search
 4. **Bi-directional Sync** - Automatic Supabase ↔ Neo4j synchronization
 
-All v7.1 optimizations maintained (BGE-M3 embeddings, Claude Haiku query expansion, BGE-Reranker-v2 local reranking, adaptive chunking, tiered semantic caching) for 40-60% better retrieval quality at $350-500/month:
+All v7.1 optimizations maintained (BGE-M3 embeddings now via local Ollama with ZERO API costs, Claude Haiku query expansion, BGE-Reranker-v2 local reranking, adaptive chunking, tiered semantic caching) for 40-60% better retrieval quality at $300-400/month (reduced from $350-500 with local embeddings):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -39,22 +39,28 @@ All v7.1 optimizations maintained (BGE-M3 embeddings, Claude Haiku query expansi
 │                                 │                                     │
 │                                 ▼                                     │
 │  ┌─────────────────────────────────────────────────────────────┐    │
-│  │  Mac Studio M3 Ultra (96GB) - Graph + Reranking Hub (NEW!)  │    │
+│  │  Mac Studio M3 Ultra (96GB) - Local AI Hub (v7.3 Enhanced!)  │    │
 │  │  ┌────────────────────────────────────────────────────┐    │    │
-│  │  │ • Neo4j Graph Database - FREE Docker (NEW v7.2)   │    │    │
+│  │  │ • Neo4j Graph Database - FREE Docker (v7.2)        │    │    │
 │  │  │   - Graph queries 10-100x faster than SQL         │    │    │
 │  │  │   - Entity relationships & multi-hop traversal    │    │    │
 │  │  │   - Eliminates ~$100+/month cloud GraphDB costs   │    │    │
 │  │  │ • Neo4j MCP Server - Claude Desktop/Code access   │    │    │
 │  │  │   - Natural language → Cypher translation          │    │    │
 │  │  │   - Direct integration with Claude Code            │    │    │
+│  │  │ • Ollama + BGE-M3 - Local embeddings (v7.3 NEW!)  │    │    │
+│  │  │   - 1024-dim vectors with ZERO API costs          │    │    │
+│  │  │   - <10ms generation vs 50-100ms API              │    │    │
+│  │  │   - Saves $50-100/month on embeddings             │    │    │
 │  │  │ • BGE-Reranker-v2 API - Local reranking (1.5GB)   │    │    │
 │  │  │   - Replaces Cohere (saves $30-50/month)          │    │    │
 │  │  │   - 10-20ms latency via Tailscale                 │    │    │
 │  │  │   - 25-35% reranking improvement                  │    │    │
 │  │  │ • mem-agent MCP - Conversation memory (8GB)        │    │    │
+│  │  │   - Graphiti with local BGE-M3 embeddings        │    │    │
+│  │  │   - 322 ChatGPT conversations imported            │    │    │
 │  │  │ • Development environment & Claude Desktop MCP     │    │    │
-│  │  │ • ~70GB available for caching/development          │    │    │
+│  │  │ • ~65GB available for caching/development          │    │    │
 │  │  └────────────────────────────────────────────────────┘    │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                 │                                     │
@@ -73,9 +79,10 @@ All v7.1 optimizations maintained (BGE-M3 embeddings, Claude Haiku query expansi
 │  │  • Backblaze B2 - Intelligent course organization ($15-25)  │    │
 │  │    10-dept taxonomy, AI classification, dual upload       │    │
 │  │                                                               │    │
-│  │  Advanced Features ($150-300/month - EXPANDED):             │    │
+│  │  Advanced Features ($100-200/month - REDUCED with v7.3):    │    │
 │  │  • LightRAG - Knowledge graph + Neo4j sync ($30-50)         │    │
-│  │  • BGE-M3 + BGE-Reranker-v2 - Mac Studio ($0)              │    │
+│  │  • BGE-M3 (Ollama) + BGE-Reranker-v2 - Mac Studio ($0)     │    │
+│  │  • Embedding APIs - ELIMINATED with Ollama (saves $50-100)  │    │
 │  │  • Redis (Upstash) - Tiered semantic caching ($10-15)       │    │
 │  │  • LlamaCloud - Free OCR tier (10K pages/month) ($0)        │    │
 │  │  • LlamaIndex - Indexing framework ($15-20)                 │    │
@@ -84,8 +91,8 @@ All v7.1 optimizations maintained (BGE-M3 embeddings, Claude Haiku query expansi
 │  │  • Mistral OCR - Complex PDF processing ($10-20)            │    │
 │  │  • Monitoring stack (Prometheus/Grafana) ($20-30)           │    │
 │  │                                                               │    │
-│  │  Total Monthly: $350-500 (includes both interfaces)          │    │
-│  │  Note: Neo4j saves ~$100+/month vs cloud GraphDB            │    │
+│  │  Total Monthly: $250-400 (v7.3 with local embeddings)        │    │
+│  │  Savings: Neo4j ~$100/month, Ollama embeddings ~$50-100     │    │
 │  └───────────────────────────────────────────────────────────────┘   │
 │                                 │                                     │
 │                                 ▼                                     │
@@ -98,7 +105,7 @@ All v7.1 optimizations maintained (BGE-M3 embeddings, Claude Haiku query expansi
 │  │                                                               │    │
 │  │  2. Intelligence Layer:                                      │    │
 │  │     Claude Vision (images) → Entity Extraction (KG)         │    │
-│  │     → CrewAI Analysis → BGE-M3 Embeddings (1024-dim)        │    │
+│  │     → CrewAI Analysis → BGE-M3 Embeddings (Ollama, local)   │    │
 │  │                                                               │    │
 │  │  3. Storage & Indexing:                                      │    │
 │  │     Supabase (BGE-M3 vectors + built-in sparse + metadata)  │    │

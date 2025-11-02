@@ -4,7 +4,7 @@
 
 This Software Requirements Specification (SRS) document provides a complete description of all functions and specifications for the AI Empire File Processing System, version 7.2 Dual-Interface Architecture Edition. This document is intended for all project stakeholders including developers, system architects, quality assurance teams, project managers, and business stakeholders involved in the development, deployment, and maintenance of the AI Empire intelligent document processing, graph-based knowledge management, and retrieval-augmented generation platform.
 
-Version 7.2 represents a revolutionary dual-interface architecture combining Neo4j Graph Database (FREE on Mac Studio Docker) with Supabase vector search, featuring natural language to Cypher translation for Claude Desktop/Code integration, a Gradio/Streamlit Chat UI for end users, bi-directional data synchronization, advanced graph traversal capabilities, and semantic entity resolution. This architecture maintains all v7.1 improvements (BGE-M3, query expansion, local reranking) while adding graph-native intelligence, achieving 10-100x faster relationship queries at $350-500/month.
+Version 7.2 represents a revolutionary dual-interface architecture combining Neo4j Graph Database (FREE on Mac Studio Docker) with Supabase vector search, featuring natural language to Cypher translation for Claude Desktop/Code integration, a Gradio/Streamlit Chat UI for end users, bi-directional data synchronization, advanced graph traversal capabilities, and semantic entity resolution. This architecture maintains all v7.1 improvements (BGE-M3 now via local Ollama - ZERO embedding costs, query expansion, local reranking) while adding graph-native intelligence, achieving 10-100x faster relationship queries at $300-400/month (reduced from $350-500/month with local embeddings).
 
 ### Document Objectives
 
@@ -63,7 +63,7 @@ The system maintains all v7.1 improvements (BGE-M3 embeddings with 1024-dim + sp
 - **Graph Patterns** - Pre-built patterns for common query types (supply chains, knowledge graphs, networks)
 
 #### Version 7.1 MAINTAINED - State-of-the-Art RAG Features
-- **BGE-M3 Embeddings** - 1024-dim vectors with built-in sparse vectors (superior to BM25)
+- **BGE-M3 Embeddings** - 1024-dim vectors with built-in sparse vectors via LOCAL Ollama (ZERO API costs, saves $50-100/month vs OpenAI/Mistral)
 - **Query Expansion** - Claude Haiku generates 4-5 query variations (15-30% better recall, $1.50-9/month)
 - **BGE-Reranker-v2** - Local reranking on Mac Studio via Tailscale (saves $30-50/month vs Cohere)
 - **Adaptive Chunking** - Document-type-aware chunking (15-25% better precision)
@@ -282,6 +282,7 @@ Each requirement is uniquely identified using the following convention:
 **From API Dependence to Local Models:**
 - v4.0: $50-100/month in LLM API costs
 - v5.0: $5-10/month (edge cases only)
+- v7.3: $0 embedding costs with local BGE-M3 via Ollama (saves additional $50-100/month)
 
 **Performance Improvements:**
 - v4.0: Variable cloud latency (5-15 seconds)
@@ -291,9 +292,11 @@ Each requirement is uniquely identified using the following convention:
 **Cost Reduction:**
 - v4.0: $125-255/month operating costs
 - v5.0: $100-195/month (40% reduction)
-- API replacement value: $200-300/month
-- ROI: 14-20 months payback
-- 5-year savings: $10,000-15,000
+- v7.3: $50-145/month (60-70% reduction with local embeddings)
+- Embedding API savings: $50-100/month with Ollama
+- API replacement value: $250-400/month
+- ROI: 10-14 months payback
+- 5-year savings: $15,000-20,000
 
 ### Document Usage Guidelines
 

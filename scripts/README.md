@@ -64,38 +64,72 @@ Select asset type to promote:
 Enter number: 1
 
 📋 Approved claude-skills:
-   1. project-charter-generator.yaml
+   1. project-management_project-charter-generator.yaml
       Size: 2048 bytes | Uploaded: 2025-01-02 14:30:00
+   2. sales-marketing_proposal-generator.yaml
+      Size: 3096 bytes | Uploaded: 2025-01-02 15:00:00
 
 Enter file number to promote: 1
 
-Select destination:
-   0. _global (cross-department)
-   1. it-engineering
-   2. sales-marketing
-   ...
+✅ Auto-detected department from filename: project-management
+📝 Production filename will be: project-charter-generator.yaml
 
-Enter number: 6
+Use auto-detected department 'project-management'? (yes/no/override): yes
 
 ⚠️  About to promote:
-   File: project-charter-generator.yaml
-   Type: claude-skills
-   Destination: production/project-management/
+   Source file: project-management_project-charter-generator.yaml
+   Production file: project-charter-generator.yaml
+   Type: claude-skills → claude-skills
+   Destination: production/project-management/claude-skills/
 
 Proceed? (yes/no): yes
 
 💾 Backed up existing version to: production/_versions/project-management/...
 ✅ Successfully promoted to production!
+🔗 Production path: production/project-management/claude-skills/project-charter-generator.yaml
 ```
+
+### Filename Naming Convention
+
+All CrewAI-generated assets **MUST** include department prefix:
+
+```
+{department}_{asset-name}.{extension}
+```
+
+**Examples:**
+- `sales-marketing_proposal-generator.yaml`
+- `it-engineering_code-review.md`
+- `_global_meeting-summarizer.yaml`
+
+The promotion script will:
+1. Auto-detect department from filename
+2. Remove department prefix in production
+3. Place in correct production folder
+
+**Department Codes:**
+```
+it-engineering, sales-marketing, customer-support,
+operations-hr-supply, finance-accounting, project-management,
+real-estate, private-equity-ma, consulting, personal-continuing-ed,
+_global (cross-department)
+```
+
+See `CREWAI_OUTPUT_GUIDELINES.md` for complete standards.
 
 ## Workflow Overview
 
 ### 1. CrewAI Generates Suggestions
 
-When CrewAI analyzes course content, it creates suggestions:
+When CrewAI analyzes course content, it creates suggestions **with department prefix**:
 
 ```
-processed/crewai-suggestions/{asset-type}/drafts/
+processed/crewai-suggestions/{asset-type}/drafts/{department}_{name}.{ext}
+```
+
+**Example:**
+```
+processed/crewai-suggestions/claude-skills/drafts/sales-marketing_proposal-generator.yaml
 ```
 
 ### 2. Review and Approve
@@ -104,8 +138,8 @@ You review and test the suggestions, then move to approved:
 
 ```bash
 # Manual move (or via UI in future)
-mv processed/crewai-suggestions/claude-skills/drafts/my-skill.yaml \
-   processed/crewai-suggestions/claude-skills/approved/my-skill.yaml
+mv processed/crewai-suggestions/claude-skills/drafts/sales-marketing_proposal-generator.yaml \
+   processed/crewai-suggestions/claude-skills/approved/sales-marketing_proposal-generator.yaml
 ```
 
 ### 3. Promote to Production
@@ -116,9 +150,20 @@ Run the promotion script:
 python3 scripts/promote_to_production.py
 ```
 
+The script will:
+1. Auto-detect department from filename (`sales-marketing_`)
+2. Remove department prefix (`proposal-generator.yaml`)
+3. Place in correct folder
+
 Assets are copied to:
 ```
-production/{department}/{asset-type}/
+production/{department}/{asset-type}/{clean-name}.{ext}
+```
+
+**Example:**
+```
+Input:  sales-marketing_proposal-generator.yaml
+Output: production/sales-marketing/claude-skills/proposal-generator.yaml
 ```
 
 ### 4. Production Use

@@ -114,11 +114,34 @@ class ProductionPromoter:
         except Exception as e:
             print(f"   ⚠️  Warning: Could not backup existing file: {e}")
 
+    def extract_department_from_filename(self, filename: str):
+        """
+        Extract department from filename
+
+        Expected format: {department}_{asset-name}.{ext}
+        Example: sales-marketing_proposal-generator.yaml
+
+        Returns: (department, clean_filename, is_global)
+        """
+        if filename.startswith("_global_"):
+            # Global asset
+            clean_name = filename.replace("_global_", "", 1)
+            return ("_global", clean_name, True)
+
+        # Check for department prefix
+        for dept in DEPARTMENTS:
+            if filename.startswith(f"{dept}_"):
+                clean_name = filename.replace(f"{dept}_", "", 1)
+                return (dept, clean_name, False)
+
+        # No department prefix found
+        return (None, filename, False)
+
     def promote_asset(
         self,
         asset_type: str,
         filename: str,
-        department: str,
+        department: str = None,
         is_global: bool = False
     ):
         """Promote an approved asset to production"""
@@ -127,17 +150,34 @@ class ProductionPromoter:
         print(f"🚀 Promoting: {filename}")
         print(f"{'='*70}\n")
 
+        # Auto-extract department from filename if not provided
+        extracted_dept, clean_filename, extracted_is_global = self.extract_department_from_filename(filename)
+
+        if extracted_dept and not department:
+            department = extracted_dept
+            is_global = extracted_is_global
+            print(f"✅ Auto-detected department from filename: {department}")
+            print(f"📝 Clean filename: {clean_filename}\n")
+        else:
+            clean_filename = filename
+
+        if not department:
+            print("❌ Error: Could not determine department from filename")
+            print("   Expected format: {department}_{name}.{ext}")
+            print("   Example: sales-marketing_proposal-generator.yaml")
+            return False
+
         # Source path (approved)
         source_path = f"processed/crewai-suggestions/{asset_type}/approved/{filename}"
 
-        # Destination path (production)
+        # Destination path (production) - uses clean filename without department prefix
         production_asset_type = ASSET_TYPE_MAPPING.get(asset_type, asset_type)
 
         if is_global:
-            dest_path = f"production/_global/{production_asset_type}/{filename}"
+            dest_path = f"production/_global/{production_asset_type}/{clean_filename}"
             location = "_global"
         else:
-            dest_path = f"production/{department}/{production_asset_type}/{filename}"
+            dest_path = f"production/{department}/{production_asset_type}/{clean_filename}"
             location = department
 
         print(f"📂 Source: {source_path}")
@@ -238,32 +278,77 @@ class ProductionPromoter:
 
         print()
 
-        # Step 4: Choose destination (department or global)
-        print("Select destination:\n")
-        print("   0. _global (cross-department)")
-        for i, dept in enumerate(DEPARTMENTS, 1):
-            print(f"   {i}. {dept}")
-        print()
+        # Step 4: Auto-detect department from filename or ask
+        filename = selected_file['filename']
+        extracted_dept, clean_filename, extracted_is_global = self.extract_department_from_filename(filename)
 
-        dest_choice = input("Enter number: ").strip()
+        if extracted_dept:
+            print(f"✅ Auto-detected department from filename: {extracted_dept}")
+            print(f"📝 Production filename will be: {clean_filename}")
+            print()
 
-        try:
-            if dest_choice == "0":
-                is_global = True
-                department = "_global"
+            # Ask for confirmation or override
+            use_auto = input(f"Use auto-detected department '{extracted_dept}'? (yes/no/override): ").strip().lower()
+
+            if use_auto == "yes":
+                department = extracted_dept
+                is_global = extracted_is_global
+            elif use_auto == "override":
+                # Manual selection
+                print("\nSelect destination:\n")
+                print("   0. _global (cross-department)")
+                for i, dept in enumerate(DEPARTMENTS, 1):
+                    print(f"   {i}. {dept}")
+                print()
+
+                dest_choice = input("Enter number: ").strip()
+
+                try:
+                    if dest_choice == "0":
+                        is_global = True
+                        department = "_global"
+                    else:
+                        is_global = False
+                        department = DEPARTMENTS[int(dest_choice) - 1]
+                except (ValueError, IndexError):
+                    print("❌ Invalid choice")
+                    return
             else:
-                is_global = False
-                department = DEPARTMENTS[int(dest_choice) - 1]
-        except (ValueError, IndexError):
-            print("❌ Invalid choice")
-            return
+                print("❌ Cancelled")
+                return
+        else:
+            # No department in filename - ask user
+            print("⚠️  No department prefix found in filename")
+            print("   Expected format: {department}_{name}.{ext}")
+            print("   Example: sales-marketing_proposal-generator.yaml")
+            print()
+            print("Select destination:\n")
+            print("   0. _global (cross-department)")
+            for i, dept in enumerate(DEPARTMENTS, 1):
+                print(f"   {i}. {dept}")
+            print()
+
+            dest_choice = input("Enter number: ").strip()
+
+            try:
+                if dest_choice == "0":
+                    is_global = True
+                    department = "_global"
+                else:
+                    is_global = False
+                    department = DEPARTMENTS[int(dest_choice) - 1]
+            except (ValueError, IndexError):
+                print("❌ Invalid choice")
+                return
 
         # Step 5: Confirm and promote
         print()
         print(f"⚠️  About to promote:")
-        print(f"   File: {selected_file['filename']}")
+        print(f"   Source file: {filename}")
+        if extracted_dept:
+            print(f"   Production file: {clean_filename}")
         print(f"   Type: {asset_type} → {ASSET_TYPE_MAPPING[asset_type]}")
-        print(f"   Destination: production/{department}/")
+        print(f"   Destination: production/{department}/{ASSET_TYPE_MAPPING[asset_type]}/")
         print()
 
         confirm = input("Proceed? (yes/no): ").strip().lower()
@@ -274,14 +359,15 @@ class ProductionPromoter:
         # Promote!
         success = self.promote_asset(
             asset_type=asset_type,
-            filename=selected_file['filename'],
+            filename=filename,
             department=department,
             is_global=is_global
         )
 
         if success:
+            final_filename = clean_filename if extracted_dept else filename
             print("\n🎉 Promotion complete!")
-            print(f"🔗 Production path: production/{department}/{ASSET_TYPE_MAPPING[asset_type]}/{selected_file['filename']}")
+            print(f"🔗 Production path: production/{department}/{ASSET_TYPE_MAPPING[asset_type]}/{final_filename}")
             print(f"📚 Your n8n workflows can now read from this location")
 
 

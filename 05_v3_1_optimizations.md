@@ -22,14 +22,16 @@
 
 **Version 7.1 optimizations remain core to v7.2 cost efficiency:**
 
-### Cost Improvements ($40-70/month savings vs v7.0)
+### Cost Improvements ($90-170/month savings vs v7.0)
 - **BGE-Reranker-v2 on Mac Studio:** $0 cost (replaces $30-50/month Cohere)
   - 299M parameter model runs locally at 10-20ms latency
   - Same quality as Cohere but 10x faster
 
-- **BGE-M3 Embeddings:** Better performance, same cost
+- **BGE-M3 Embeddings via Ollama (v7.3 NEW):** $0 cost (saves $50-100/month)
+  - Local generation via Ollama on Mac Studio - ZERO API costs
+  - <10ms generation time vs 50-100ms API latency
   - 1024-dim vectors with built-in sparse (3-5% quality improvement)
-  - Built-in sparse vectors eliminate separate FTS index
+  - Complete privacy - no data leaves your infrastructure
 
 - **LlamaCloud/LlamaParse Free Tier:** $0 cost (replaces $20/month Mistral OCR)
   - 10,000 pages/month free tier
@@ -47,8 +49,11 @@
 ### Overall Impact
 - **Previous (v5.0):** $375-550/month
 - **Version 7.1:** $335-480/month
-- **Monthly Savings:** $40-70 (10-15% reduction)
-- **Quality:** 40-60% better retrieval (up from 30-50%)
+- **Version 7.3 (with Ollama):** $285-380/month
+- **Monthly Savings:** $90-170 (24-31% reduction from v5.0)
+- **Embedding API Savings:** $50-100/month with local Ollama
+- **Quality:** 40-60% better retrieval (maintained from v7.1)
+- **Performance:** 5-10x faster embeddings (<10ms local)
 
 ---
 

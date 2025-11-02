@@ -833,27 +833,67 @@ production/
 **Example: Promoting a Project Charter Skill**
 
 ```bash
-# Step 1: CrewAI generates suggestion
-processed/crewai-suggestions/claude-skills/drafts/project-charter-generator.yaml
+# Step 1: CrewAI generates suggestion WITH DEPARTMENT PREFIX
+processed/crewai-suggestions/claude-skills/drafts/project-management_project-charter-generator.yaml
 
 # Step 2: You review and approve
-mv drafts/project-charter-generator.yaml approved/project-charter-generator.yaml
+mv drafts/project-management_project-charter-generator.yaml \
+   approved/project-management_project-charter-generator.yaml
 
-# Step 3: Promote to production
+# Step 3: Promote to production (auto-detects department from filename!)
 python scripts/promote_to_production.py
 
 # Interactive prompts:
-#   Asset type: claude-skills
-#   File: project-charter-generator.yaml
-#   Destination: project-management (or _global)
+#   Asset type: 1 (claude-skills)
+#   File: 1 (project-management_project-charter-generator.yaml)
+#   ✅ Auto-detected department: project-management
+#   📝 Production filename: project-charter-generator.yaml
+#   Use auto-detected department? yes
 
-# Step 4: Now in production!
+# Step 4: Now in production! (department prefix removed)
 production/project-management/claude-skills/project-charter-generator.yaml
 
 # Your workflows can now use it:
 # - Claude Code loads skills from production/
 # - n8n reads from production/{dept}/ folders
 ```
+
+### Filename Naming Convention (IMPORTANT!)
+
+All CrewAI-generated suggestions **MUST** follow this format:
+
+```
+{department}_{asset-name}.{extension}
+```
+
+**Examples:**
+- `sales-marketing_proposal-generator.yaml`
+- `it-engineering_code-review-checklist.md`
+- `finance-accounting_budget-analysis-prompt.md`
+- `_global_meeting-summarizer.yaml` (cross-department)
+
+**Why?**
+- Automatic department detection during promotion
+- No manual department selection needed
+- Clean filenames in production (prefix removed)
+- Easy to see which department each draft belongs to
+
+**Department Codes:**
+```
+it-engineering
+sales-marketing
+customer-support
+operations-hr-supply
+finance-accounting
+project-management
+real-estate
+private-equity-ma
+consulting
+personal-continuing-ed
+_global (cross-department)
+```
+
+See `CREWAI_OUTPUT_GUIDELINES.md` for complete filename standards.
 
 ### Production Asset Management
 

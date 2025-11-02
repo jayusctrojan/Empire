@@ -448,23 +448,28 @@ def assessPDFComplexity(file):
 
 #### 3.1.3.2 Local Embeddings
 
-**LLR-007:** The system SHALL generate embeddings using local nomic-embed-text (2GB)
+**LLR-007:** The system SHALL generate embeddings using local BGE-M3 via Ollama (2GB)
 
 *Priority: Essential*
-*Replaces: OpenAI text-embedding-3-small*
-*Status: Active - v5.0*
+*Model: BAAI/bge-m3 (1024-dimensional vectors)*
+*Server: Ollama on localhost:11434*
+*Replaces: OpenAI/Mistral embedding APIs (saves $50-100/month)*
+*Performance: <10ms local vs 50-100ms API*
+*Status: Active - v7.3*
 
 **LLR-008:** The system SHALL create embeddings without external API calls
 
 *Priority: Essential*
-*Benefit: Zero latency, no cost*
-*Status: Active - v5.0*
+*Benefit: Zero latency, zero API costs, complete privacy*
+*Integration: Graphiti MCP via OllamaEmbedder class*
+*Status: Active - v7.3*
 
 **LLR-009:** The system SHALL cache embeddings locally
 
 *Priority: High*
-*Storage: Mac Studio SSD*
-*Status: Active - v5.0*
+*Storage: Mac Studio SSD + Neo4j graph database*
+*Memory: 322 ChatGPT conversations imported with local embeddings*
+*Status: Active - v7.3*
 
 #### 3.1.3.3 Local Reranking
 
@@ -553,10 +558,10 @@ def assessPDFComplexity(file):
 
 *Priority: Essential*
 *Backend: Supabase pgvector database*
-*Embeddings: BGE-M3 1024-dim vectors with built-in sparse vectors (v7.1)*
-*Features: Similarity search, filtering, metadata queries*
+*Embeddings: BGE-M3 1024-dim vectors via local Ollama (v7.3 - ZERO API costs)*
+*Features: Similarity search, filtering, metadata queries, built-in sparse vectors*
 *Performance: <50ms dense, <100ms sparse query response time*
-*Status: Active - v7.1*
+*Status: Active - v7.3*
 
 **HR-002:** The system SHALL maintain and query knowledge graphs
 
@@ -1084,10 +1089,12 @@ def assessPDFComplexity(file):
 *Impact: 40-60% improvement in search relevance*
 *Status: Active - v7.1*
 
-**SRC-002:** The system SHALL support dense vector search using BGE-M3 embeddings
+**SRC-002:** The system SHALL support dense vector search using BGE-M3 embeddings (local via Ollama)
 
 *Priority: Essential*
 *Dimensions: 1024*
+*Server: Ollama localhost:11434*
+*Cost: $0 (vs $50-100/month API)*
 *Similarity: Cosine distance*
 *Index: HNSW with m=16, ef_construction=64*
 *Status: Active - v7.1*
@@ -2784,13 +2791,13 @@ Cost: $5-10/month
 *Replaced by: MEM-001 through MEM-010*
 *Reason: Local mem-agent provides better privacy and performance*
 
-#### OpenAI Embeddings (Replaced by nomic-embed)
+#### OpenAI/Mistral Embeddings (Replaced by local BGE-M3)
 
 **DEPRECATED-FR-069:** ~~The system SHALL generate embeddings using OpenAI text-embedding-3-small~~
 
-*Deprecated: v5.0*
-*Replaced by: LLR-007 (local nomic-embed-text)*
-*Reason: Local embeddings eliminate API costs and latency*
+*Deprecated: v7.3*
+*Replaced by: LLR-007 (BGE-M3 via Ollama)*
+*Reason: Zero API costs ($50-100/month savings), 5-10x faster (<10ms), complete privacy*
 
 #### Mistral Pixtral Vision API (Replaced by Qwen2.5-VL)
 
@@ -2812,10 +2819,10 @@ Cost: $5-10/month
 
 For users migrating from v4.0 to v5.0:
 
-1. **Memory Migration:** Export Zep memories → Convert to Markdown → Import to mem-agent
-2. **Embedding Migration:** Re-generate with nomic-embed for better local performance
+1. **Memory Migration:** Export Zep memories → Convert to Markdown → Import to mem-agent/Graphiti
+2. **Embedding Migration:** Re-generate with BGE-M3 via Ollama for zero-cost local performance
 3. **Vision Migration:** Re-process images with local Qwen2.5-VL
-4. **API Migration:** Update to LiteLLM endpoints for compatibility
+4. **API Migration:** Eliminate embedding APIs completely with local Ollama
 5. **Hardware Migration:** Transition from Mac Mini M4 to Mac Studio M3 Ultra
 
 ## 3.9 Performance Metrics Summary
