@@ -2,6 +2,32 @@ AI Empire Complete Architecture v7.3 (Local Embeddings + Persistent Memory) - Pr
 Cloud-First AI Architecture with Local BGE-M3 Embeddings and Graphiti Memory System
 
 ================================================================================
+DEVELOPMENT ENVIRONMENT & TOOLS
+================================================================================
+
+Primary IDE: Visual Studio Code
+- Claude Code (CLI) - Primary architect for complex development tasks
+- Cline (VS Code extension) - Rapid feature implementation within VS Code
+- Continue.dev (VS Code extension) - Code completion and refactoring
+
+MCP Servers (Model Context Protocol) Available for Development:
+1. Claude Context MCP - Conversation context and project memory across sessions
+2. Chrome DevTools MCP - Browser debugging, DOM inspection, network/performance analysis
+3. Ref MCP - Official documentation reference (FastAPI, Neo4j, Supabase, Anthropic, LlamaIndex, Pydantic)
+4. TaskMaster MCP - AI-powered task management, project planning, complexity analysis, workflow automation
+5. MCP_Docker - GitHub operations (repos, PRs, issues, code search) + Render deployment (services, logs, metrics)
+6. Supabase MCP - Direct PostgreSQL + pgvector operations (tables, queries, indexes, RLS policies)
+7. neo4j MCP - Graph database queries via natural language → Cypher translation
+
+All MCPs integrate seamlessly with Claude Code CLI for direct access to:
+- Databases (PostgreSQL, Neo4j)
+- Documentation (FastAPI, Neo4j, Supabase, etc.)
+- GitHub (code, issues, PRs)
+- Render (deployment, logs, monitoring)
+- Browser DevTools (frontend debugging)
+- Task Management (project planning and tracking)
+
+================================================================================
 VERSION 7.3 - LOCAL EMBEDDINGS + PERSISTENT MEMORY (November 2025)
 ================================================================================
 This version adds LOCAL embedding generation and persistent memory system:
@@ -25,19 +51,26 @@ This version adds LOCAL embedding generation and persistent memory system:
 - ✅ Full Observability (Prometheus, Grafana, OpenTelemetry)
 - RESULT: 40-60% better retrieval + DUAL ACCESS MODES + $0 EMBEDDING COSTS
 
-Core Architecture Decisions:
+Core Architecture Decisions (v7.2 - PRODUCTION + DEVELOPMENT):
+
+**PRODUCTION ARCHITECTURE:**
 - PRIMARY AI: Claude Sonnet 4.5 API (synthesis) + Claude Haiku (expansion)
-- EMBEDDINGS: BGE-M3 LOCAL via Ollama (FREE - previously OpenAI API)
-- MEMORY SYSTEM: Graphiti MCP Server with Neo4j backend
-- RERANKING: BGE-Reranker-v2 on Mac Studio via Tailscale
-- DUAL STORAGE: Supabase pgvector + Neo4j Graph Database (synced)
-- DUAL INTERFACE: Neo4j MCP (Claude Desktop) + Chat UI (Gradio)
-- DOCUMENT PROCESSING: LlamaIndex on Render (srv-d2nl1lre5dus73atm9u0)
-- ORCHESTRATION: CrewAI on Render (srv-d2n0hh3uibrs73buafo0)
-- KNOWLEDGE: LightRAG + Neo4j for graph relationships + Graphiti temporal graphs
+- BACKEND API: FastAPI (REST + WebSocket) on Render ($20-30/month)
+- TASK PROCESSING: Celery workers with Redis broker ($20-30/month)
+- PRODUCTION MEMORY: PostgreSQL graph tables (user_memory_nodes, user_memory_edges in Supabase)
+- EMBEDDINGS: BGE-M3 LOCAL via Ollama (FREE - development testing)
+- RERANKING: BGE-Reranker-v2 on Mac Studio (development testing)
+- STORAGE: Supabase PostgreSQL + pgvector + graph tables
+- ORCHESTRATION: CrewAI on Render (srv-d2n0hh3uibrs73buafo0) - MILESTONE 8
 - MULTI-MODAL: Claude Vision for images, Soniox for audio transcription
 - CACHING: Redis semantic cache with tiered similarity thresholds
-- Mac Studio: Development + BGE models + Neo4j Docker + Ollama server
+- MONITORING: Prometheus + Grafana dashboards
+
+**DEVELOPMENT ENVIRONMENT (Mac Studio):**
+- Graphiti MCP Server: Development/testing memory ONLY (NOT production)
+- Neo4j Graph Database: FREE Docker for development testing
+- Ollama: BGE-M3 embeddings + BGE-Reranker-v2 (local, zero cost)
+- Development testing for models before production deployment
 
 ================================================================================
 DUAL-INTERFACE ARCHITECTURE (NEW v7.2)
