@@ -720,11 +720,81 @@ Document Processing Pipeline - Complete Flow
 ================================================================================
 
 Input Sources:
-├── Web Upload (n8n webhook)
-├── Backblaze B2 monitoring
+├── Web UI Upload (Gradio/Streamlit) → FastAPI → Immediate processing
+├── Mountain Duck Upload → B2 pending/courses/ → B2 Monitor (30s poll) → Processing
+├── Backblaze B2 monitoring (30-second polling for Mountain Duck auto-detection)
 ├── YouTube URLs
 ├── Web Scraping (Firecrawl)
-└── Direct file uploads
+└── Direct file uploads (n8n webhook)
+
+Dual Upload Architecture (NEW v7.2):
+
+Method 1: Mountain Duck (Direct B2 Upload)
+├── User drags file to /Volumes/Backblaze B2/pending/courses/
+├── B2 Folder Monitor polls every 30 seconds (FastAPI background task)
+├── New file detected → triggers processing workflow automatically
+├── Store metadata in Supabase with upload_source='mountain_duck'
+└── AI auto-classification and intelligent filename generation
+
+Method 2: Web UI (Gradio/Streamlit)
+├── User uploads via browser (drag-drop or file picker)
+├── FastAPI receives file via POST /api/upload/single or /batch
+├── Upload to B2 pending/courses/
+├── Store metadata in Supabase with upload_source='web_ui'
+├── Immediate processing trigger (no 30-second polling delay)
+└── AI auto-classification and intelligent filename generation
+
+Both Methods Converge at Processing Pipeline:
+├── B2 pending/courses/ → AI Classification
+├── Department classification (1 of 10 departments)
+├── Course structure extraction (instructor, modules, lessons)
+├── Intelligent filename generation (proper sorting with M01, L01 format)
+├── Document processing (content extraction, embeddings, storage)
+├── CrewAI analysis (PDF summaries + suggestions)
+└── Move to processed/courses/{department}/
+
+B2 Folder Structure (10 Departments):
+```
+JB-Course-KB/
+├── pending/courses/              # Drop ANY course here (via UI or Mountain Duck)
+├── processing/                   # Temporary processing
+├── processed/
+│   ├── courses/                  # 10 department folders (actual course files)
+│   ├── crewai-summaries/        # 10 department folders (PDF summaries with images)
+│   └── crewai-suggestions/      # 10 department folders (YAML skills + MD commands)
+└── failed/                       # Failed processing attempts
+```
+
+10 Business Departments:
+1. it-engineering - Technology, software, DevOps, data, security, cloud
+2. sales-marketing - Sales, marketing, product strategy, R&D, customer success
+3. customer-support - Technical support, help desk, SLA management
+4. operations-hr-supply - HR, operations, supply chain, procurement, legal & compliance
+5. finance-accounting - FP&A, accounting, tax, audits, financial risk
+6. project-management - Agile, Scrum, PMP, project tools, stakeholder management
+7. real-estate - Property management, CRE, investment, development, leasing
+8. private-equity-ma - M&A, due diligence, PE, valuation, exit strategies
+9. consulting - Management consulting, strategy frameworks, client engagement
+10. personal-continuing-ed - Psychology, NLP, life coaching, mindfulness, wellness
+
+Intelligent File Naming (AI-Powered):
+- Format: {Instructor/Company}-{Course}-M{##}-{Module}-L{##}-{Lesson}.ext
+- Examples:
+  * Grant_Cardone-10X_Sales_System-M01-Prospecting-L01-Cold_Calling.pdf
+  * McKinsey-Strategy_Frameworks-M01-BCG_Matrix.pdf
+  * VirtualCoach-NLP_Practitioner-M05-Anchoring_Techniques.pdf
+- Proper alphabetical sorting (M01, M02... L01, L02...)
+- AI extracts structure using Claude Haiku
+
+CrewAI Outputs:
+1. crewai-summaries/ - PDF with embedded images, frameworks, module tables
+2. crewai-suggestions/ - YAML Claude skills + Markdown slash commands
+
+Mountain Duck Configuration:
+- Protocol: Backblaze B2
+- Credentials: Stored in .env file (NOT in git)
+- Bucket: JB-Course-KB
+- Mount: /Volumes/Backblaze B2/
 
 Processing Services:
 ├── MarkItDown MCP → 40+ format conversion to Markdown
