@@ -2,9 +2,11 @@
 
 ## 8.0 Mac Studio Video Processing Architecture (v7.2)
 
-### 8.0.1 Local-First Video Processing with Graph Integration
+### 8.0.1 Development Environment Video Processing
 
-The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCAL video processing, eliminating cloud vision API costs and ensuring complete privacy for sensitive video content. Video processing capabilities integrate with Neo4j for entity/relationship extraction and all v7.3 RAG improvements including BGE-M3 embeddings via local Ollama (ZERO API costs, saves $50-100/month) and tiered semantic caching.
+**IMPORTANT:** Video processing capabilities described in this document are for the **DEVELOPMENT ENVIRONMENT ONLY** on Mac Studio. Production video processing in v7.2 uses cloud-based services with FastAPI + Celery architecture.
+
+The Mac Studio development environment leverages M3 Ultra's powerful hardware for LOCAL video processing, enabling development and testing of vision models without cloud API costs. Video processing integrates with Neo4j for entity/relationship extraction and all v7.2 RAG improvements including BGE-M3 embeddings via local Ollama.
 
 **Core Capabilities:**
 - **Qwen2.5-VL-7B** running locally for all vision tasks (5GB memory)
@@ -74,8 +76,9 @@ The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 - Audio-visual synchronization (local processing)
 - Speaker identification with privacy preservation
 - Emotion detection via local models
-- Topic segmentation using Llama 3.3 70B
-- **mem-agent integration** for context continuity
+- Topic segmentation using local LLM
+- **Graphiti MCP integration** for development context continuity (dev only)
+- **PostgreSQL graph memory** for production (user_memory_nodes/edges)
 
 ### 8.1.3 Local vs Cloud Processing Decision
 
@@ -108,7 +111,7 @@ The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 - Quick preview generation (Neural Engine)
 - Progressive quality improvement (GPU-accelerated)
 - Background processing (efficient core usage)
-- Incremental indexing with mem-agent
+- Incremental indexing with Graphiti MCP (dev) or PostgreSQL graph (production)
 - **Local processing queue** management
 
 ### 8.2.2 Video Intelligence
@@ -121,9 +124,9 @@ The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 - **32 tokens/second** summary generation
 
 **VPR-009: Search and Discovery**
-- Visual similarity search (local embeddings via nomic-embed)
-- Moment-based search with mem-agent memory
-- Cross-video references using local vector DB
+- Visual similarity search (local embeddings via BGE-M3 on Ollama)
+- Moment-based search with PostgreSQL graph memory (production)
+- Cross-video references using pgvector (production) or Neo4j (dev)
 - Temporal search with GPU acceleration
 - **Zero-latency local search** for cached content
 
@@ -223,8 +226,9 @@ The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 
 ### 8.6.1 Unified Processing Pipeline
 
-**VPR-021: mem-agent Integration (NEW)**
-- Video context stored in mem-agent
+**VPR-021: Graph Memory Integration (NEW)**
+- **Development:** Video context stored in Graphiti MCP with Neo4j
+- **Production:** Video context in PostgreSQL graph tables (user_memory_nodes/edges)
 - Temporal memory of video segments
 - Cross-video relationship tracking
 - User preferences learning
@@ -239,14 +243,14 @@ The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 
 ### 8.6.2 Workflow Integration
 
-**Automated Video Pipeline:**
-1. Video ingested via n8n workflow
-2. Privacy detection routes to Mac Studio
-3. Qwen2.5-VL-7B processes frames locally
-4. Llama 3.3 70B generates understanding
-5. mem-agent stores video context
-6. Results encrypted and backed to B2 (v7.2 with course organization)
-7. Zero cloud exposure for sensitive videos
+**Automated Video Pipeline (v7.2):**
+1. Video ingested via FastAPI upload endpoint (production) or local testing (dev)
+2. Privacy detection routes processing decision
+3. Qwen2.5-VL-7B processes frames locally (dev environment)
+4. Local LLM generates understanding (dev) or Claude API (production)
+5. PostgreSQL graph stores video context (production) / Graphiti MCP (dev)
+6. Results encrypted and backed to B2 with intelligent organization
+7. Zero cloud exposure for sensitive videos in dev environment
 
 ## 8.7 Performance Benchmarks (v7.1 - Video Processing)
 
@@ -279,13 +283,14 @@ The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 
 ### 8.8.1 Software Dependencies
 
-**Local Processing Stack:**
+**Local Processing Stack (Mac Studio Development):**
 - FFmpeg 6.0+ (Hardware acceleration support)
-- Qwen2.5-VL-7B model (5GB)
+- Qwen2.5-VL-7B model (5GB) - Development only
 - OpenCV with Metal support
 - Core ML frameworks
 - Video processing libraries
-- mem-agent MCP integration
+- Graphiti MCP with Neo4j (development only)
+- PostgreSQL client for production integration
 
 ### 8.8.2 Hardware Requirements
 
@@ -299,10 +304,11 @@ The v7.3 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 
 ## 8.9 Disaster Recovery
 
-**Video Processing Recovery:**
-- Encrypted video backups to B2 (v7.2 with intelligent course organization)
-- Model configurations in GitHub LFS
-- Processing state in mem-agent
+**Video Processing Recovery (v7.2):**
+- Encrypted video backups to B2 with intelligent organization
+- Model configurations in GitHub LFS (development models)
+- Processing state in PostgreSQL graph (production) / Graphiti MCP (dev)
 - Workflow definitions in IaC
+- FastAPI/Celery infrastructure recovery procedures
 - 4-hour RTO for video pipeline
 - Zero data loss for processed videos

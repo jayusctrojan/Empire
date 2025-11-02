@@ -4,28 +4,42 @@
 
 **Version 7.2 introduces a breakthrough dual-interface architecture with graph-native intelligence:**
 
-### v7.2 NEW - Dual-Interface & Graph Database
-- **Neo4j Graph Database:** FREE on Mac Studio Docker
+### v7.2 NEW - Hybrid Production Architecture
+- **Neo4j Graph Database (PRODUCTION):** Self-hosted on Mac Studio Docker (saves $100+/month)
+  - Knowledge graphs, entity relationships, multi-hop traversal
   - 10-100x faster relationship queries than SQL
-  - Multi-hop traversal, pathfinding, centrality analysis
+  - Pathfinding, community detection, centrality analysis
   - Automatic Supabase ↔ Neo4j bi-directional sync
-- **Neo4j MCP Server:** Direct Claude Desktop/Code integration
+  - Accessed via REST/WebSocket APIs AND Neo4j MCP
+- **Neo4j MCP Server (PRODUCTION):** Direct Claude Desktop/Code integration
   - Natural language → Cypher translation via Claude Sonnet
+  - Multi-modal production access pattern
   - Graph query tools (neo4j_query, entity_search, graph_traverse, path_find)
 - **Chat UI Interface:** Gradio/Streamlit on Render ($15-20/month)
   - End-user access with both vector AND graph query support
   - Hybrid search combining semantic + relationship intelligence
 
-### Core Components (v7.3 ENHANCED)
-- **BGE-M3 Embeddings:** 1024-dim vectors via LOCAL Ollama (v7.3 - ZERO API costs, saves $50-100/month)
+### Core Components (v7.2 ENHANCED)
+- **BGE-M3 Embeddings:** 1024-dim vectors via LOCAL Ollama (v7.2 - ZERO API costs, saves $50-100/month)
 - **Query Expansion:** Claude Haiku generates 4-5 semantic variations (15-30% recall improvement)
 - **BGE-Reranker-v2:** Mac Studio local reranking via Tailscale (replaces Cohere, $30-50/month savings)
 - **Adaptive Chunking:** Document-type-aware (contracts 300, policies 400, technical 512 tokens)
-- **Tiered Caching:** Redis semantic cache with 0.98+/0.93-0.97/0.88-0.92 thresholds
+- **Redis Caching:** Semantic cache + Celery broker + result backend
 - **LlamaCloud/LlamaParse:** Free tier OCR (10K pages/month, replaces Mistral)
 - **LightRAG:** Knowledge graph enhanced with Neo4j backend for entity relationships
-- **mem-agent MCP:** Developer memory on Mac Studio (8GB, <500ms latency)
-- **Observability:** Prometheus, Grafana, OpenTelemetry stack
+- **PostgreSQL Graph Memory:** Production user memory (user_memory_nodes, user_memory_edges in Supabase)
+- **Graphiti MCP:** Development/testing memory ONLY on Mac Studio (NOT production)
+- **Observability:** Prometheus, Grafana, structured logging to Supabase
+
+### Production Architecture (v7.2 - 8 Milestones)
+- **FastAPI Backend:** REST + WebSocket APIs with async processing (Milestone 1)
+- **Celery Workers:** Distributed async tasks for document processing (Milestone 2)
+- **pgvector Storage:** HNSW indexed embeddings in Supabase (Milestone 3)
+- **Hybrid Search:** Vector + keyword + fuzzy with RRF fusion (Milestone 4)
+- **WebSocket Chat:** Real-time streaming with PostgreSQL graph memory (Milestone 5)
+- **Monitoring Stack:** Prometheus + Grafana dashboards (Milestone 6)
+- **RBAC Admin:** User management and activity logging (Milestone 7)
+- **CrewAI Integration:** Multi-agent workflows with execution tracking (Milestone 8)
 
 ### Performance Gains (v7.3)
 - **Retrieval Quality:** 40-60% improvement (maintained from v7.1)

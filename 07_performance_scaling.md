@@ -1,15 +1,25 @@
 # 7. Performance and Scaling Optimizations (v7.1 Mac Studio)
 
-## V7.2 Performance Enhancements with Graph Database
+## V7.2 Performance Enhancements with Dual-Environment Architecture
 
-**Version 7.2 adds graph-native performance for relationship-heavy queries:**
+**Version 7.2 adds production-grade performance with FastAPI, Celery, and graph-native queries:**
 
-### NEW v7.2 - Graph Query Performance
+### NEW v7.2 - Production Performance (8 Milestones)
+- **FastAPI Async:** Non-blocking I/O for high concurrency
+- **Celery Workers:** Parallel document processing with horizontal scaling
+- **Redis Caching:** Semantic query cache with <10ms lookups
+- **WebSocket Streaming:** Real-time chat with token-by-token responses
+- **pgvector HNSW:** <100ms similarity search with indexed vectors
+- **Prometheus Metrics:** Sub-second query latency tracking
+- **Load Balancing:** Multiple API instances for high availability
+
+### NEW v7.2 - Graph Query Performance (Neo4j)
 - **Graph Query Speed:** 10-100x faster than SQL joins for relationships
 - **Multi-hop Traversal:** <100ms for simple paths, <500ms for complex analysis
 - **Community Detection:** Identifies entity clusters and relationship patterns
 - **Centrality Analysis:** Ranks entities by influence in knowledge graph
 - **Neo4j Caching:** In-memory graph caching for <50ms latencies
+- **MCP Integration:** Direct Claude Desktop/Code access with natural language → Cypher
 
 ### V7.3 Retrieval Quality & Performance (ENHANCED)
 - **Overall Improvement:** 40-60% better retrieval (maintained from v7.1)
@@ -41,11 +51,14 @@
 - **Priority:** Critical
 - **Description:** Optimize 96GB unified memory allocation
 - **Implementation:**
-  - 65GB reserved for AI models (Llama 70B, Qwen-VL, mem-agent)
-  - 31GB for operations, caching, and processing
+  - ~8GB for Graphiti MCP (development/testing only, NOT production)
+  - ~10GB for Ollama BGE-M3 and BGE-Reranker-v2 (development testing)
+  - ~10GB for Neo4j graph database (PRODUCTION - self-hosted for cost savings)
+  - ~65GB for development, caching, and testing
   - Dynamic reallocation based on workload
   - Memory pressure monitoring and alerts
 - **Target:** Zero swap usage, <70% memory utilization
+- **Note:** Hybrid architecture - Neo4j production graph database runs on Mac Studio, other production services (FastAPI, Celery, PostgreSQL) run in cloud
 - **Status:** Active - v5.0
 
 **PSR-002: GPU Utilization Management**
@@ -61,36 +74,48 @@
 
 ### 7.1.2 Model Performance Optimization
 
-**PSR-003: LLM Inference Optimization**
+**PSR-003: Local Embedding & Reranking Optimization**
 - **Priority:** Critical
-- **Description:** Maintain consistent 32 tok/s for Llama 70B
+- **Description:** Optimize Ollama BGE-M3 embeddings and BGE-Reranker-v2 on Mac Studio
 - **Implementation:**
 ```yaml
-llm_optimization:
-  model: llama-3.3-70b
-  quantization: Q4_K_M
-  context_size: 8192
-  batch_size: 512
-  threads: 24  # Leave 4 cores for system
-  gpu_layers: -1  # Full GPU offload
-  mlock: true  # Lock model in memory
+embedding_optimization:
+  provider: ollama
+  model: bge-m3
+  dimensions: 1024
+  sparse_vectors: true  # Built-in sparse support
+  batch_size: 100
+  gpu_acceleration: true
   performance_targets:
-    tokens_per_second: 32
-    first_token_latency: <500ms
-    memory_bandwidth: 400GB/s
+    embedding_latency: <10ms
+    throughput: 1000+ embeddings/minute
+    cost: $0 (local inference)
+
+reranking_optimization:
+  model: bge-reranker-v2
+  location: mac_studio
+  batch_size: 50
+  gpu_acceleration: true
+  performance_targets:
+    reranking_latency: 10-20ms
+    precision_improvement: 25-35%
+    cost: $0 (saves $30-50/month vs Cohere)
 ```
-- **Status:** Active - v5.0
+- **Note:** Mac Studio used for development embedding/reranking models
+- **Status:** Active - v7.2
 
 **PSR-004: Multi-Model Orchestration**
 - **Priority:** High
-- **Description:** Efficient model switching and caching
+- **Description:** Efficient model switching and caching for Mac Studio development models
 - **Implementation:**
-  - Keep frequently used models warm
+  - Keep BGE-M3, BGE-Reranker-v2 models warm in Ollama
   - Preload models during idle time
   - Smart eviction policy (LRU with priority)
-  - Parallel model execution where possible
-- **Target:** <2s model switch time
-- **Status:** Active - v5.0
+  - Parallel execution: embedding generation + reranking
+  - Neo4j graph queries run concurrently with embedding tasks
+- **Target:** <2s model switch time, <500ms for warm models
+- **Note:** Mac Studio hosts development/testing models only
+- **Status:** Active - v7.2
 
 ## 7.2 Advanced Batch Processing (v5.0)
 
@@ -322,16 +347,16 @@ performance_metrics:
 
 ## 7.6 Performance Benchmarks (v5.0)
 
-### 7.6.1 Throughput Targets
+### 7.6.1 Throughput Targets (v7.2 Production)
 
-| Metric | v5.0 Target | v5.0 Achieved | Peak Capability |
-|--------|-------------|---------------|-----------------|
-| Documents/Day | 500+ | 500-600 | 1000 |
-| Concurrent Workflows | 10 | 10 | 15 |
-| Local Processing | 98% | 98% | 99% |
-| Tokens/Second | 32 | 32 | 40 |
+| Metric | v7.2 Target | Achieved | Peak Capability |
+|--------|-------------|----------|-----------------|
+| Documents/Day (Production) | 500+ | 500-600 | 1000+ |
+| Concurrent Celery Tasks | 10 | 10 | 20 |
+| Embeddings/Minute (Ollama) | 1000+ | 1000+ | 1500+ |
+| API Requests/Minute | 100+ | 100+ | 200+ |
 | Cache Hit Rate | 80% | 82% | 90% |
-| Memory Efficiency | 70% | 68% | 75% |
+| Memory Efficiency (Mac Studio Dev) | 70% | 68% | 75% |
 
 ### 7.6.2 Latency Targets (v7.1 - Enhanced)
 
@@ -346,36 +371,37 @@ performance_metrics:
 | Document Processing | <60s | 30s | 55s | 90s |
 | Semantic Cache Hit | <50ms | 10ms | 30ms | 60ms |
 
-### 7.6.3 Cost Efficiency (v7.1 - Optimized)
+### 7.6.3 Cost Efficiency (v7.2 - Production)
 
-| Metric | v7.1 Target | Achieved | vs Cloud |
+| Metric | v7.2 Target | Achieved | vs Cloud |
 |--------|-------------|----------|----------|
 | Cost per Document | <$0.01 | $0.005 | -95% |
-| Monthly Recurring | $335-480 | $335-480 | -39% |
+| Monthly Recurring | $300-400 | $300-400 | -45% |
 | API Calls Avoided/Day | 1000+ | 1200+ | N/A |
 | BGE-Reranker Cost | $0 | $0 | -$30-50 |
+| BGE-M3 Embeddings Cost | $0 | $0 | -$50-100 |
 | LlamaParse Cost | $0 | $0 | -$20 |
 | Claude Haiku Cost | $1.50-9 | $1.50-9 | Minimal |
-| Value Generated/Month | $400+ | $400+ | N/A |
-| ROI Improvement | -10-15% | -10-15% | N/A |
+| FastAPI/Celery Infrastructure | $40-60 | $40-60 | Production Ready |
+| Value Generated/Month | $500+ | $500+ | N/A |
 
 ## 7.7 Optimization Recommendations
 
-### 7.7.1 Current Optimizations (v7.1)
+### 7.7.1 Current Optimizations (v7.2)
 
 **Implemented:**
-1. BGE-M3 1024-dim embeddings with sparse vectors
+1. BGE-M3 1024-dim embeddings with sparse vectors via Ollama (zero cost)
 2. Claude Haiku query expansion (4-5 variations)
-3. BGE-Reranker-v2 local reranking (10-20ms)
+3. BGE-Reranker-v2 local reranking (10-20ms, saves $30-50/month)
 4. Adaptive document-type chunking (300-512 tokens)
 5. Tiered semantic caching (0.98+/0.93-0.97/0.88-0.92)
 6. LlamaCloud/LlamaParse free tier OCR (10K pages/month)
-7. Full GPU offloading for Llama 70B
-8. 31GB memory cache with 60-80% hit rate
-9. Parallel workflow processing (10 concurrent)
-10. Local-first routing (98%)
-11. Intelligent batch processing
-12. Proactive model loading
+7. FastAPI async I/O for non-blocking requests
+8. Celery distributed task processing with Redis broker
+9. Parallel workflow processing (10 concurrent Celery tasks)
+10. WebSocket streaming for real-time chat responses
+11. Intelligent batch processing with Celery workers
+12. Proactive model loading (BGE-M3, BGE-Reranker-v2)
 
 **In Progress:**
 1. Reciprocal Rank Fusion score optimization
@@ -383,16 +409,16 @@ performance_metrics:
 3. Advanced monitoring dashboards
 4. Real-time cost tracking
 
-### 7.7.2 Future Optimizations (v7.2+)
+### 7.7.2 Future Optimizations (v7.3+)
 
 **Planned Enhancements:**
-1. Knowledge graph context integration
-2. Multi-hop entity traversal optimization
-3. Advanced ML-based predictions
-4. Self-healing capabilities
-5. Real-time optimization
-6. Enterprise scaling options
-7. Multi-modal context fusion
+1. Advanced ML-based access predictions
+2. Self-healing capabilities
+3. Auto-scaling Celery workers based on queue depth
+4. Enterprise scaling options (multi-tenancy)
+5. Multi-modal context fusion
+6. Distributed tracing with OpenTelemetry
+7. Advanced cost optimization with dynamic routing
 
 ## 7.8 Performance Testing Framework
 
@@ -461,22 +487,27 @@ benchmark_tests:
 
 ## 7.10 Migration Notes
 
-### From v5.0 to v7.3
+### From v5.0 to v7.2
 - 768-dim embeddings → 1024-dim BGE-M3 via Ollama (local, zero-cost)
 - No query expansion → Claude Haiku 4-5 variations
 - Cohere reranking ($30-50/month) → BGE-Reranker-v2 (Mac Studio, $0)
 - Fixed chunking → Adaptive document-type chunking
 - Single cache threshold → Tiered 0.98+/0.93-0.97/0.88-0.92
 - Mistral OCR ($20/month) → LlamaCloud/LlamaParse (free tier)
+- **NEW v7.2:** Added FastAPI + Celery production architecture
+- **NEW v7.2:** WebSocket chat with PostgreSQL graph memory
+- **NEW v7.2:** Prometheus + Grafana monitoring stack
 - 30-50% retrieval quality → 40-60% retrieval quality
-- $375-550/month → $335-480/month
+- $375-550/month → $300-400/month
 
-### Performance Improvements (v5.0 to v7.3)
+### Performance Improvements (v5.0 to v7.2)
 - 10-20% better retrieval quality (embeddings + expansion)
 - 25-35% precision improvement (reranking)
 - 15-25% coherence improvement (adaptive chunking)
 - 5-10x faster embedding generation (<10ms local vs 50-100ms API)
+- Production-ready async API with FastAPI
+- Horizontal scaling with Celery workers
+- Real-time chat with WebSocket streaming
 - $50-100/month cost savings on embeddings
 - 10x faster reranking (10-20ms vs 1000ms+)
-- $40-70/month cost savings
-- Same quality, lower cost optimization
+- $90-170/month total cost savings

@@ -2,17 +2,33 @@
 
 ## IMPORTANT: Version 7.2 Supersedes This Document
 
-**Version 7.2** represents a revolutionary architectural evolution that supersedes v3.0 enhancements with:
+**Version 7.2** represents a revolutionary architectural evolution with dual-environment deployment and 8 production milestones:
 
-### v7.2 NEW - Dual-Interface Architecture
-- **Neo4j Graph Database:** FREE on Mac Studio Docker (10-100x faster relationship queries)
+### v7.2 Hybrid Production Architecture (Mac Studio + Cloud)
+- **Neo4j Docker (PRODUCTION):** Graph database on Mac Studio (saves ~$100/month vs cloud Neo4j)
+  - Knowledge graphs, entity relationships, multi-hop traversal
+  - Accessed via REST/WebSocket APIs AND Neo4j MCP
+- **Ollama BGE-M3 (Dev Testing):** Local embeddings for development (1024-dim, ZERO API costs)
+- **Graphiti MCP (Dev Only):** Memory testing for development ONLY (NOT production)
+- **BGE-Reranker-v2 (Dev Testing):** Local reranking testing (production uses cloud services)
+- **Claude Desktop:** MCP integration for development and production graph access
+
+### v7.2 Production Architecture (8 Milestones)
+- **FastAPI Backend:** REST + WebSocket APIs with async processing (Milestone 1)
+- **Celery Workers:** Distributed async tasks with Redis broker (Milestone 2)
+- **PostgreSQL Graph Memory:** user_memory_nodes/edges in Supabase (Milestone 5 - NOT Graphiti)
+- **Hybrid Search:** Vector + keyword + fuzzy with RRF fusion (Milestone 4)
+- **WebSocket Chat:** Real-time chat with streaming responses (Milestone 5)
+- **Prometheus + Grafana:** Comprehensive monitoring (Milestone 6)
+- **RBAC Admin:** User management and activity logging (Milestone 7)
+- **CrewAI Integration:** Multi-agent workflows (Milestone 8)
+
+### Key Features Maintained from v3.0
 - **Neo4j MCP Server:** Direct Claude Desktop/Code integration with natural language → Cypher
-- **Chat UI Interface:** Gradio/Streamlit for end-user access (Render deployment)
+- **Chat UI Interface:** Gradio/Streamlit with WebSocket (Render deployment)
 - **Bi-directional Sync:** Automatic Supabase ↔ Neo4j synchronization
 - **Graph Traversal:** Multi-hop pathfinding, community detection, centrality analysis
 - **Semantic Entity Resolution:** ML-based deduplication
-
-### v7.3 ENHANCED - State-of-the-Art RAG with Local Embeddings
 - **BGE-M3 Embeddings via Ollama:** 1024-dim vectors with ZERO API costs (saves $50-100/month)
   - <10ms local generation vs 50-100ms API
   - Complete privacy - no data leaves infrastructure
@@ -21,9 +37,9 @@
 - **Adaptive Chunking:** Document-type-aware (15-25% better precision)
 - **Tiered Caching:** 0.98+ direct hit, 0.93-0.97 similar answer thresholds
 - **Performance:** 40-60% better retrieval quality with hybrid vector + graph search
-- **Cost:** $250-400/month (reduced from $350-500 with local embeddings)
+- **Cost:** $300-400/month (reduced from $500-600 with local embeddings)
 
-For current implementation guidance, refer to **Section 3 (Specific Requirements)** and **Sections 7-10** for v7.2 details.
+For current implementation guidance, refer to **Workflows_Final/** directory for 8 milestone specifications and **Section 3 (Specific Requirements)** for detailed requirements.
 
 ---
 

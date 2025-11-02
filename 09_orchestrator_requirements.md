@@ -1,16 +1,20 @@
 # 9. Orchestrator and Scheduler Requirements
 
-## V7.2 Orchestration with Dual-Interface Routing
+## V7.2 Production Orchestration Architecture
 
-**Version 7.2 adds intelligent routing between vector search, graph queries, and dual interfaces:**
+**Version 7.2 implements production-grade orchestration with FastAPI + Celery:**
 
-### V7.2 NEW - Dual-Interface Orchestration
+### V7.2 NEW - Production Orchestration (8 Milestones)
+- **FastAPI Backend:** Async REST + WebSocket API for document intake and queries
+- **Celery Task Queue:** Distributed async processing with Redis broker
 - **Query Type Detection:** Classify queries as semantic, relational, or hybrid
-- **Vector → Graph Router:** Route relational queries to Neo4j for 10-100x speed improvement
-- **Interface Selector:** Route to Chat UI for end-users or Neo4j MCP for developers
-- **Bi-directional Sync Orchestration:** Automatic Supabase ↔ Neo4j synchronization in workflow
-- **Cypher Generation:** Claude Sonnet translates natural language to Cypher in real-time
+- **Vector → Graph Router:** Route relational queries to Neo4j (dev) or PostgreSQL graph (production)
+- **Interface Selector:** WebSocket Chat UI for end-users, Neo4j MCP for developers
+- **Bi-directional Sync Orchestration:** Automatic Supabase ↔ Neo4j synchronization (dev environment)
+- **Cypher Generation:** Natural language → Cypher via Claude Sonnet (Neo4j MCP)
 - **Hybrid Result Merging:** Combine vector semantic results with graph relationship results
+- **Production Memory:** PostgreSQL graph tables (user_memory_nodes/edges) NOT Graphiti MCP
+- **Development Memory:** Graphiti MCP with Neo4j for testing only
 
 ### V7.3 Orchestration Improvements (ENHANCED)
 - **Local Embedding Generation:** BGE-M3 via Ollama with <10ms latency, zero API costs
@@ -24,50 +28,65 @@
 
 ---
 
-## 9.0 Mac Studio Local Orchestration (v7.1 - Enhanced)
+## 9.0 Orchestration Architecture (v7.2 - Production + Development)
 
-### 9.0.1 Local-First Workflow Architecture
+### 9.0.1 Dual-Environment Orchestration
 
-The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with integrated RAG components, ensuring sensitive workflows never leave the hardware while maintaining enterprise-grade orchestration capabilities.
+**Production Environment (Cloud Services):**
+- **FastAPI Backend:** Async REST + WebSocket APIs on Render
+- **Celery Workers:** Distributed task processing with Redis broker
+- **PostgreSQL Graph Memory:** Production user memory (user_memory_nodes/edges in Supabase)
+- **WebSocket Chat:** Real-time streaming with token-by-token responses
+- **Prometheus + Grafana:** Production monitoring and alerting
+- **Horizontal Scaling:** Multiple Celery workers for high throughput
 
-**Core Capabilities:**
-- **98% of workflows** execute locally on Mac Studio
-- **Offline mode** for complete cloud independence
-- **Privacy-first** orchestration with PII detection
-- **Zero latency** for local workflow execution
-- **Unlimited workflow executions** without API costs
-- **API replacement value:** ~$100-200/month (workflow automation + embedding APIs)
+**Development Environment (Mac Studio):**
+- **Local Testing:** Ollama BGE-M3 embeddings (zero cost)
+- **Neo4j Graph DB:** PRODUCTION graph database (self-hosted on Mac Studio Docker, saves $100+/month vs cloud)
+- **Graphiti MCP:** Development-only memory testing (NOT production)
+- **Neo4j MCP Server:** PRODUCTION access via Claude Desktop/Code (natural language graph queries)
+- **Local Models:** BGE-M3, BGE-Reranker-v2 for development testing
+- **Offline Capability:** Complete cloud independence for development
 
-### 9.0.2 Mac Studio Resource Orchestration
+### 9.0.2 Mac Studio Resource Orchestration (Development Only)
 
 **Resource Allocation:**
-- **60-core GPU** scheduling for parallel workflows
-- **32-core Neural Engine** for ML-accelerated tasks
+- **60-core GPU** scheduling for parallel development tasks
+- **32-core Neural Engine** for ML-accelerated testing
 - **96GB memory** allocation management
 - **800 GB/s bandwidth** optimization
-- **31GB buffer** for workflow data caching
-- **Model switching** orchestration (Llama 3.3, Qwen2.5-VL)
+- **Development models:** BGE-M3, BGE-Reranker-v2 via Ollama
+- **Neo4j (PRODUCTION):** Graph database for knowledge graphs (~10GB)
+- **Graphiti MCP (DEV ONLY):** Development/testing memory tool (NOT production, uses Neo4j for testing)
 
 ## 9.1 Workflow Orchestration
 
-### 9.1.1 n8n Integration (Cloud and Local Modes)
+### 9.1.1 Production Task Processing (v7.2)
 
-**OCR-001: Workflow Management (Enhanced)**
-- Visual workflow designer (cloud via Render)
-- **Local workflow execution** option on Mac Studio
-- 500+ node integrations
-- Custom node development
-- Version control integration
+**OCR-001: Celery Task Queue (Production)**
+- **Distributed async processing** with Celery workers on Render
+- **Redis broker** for task queue management
+- **Result backend** for task status tracking
+- **Parallel processing** of documents and queries
+- **Horizontal scaling** with multiple workers
+- **Retry mechanisms** for failed tasks
+- **Task prioritization** and routing
 - **Infrastructure as Code** deployment
 
-**OCR-002: Execution Control (Privacy-Enhanced)**
-- Manual triggers
-- Scheduled execution
-- Event-based triggers
-- Webhook triggers
-- API triggers
-- **Offline triggers** for local-only execution
-- **Privacy triggers** for sensitive data detection
+**OCR-001B: Development Workflow Testing**
+- Local workflow testing on Mac Studio
+- Integration testing with Graphiti MCP (dev only)
+- Model performance testing with local embeddings
+- Neo4j query testing via MCP server
+
+**OCR-002: Execution Control (v7.2 Production)**
+- **FastAPI endpoints** for manual triggers
+- **Celery beat** for scheduled execution
+- **Event-based triggers** via Redis pub/sub
+- **Webhook triggers** through FastAPI
+- **WebSocket connections** for real-time updates
+- **Production API** authentication and authorization
+- **Development testing** on Mac Studio with local models
 
 ### 9.1.2 Process Orchestration
 
@@ -79,13 +98,14 @@ The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with in
 - Retry mechanisms
 - **Local fallback** for cloud failures
 
-**OCR-004: Data Flow Management**
-- Data transformation between steps
-- Variable passing
-- State management via **mem-agent**
-- Result aggregation
-- Stream processing
-- **Zero-knowledge data handling**
+**OCR-004: Data Flow Management (v7.2)**
+- Data transformation between Celery tasks
+- Variable passing via Redis backend
+- **Production:** State management in PostgreSQL graph tables (user_memory_nodes/edges)
+- **Development:** State management in Graphiti MCP (testing only)
+- Result aggregation across distributed workers
+- Stream processing via WebSocket
+- **Production memory:** PostgreSQL NOT Graphiti MCP
 
 ### 9.1.3 Hybrid Orchestration Architecture (NEW)
 
@@ -183,13 +203,14 @@ The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with in
 - Performance monitoring
 - **Offline agent capability**
 
-**OCR-006: Task Distribution**
-- Capability-based routing
-- Load-balanced distribution
-- Affinity-based assignment
-- Skills matching
-- Context preservation via **mem-agent**
-- **Privacy-aware agent selection**
+**OCR-006: Task Distribution (v7.2)**
+- Capability-based routing in Celery
+- Load-balanced distribution across workers
+- Task priority and affinity-based assignment
+- Worker specialization (document processing, embeddings, queries)
+- **Production:** Context preservation in PostgreSQL graph
+- **Development:** Context in Graphiti MCP (testing only)
+- **Memory architecture:** PostgreSQL for production, Graphiti for dev only
 
 ### 9.3.2 Agent Communication
 
@@ -211,21 +232,22 @@ The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with in
 
 ### 9.3.3 Local Model Coordination (NEW)
 
-**OCR-019: mem-agent Workflow State (NEW)**
-- Persistent workflow context
-- Cross-workflow memory sharing
-- User preference learning
-- Historical execution patterns
-- **<500ms state retrieval**
-- **Markdown-based storage**
+**OCR-019: Graph Memory Workflow State (v7.2)**
+- **Production:** PostgreSQL graph tables for persistent workflow context
+- **Development:** Graphiti MCP for testing workflow memory (NOT production)
+- Cross-workflow memory sharing via graph relationships
+- User preference learning in user_memory_nodes
+- Historical execution patterns in user_memory_edges
+- **<500ms state retrieval** from PostgreSQL
+- **Production memory:** PostgreSQL user_memory_nodes/edges ONLY
 
-**OCR-020: Local Model Orchestration (NEW)**
-- **Llama 3.3 70B** task queuing
-- **Qwen2.5-VL-7B** vision scheduling
-- Model switching logic
-- Memory management (65GB models)
-- **32 tok/s throughput** management
-- **Zero model API costs**
+**OCR-020: Local Model Orchestration (Mac Studio)**
+- **BGE-M3** embedding generation via Ollama (development testing)
+- **BGE-Reranker-v2** local reranking (development testing)
+- **Neo4j** graph queries (PRODUCTION - knowledge graphs, entity relationships)
+- **Graphiti MCP** memory testing (development only, NOT production)
+- **Zero-cost** local model inference for development
+- **Production architecture:** Neo4j for graphs, PostgreSQL for vectors/data, both work together
 
 ## 9.4 Monitoring and Management
 
@@ -363,48 +385,57 @@ The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with in
 
 ### 9.8.1 Software Dependencies
 
-**Local Orchestration Stack:**
-- n8n (Render hosted, $15-30/month)
-- CrewAI (Render hosted, $15-20/month)
-- Local workflow engine
-- mem-agent MCP integration
-- LiteLLM API server
-- Prometheus metrics
-- Grafana dashboards
+**Production Orchestration Stack (v7.2):**
+- FastAPI backend (Render, $20-30/month)
+- Celery workers (Render, $20-30/month)
+- Redis broker + cache (Upstash, $10-15/month)
+- PostgreSQL with pgvector (Supabase, included in base)
+- Prometheus metrics (Render, included)
+- Grafana dashboards (Render, included)
+- WebSocket support for real-time chat
 
-### 9.8.2 Hardware Utilization
+**Development Stack (Mac Studio):**
+- Ollama (BGE-M3, BGE-Reranker-v2)
+- Neo4j Docker (FREE)
+- Graphiti MCP (development testing only)
+- Local testing infrastructure
 
-**Mac Studio M3 Ultra:**
-- 28-core CPU for orchestration
-- 60-core GPU for parallel workflows
-- 32-core Neural Engine for ML tasks
-- 96GB RAM (orchestration overhead: ~5GB)
+### 9.8.2 Hardware Utilization (Development Environment)
+
+**Mac Studio M3 Ultra (Development Only):**
+- 28-core CPU for development testing
+- 60-core GPU for embedding generation testing
+- 32-core Neural Engine for ML acceleration
+- 96GB RAM allocation (~8GB Graphiti, ~10GB Ollama, ~10GB Neo4j)
 - 800 GB/s memory bandwidth
-- 10+ concurrent workflows
+- Used for local testing and development ONLY
 
-## 9.9 Orchestration Metrics (v7.1)
+## 9.9 Orchestration Metrics (v7.2 Production)
 
 ### 9.9.1 Performance Targets
 
-| Metric | Target | Mac Studio Capability |
-|--------|--------|----------------------|
-| Workflow Initiation | <100ms | 50-100ms (local) |
-| Concurrent Workflows | 10+ | 15+ achievable |
-| GPU Utilization | <70% | 60% average |
-| Memory Usage | <5GB overhead | 3-5GB typical |
-| Local Execution % | 98% | 98% achievable |
-| API Cost Savings | $50-100/mo | $100+ realized |
-| Offline Capability | 100% core | 100% achieved |
+| Metric | v7.2 Target | Production Capability |
+|--------|-------------|----------------------|
+| API Request Latency | <100ms | 50-100ms (FastAPI) |
+| Concurrent Celery Tasks | 10+ | 20+ with scaling |
+| Document Processing | <60s | 30-55s typical |
+| WebSocket Latency | <50ms | 30ms typical |
+| Query Response Time | <1s | 500-900ms |
+| PostgreSQL Graph Retrieval | <500ms | 200-400ms |
+| Cache Hit Rate | 80% | 82% achieved |
 
-### 9.9.2 Cost Comparison
+### 9.9.2 Cost Comparison (v7.2)
 
-| Service | Cloud-Only | Mac Studio Hybrid |
-|---------|------------|-------------------|
-| Workflow Automation | $50-100/mo | $15-30/mo (n8n) |
-| Agent Orchestration | $50-100/mo | $15-20/mo (CrewAI) |
-| API Calls | $100-200/mo | $0 (local) |
-| Total | $200-400/mo | $30-50/mo |
-| **Savings** | - | **$170-350/month** |
+| Service | Cloud-Only | v7.2 Production |
+|---------|------------|-----------------|
+| Backend API | $50-100/mo | $20-30/mo (FastAPI on Render) |
+| Task Processing | $50-100/mo | $20-30/mo (Celery on Render) |
+| Message Broker | $30-50/mo | $10-15/mo (Redis Upstash) |
+| Database | $50-100/mo | $25/mo (Supabase Pro) |
+| Embeddings API | $50-100/mo | $0 (Ollama local dev) |
+| Graph Database | $100+/mo | $0 (Neo4j Docker local dev) |
+| **Total** | **$330-550/mo** | **$75-100/mo + $0 dev costs** |
+| **Savings** | - | **$230-450/month (58-82%)** |
 
 ## 9.10 Privacy and Compliance
 

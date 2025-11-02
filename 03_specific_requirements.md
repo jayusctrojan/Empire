@@ -80,6 +80,95 @@
 *Description: Direct Cypher generation from user intent*
 *Status: v7.2 NEW*
 
+**FR-MCP-003:** The system SHALL use Graphiti MCP for development/testing ONLY
+
+*Priority: Critical*
+*Note: Graphiti MCP is NOT used in production*
+*Production Memory: PostgreSQL graph tables (user_memory_nodes, user_memory_edges)*
+*Status: v7.2 Architecture Decision*
+
+### 3.0.4 Production Architecture Requirements (8 Milestones)
+
+**FR-PROD-001:** The system SHALL implement FastAPI REST + WebSocket backend
+
+*Priority: Critical*
+*Deployment: Render cloud platform*
+*APIs: Document upload, query, search, admin, WebSocket chat*
+*Details: Workflows_Final/milestone_1_document_intake.md*
+*Status: v7.2 Implementation - Milestone 1*
+
+**FR-PROD-002:** The system SHALL use Celery workers for async document processing
+
+*Priority: Critical*
+*Broker: Redis*
+*Tasks: Text extraction, embedding generation, CrewAI workflows*
+*Details: Workflows_Final/milestone_2_universal_processing.md*
+*Status: v7.2 Implementation - Milestone 2*
+
+**FR-PROD-003:** The system SHALL generate embeddings via Ollama BGE-M3 locally
+
+*Priority: Critical*
+*Embedding Dimension: 1024*
+*Cost: $0/month (eliminates $50-100/month API costs)*
+*Details: Workflows_Final/milestone_3_advanced_rag.md*
+*Status: v7.2 Implementation - Milestone 3*
+
+**FR-PROD-004:** The system SHALL store embeddings in Supabase pgvector with HNSW indexing
+
+*Priority: Critical*
+*Index Type: HNSW*
+*Search Performance: <100ms for similarity queries*
+*Details: Workflows_Final/milestone_3_advanced_rag.md*
+*Status: v7.2 Implementation - Milestone 3*
+
+**FR-PROD-005:** The system SHALL implement hybrid search with RRF fusion
+
+*Priority: High*
+*Methods: Vector + keyword + fuzzy + BM25*
+*Fusion: Reciprocal Rank Fusion*
+*Details: Workflows_Final/milestone_4_query_processing.md*
+*Status: v7.2 Implementation - Milestone 4*
+
+**FR-PROD-006:** The system SHALL provide WebSocket chat with PostgreSQL graph memory
+
+*Priority: Critical*
+*Protocol: WebSocket*
+*Memory: PostgreSQL graph tables (NOT Graphiti MCP)*
+*Tables: user_memory_nodes, user_memory_edges, user_document_connections*
+*Details: Workflows_Final/milestone_5_chat_ui.md*
+*Status: v7.2 Implementation - Milestone 5*
+
+**FR-PROD-007:** The system SHALL collect metrics with Prometheus and visualize with Grafana
+
+*Priority: High*
+*Metrics: API latency, throughput, error rates, resource usage*
+*Dashboards: Grafana with pre-built dashboards*
+*Details: Workflows_Final/milestone_6_monitoring.md*
+*Status: v7.2 Implementation - Milestone 6*
+
+**FR-PROD-008:** The system SHALL implement RBAC admin system
+
+*Priority: High*
+*Features: User management, document management, batch operations, system stats*
+*Authentication: JWT-based*
+*Details: Workflows_Final/milestone_7_admin_tools.md*
+*Status: v7.2 Implementation - Milestone 7*
+
+**FR-PROD-009:** The system SHALL integrate CrewAI multi-agent workflows
+
+*Priority: High*
+*Agents: Researcher, analyst, writer*
+*Storage: Supabase tables for crew executions, tasks, generated assets*
+*Details: Workflows_Final/milestone_8_crewai_integration.md*
+*Status: v7.2 Implementation - Milestone 8*
+
+**FR-PROD-010:** The system SHALL implement 38 PostgreSQL tables across all milestones
+
+*Priority: Critical*
+*Details: Workflows_Final/database_setup.md*
+*Migration Scripts: Available for all 8 milestones*
+*Status: v7.2 Database Schema*
+
 ## 3.1 Functional Requirements
 
 ### 3.1.1 Document Processing Requirements (Core - All Versions)
