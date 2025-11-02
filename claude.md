@@ -1,7 +1,39 @@
 # Claude Code Development Guide for Empire v7.2
 
+## 🚀 Quick Reference: AI Development Tools Available
+
+**Primary IDE:** Visual Studio Code with Claude Code, Cline, and Continue.dev extensions
+
+**AI Assistants:**
+- **Claude Code** (CLI) - Primary architect for complex tasks
+- **Cline** (VS Code) - Rapid feature implementation
+- **Continue.dev** (VS Code) - Code completion and inline suggestions
+
+**MCP Servers (Model Context Protocol) Available:**
+1. **Claude Context MCP** - Maintains conversation context and project memory across sessions
+2. **Chrome DevTools MCP** - Browser debugging, DOM inspection, network analysis, performance monitoring
+3. **Ref MCP** - Official documentation reference (FastAPI, Neo4j, Supabase, Anthropic, LlamaIndex, Pydantic)
+4. **TaskMaster MCP** - AI-powered task management, project planning, complexity analysis
+5. **MCP_Docker** - GitHub operations (repos, PRs, issues, code search) + Render deployment (services, logs, metrics)
+6. **Supabase MCP** - Direct PostgreSQL + pgvector operations (tables, queries, indexes, RLS policies)
+7. **neo4j MCP** - Graph database queries via natural language → Cypher translation
+
+**Key Integration:** All MCPs work seamlessly with Claude Code CLI, providing direct access to databases, documentation, GitHub, and deployment platforms.
+
+---
+
 ## Overview
-This document outlines all tools, MCPs, and development environments available for building Empire v7.2. Read this file at the start of each development session to understand your capabilities.
+This document outlines all tools, MCPs, and development environments available for building Empire v7.2 with production-grade FastAPI + Celery architecture. Read this file at the start of each development session to understand your capabilities.
+
+**Architecture Note**: Empire v7.2 uses a hybrid database production architecture:
+- **Production Databases**:
+  - PostgreSQL (Supabase) - Vector search, user data, sessions
+  - Neo4j (Mac Studio Docker) - Knowledge graphs, entity relationships
+  - Redis (Upstash/Local) - Caching and Celery broker
+- **Production Services**: FastAPI + Celery on Render
+- **Multi-Modal Access**:
+  - REST/WebSocket APIs (FastAPI)
+  - Neo4j MCP (Claude Desktop/Code for natural language graph queries)
 
 ---
 
@@ -96,15 +128,22 @@ This document outlines all tools, MCPs, and development environments available f
   # Use for document parsing and indexing
   ```
 
-**CrewAI Service** (Already Running):
+**CrewAI Service** (CRITICAL - Milestone 8):
 - **Service ID**: `srv-d2n0hh3uibrs73buafo0`
 - **URL**: https://jb-crewai.onrender.com
-- **Purpose**: Multi-agent AI orchestration
-- **Status**: ACTIVE - Use this for complex multi-step workflows
+- **Purpose**: Multi-agent AI orchestration and content analysis workflows
+- **Status**: ACTIVE - REQUIRED for Milestone 8 implementation
+- **Workflows**:
+  - Multi-agent task coordination
+  - Content analysis automation
+  - Multi-document processing
+  - Framework extraction
+  - Long-running async tasks via Celery
 - **Integration**:
   ```python
   CREWAI_SERVICE_URL = "https://jb-crewai.onrender.com"
   # Use for multi-agent task coordination
+  # Milestone 8: Multi-agent workflows for content analysis
   ```
 
 **Usage Examples**:
@@ -129,8 +168,14 @@ This document outlines all tools, MCPs, and development environments available f
 
 ---
 
-### 2.3 Neo4j MCP
-**Purpose**: Direct natural language queries to Neo4j graph database
+### 2.3 Neo4j MCP (PRODUCTION)
+**Purpose**: Production knowledge graph queries via natural language (essential for multi-modal access)
+
+**Role in Production**:
+- Primary interface for knowledge graph queries via Claude Desktop/Code
+- Enables natural language to Cypher translation
+- Provides graph traversal and relationship analysis
+- Works alongside PostgreSQL for comprehensive data access
 
 **Capabilities**:
 - **Schema Management**:
@@ -465,7 +510,87 @@ def generate_embeddings(text: str) -> list[float]:
 
 ---
 
-## 5. Empire v7.2 Specific Tools
+## 5. Monitoring and Observability Stack (Milestone 6)
+
+### Overview
+Empire v7.2 includes comprehensive monitoring using Prometheus, Grafana, and supporting services for metrics, alerting, and visualization.
+
+### Monitoring Services Available
+
+#### **Prometheus** (Port 9090)
+- Metrics collection and storage
+- Time-series database
+- Alert evaluation
+- Scrapes metrics from all Empire services
+
+#### **Grafana** (Port 3000)
+- Visualization dashboards
+- Custom Empire dashboard pre-configured
+- Credentials: admin/empiregrafana123
+
+#### **Redis** (Port 6379)
+- Celery task broker
+- Cache backend
+- Session storage
+
+#### **Flower** (Port 5555)
+- Celery task monitoring UI
+- Worker status and task history
+- Credentials: admin/empireflower123
+
+#### **Alertmanager** (Port 9093)
+- Alert routing and notifications
+- Email/Slack integration ready
+- Grouped and silenced alerts
+
+### Quick Start Monitoring
+```bash
+# Start all monitoring services
+./start-monitoring.sh
+
+# Test monitoring integration
+python test_monitoring.py
+
+# Run example app with full metrics
+python example_app_with_monitoring.py
+```
+
+### Required for Your FastAPI App
+**Minimum integration** - Add this to your FastAPI app:
+```python
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Response
+
+@app.get("/monitoring/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+```
+
+### Monitoring Files
+- `docker-compose.monitoring.yml` - Docker services configuration
+- `monitoring/prometheus.yml` - Prometheus config
+- `monitoring/alert_rules.yml` - Alert definitions
+- `monitoring/INTEGRATION_GUIDE.md` - Complete integration guide
+- `example_app_with_monitoring.py` - Working example
+- `test_monitoring.py` - Verification script
+
+### Access URLs
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/empiregrafana123)
+- **Flower**: http://localhost:5555 (admin/empireflower123)
+- **Alertmanager**: http://localhost:9093
+
+### Environment Variables (Already in .env)
+```bash
+PROMETHEUS_ENABLED=true
+GRAFANA_PORT=3000
+CELERY_BROKER_URL=redis://localhost:6379/0
+FLOWER_PORT=5555
+```
+
+---
+
+## 7. Empire v7.2 Specific Tools
 
 ### Local Services (Running on Mac Studio via Tailscale)
 
@@ -709,7 +834,7 @@ async def complex_query(user_query: str):
 
 ---
 
-## 6. Development Checklist for Each Session
+## 8. Development Checklist for Each Session
 
 ### Before Starting:
 - [ ] Read this claude.md file
@@ -718,6 +843,7 @@ async def complex_query(user_query: str):
 - [ ] Verify Ollama is running: `ollama list`
 - [ ] **Verify LlamaIndex service**: `curl https://jb-llamaindex.onrender.com/health`
 - [ ] **Verify CrewAI service**: `curl https://jb-crewai.onrender.com/health`
+- [ ] **Check monitoring stack** (if needed): `./start-monitoring.sh` and verify at http://localhost:3000
 - [ ] Check MCP connections: Run test queries on Neo4j and Supabase MCPs
 - [ ] Load `.env` variables
 
@@ -736,7 +862,7 @@ async def complex_query(user_query: str):
 
 ---
 
-## 7. Common MCP Workflows
+## 9. Common MCP Workflows
 
 ### Create Database Schema
 ```
@@ -777,7 +903,7 @@ Claude Code � Use MCP_Docker GitHub:
 
 ---
 
-## 8. Environment Variables Reference
+## 10. Environment Variables Reference
 
 All credentials should be in `.env` file (see PRE_DEV_CHECKLIST.md):
 
@@ -816,7 +942,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 ---
 
-## 9. Key Architecture Files to Reference
+## 11. Key Architecture Files to Reference
 
 ### Documentation:
 1. **empire-arch.txt** - Core architecture specification (v7.2)
@@ -843,7 +969,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 ---
 
-## 10. MCP Testing Commands
+## 12. MCP Testing Commands
 
 ### Test Neo4j MCP:
 ```
@@ -887,7 +1013,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 ---
 
-## 11. Troubleshooting
+## 13. Troubleshooting
 
 ### MCP Not Responding:
 1. Check `~/.config/claude-code/mcp_settings.json`
@@ -930,7 +1056,7 @@ ollama run bge-m3 "test"
 
 ---
 
-## 12. Best Practices
+## 14. Best Practices
 
 ### When to Use Each Tool:
 
@@ -984,7 +1110,7 @@ ollama run bge-m3 "test"
 
 ---
 
-## 13. Quick Reference Commands
+## 15. Quick Reference Commands
 
 ### Start Development:
 ```bash
@@ -1020,7 +1146,7 @@ pytest tests/ -v
 
 ---
 
-## 14. Summary: Your Tools
+## 16. Summary: Your Tools
 
 | Tool | Purpose | Access Method |
 |------|---------|---------------|
@@ -1036,7 +1162,7 @@ pytest tests/ -v
 
 ---
 
-## 15. Next Steps
+## 17. Next Steps
 
 After reading this file:
 1. Check PRE_DEV_CHECKLIST.md for credentials
