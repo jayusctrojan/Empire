@@ -81,3 +81,6 @@ files2/
 # Large resource directories (comment out if needed)
 Resources/
 empire-canvas-codex/
+
+# Data directories (runtime data, not tracked)
+data/

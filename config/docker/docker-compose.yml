@@ -16,10 +16,10 @@ services:
       - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
       - NEO4J_dbms_security_procedures_allowlist=apoc.*,gds.*
     volumes:
-      - ./neo4j/data:/data
-      - ./neo4j/logs:/logs
-      - ./neo4j/import:/import
-      - ./neo4j/plugins:/plugins
+      - ../../data/neo4j/data:/data
+      - ../../data/neo4j/logs:/logs
+      - ../../data/neo4j/import:/import
+      - ../../data/neo4j/plugins:/plugins
 
   redis:
     image: redis:7-alpine
@@ -29,7 +29,7 @@ services:
       - "6379:6379"  # Redis default port
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
-      - ./redis/data:/data
+      - ../../data/redis/data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

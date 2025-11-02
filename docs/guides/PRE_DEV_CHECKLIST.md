@@ -3,18 +3,28 @@
 ## Overview
 This checklist ensures all API keys, credentials, and MCPs are configured before FastAPI development begins. Complete each section and mark items as done.
 
+### Production Architecture - Hybrid Database System
+Empire v7.2 uses a **dual database production architecture**:
+- **PostgreSQL (Supabase)**: User data, vector embeddings, sessions, authentication
+- **Neo4j (Mac Studio)**: Knowledge graphs, entity relationships, graph traversal
+- **Both are PRODUCTION databases** working together
+- **Multi-modal access**: REST/WebSocket APIs + Neo4j MCP for natural language queries
+
 ---
 
 ## 1. Core Database & Storage
 
-### ✅ Neo4j Graph Database (Local Docker)
+### ✅ Neo4j Graph Database (PRODUCTION - Local Docker)
 - **Status**: ✅ Configured in docker-compose.yml
+- **Role**: PRODUCTION knowledge graph database (works alongside PostgreSQL)
+- **Purpose**: Entity relationships, graph traversal, multi-hop queries, natural language access via MCP
 - **Connection**: `bolt://localhost:7687`
 - **Credentials**:
   - Username: `neo4j`
   - Password: `***REMOVED***`
 - **Web Interface**: http://localhost:7474
 - **Location**: Environment variables in docker-compose.yml
+- **Access from cloud**: Via Tailscale VPN to Mac Studio
 
 ### ⬜ Supabase PostgreSQL + pgvector
 - **Status**: ⬜ Needs setup
@@ -238,7 +248,75 @@ This checklist ensures all API keys, credentials, and MCPs are configured before
 
 ---
 
-## 6. MCP Servers to Configure
+## 6. Monitoring & Observability Stack
+
+### ✅ Monitoring Services
+- **Status**: ✅ Fully configured and ready
+- **Required for**: Production observability, metrics, alerts
+- **Services Included**:
+  - **Prometheus** (Port 9090) - Metrics collection
+  - **Grafana** (Port 3000) - Dashboards (admin/empiregrafana123)
+  - **Alertmanager** (Port 9093) - Alert routing
+  - **Redis** (Port 6379) - Celery broker (if not using above)
+  - **Flower** (Port 5555) - Celery monitoring (admin/empireflower123)
+
+### ✅ Quick Start
+```bash
+# Start all monitoring services
+./start-monitoring.sh
+
+# Verify services are running
+docker ps | grep -E "prometheus|grafana|redis|flower"
+
+# Test monitoring integration
+python test_monitoring.py
+
+# Run example app to see metrics
+python example_app_with_monitoring.py
+```
+
+### ✅ Python Dependencies
+```bash
+# Install monitoring requirements
+pip install -r requirements-monitoring.txt
+# OR manually:
+pip install prometheus-client celery redis flower
+```
+
+### ✅ FastAPI Integration Required
+Add this minimum code to your FastAPI app:
+```python
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Response
+
+@app.get("/monitoring/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+```
+
+### ✅ Access URLs
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/empiregrafana123)
+- **Flower**: http://localhost:5555 (admin/empireflower123)
+- **Alertmanager**: http://localhost:9093
+
+### ✅ Environment Variables (Already in .env)
+```bash
+PROMETHEUS_ENABLED=true
+GRAFANA_PORT=3000
+CELERY_BROKER_URL=redis://localhost:6379/0
+FLOWER_PORT=5555
+```
+
+### ✅ Documentation
+- `monitoring/INTEGRATION_GUIDE.md` - Complete integration guide
+- `monitoring/README.md` - Detailed monitoring docs
+- `example_app_with_monitoring.py` - Working example
+- `docker-compose.monitoring.yml` - Services config
+
+---
+
+## 8. MCP Servers to Configure
 
 ### ⬜ Supabase MCP
 - **Status**: ⬜ Needs configuration
@@ -264,9 +342,10 @@ This checklist ensures all API keys, credentials, and MCPs are configured before
   2. Run: `/mcp list` to verify Supabase MCP is loaded
   3. Test with: "List all tables in Supabase"
 
-### ⬜ Neo4j MCP
+### ⬜ Neo4j MCP (PRODUCTION)
 - **Status**: ⬜ Needs configuration
-- **Purpose**: Natural language queries to graph database, schema creation
+- **Purpose**: PRODUCTION - Natural language graph queries via Claude Desktop/Code
+- **Critical for**: Multi-modal access pattern (developers use Claude for graph queries)
 - **Configuration File**: `~/.config/claude-code/mcp_settings.json`
 - **Setup**:
   ```json
@@ -296,7 +375,7 @@ This checklist ensures all API keys, credentials, and MCPs are configured before
 
 ---
 
-## 7. Environment Variables File Template
+## 9. Environment Variables File Template
 
 Create a `.env` file in the Empire directory with this template:
 
@@ -370,7 +449,7 @@ ENABLE_LLAMAINDEX_INTEGRATION=true
 
 ---
 
-## 8. Claude Desktop MCP Configuration
+## 10. Claude Desktop MCP Configuration
 
 ### Combined MCP Configuration File
 **Location**: `~/.config/claude-code/mcp_settings.json`
@@ -402,7 +481,7 @@ ENABLE_LLAMAINDEX_INTEGRATION=true
 
 ---
 
-## 9. Database Schema Setup (Via Supabase MCP)
+## 11. Database Schema Setup (Via Supabase MCP)
 
 Once Supabase MCP is configured, Claude can directly create these tables:
 
@@ -426,7 +505,7 @@ Once Supabase MCP is configured, Claude can directly create these tables:
 
 ---
 
-## 10. FastAPI Development Setup
+## 12. FastAPI Development Setup
 
 ### Python Environment
 ```bash
@@ -467,7 +546,7 @@ Empire/
 
 ---
 
-## 11. Integration Patterns
+## 13. Integration Patterns
 
 ### Pattern 1: Document Processing with LlamaIndex
 ```python
@@ -542,7 +621,7 @@ async def hybrid_search(query: str):
 
 ---
 
-## 12. Pre-Development Checklist Summary
+## 14. Pre-Development Checklist Summary
 
 ### Must Complete Before Development:
 - [ ] Neo4j running: `docker-compose up -d`
@@ -578,7 +657,7 @@ async def hybrid_search(query: str):
 
 ---
 
-## 13. Testing Checklist
+## 15. Testing Checklist
 
 ### Before Starting Development:
 ```bash
@@ -625,7 +704,7 @@ In Claude Code session:
 
 ---
 
-## 14. Estimated Monthly Costs
+## 16. Estimated Monthly Costs
 
 | Service | Tier | Cost |
 |---------|------|------|
@@ -648,7 +727,7 @@ In Claude Code session:
 
 ---
 
-## 15. Next Steps After Checklist Complete
+## 17. Next Steps After Checklist Complete
 
 1. Run: `docker-compose up -d` to start Neo4j
 2. Create Supabase project and get credentials

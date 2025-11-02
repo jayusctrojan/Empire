@@ -1,0 +1,134 @@
+# ==========================================
+# ALERTMANAGER CONFIGURATION - EMPIRE v7.2
+# ==========================================
+
+global:
+  # The smarthost and SMTP sender used for mail notifications
+  smtp_from: 'empire-alerts@empire.ai'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'alerts@empire.ai'
+  smtp_auth_password: 'your-smtp-password'
+
+  # Global timeout settings
+  resolve_timeout: 5m
+
+# The directory from which notification templates are read
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# The root route on which each incoming alert enters
+route:
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'service', 'severity']
+
+  # Wait time before sending initial alert
+  group_wait: 30s
+
+  # Wait time before sending batch of new alerts for the same group
+  group_interval: 5m
+
+  # Repeat interval for alerts
+  repeat_interval: 4h
+
+  # Default receiver
+  receiver: 'default-receiver'
+
+  # Child routes for specific routing
+  routes:
+    # Critical alerts go to PagerDuty/immediate notification
+    - match:
+        severity: critical
+      receiver: critical-receiver
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts go to email/slack
+    - match:
+        severity: warning
+      receiver: warning-receiver
+      group_wait: 1m
+      repeat_interval: 4h
+
+    # Info alerts just go to logs
+    - match:
+        severity: info
+      receiver: info-receiver
+      group_wait: 5m
+      repeat_interval: 12h
+
+# Inhibition rules to mute alerts
+inhibit_rules:
+  # Mute warning alerts if critical alert for same component is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component']
+
+  # Mute info alerts if warning or critical alert is firing
+  - source_match_re:
+      severity: 'warning|critical'
+    target_match:
+      severity: 'info'
+    equal: ['alertname', 'component']
+
+# Receivers configuration
+receivers:
+  # Default receiver - sends to email
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'alerts@empire.ai'
+        send_resolved: true
+        headers:
+          Subject: '[Empire Alert] {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>{{ .GroupLabels.alertname }}</h2>
+          <p><b>Severity:</b> {{ .CommonLabels.severity }}</p>
+          <p><b>Component:</b> {{ .CommonLabels.component }}</p>
+          {{ range .Alerts }}
+          <hr>
+          <p><b>Summary:</b> {{ .Annotations.summary }}</p>
+          <p><b>Description:</b> {{ .Annotations.description }}</p>
+          <p><b>Started at:</b> {{ .StartsAt }}</p>
+          {{ end }}
+
+  # Critical alerts receiver
+  - name: 'critical-receiver'
+    email_configs:
+      - to: 'oncall@empire.ai'
+        send_resolved: true
+        require_tls: true
+        headers:
+          Subject: '[CRITICAL] Empire Alert: {{ .GroupLabels.alertname }}'
+    # Uncomment and configure if using Slack
+    # slack_configs:
+    #   - api_url: '${SLACK_WEBHOOK_URL}'
+    #     channel: '#critical-alerts'
+    #     title: 'Critical Alert: {{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+    #     send_resolved: true
+    # Uncomment and configure if using PagerDuty
+    # pagerduty_configs:
+    #   - service_key: 'your-pagerduty-service-key'
+    #     description: '{{ .GroupLabels.alertname }}'
+
+  # Warning alerts receiver
+  - name: 'warning-receiver'
+    email_configs:
+      - to: 'dev-team@empire.ai'
+        send_resolved: true
+        headers:
+          Subject: '[Warning] Empire: {{ .GroupLabels.alertname }}'
+    # Uncomment and configure if using Slack
+    # slack_configs:
+    #   - api_url: '${SLACK_WEBHOOK_URL}'
+    #     channel: '#alerts'
+    #     title: 'Warning: {{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+  # Info alerts receiver (just logs, no actual notification)
+  - name: 'info-receiver'
+    # This receiver intentionally does nothing - info alerts are just logged
+    webhook_configs:
+      - url: 'http://localhost:9094/log'  # Mock webhook for logging
+        send_resolved: true

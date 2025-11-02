@@ -10,10 +10,13 @@ echo "🚀 Empire AI v7.2 - Neo4j Setup"
 echo "================================"
 echo ""
 
+# Navigate to project root
+cd "$(dirname "$0")/../.." || exit 1
+
 # Check if Neo4j container is running
 if ! docker ps | grep -q empire-neo4j; then
     echo "❌ Error: Neo4j container is not running"
-    echo "   Please start it with: docker-compose up -d"
+    echo "   Please start it with: docker-compose -f config/docker/docker-compose.yml up -d"
     exit 1
 fi
 
@@ -28,7 +31,7 @@ docker exec -i empire-neo4j cypher-shell \
     -u neo4j \
     -p ***REMOVED*** \
     -d neo4j \
-    < neo4j_schema.cypher
+    < config/schemas/neo4j_schema.cypher
 
 if [ $? -eq 0 ]; then
     echo ""

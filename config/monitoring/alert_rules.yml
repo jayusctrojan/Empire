@@ -1,0 +1,281 @@
+# ==========================================
+# ALERT RULES - EMPIRE v7.2
+# ==========================================
+
+groups:
+  # ==========================================
+  # EMPIRE APPLICATION ALERTS
+  # ==========================================
+  - name: empire_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(empire_errors_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: empire_api
+        annotations:
+          summary: "High error rate detected in Empire API"
+          description: "Error rate is {{ $value }} errors/sec (threshold: 1/sec)"
+
+      # Critical error rate
+      - alert: CriticalErrorRate
+        expr: rate(empire_errors_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: empire_api
+        annotations:
+          summary: "Critical error rate in Empire API"
+          description: "Error rate is {{ $value }} errors/sec - immediate attention required"
+
+      # Slow document processing
+      - alert: SlowDocumentProcessing
+        expr: histogram_quantile(0.95, rate(empire_document_processing_seconds_bucket[5m])) > 30
+        for: 10m
+        labels:
+          severity: warning
+          component: document_processor
+        annotations:
+          summary: "Document processing is slow"
+          description: "P95 processing time is {{ $value }}s (threshold: 30s)"
+
+      # Very slow document processing
+      - alert: VerySlowDocumentProcessing
+        expr: histogram_quantile(0.95, rate(empire_document_processing_seconds_bucket[5m])) > 60
+        for: 5m
+        labels:
+          severity: critical
+          component: document_processor
+        annotations:
+          summary: "Document processing critically slow"
+          description: "P95 processing time is {{ $value }}s - system may be overloaded"
+
+      # High search latency
+      - alert: HighSearchLatency
+        expr: histogram_quantile(0.95, rate(empire_search_latency_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: search
+        annotations:
+          summary: "Search queries are slow"
+          description: "P95 search latency is {{ $value }}s (threshold: 2s)"
+
+      # Critical search latency
+      - alert: CriticalSearchLatency
+        expr: histogram_quantile(0.95, rate(empire_search_latency_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: search
+        annotations:
+          summary: "Search system critically slow"
+          description: "P95 search latency is {{ $value }}s - users experiencing timeouts"
+
+      # LLM response time high
+      - alert: HighLLMResponseTime
+        expr: histogram_quantile(0.95, rate(empire_llm_response_seconds_bucket[5m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "LLM responses are slow"
+          description: "P95 LLM response time is {{ $value }}s (threshold: 20s)"
+
+      # Too many WebSocket connections
+      - alert: HighWebSocketConnections
+        expr: empire_active_websockets > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: websocket
+        annotations:
+          summary: "High number of WebSocket connections"
+          description: "{{ $value }} active connections (threshold: 1000)"
+
+      # Celery queue backing up
+      - alert: HighCeleryQueueSize
+        expr: empire_celery_queue_size > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: celery
+        annotations:
+          summary: "Celery queue is backing up"
+          description: "Queue size is {{ $value }} tasks (threshold: 100)"
+
+      # Critical queue size
+      - alert: CriticalCeleryQueueSize
+        expr: empire_celery_queue_size > 500
+        for: 2m
+        labels:
+          severity: critical
+          component: celery
+        annotations:
+          summary: "Celery queue critically backed up"
+          description: "Queue size is {{ $value }} tasks - workers may be stuck"
+
+  # ==========================================
+  # SERVICE AVAILABILITY ALERTS
+  # ==========================================
+  - name: service_health
+    interval: 30s
+    rules:
+      # Empire API down
+      - alert: EmpireAPIDown
+        expr: up{job="empire_api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Empire API is down"
+          description: "The Empire API service has been down for 2 minutes"
+
+      # Redis down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache/broker has been down for 2 minutes"
+
+      # Neo4j down
+      - alert: Neo4jDown
+        expr: up{job="neo4j"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: neo4j
+        annotations:
+          summary: "Neo4j database is down"
+          description: "Neo4j graph database has been down for 5 minutes"
+
+      # LlamaIndex service down
+      - alert: LlamaIndexServiceDown
+        expr: up{job="llamaindex_service"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: llamaindex
+        annotations:
+          summary: "LlamaIndex service is down"
+          description: "LlamaIndex service on Render has been down for 10 minutes"
+
+      # CrewAI service down
+      - alert: CrewAIServiceDown
+        expr: up{job="crewai_service"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: crewai
+        annotations:
+          summary: "CrewAI service is down"
+          description: "CrewAI service on Render has been down for 10 minutes"
+
+  # ==========================================
+  # RESOURCE USAGE ALERTS
+  # ==========================================
+  - name: resource_alerts
+    interval: 30s
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: (100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Critical CPU usage
+      - alert: CriticalCPUUsage
+        expr: (100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 95
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }} - system may be unresponsive"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Critical memory usage
+      - alert: CriticalMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical memory usage"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }} - OOM killer may activate"
+
+      # Disk space low
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Low disk space"
+          description: "Only {{ $value }}% disk space remaining on {{ $labels.instance }}"
+
+      # Critical disk space
+      - alert: CriticalDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical disk space"
+          description: "Only {{ $value }}% disk space remaining - system may fail"
+
+  # ==========================================
+  # CONTAINER ALERTS
+  # ==========================================
+  - name: container_alerts
+    interval: 30s
+    rules:
+      # Container restart loop
+      - alert: ContainerRestartLoop
+        expr: rate(container_last_seen{name=~"empire.*"}[15m]) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+          component: container
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting frequently"
+          description: "Container has restarted {{ $value }} times in the last 15 minutes"
+
+      # Container high memory
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name=~"empire.*"} / container_spec_memory_limit_bytes{name=~"empire.*"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: container
+        annotations:
+          summary: "Container {{ $labels.name }} using high memory"
+          description: "Container is using {{ $value | humanizePercentage }} of its memory limit"
