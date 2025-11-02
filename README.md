@@ -5,13 +5,40 @@ This directory contains the complete Software Requirements Specification (SRS) f
 
 ## 🚀 v7.2 BREAKING NEWS - Dual-Interface Architecture
 
-### Current Status (Dual-Interface Redesign - October 2024)
-- **Phase:** v7.2 Dual-Interface Architecture Specification
-- **Architecture:** Neo4j Graph Database + Dual Interfaces (Chat UI + Neo4j MCP)
-- **Core Innovation:** Natural language → Cypher translation via Neo4j MCP for Claude Desktop/Code
-- **Infrastructure:** Mac Studio M3 Ultra (running Neo4j Docker) + Supabase hybrid + Render services
-- **Monthly Cost:** $350-500 (includes both interfaces)
-- **Key Feature:** Neo4j FREE on Mac Studio, eliminates expensive vector DB constraints
+### Development Environment & Tools
+**Primary IDE:** Visual Studio Code
+- **AI Assistants:**
+  - **Claude Code** (CLI) - Primary for architecture and complex tasks
+  - **Cline** (VS Code extension) - Secondary for rapid iteration
+  - **Continue.dev** (VS Code extension) - Code completion and refactoring
+
+**Available MCP Servers for Development:**
+- **Claude Context MCP** - Maintains conversation context across sessions
+- **Chrome DevTools MCP** - Browser debugging and frontend troubleshooting
+- **Ref MCP** - Official documentation reference (FastAPI, Neo4j, Supabase, etc.)
+- **TaskMaster MCP** - AI-powered task management and project planning
+- **MCP_Docker** - GitHub repository management + Render deployment
+- **Supabase MCP** - Direct PostgreSQL + pgvector database operations
+- **neo4j MCP** - Graph database queries via natural language
+
+### Current Status (Production-Ready Architecture - November 2024)
+- **Phase:** v7.2 Hybrid Database Production Architecture with 8 Milestones
+- **Architecture:** FastAPI + Celery + Dual Database System (PostgreSQL + Neo4j Both Production)
+- **Core Innovation:** Multi-modal access - REST/WebSocket APIs + Neo4j MCP for natural language graph queries
+- **Infrastructure:**
+  - **Production Databases**:
+    - Supabase PostgreSQL + pgvector (user data, vectors, sessions)
+    - Neo4j on Mac Studio Docker (knowledge graphs, entity relationships)
+    - Redis (caching + Celery broker)
+  - **Production Services**: FastAPI + Celery on Render
+  - **Local Compute**: Mac Studio M3 Ultra (Ollama embeddings + Neo4j hosting)
+- **Monthly Cost:** $300-400 (cloud services only, Neo4j FREE on Mac Studio)
+- **Key Features:**
+  - 8 production milestones implemented
+  - FastAPI async REST + WebSocket APIs
+  - Celery distributed task processing
+  - Hybrid database queries (PostgreSQL vectors + Neo4j graphs)
+  - Neo4j MCP enables natural language graph access via Claude Desktop/Code
 
 ### v7.2 Revolutionary Features (NEW)
 
@@ -26,25 +53,39 @@ This directory contains the complete Software Requirements Specification (SRS) f
 - ✅ **Advanced Traversal** - Multi-hop pathfinding, community detection, centrality analysis
 - ✅ **Semantic Entity Resolution** - ML-based entity matching and deduplication
 
-**Why v7.2 is a Game Changer:**
-1. **Cost Efficiency:** Neo4j FREE on Mac Studio eliminates expensive hosted solutions
-2. **Developer Experience:** Claude Code + Neo4j MCP = natural language graph queries
-3. **Performance:** 10-100x faster for relationship queries than SQL joins
-4. **Flexibility:** Dual interfaces serve both technical and non-technical users
-5. **Intelligence:** Graph-native reasoning for complex relationship analysis
-6. **Hybrid Strength:** Combines vector search (Supabase) + graph queries (Neo4j)
+**8 Production Milestones (v7.2):**
+1. **Milestone 1: Document Intake** - FastAPI upload API, B2 storage, SHA-256 deduplication
+2. **Milestone 2: Universal Processing** - Celery async tasks, text extraction (40+ formats), OCR
+3. **Milestone 3: Advanced RAG** - BGE-M3 embeddings via Ollama (local), pgvector storage, HNSW indexing
+4. **Milestone 4: Query Processing** - Hybrid search, Claude Haiku expansion, BGE-Reranker-v2 local
+5. **Milestone 5: Chat UI & Memory** - WebSocket chat with token streaming, PostgreSQL graph memory
+6. **Milestone 6: Monitoring** - Prometheus metrics, Grafana dashboards, structured logging
+7. **Milestone 7: Admin Tools** - RBAC system, document management, batch operations
+8. **Milestone 8: CrewAI Integration** - Multi-agent workflows, content analysis automation
 
-### v7.2 Cost Breakdown - $350-500/month
+**Why v7.2 is a Game Changer:**
+1. **Hybrid Database Production:** PostgreSQL for vectors/users + Neo4j for knowledge graphs (both production)
+2. **Cost Efficiency:** Neo4j FREE on Mac Studio + local embeddings ($0) eliminates major costs
+3. **Multi-Modal Access:** REST/WebSocket APIs for apps + Neo4j MCP for Claude Desktop natural language queries
+4. **Performance:** 10-100x faster graph queries than SQL joins, <100ms embeddings, WebSocket streaming
+5. **Intelligence:** Graph-native reasoning for complex relationship analysis
+6. **Hybrid Strength:** Vector search (PostgreSQL) + graph queries (Neo4j) working together in production
+
+### v7.2 Cost Breakdown - $300-400/month
 
 **Core Infrastructure ($150-200/month):**
-- **Neo4j:** $0 (free, Mac Studio Docker)
+- **FastAPI Backend (Render):** $20-30 (REST + WebSocket APIs, Milestones 1-5)
+- **Celery Workers (Render):** $20-30 (async task processing, Milestone 2)
 - **Claude Sonnet 4.5 API:** $50-80 (synthesis + Cypher generation)
 - **Claude Haiku:** $1.50-9 (query optimization)
-- **n8n (Render):** $30 (workflow orchestration)
-- **CrewAI (Render):** $20 (content analysis)
-- **Chat UI (Gradio/Streamlit):** $15-20 (Render deployment)
-- **Supabase:** $25 (PostgreSQL + pgvector for hybrid)
+- **CrewAI (Render):** $20 (multi-agent orchestration, Milestone 8)
+- **Supabase:** $25 (PostgreSQL + pgvector + graph tables)
 - **Backblaze B2:** $15-25 (file storage)
+
+**Production Infrastructure (Mac Studio - $0 additional):**
+- **Neo4j:** $0 (FREE Docker on Mac Studio - PRODUCTION knowledge graph database)
+- **Ollama:** $0 (BGE-M3 embeddings, BGE-Reranker-v2 local - PRODUCTION)
+- **Tailscale:** $0 (VPN for secure access from cloud services to Mac Studio)
 
 **Advanced Features ($150-300/month):**
 - **LightRAG API:** $30-50 (knowledge graph, now with Neo4j sync)
@@ -575,6 +616,72 @@ Graph database + Vector search + Dual interfaces:
 - ✅ **Production-ready** with 99.9% uptime SLA
 - ✅ **Best-of-both-worlds** (vector + graph for comprehensive queries)
 
+## 📊 Monitoring and Observability Stack (Milestone 6 - READY)
+
+### Overview
+Empire v7.2 includes a comprehensive monitoring stack for production-grade observability, performance tracking, and alerting.
+
+### Monitoring Services Configured
+- **Prometheus** (Port 9090) - Metrics collection and storage
+- **Grafana** (Port 3000) - Visualization dashboards (admin/empiregrafana123)
+- **Alertmanager** (Port 9093) - Alert routing and notifications
+- **Redis** (Port 6379) - Celery task broker and cache
+- **Flower** (Port 5555) - Celery task monitoring (admin/empireflower123)
+- **Node Exporter** - System-level metrics
+- **cAdvisor** - Container metrics
+
+### Quick Start
+```bash
+# Start monitoring stack
+./start-monitoring.sh
+
+# Test monitoring integration
+python test_monitoring.py
+
+# Run example app with metrics
+python example_app_with_monitoring.py
+```
+
+### Key Metrics Tracked
+- Document upload rates and processing times
+- Search latency and success rates
+- LLM response times
+- WebSocket connections
+- Celery queue sizes
+- Error rates by component
+- System resources (CPU, memory, disk)
+
+### Alert Rules Configured
+**Critical Alerts:**
+- Service downtime (API, Redis, Neo4j)
+- Critical error rates (>5/sec)
+- Very slow processing (>60s P95)
+- Resource exhaustion (>95%)
+
+**Warning Alerts:**
+- High error rates (>1/sec)
+- Slow processing (>30s P95)
+- High resource usage (>80%)
+- Queue backlogs (>100 tasks)
+
+### Integration Requirements
+```python
+# Minimum required in your FastAPI app:
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Response
+
+@app.get("/monitoring/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+```
+
+### Files and Documentation
+- `docker-compose.monitoring.yml` - Docker services configuration
+- `monitoring/INTEGRATION_GUIDE.md` - Complete integration guide
+- `monitoring/README.md` - Detailed monitoring documentation
+- `example_app_with_monitoring.py` - Fully instrumented example
+- `test_monitoring.py` - Verification script
+
 ## ✅ Next Steps - Gap Resolution Implementation
 
 ### Database Setup (Day 1)
@@ -593,7 +700,7 @@ Graph database + Vector search + Dual interfaces:
 
 ### Short Term (Next 2 Weeks)
 1. **Integrate LlamaIndex + LangExtract** - Precise extraction pipeline
-2. **Setup Monitoring Stack** - Prometheus + Grafana + OpenTelemetry
+2. ✅ **Monitoring Stack READY** - Prometheus + Grafana + Alertmanager configured
 3. **Configure Multi-Modal** - Claude Vision + Soniox integration
 4. **Test Hybrid Search** - Validate 30-50% improvement
 5. **Optimize Costs** - Fine-tune caching and batch processing
