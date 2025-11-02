@@ -210,6 +210,52 @@ Claude Code Integration:
 - Graph context available for code generation
 - Example: "Generate Python code to process all documents related to RAG optimization"
 
+================================================================================
+GRAPHITI MCP CONFIGURATION (ADDED v7.2 - Nov 2025)
+================================================================================
+
+Developer Memory System with Graphiti:
+├── Technology Stack:
+│   ├── Graphiti Core: Temporal knowledge graph framework
+│   ├── Neo4j Community: Graph database backend (bolt://localhost:7687)
+│   ├── OpenAI API: Embeddings (text-embedding-3-small)
+│   ├── MCP Protocol: Claude Desktop/Code integration
+│   └── Project-Based Memory Groups
+
+├── Memory Architecture:
+│   ├── Naming Convention: project_{projectname}_{aspect}
+│   ├── Empire Project Groups:
+│   │   ├── project_empire - Main project memories
+│   │   ├── project_empire_dev - Development notes
+│   │   ├── project_empire_docs - Documentation
+│   │   ├── project_empire_api - API specifications
+│   │   └── project_empire_notes - Meeting notes
+│   ├── Personal Memory:
+│   │   └── personal - ChatGPT history (332 memories imported)
+│   └── Other Projects:
+│       ├── project_healthtrack - Health industry project
+│       └── project_crypto_dashboard - Fintech project
+
+├── Context Management:
+│   ├── Quick Switch: ./mem empire (changes active context)
+│   ├── Add Project: ./mem add "project-name" --client "Client" --industry "Industry"
+│   ├── List Projects: ./mem (shows all contexts)
+│   └── Auto-updates GROUP_ID in .env for MCP server
+
+├── File Locations (/mem-agent-mcp/):
+│   ├── graphiti-mcp-wrapper.sh - MCP server launcher
+│   ├── memory_context_manager.py - Context switching tool
+│   ├── memory_contexts.json - Project metadata
+│   ├── import_chatgpt_direct.py - Bulk import tool
+│   └── graphiti/mcp_server/.env - API keys & config
+
+└── Benefits:
+    ├── Complete separation of personal vs work memories
+    ├── Scalable to unlimited projects
+    ├── <100ms retrieval with Neo4j indexes
+    ├── Context-aware code generation in Claude Code
+    └── Temporal tracking of knowledge evolution
+
 Cloud AI Infrastructure (PRIMARY)
 	•	Claude Sonnet 4.5 API - Document synthesis ($30-50/month)
 	  - Best-in-class accuracy for business documents (97-99%)
@@ -348,20 +394,42 @@ Context Expansion (ESSENTIAL):
     ├── Preserve semantic boundaries
     └── Configurable thresholds
 
-Memory System (ESSENTIAL - v7.0):
+Memory System (ESSENTIAL - v7.2 UPDATED Nov 2025):
 
-IMPORTANT: Empire has TWO DISTINCT memory systems:
-1. Developer Memory: mem-agent MCP (local development only)
+IMPORTANT: Empire has THREE DISTINCT memory systems:
+1. Developer Memory: Graphiti MCP with Neo4j (local development & Claude Code)
 2. Production User Memory: Supabase graph-based (end-user workflows)
+3. Personal Memory: Separated ChatGPT history (332 conversations imported)
 
-├── Developer Memory: mem-agent MCP (NOT FOR PRODUCTION)
-│   ├── Purpose: Local development and testing ONLY
-│   ├── Integration: Claude Desktop via Model Context Protocol
-│   ├── Location: Mac Studio local environment
-│   ├── ~8GB memory footprint
-│   ├── <500ms retrieval latency
-│   ├── Usage: Developer tool, NOT used in n8n production workflows
-│   └── NOT accessible to end users
+├── Developer Memory: Graphiti MCP with Neo4j (UPDATED Nov 2025)
+│   ├── Purpose: Development memory with Claude Code integration
+│   ├── Technology: Zep Graphiti + Neo4j Graph Database
+│   ├── Integration: Claude Desktop & Claude Code via MCP
+│   ├── Location: Mac Studio local environment (Docker)
+│   ├── Storage: Neo4j Community Edition (bolt://localhost:7687)
+│   ├── Memory Architecture:
+│   │   ├── Project-Based Naming: project_{projectname}_{aspect}
+│   │   ├── Empire Groups:
+│   │   │   ├── project_empire - Main project memories
+│   │   │   ├── project_empire_dev - Development notes
+│   │   │   ├── project_empire_docs - Documentation
+│   │   │   ├── project_empire_api - API specifications
+│   │   │   └── project_empire_notes - Meeting notes
+│   │   ├── Personal Groups:
+│   │   │   └── personal - ChatGPT history (332 memories)
+│   │   └── Other Projects: project_healthtrack, project_crypto_dashboard
+│   ├── Context Management:
+│   │   ├── Switch Command: ./mem empire
+│   │   ├── Manager: memory_context_manager.py
+│   │   ├── Config: memory_contexts.json
+│   │   └── Auto-updates GROUP_ID in .env
+│   ├── Import Tools:
+│   │   ├── import_chatgpt_direct.py - Direct Neo4j import
+│   │   ├── import_chatgpt_to_graphiti.py - Via Graphiti API
+│   │   └── Bulk import capability for project docs
+│   ├── Performance: <100ms retrieval with Neo4j indexes
+│   ├── Scalability: Unlimited projects without restructuring
+│   └── Privacy: Complete separation between personal/work
 │
 ├── Production User Memory: Supabase Graph-Based (v7.0)
 │   ├── Purpose: End-user memory in production n8n workflows
@@ -1726,7 +1794,7 @@ Production Readiness: Complete
 
 Empire Advantages Over Total RAG:
 ✅ Superior AI Stack: Claude Sonnet 4.5 > GPT-4
-✅ Better Memory: mem-agent MCP > Zep (privacy + performance)
+✅ Better Memory: Graphiti MCP with Neo4j (temporal knowledge graphs)
 ✅ More Efficient: 768-dim embeddings vs 1536-dim
 ✅ Advanced Extraction: LlamaIndex + LangExtract (Total RAG lacks)
 ✅ Full Observability: Prometheus + Grafana (Total RAG lacks)
@@ -1735,9 +1803,36 @@ Empire Advantages Over Total RAG:
 ✅ IEEE 830-1998 Compliant SRS: 340+ requirements documented
 
 ================================================================================
-Last Updated: October 28, 2025
-Version: 7.0 - Production-Ready Architecture with Advanced RAG
+MEMORY SYSTEM UPDATES (November 2025)
+================================================================================
+
+Developer Memory System Upgraded to Graphiti:
+✅ Replaced mem-agent MCP with Graphiti + Neo4j for developer memory
+✅ Implemented project-based memory architecture (project_{name}_{aspect})
+✅ Complete separation of personal (332 ChatGPT memories) vs work memories
+✅ Context switching via ./mem command (instant project switching)
+✅ Scalable to unlimited projects without restructuring
+✅ Temporal knowledge graphs tracking information evolution
+✅ Full integration with Claude Code for context-aware development
+
+Empire Project Memory Structure:
+├── project_empire - Main project memories
+├── project_empire_dev - Development notes and decisions
+├── project_empire_docs - Documentation and specifications
+├── project_empire_api - API endpoints and contracts
+└── project_empire_notes - Meeting notes and discussions
+
+Key Benefits:
+• Privacy: Personal memories completely isolated from work
+• Scalability: Add new projects with ./mem add "project-name"
+• Performance: <100ms retrieval with Neo4j indexing
+• Integration: Seamless Claude Code MCP integration
+• Flexibility: Switch contexts instantly without restart
+
+================================================================================
+Last Updated: November 1, 2025
+Version: 7.2 - Dual-Interface Architecture with Graphiti Memory System
 Classification: Confidential - Internal Use
-Implementation Status: Planning Phase - Documentation Complete (All Gaps Resolved)
+Implementation Status: Memory System Deployed, RAG Pipeline in Development
 Priority: HIGH - Ready for production implementation
 ================================================================================

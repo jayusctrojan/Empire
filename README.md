@@ -121,7 +121,12 @@ This directory contains the complete Software Requirements Specification (SRS) f
 - ✅ **LlamaIndex** (https://jb-llamaindex.onrender.com) - Document processing & UI ($15-20/month)
 - ✅ **LangExtract** - Gemini-powered extraction for precise grounding with LlamaIndex ($10-20/month)
 - ✅ **Supabase** - PostgreSQL + pgvector + FTS ($25/month)
-- ✅ **Backblaze B2** - File storage (JB-Course-KB bucket) ($15-25/month)
+- ✅ **Backblaze B2** - File storage with intelligent course organization (JB-Course-KB bucket) ($15-25/month)
+  - **NEW v7.2:** 10-department taxonomy with AI-powered classification
+  - **Folder Structure:** courses/, crewai-summaries/, crewai-suggestions/
+  - **Upload Methods:** Mountain Duck (direct B2) + Web UI (FastAPI)
+  - **Auto-Classification:** Claude Haiku classifies into 10 business departments
+  - **Intelligent Naming:** AI-generated filenames with module/lesson sorting (M01, L02 format)
 
 **Advanced Features:**
 - ✅ **LightRAG API** - Knowledge graph integration ($30-50/month)
@@ -173,7 +178,14 @@ Note: All core sections updated to v7.0 with comprehensive gap resolutions
 
 ### Completed Components ✅
 - **Upload Interface:** Blue-themed web interface at https://jb-llamaindex.onrender.com
-- **Dual Triggers:** HTML webhook + Backblaze B2 monitoring
+- **Dual Triggers:** HTML webhook + Backblaze B2 monitoring (30-second polling)
+- **Course Management System (NEW v7.2):** 🆕
+  - **B2 Folder Structure:** 10-department taxonomy (33 folders created)
+  - **AI Classification:** Claude Haiku auto-classifies courses into departments
+  - **Intelligent Naming:** AI extracts structure and generates sortable filenames
+  - **Dual Upload:** Mountain Duck (direct B2) + Web UI (Gradio/Streamlit)
+  - **CrewAI Outputs:** PDF summaries + YAML skills + Markdown commands
+  - **Departments:** IT, Sales/Marketing, Support, Operations/HR, Finance, PM, Real Estate, PE/M&A, Consulting, Personal Ed
 - **YouTube Processing:** Full transcript extraction with YouTubeTranscriptApi
 - **Article Processing:** Web scraping with newspaper3k
 - **File Processing:** 40+ formats via MarkItDown MCP

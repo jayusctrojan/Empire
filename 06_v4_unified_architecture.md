@@ -214,10 +214,10 @@
 - Firecrawl (web scraping)
 - Pinecone (vector storage)
 - Supabase (SQL database)
-- Backblaze B2 (encrypted backups)
+- Backblaze B2 (encrypted backups + course organization)
 
 #### Storage and Databases
-- **Primary Storage:** Backblaze B2 (encrypted)
+- **Primary Storage:** Backblaze B2 (encrypted + v7.2 intelligent course organization)
 - **Vector Database:** Pinecone ($0-70/month)
 - **Graph Database:** LightRAG API (cloud)
 - **SQL Database:** Supabase PostgreSQL ($25/month)

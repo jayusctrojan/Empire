@@ -70,7 +70,8 @@ All v7.1 optimizations maintained (BGE-M3 embeddings, Claude Haiku query expansi
 │  │  • CrewAI (Render) - Content Analysis ($20)                │    │
 │  │  • Supabase - PostgreSQL + pgvector + FTS ($25)            │    │
 │  │  • Chat UI (Gradio/Streamlit) - End user access ($15-20)   │    │
-│  │  • Backblaze B2 - File storage ($15-25)                    │    │
+│  │  • Backblaze B2 - Intelligent course organization ($15-25)  │    │
+│  │    10-dept taxonomy, AI classification, dual upload       │    │
 │  │                                                               │    │
 │  │  Advanced Features ($150-300/month - EXPANDED):             │    │
 │  │  • LightRAG - Knowledge graph + Neo4j sync ($30-50)         │    │
@@ -185,7 +186,13 @@ The system integrates with multiple services, prioritizing simplicity and reliab
   - Required for users to query documents
   - Enables RAG testing
   - Department agent interfaces
-- **Backblaze B2:** File storage and backups ($10-20/month)
+- **Backblaze B2:** File storage with intelligent course organization (JB-Course-KB bucket) ($15-25/month)
+  - **NEW v7.2:** 10-department taxonomy with AI-powered classification
+  - **Folder Structure:** courses/, crewai-summaries/, crewai-suggestions/
+  - **Upload Methods:** Mountain Duck (direct B2) + Web UI (FastAPI)
+  - **Auto-Classification:** Claude Haiku classifies into 10 business departments
+  - **Intelligent Naming:** AI-generated filenames with module/lesson sorting (M01, L02 format)
+  - **Departments:** IT, Sales/Marketing, Support, Operations/HR, Finance, PM, Real Estate, PE/M&A, Consulting, Personal Ed
 
 **Specialized Services (As Needed):**
 - **LlamaIndex (Render):** Document processing & UI ($15-20/month)

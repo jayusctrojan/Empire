@@ -101,7 +101,11 @@ The system maintains all v7.1 improvements (BGE-M3 embeddings with 1024-dim + sp
 - Three-tier caching architecture (Memory, Redis, Disk)
 - Fast track processing for simple documents (70% faster)
 - Real-time API cost tracking and optimization
-- Comprehensive backup to Backblaze B2
+- Comprehensive backup to Backblaze B2 with intelligent course organization
+- **NEW v7.2:** 10-department taxonomy with AI-powered course classification
+- **Dual Upload Architecture:** Mountain Duck (direct B2) + Web UI (FastAPI)
+- **Intelligent File Naming:** AI-generated filenames with module/lesson sorting (M01, L02)
+- **CrewAI Outputs:** PDF summaries + YAML skills + Markdown commands
 - Disaster recovery with 4-hour RTO and 1-hour RPO
 - SOC 2 Type II compliant cloud services only
 

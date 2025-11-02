@@ -207,7 +207,7 @@ pipeline_stages:
 - **Implementation:**
   - L1: 31GB memory (hot data, <10ms access)
   - L2: 100GB SSD (warm data, <50ms access)
-  - L3: Backblaze B2 (cold storage)
+  - L3: Backblaze B2 (cold storage + v7.2 intelligent course organization)
   - Smart promotion/demotion between tiers
 - **Target:** 85% overall cache hit rate
 - **Status:** Active - v5.0

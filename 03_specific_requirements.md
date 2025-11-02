@@ -2039,7 +2039,7 @@ def assessPDFComplexity(file):
 **NFR-006: Horizontal Scaling**
 - Cloud Services: Auto-scaling based on load
 - Processing: Dynamic worker allocation
-- Storage: Unlimited storage via Backblaze B2
+- Storage: Unlimited storage via Backblaze B2 with intelligent course organization (v7.2: 10-dept taxonomy, AI classification)
 - Database: Connection pooling and read replicas
 
 *Priority: High*
@@ -2249,19 +2249,28 @@ Max Connections: 60
 ```
 *Status: Active - All Versions*
 
-**SI-007:** Backblaze B2 Backup Interface
+**SI-007:** Backblaze B2 Storage & Course Organization Interface (v7.2 Enhanced)
 ```python
-Interface: B2 API
+Interface: B2 API + Course Classification
 Protocol: HTTPS/REST
 Endpoint: https://api.backblazeb2.com
+Bucket: JB-Course-KB
 Authentication: Application Key
 Encryption: Client-side AES-256
 Operations:
-  - upload_file(encrypted_data)
+  - upload_file(encrypted_data, department, metadata)
+  - classify_course(filename, content_preview) → department, structure
+  - generate_intelligent_filename(structure) → formatted_name
   - download_file(file_id)
   - list_file_versions()
+  - monitor_folder_changes() → new uploads detection (Mountain Duck)
+Features (NEW v7.2):
+  - 10-department taxonomy with AI classification
+  - Dual upload: Mountain Duck + Web UI
+  - Intelligent filename generation (M01-L02 format)
+  - CrewAI summaries and suggestions folders
 ```
-*Status: Active - All Versions*
+*Status: Active - All Versions, Enhanced v7.2*
 
 **SI-008:** Hyperbolic.ai LLM Interface (Minimal Use)
 ```python

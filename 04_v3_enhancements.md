@@ -390,12 +390,17 @@ The semantic chunking system creates context-aware document segments that preser
 - **Performance:** <50ms access time
 - **Compression:** 3:1 ratio for efficiency
 
-**Tier 3: Disk Cache (Backblaze B2)**
+**Tier 3: Disk Cache & Course Organization (Backblaze B2 - v7.2 Enhanced)**
 - **Size:** Unlimited with versioning
 - **TTL:** Permanent with lifecycle rules
-- **Content:** All processed documents and results
+- **Content:** All processed documents, results, and organized courses
 - **Performance:** <500ms access time
 - **Encryption:** Client-side AES-256
+- **NEW v7.2 Features:**
+  - 10-department taxonomy with AI-powered classification
+  - Dual upload architecture (Mountain Duck + Web UI)
+  - Intelligent filename generation with module/lesson structure
+  - CrewAI summaries and suggestions folders
 
 ### 4.4.2 Cache Management
 
@@ -403,6 +408,7 @@ The semantic chunking system creates context-aware document segments that preser
 - L1 Cache (Mac Studio Memory): 31GB available, TTL: adaptive
 - L2 Cache (Mac Studio SSD): 100GB, TTL: 24 hours
 - L3 Cache (Backblaze B2): Unlimited, TTL: permanent with versioning
+  - v7.2 Enhanced: Includes 10-dept course organization, AI classification, dual upload
 
 *Priority: Essential*
 *Note: v5.0 - Optimized for Mac Studio architecture*

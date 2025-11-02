@@ -343,7 +343,7 @@ The v7.1 architecture enables LOCAL workflow orchestration on Mac Studio with in
 - **Cloud service failure** detection
 - **Offline mode** activation
 - **Data recovery** workflows
-- **Backup triggering** to B2
+- **Backup triggering** to B2 (v7.2 with intelligent course organization)
 - **4-hour RTO** compliance
 - **1-hour RPO** maintenance
 

@@ -197,7 +197,7 @@ The v7.2 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 
 **VPR-019: Zero-Knowledge Video Backup (NEW)**
 - Client-side encryption before backup
-- Encrypted frame storage in B2
+- Encrypted frame storage in B2 (v7.2 includes intelligent course organization)
 - Metadata encryption
 - Key management local only
 - **Complete video privacy** maintained
@@ -244,7 +244,7 @@ The v7.2 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 3. Qwen2.5-VL-7B processes frames locally
 4. Llama 3.3 70B generates understanding
 5. mem-agent stores video context
-6. Results encrypted and backed to B2
+6. Results encrypted and backed to B2 (v7.2 with course organization)
 7. Zero cloud exposure for sensitive videos
 
 ## 8.7 Performance Benchmarks (v7.1 - Video Processing)
@@ -299,7 +299,7 @@ The v7.2 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 ## 8.9 Disaster Recovery
 
 **Video Processing Recovery:**
-- Encrypted video backups to B2
+- Encrypted video backups to B2 (v7.2 with intelligent course organization)
 - Model configurations in GitHub LFS
 - Processing state in mem-agent
 - Workflow definitions in IaC

@@ -145,7 +145,7 @@ n8n Instance (Render - $15-30/month)
 │
 └── Infrastructure Components:
     ├── Supabase (Vector DB + PostgreSQL - $25/month)
-    ├── Backblaze B2 (Object Storage - $10-20/month)
+    ├── Backblaze B2 (Object Storage + Course Organization - $15-25/month, v7.2 Enhanced)
     ├── Redis (Caching Layer - $7/month)
     └── Monitoring (Prometheus/Grafana - Self-hosted)
 ```
@@ -178,7 +178,7 @@ n8n Instance (Render - $15-30/month)
 - Set up document intake webhook with proper multipart handling
 - Implement comprehensive file validation using Code node
 - Create intelligent routing with corrected Switch node syntax
-- Store documents in Backblaze B2 with proper metadata
+- Store documents in Backblaze B2 with proper metadata (v7.2: includes AI classification and intelligent naming)
 - Log all operations to Supabase for tracking
 - Handle errors gracefully with retry logic
 
@@ -7255,7 +7255,7 @@ This comprehensive Section 10 implementation guide provides:
 | n8n (Render) | $15-30 | Core platform |
 | PostgreSQL | $7 | n8n database |
 | Supabase | $25 | Vector DB + Storage |
-| Backblaze B2 | $10-20 | Document storage |
+| Backblaze B2 | $15-25 | Document storage + Course Organization (v7.2) |
 | Redis Cache | $7 | Performance |
 | Claude API | $30-50 | AI processing |
 | OpenAI | $5-10 | Embeddings |
