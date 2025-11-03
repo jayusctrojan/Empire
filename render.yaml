@@ -1,0 +1,109 @@
+# Empire v7.3 - Render Deployment Configuration
+# Defines FastAPI web service and Celery worker service
+
+services:
+  # FastAPI Web Service
+  - type: web
+    name: empire-api
+    runtime: python
+    plan: starter  # $7/month
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    branch: main
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: "10000"
+      # Database connections (set via Render dashboard or CLI for security)
+      - key: SUPABASE_URL
+        sync: false  # Set manually
+      - key: SUPABASE_SERVICE_KEY
+        sync: false  # Set manually
+      - key: NEO4J_URI
+        sync: false  # Set manually
+      - key: NEO4J_USERNAME
+        value: neo4j
+      - key: NEO4J_PASSWORD
+        sync: false  # Set manually
+      - key: REDIS_URL
+        sync: false  # Set manually
+      # AI Services
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Set manually
+      - key: LLAMA_CLOUD_API_KEY
+        sync: false  # Set manually
+      # External Services
+      - key: LLAMAINDEX_SERVICE_URL
+        value: https://jb-llamaindex.onrender.com
+      - key: CREWAI_SERVICE_URL
+        value: https://jb-crewai.onrender.com
+      - key: CREWAI_API_KEY
+        sync: false  # Set manually
+      # B2 Backblaze
+      - key: B2_APPLICATION_KEY_ID
+        sync: false  # Set manually
+      - key: B2_APPLICATION_KEY
+        sync: false  # Set manually
+      - key: B2_BUCKET_NAME
+        value: JB-Course-KB
+      # CORS
+      - key: CORS_ORIGINS
+        value: "*"  # Update with actual frontend domains
+
+  # Celery Worker Service
+  - type: worker
+    name: empire-celery-worker
+    runtime: python
+    plan: starter  # $7/month
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    autoDeploy: true
+    branch: main
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: ENVIRONMENT
+        value: production
+      # Database connections (same as web service)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USERNAME
+        value: neo4j
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false  # Same as REDIS_URL
+      - key: CELERY_RESULT_BACKEND
+        sync: false  # Same as REDIS_URL
+      # AI Services
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LLAMA_CLOUD_API_KEY
+        sync: false
+      # External Services
+      - key: LLAMAINDEX_SERVICE_URL
+        value: https://jb-llamaindex.onrender.com
+      - key: CREWAI_SERVICE_URL
+        value: https://jb-crewai.onrender.com
+      - key: CREWAI_API_KEY
+        sync: false
+      # B2 Backblaze
+      - key: B2_APPLICATION_KEY_ID
+        sync: false
+      - key: B2_APPLICATION_KEY
+        sync: false
+      - key: B2_BUCKET_NAME
+        value: JB-Course-KB
