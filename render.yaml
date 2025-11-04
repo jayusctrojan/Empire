@@ -68,7 +68,7 @@ services:
     branch: main
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: "3.11.9"
       - key: ENVIRONMENT
         value: production
       # Database connections (same as web service)
@@ -107,3 +107,15 @@ services:
         sync: false
       - key: B2_BUCKET_NAME
         value: JB-Course-KB
+      # Document Processing Services
+      - key: SONIOX_API_KEY
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: LANGEXTRACT_API_KEY
+        sync: false
+      # Application Settings
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: LOG_LEVEL
+        value: INFO
