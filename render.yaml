@@ -4,7 +4,7 @@
 services:
   # FastAPI Web Service
   - type: web
-    name: empire-api
+    name: jb-empire-api
     runtime: python
     plan: starter  # $7/month
     region: oregon
@@ -58,7 +58,7 @@ services:
 
   # Celery Worker Service
   - type: worker
-    name: empire-celery-worker
+    name: jb-empire-celery
     runtime: python
     plan: starter  # $7/month
     region: oregon

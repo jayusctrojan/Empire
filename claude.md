@@ -14,11 +14,15 @@
 2. **Chrome DevTools MCP** - Browser debugging, DOM inspection, network analysis, performance monitoring
 3. **Ref MCP** - Official documentation reference (FastAPI, Neo4j, Supabase, Anthropic, LlamaIndex, Pydantic)
 4. **TaskMaster MCP** - AI-powered task management, project planning, complexity analysis
-5. **MCP_Docker** - GitHub operations (repos, PRs, issues, code search) + Render deployment (services, logs, metrics)
+5. **Render MCP** - Deployment and service management (web services, databases, logs, metrics, environment variables)
 6. **Supabase MCP** - Direct PostgreSQL + pgvector operations (tables, queries, indexes, RLS policies)
 7. **neo4j MCP** - Graph database queries via natural language → Cypher translation
 
-**Key Integration:** All MCPs work seamlessly with Claude Code CLI, providing direct access to databases, documentation, GitHub, and deployment platforms.
+**GitHub Operations:** Available directly via terminal/CLI using `gh` (GitHub CLI) and `git` commands - no MCP needed.
+
+**Tailscale VPN:** Available via terminal/CLI using `tailscale` command for remote access, funnel exposure, and exit node management.
+
+**Key Integration:** All MCPs work seamlessly with Claude Code CLI, providing direct access to databases, documentation, and deployment platforms.
 
 ---
 
@@ -71,50 +75,29 @@ This document outlines all tools, MCPs, and development environments available f
 
 ---
 
-### 2.2 MCP_Docker (GitHub + Render Integration)
-**Purpose**: GitHub repository management and Render deployment
+### 2.2 Render MCP (Deployment & Service Management)
+**Purpose**: Manage Render deployments, services, and infrastructure
 
-#### GitHub Operations:
-- **Repository Management**:
-  - Clone, create, fork repositories
-  - Branch management (create, merge, delete)
-  - Commit and push changes
-
-- **Pull Requests**:
-  - Create PRs with detailed descriptions
-  - Review PR diffs
-  - Merge PRs
-  - Comment on PRs
-
-- **Issues**:
-  - Create, update, close issues
-  - Assign issues
-  - Add labels and milestones
-  - Track sub-issues
-
-- **Code Search**:
-  - Search across repositories
-  - Find functions, classes, patterns
-  - Search by file type or language
-
-#### Render Operations:
+**Capabilities**:
 - **Web Services**:
   - Create and deploy FastAPI services
   - Configure environment variables
   - View logs and metrics
   - Scale services
+  - Monitor service health
 
 - **Databases**:
   - Create PostgreSQL instances
   - Manage Redis/KeyValue stores
   - Monitor database metrics
+  - View connection strings
 
 - **Static Sites**:
   - Deploy frontend applications
   - Configure build settings
   - Manage deployments
 
-#### Existing Render Deployments (IMPORTANT!):
+**Existing Render Deployments (IMPORTANT!):
 **Workspace ID**: `tea-d1vtdtre5dus73a4rb4g`
 
 **LlamaIndex Service** (Already Running):
@@ -148,23 +131,20 @@ This document outlines all tools, MCPs, and development environments available f
 
 **Usage Examples**:
 ```python
-# GitHub
-"Create a new branch called feature/graph-sync"
-"Search the codebase for BGE-M3 embedding usage"
-"Create a PR from feature/graph-sync to main"
-
-# Render - Existing Services
+# Existing Services
 "Show me the status of jb-llamaindex service"
 "Show me the logs for jb-crewai service"
 "List all services in workspace tea-d1vtdtre5dus73a4rb4g"
 "What's the health status of srv-d2nl1lre5dus73atm9u0?"
+"Show me the environment variables for the llamaindex service"
 
-# Render - New Services
+# New Services
 "Deploy the FastAPI app to Render"
 "Create a PostgreSQL database on Render"
+"Update the environment variables for service srv-xyz"
 ```
 
-**Configuration**: Already configured in `mcp_settings.json`
+**Configuration**: Added via `claude mcp add --transport http` command with bearer token
 
 ---
 
@@ -502,11 +482,11 @@ def generate_embeddings(text: str) -> list[float]:
 3. Use **Supabase MCP** to check vector storage
 4. Use **Ref MCP** to verify API usage
 
-### Phase 5: Deployment (Claude Code + MCP_Docker)
-1. Use **Claude Code** with **MCP_Docker** to deploy to Render
-2. Create PR and merge to main
-3. Monitor logs and metrics
-4. Set up environment variables
+### Phase 5: Deployment (Claude Code + Render MCP + GitHub CLI)
+1. Use **Claude Code** with **Render MCP** to deploy to Render
+2. Use **GitHub CLI** (`gh`) to create PR and merge to main via terminal
+3. Monitor logs and metrics via **Render MCP**
+4. Set up environment variables via **Render MCP**
 
 ---
 
@@ -633,6 +613,41 @@ compressor = LLMChainCompressor.from_llm(
     OllamaLLM(model="bge-reranker-v2-m3")
 )
 ```
+
+---
+
+### Tailscale CLI (Remote Access & Networking)
+
+Tailscale provides secure remote access to Mac Studio services and exit node functionality for traveling.
+
+#### Common Tailscale Commands
+```bash
+# Check Tailscale status
+tailscale status
+
+# Enable exit node (route all traffic through Mac Studio)
+tailscale up --advertise-exit-node --accept-routes
+
+# Expose local service via public HTTPS (Funnel)
+tailscale funnel 8081
+
+# Check current funnel status
+tailscale funnel status
+
+# Set custom hostname (optional)
+tailscale set --hostname jb-studio
+
+# Get Tailscale IP
+tailscale ip -4
+
+# SSH to machine via Tailscale
+ssh user@machine-name
+
+# Stop Tailscale
+tailscale down
+```
+
+**Note**: Tailscale configuration details (machine name, IP, funnel URL) are stored in `.env` file and should not be committed to GitHub.
 
 ---
 
@@ -875,7 +890,7 @@ Claude Code � Use Neo4j MCP:
 
 ### Deploy to Render
 ```
-Claude Code � Use MCP_Docker:
+Claude Code � Use Render MCP:
 "Deploy the FastAPI app to Render with these environment variables..."
 "Show me the deployment logs"
 ```
@@ -895,10 +910,13 @@ Claude Code � Use Ref MCP:
 ```
 
 ### Search Codebase
-```
-Claude Code � Use MCP_Docker GitHub:
-"Search the repo for all instances of BGE-M3 usage"
-"Find the function that handles document parsing"
+```bash
+# Use grep/ripgrep directly via terminal
+grep -r "BGE-M3" .
+rg "document.*pars" --type python
+
+# Use GitHub CLI for repo-wide search
+gh search code "BGE-M3" --repo owner/repo
 ```
 
 ---
@@ -985,14 +1003,16 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 "Count the number of rows in the documents table"
 ```
 
-### Test MCP_Docker (GitHub):
-```
-"Show me the latest commit on the Empire repo"
-"List all open issues"
-"Search for 'embedding' in the codebase"
+### Test GitHub CLI:
+```bash
+# Use gh CLI directly
+gh repo view
+gh issue list
+gh pr list
+gh search code "embedding"
 ```
 
-### Test MCP_Docker (Render):
+### Test Render MCP:
 ```
 "List all my Render services"
 "Show me the logs for the empire-api service"
@@ -1091,10 +1111,16 @@ ollama run bge-m3 "test"
 - Managing data
 - Checking table stats
 
-**Use MCP_Docker When**:
-- GitHub operations (PR, issues, search)
+**Use GitHub CLI (`gh`) When**:
+- GitHub operations (PR, issues, search) - use via terminal
+- Creating and managing branches - `gh pr create`, `gh issue list`, etc.
+- Code search across repositories - `gh search code`
+
+**Use Render MCP When**:
 - Deploying to Render
 - Managing cloud services
+- Viewing logs and metrics
+- Configuring environment variables
 
 **Use Chrome DevTools MCP When**:
 - Frontend is not working
@@ -1153,9 +1179,11 @@ pytest tests/ -v
 | **Claude Code** | CLI AI assistant | Terminal |
 | **Cline** | VS Code AI coding | VS Code sidebar |
 | **Continue.dev** | Code completion | VS Code inline |
+| **GitHub CLI (`gh`)** | GitHub operations | Terminal commands |
+| **Tailscale CLI** | VPN & remote access | Terminal commands |
 | **Neo4j MCP** | Graph database ops | Natural language in Claude |
 | **Supabase MCP** | SQL database ops | Natural language in Claude |
-| **MCP_Docker** | GitHub + Render | Natural language in Claude |
+| **Render MCP** | Deployment & services | Natural language in Claude |
 | **Chrome DevTools MCP** | Frontend debugging | Natural language in Claude |
 | **Ref MCP** | Documentation | Natural language in Claude |
 | **Claude Context MCP** | Session context | Natural language in Claude |
@@ -1186,3 +1214,7 @@ If you're unsure which tool to use:
 - Ask Claude Code: "Which tool should I use to [task]?"
 - Reference section 12 "Best Practices" above
 - Test each MCP to understand its capabilities
+
+## Task Master AI Instructions
+**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+@./.taskmaster/CLAUDE.md

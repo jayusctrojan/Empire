@@ -17,9 +17,13 @@ This directory contains the complete Software Requirements Specification (SRS) f
 - **Chrome DevTools MCP** - Browser debugging and frontend troubleshooting
 - **Ref MCP** - Official documentation reference (FastAPI, Neo4j, Supabase, etc.)
 - **TaskMaster MCP** - AI-powered task management and project planning
-- **MCP_Docker** - GitHub repository management + Render deployment
+- **Render MCP** - Deployment and service management on Render
 - **Supabase MCP** - Direct PostgreSQL + pgvector database operations
 - **neo4j MCP** - Graph database queries via natural language
+
+**GitHub Operations**: Available directly via terminal using `gh` (GitHub CLI) and `git` commands - no MCP needed.
+
+**Tailscale VPN**: Available via terminal using `tailscale` command for remote access, funnel exposure, and exit node management.
 
 ### Current Status (Production-Ready Architecture - November 2024)
 - **Phase:** v7.2 Hybrid Database Production Architecture with 8 Milestones
@@ -623,7 +627,7 @@ Empire v7.2 includes a comprehensive monitoring stack for production-grade obser
 
 ### Monitoring Services Configured
 - **Prometheus** (Port 9090) - Metrics collection and storage
-- **Grafana** (Port 3000) - Visualization dashboards (admin/empiregrafana123)
+- **Grafana** (Port 3001) - Visualization dashboards (admin/empiregrafana123)
 - **Alertmanager** (Port 9093) - Alert routing and notifications
 - **Redis** (Port 6379) - Celery task broker and cache
 - **Flower** (Port 5555) - Celery task monitoring (admin/empireflower123)
