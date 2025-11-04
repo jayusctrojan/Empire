@@ -7,7 +7,7 @@ services:
       - "7474:7474"  # HTTP
       - "7687:7687"  # Bolt
     environment:
-      - NEO4J_AUTH=neo4j/***REMOVED***
+      - NEO4J_AUTH=neo4j/empiresecure123
       - NEO4J_PLUGINS=["apoc", "graph-data-science"]
       - NEO4J_dbms_memory_heap_initial__size=2g
       - NEO4J_dbms_memory_heap_max__size=4g
@@ -15,11 +15,18 @@ services:
       - NEO4J_server_memory_heap_max__size=4g
       - NEO4J_dbms_security_procedures_unrestricted=apoc.*,gds.*
       - NEO4J_dbms_security_procedures_allowlist=apoc.*,gds.*
+      # TLS/SSL Configuration
+      - NEO4J_dbms_ssl_policy_bolt_enabled=true
+      - NEO4J_dbms_ssl_policy_bolt_base__directory=/certificates/bolt
+      - NEO4J_dbms_ssl_policy_bolt_private__key=private.key
+      - NEO4J_dbms_ssl_policy_bolt_public__certificate=public.crt
+      - NEO4J_dbms_connector_bolt_tls__level=OPTIONAL
     volumes:
       - ../../data/neo4j/data:/data
       - ../../data/neo4j/logs:/logs
       - ../../data/neo4j/import:/import
       - ../../data/neo4j/plugins:/plugins
+      - ../../data/neo4j/certificates:/certificates
 
   redis:
     image: redis:7-alpine

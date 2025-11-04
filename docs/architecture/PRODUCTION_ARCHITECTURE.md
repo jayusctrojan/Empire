@@ -155,7 +155,7 @@ services:
       - "7474:7474"  # Web interface
       - "7687:7687"  # Bolt protocol
     environment:
-      - NEO4J_AUTH=neo4j/***REMOVED***
+      - NEO4J_AUTH=neo4j/<your-password>  # Set from .env file
     volumes:
       - ./neo4j/data:/data
       - ./neo4j/logs:/logs

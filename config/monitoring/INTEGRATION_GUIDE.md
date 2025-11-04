@@ -248,7 +248,7 @@ docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 3. You should see your custom metrics
 
 ### Check Grafana dashboard:
-1. Go to http://localhost:3000
+1. Go to http://localhost:3001
 2. Login (admin/empiregrafana123)
 3. Open "Empire Document Processing Dashboard"
 4. You should see data flowing
@@ -385,7 +385,7 @@ python app/main.py
 curl http://localhost:8000/monitoring/metrics
 
 # 5. View in Grafana
-open http://localhost:3000
+open http://localhost:3001
 ```
 
 That's it! Your monitoring should now be fully integrated with your Empire application.

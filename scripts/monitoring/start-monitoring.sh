@@ -77,8 +77,8 @@ else
 fi
 
 # Check Grafana
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/api/health | grep -q "200"; then
-    echo -e "${GREEN}✓ Grafana is running at http://localhost:3000${NC}"
+if curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/api/health | grep -q "200"; then
+    echo -e "${GREEN}✓ Grafana is running at http://localhost:3001${NC}"
     echo "  Username: ${GRAFANA_ADMIN_USER:-admin}"
     echo "  Password: ${GRAFANA_ADMIN_PASSWORD:-empiregrafana123}"
 else
@@ -115,7 +115,7 @@ echo "=========================================="
 echo ""
 echo "Services URLs:"
 echo "  • Prometheus:    http://localhost:9090"
-echo "  • Grafana:       http://localhost:3000"
+echo "  • Grafana:       http://localhost:3001"
 echo "  • Flower:        http://localhost:5555"
 echo "  • Alertmanager:  http://localhost:9093"
 echo "  • Redis:         localhost:6379"

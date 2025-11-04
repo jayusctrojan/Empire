@@ -21,7 +21,7 @@ Empire v7.2 uses a **dual database production architecture**:
 - **Connection**: `bolt://localhost:7687`
 - **Credentials**:
   - Username: `neo4j`
-  - Password: `***REMOVED***`
+  - Password: `<your-password>`  *(Set in docker-compose.yml and .env)*
 - **Web Interface**: http://localhost:7474
 - **Location**: Environment variables in docker-compose.yml
 - **Access from cloud**: Via Tailscale VPN to Mac Studio
@@ -356,7 +356,7 @@ FLOWER_PORT=5555
         "args": ["run", "-i", "--rm",
                  "-e", "NEO4J_URI=bolt://host.docker.internal:7687",
                  "-e", "NEO4J_USERNAME=neo4j",
-                 "-e", "NEO4J_PASSWORD=***REMOVED***",
+                 "-e", "NEO4J_PASSWORD=<your-password>",  # From .env
                  "neo4j/mcp-server-neo4j:latest"
         ]
       }
@@ -387,7 +387,7 @@ Create a `.env` file in the Empire directory with this template:
 # ----- Database & Storage -----
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=***REMOVED***
+NEO4J_PASSWORD=<your-secure-password>  # Set in docker-compose.yml NEO4J_AUTH
 
 SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -471,7 +471,7 @@ ENABLE_LLAMAINDEX_INTEGRATION=true
         "run", "-i", "--rm",
         "-e", "NEO4J_URI=bolt://host.docker.internal:7687",
         "-e", "NEO4J_USERNAME=neo4j",
-        "-e", "NEO4J_PASSWORD=***REMOVED***",
+        "-e", "NEO4J_PASSWORD=<your-password>",  # From .env
         "neo4j/mcp-server-neo4j:latest"
       ]
     }

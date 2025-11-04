@@ -14,7 +14,7 @@
   - 7687 (Bolt Protocol)
 - **Credentials**:
   - Username: `neo4j`
-  - Password: `***REMOVED***`
+  - Password: `<your-password>`  *(See .env file)*
 - **Web UI**: http://localhost:7474
 - **Memory**: 2-4GB heap configured
 - **Plugins**: APOC, Graph Data Science
@@ -84,8 +84,8 @@ curl http://localhost:11434/api/embeddings -d '{
 ### 4. **Supabase (PostgreSQL + pgvector)** ✅ CONNECTED
 - **Status**: UP
 - **Tier**: SMALL (2GB RAM, $15/month)
-- **Project ID**: `***REMOVED***`
-- **URL**: `https://***REMOVED***.supabase.co`
+- **Project ID**: `<your-project-id>`
+- **URL**: `https://<your-project-id>.supabase.co`
 - **Region**: US East (likely)
 
 **Credentials** (from .env):
@@ -96,7 +96,7 @@ curl http://localhost:11434/api/embeddings -d '{
 
 **Test Command**:
 ```bash
-curl -H "apikey: YOUR_ANON_KEY" https://***REMOVED***.supabase.co/rest/v1/
+curl -H "apikey: YOUR_ANON_KEY" https://<your-project-id>.supabase.co/rest/v1/
 ```
 
 **Features Available**:
@@ -353,7 +353,7 @@ else
     echo "❌ Ollama - Not responding"
 fi
 
-***REMOVED***
+# Supabase
 if curl -s -H "apikey: $SUPABASE_ANON_KEY" "$SUPABASE_URL/rest/v1/" > /dev/null 2>&1; then
     echo "✅ Supabase - Connected ($SUPABASE_URL)"
 else

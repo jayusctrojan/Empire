@@ -15,10 +15,11 @@ These services are **REQUIRED** components of Empire's document processing pipel
 
 ### Configuration
 ```bash
-B2_APPLICATION_KEY_ID=***REMOVED***
-B2_APPLICATION_KEY=***REMOVED***
+B2_APPLICATION_KEY_ID=<from .env>
+B2_APPLICATION_KEY=<from .env>
 B2_BUCKET_NAME=JB-Course-KB
 ```
+⚠️ **SECURITY**: Get actual values from `.env` file - NEVER commit these to git!
 
 ### Folder Structure
 ```
@@ -100,8 +101,9 @@ def move_to_processed(filename: str):
 
 ### Configuration
 ```bash
-SONIOX_API_KEY=***REMOVED***
+SONIOX_API_KEY=<from .env>
 ```
+⚠️ **SECURITY**: Get actual value from `.env` file - NEVER commit to git!
 
 ### When Used
 - Course video uploads

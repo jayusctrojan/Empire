@@ -863,7 +863,7 @@ def setup_logging():
     file_handler.setFormatter(JSONFormatter())
     root_logger.addHandler(file_handler)
 
-    ***REMOVED*** handler for ERROR and above
+    # Supabase handler for ERROR and above
     if settings.log_to_database:
         db_handler = SupabaseLogHandler()
         db_handler.setLevel(logging.ERROR)

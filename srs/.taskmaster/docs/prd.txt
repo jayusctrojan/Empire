@@ -1,0 +1,2246 @@
+# Empire v7.3 - Product Requirements Document (PRD)
+# AI File Processing System with Dual-Interface Architecture
+# Version: 7.3 | Status: In Development | Date: 2025-01-02
+
+================================================================================
+PROJECT OVERVIEW
+================================================================================
+
+Empire v7.3 is a production-grade AI file processing system featuring:
+- Dual-interface architecture (Neo4j MCP + Chat UI)
+- Production backend: FastAPI + Celery on Render
+- Hybrid database system (PostgreSQL + Neo4j + Redis)
+- Advanced RAG with BGE-M3 embeddings and hybrid search
+- Multi-modal document processing (text, images, audio, video)
+- 15 specialized CrewAI agents for content analysis and asset generation
+- 10-department taxonomy with AI classification
+- 8 production milestones for systematic implementation
+
+================================================================================
+TECHNICAL ARCHITECTURE SUMMARY (v7.3)
+================================================================================
+
+Production Infrastructure:
+- **Backend API**: FastAPI (REST + WebSocket) on Render ($20-30/month)
+- **Task Processing**: Celery workers with Redis broker on Render ($20-30/month)
+- **Database**: Supabase PostgreSQL + pgvector + graph tables ($25/month)
+- **Graph DB**: Neo4j Community on Mac Studio Docker (FREE, production knowledge graphs)
+- **Cache/Broker**: Redis (Upstash $10-15/month or local)
+- **Services**: LlamaIndex (document parsing) + CrewAI (multi-agent) on Render
+
+AI Models:
+- **Production Generation**: Claude Sonnet 4.5 API (synthesis, Cypher generation)
+- **Production Expansion**: Claude Haiku API (query expansion, classification)
+- **Development Embeddings**: BGE-M3 via Ollama on Mac Studio (1024-dim, testing)
+- **Development Reranking**: BGE-Reranker-v2 via Ollama on Mac Studio (testing)
+
+Three Memory Systems:
+1. **Graphiti MCP + Neo4j** - Developer memory (local, Claude Desktop/Code integration)
+2. **Supabase Graph Tables** - Production user memory (user_memory_nodes, user_memory_edges)
+3. **Personal Memory** - Separated ChatGPT history (332 conversations imported)
+
+Multi-Modal Access:
+- **REST/WebSocket APIs** - FastAPI endpoints for programmatic access
+- **Neo4j MCP** - Natural language → Cypher for Claude Desktop/Code
+- **Chat UI** - Gradio/Streamlit for end users
+
+10-Department Taxonomy:
+1. it-engineering
+2. sales-marketing
+3. customer-support
+4. operations-hr-supply
+5. finance-accounting
+6. project-management
+7. real-estate
+8. private-equity-ma
+9. consulting
+10. personal-continuing-ed
+
+External Services (Already Deployed):
+- **LlamaIndex Service**: https://jb-llamaindex.onrender.com (srv-d2nl1lre5dus73atm9u0)
+- **CrewAI Service**: https://jb-crewai.onrender.com (srv-d2n0hh3uibrs73buafo0)
+- **Backblaze B2**: Primary file storage with intelligent folder structure
+- **Soniox**: Audio transcription ($10-20/month)
+- **Mistral OCR**: Complex PDF processing ($20/month)
+- **LangExtract**: Structured field extraction ($10-20/month)
+
+================================================================================
+SUCCESS CRITERIA
+================================================================================
+
+Performance Targets:
+- Document processing: <1s per document (cached)
+- Query latency: <500ms
+- Search quality: 95%+ relevance
+- Cache hit rate: 60-80%
+- Hybrid search improvement: +40-60% vs baseline
+
+Scalability Targets:
+- Handle 1000+ documents/day
+- Support 5000+ queries/day
+- 99.9% uptime SLA
+- Horizontal scaling with multiple Celery workers
+
+Quality Targets:
+- AI accuracy: 97-99%
+- Entity extraction: >95%
+- Department classification: >96%
+
+Cost Target:
+- Total monthly cost: $250-350 (down from $450+ in v4.0)
+- Savings: 58-82% vs cloud-only architecture
+
+================================================================================
+MILESTONE 1: DOCUMENT INTAKE & VALIDATION
+================================================================================
+
+Purpose: Handle document uploads, validation, deduplication, and initial metadata extraction
+
+Requirements:
+
+**FR-001: File Upload Capabilities**
+- Priority: Essential
+- Multi-file upload support (up to 10 files simultaneously)
+- Supported formats: PDF, DOCX, TXT, Images (PNG, JPG), Audio (MP3, WAV), Video (MP4)
+- Max file size: 100MB per file
+- Drag-and-drop interface
+- Progress indicators for each file
+- Upload to Backblaze B2 pending/ folder
+
+**FR-002: Format Validation**
+- Priority: Essential
+- Real-time format validation before upload
+- File integrity checks (corruption detection)
+- Security scanning for malicious files
+- MIME type verification
+- Extension validation
+- Reject unsupported formats with clear error messages
+
+**FR-003: Metadata Extraction**
+- Priority: High
+- Extract basic metadata: filename, size, type, upload timestamp
+- Extract document metadata: title, author, creation date (when available)
+- Extract EXIF data from images
+- Extract audio/video duration and codec information
+- Store metadata in Supabase documents table
+
+**FR-004: Duplicate Detection**
+- Priority: High
+- SHA-256 hash-based deduplication
+- Check against existing documents before processing
+- Option to skip or overwrite duplicates
+- Fuzzy matching for near-duplicates (optional)
+- Deduplication across all users (configurable per deployment)
+
+**FR-005: Queue Management**
+- Priority: Essential
+- Celery task queue for async processing
+- Priority-based queue (urgent, normal, low)
+- Task status tracking (pending, processing, completed, failed)
+- Retry mechanism for failed tasks (3 attempts with exponential backoff)
+- Dead letter queue for permanently failed tasks
+
+**FR-006: User Notifications**
+- Priority: Medium
+- Real-time upload progress via WebSocket
+- Completion notifications
+- Error notifications with actionable messages
+- Email notifications for long-running tasks (optional)
+
+**FR-007: Backblaze B2 Integration**
+- Priority: Essential
+- Upload to B2 pending/courses/ folder via Mountain Duck or Web UI
+- Mountain Duck: 30-second polling for new files
+- Web UI: Immediate processing trigger
+- File organization: pending/ → processing/ → processed/ or failed/
+- Zero-knowledge encryption for sensitive files (optional)
+
+**Backblaze B2 Folder Structure:**
+```
+JB-Course-KB/
+├── pending/courses/          # Upload destination (Mountain Duck or Web UI)
+├── processing/               # Temporary during processing
+├── processed/
+│   ├── courses/{10-departments}/     # Organized course files
+│   ├── crewai-summaries/{10-departments}/  # PDF summaries with visuals
+│   └── crewai-suggestions/{asset-type}/drafts/  # Generated assets
+│       ├── claude-skills/drafts/
+│       ├── claude-commands/drafts/
+│       ├── agents/drafts/
+│       ├── prompts/drafts/
+│       └── workflows/drafts/
+└── failed/                   # Failed processing
+```
+
+**AI Classification Workflow (Claude Haiku):**
+```python
+async def auto_classify_course(filename: str, content_preview: str) -> dict:
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+    prompt = f"""Analyze this course material and classify it into one of these departments:
+
+    DEPARTMENTS: it-engineering, sales-marketing, customer-support,
+                 operations-hr-supply, finance-accounting, project-management,
+                 real-estate, private-equity-ma, consulting, personal-continuing-ed
+
+    Filename: {filename}
+    Content Preview: {content_preview[:1000]}
+
+    Return JSON with: department, confidence (0-1), subdepartment (if applicable)
+    """
+
+    response = client.messages.create(
+        model="claude-3-5-haiku-20241022",  # Fast and cheap for classification
+        max_tokens=600,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    return json.loads(response.content[0].text)
+```
+
+**Database Schema (Supabase):**
+```sql
+-- Documents table
+CREATE TABLE documents (
+    document_id VARCHAR(64) PRIMARY KEY,
+    filename VARCHAR(500) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    file_size_bytes BIGINT,
+    file_hash VARCHAR(64) UNIQUE,
+    upload_date TIMESTAMPTZ DEFAULT NOW(),
+    processing_status VARCHAR(20) DEFAULT 'pending',
+    processing_complete BOOLEAN DEFAULT FALSE,
+    b2_file_path TEXT,
+    department VARCHAR(50),
+    subdepartment VARCHAR(100),
+    metadata JSONB DEFAULT '{}'
+);
+
+-- File uploads tracking
+CREATE TABLE file_uploads (
+    upload_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id VARCHAR(64) REFERENCES documents(document_id),
+    upload_method VARCHAR(20), -- 'web_ui' or 'mountain_duck'
+    upload_source VARCHAR(100), -- user or system identifier
+    upload_timestamp TIMESTAMPTZ DEFAULT NOW(),
+    processing_started_at TIMESTAMPTZ,
+    processing_completed_at TIMESTAMPTZ,
+    error_message TEXT,
+    retry_count INTEGER DEFAULT 0
+);
+
+-- Courses table (organized processed files)
+CREATE TABLE courses (
+    course_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id VARCHAR(64) REFERENCES documents(document_id),
+    course_title VARCHAR(500),
+    department VARCHAR(50) NOT NULL,
+    subdepartment VARCHAR(100),
+    instructor_name VARCHAR(200),
+    duration_minutes INTEGER,
+    difficulty_level VARCHAR(20), -- beginner, intermediate, advanced
+    tags TEXT[],
+    description TEXT,
+    b2_processed_path TEXT,
+    classification_confidence DECIMAL(3,2),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Success Metrics:**
+- Upload success rate: >99%
+- Duplicate detection accuracy: 100%
+- Average upload time: <5s per 10MB file
+- Validation error rate: <1%
+- Classification accuracy: >96%
+
+================================================================================
+MILESTONE 2: UNIVERSAL PROCESSING PIPELINE
+================================================================================
+
+Purpose: Extract text and structured data from all document types using specialized services
+
+Requirements:
+
+**FR-008: PDF Processing**
+- Priority: Essential
+- **Clean PDFs**: LlamaParse for text extraction (https://jb-llamaindex.onrender.com)
+- **Scanned PDFs**: Mistral OCR for complex layouts and tables ($20/month)
+- **Simple scans**: Tesseract OCR (free, local fallback)
+- Table extraction with structure preservation
+- Image extraction from PDFs
+- Maintain page numbers and section headers
+
+**FR-009: Document Processing (DOCX, TXT)**
+- Priority: Essential
+- Native DOCX parsing with python-docx
+- Preserve formatting (headers, lists, tables)
+- Extract embedded images
+- Convert to structured markdown
+- Plain text extraction for TXT files
+
+**FR-010: Image Processing**
+- Priority: High
+- Claude Vision API for image understanding
+- Extract text via OCR (Tesseract fallback)
+- Generate image descriptions
+- Detect charts, diagrams, infographics
+- Extract data from charts/tables
+
+**FR-011: Audio Processing**
+- Priority: High
+- **Soniox** transcription service ($10-20/month, high accuracy)
+- Speaker diarization (identify different speakers)
+- Timestamp generation for transcript
+- Audio quality assessment
+- Language detection
+
+**FR-012: Video Processing**
+- Priority: High
+- Frame extraction at key intervals (30-second intervals)
+- Audio extraction → Soniox transcription
+- **Claude Vision** for frame analysis (identify visual content)
+- Scene detection and segmentation
+- Generate timeline with topics
+
+**FR-013: Structured Data Extraction**
+- Priority: High
+- **LangExtract** service for field extraction ($10-20/month)
+- Extract entities: names, organizations, locations, dates
+- Extract key-value pairs (e.g., "Instructor: John Smith")
+- Extract course metadata: module numbers, lesson titles
+- Intelligent filename generation (M01-L02 format)
+
+**FR-014: Chunking Strategy**
+- Priority: Essential
+- Adaptive chunking based on document type
+- **Documents**: Semantic chunking (paragraphs, sections)
+- **Code**: Function/class-level chunking
+- **Transcripts**: Time-based + topic-based chunking
+- Chunk size: 500-1000 tokens (configurable)
+- Overlap: 50-100 tokens between chunks
+- Preserve context across chunks
+
+**Document Processing Flow:**
+```
+Document Upload → Upload to B2 (pending/) → File Type Detection
+├── PDF → Clean? → LlamaParse | Scanned? → Mistral OCR
+├── DOCX → python-docx parsing
+├── Audio → Soniox Transcript
+├── Video → Frame extraction + Soniox Transcript + Claude Vision
+├── Image → Claude Vision + Tesseract OCR
+└── TXT → Direct text extraction
+
+→ Extracted Text → LangExtract (structured fields)
+→ Claude Sonnet (entity extraction) → BGE-M3 (embeddings)
+→ Store: Supabase pgvector + Neo4j Graph + B2 (move to processed/)
+```
+
+**FR-015: Error Handling**
+- Priority: Essential
+- Graceful degradation (fallback to simpler methods)
+- Retry logic for transient service failures
+- Partial processing support (save what succeeded)
+- Detailed error logging with stack traces
+- Move failed files to B2 failed/ folder
+
+**FR-016: Processing Monitoring**
+- Priority: High
+- Real-time progress tracking via Celery
+- Stage-by-stage status updates
+- Processing time metrics per stage
+- Resource usage monitoring (CPU, memory, API calls)
+- Cost tracking per document
+
+**Database Schema (Processing):**
+```sql
+-- Document chunks
+CREATE TABLE document_chunks (
+    chunk_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id VARCHAR(64) REFERENCES documents(document_id),
+    chunk_index INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    chunk_metadata JSONB DEFAULT '{}',
+    embedding vector(1024), -- BGE-M3 embeddings
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create vector index for similarity search
+CREATE INDEX ON document_chunks USING hnsw (embedding vector_cosine_ops);
+
+-- Processing logs
+CREATE TABLE processing_logs (
+    log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id VARCHAR(64) REFERENCES documents(document_id),
+    stage VARCHAR(50) NOT NULL, -- 'upload', 'extraction', 'chunking', 'embedding', etc.
+    status VARCHAR(20) NOT NULL, -- 'started', 'completed', 'failed'
+    details JSONB DEFAULT '{}',
+    error_message TEXT,
+    processing_time_ms INTEGER,
+    logged_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Service Integration (Already Deployed):**
+
+LlamaIndex Service Integration:
+```python
+import requests
+
+LLAMAINDEX_BASE_URL = "https://jb-llamaindex.onrender.com"
+
+def parse_document(file_url: str):
+    response = requests.post(
+        f"{LLAMAINDEX_BASE_URL}/parse",
+        json={
+            "file_url": file_url,
+            "parse_instructions": "Extract structured data, preserve formatting"
+        },
+        headers={"Authorization": f"Bearer {os.getenv('LLAMAINDEX_API_KEY')}"}
+    )
+    return response.json()
+```
+
+**Success Metrics:**
+- Processing success rate: >98%
+- Average processing time: <60s per document
+- OCR accuracy: >95%
+- Transcription accuracy: >98% (Soniox)
+- Chunk quality score: >90%
+
+================================================================================
+MILESTONE 3: ADVANCED RAG IMPLEMENTATION
+================================================================================
+
+Purpose: Implement hybrid search, embeddings, reranking, and graph integration
+
+Requirements:
+
+**FR-017: Embedding Generation**
+- Priority: Essential
+- **Development**: BGE-M3 via Ollama on Mac Studio (1024-dim, testing)
+- **Production**: Claude API or hosted BGE-M3 endpoint
+- Batch processing (100 chunks per batch)
+- Embedding caching in Supabase
+- Regenerate embeddings on content updates
+- Latency target: <100ms per chunk (local)
+
+**FR-018: Vector Storage (Supabase pgvector)**
+- Priority: Essential
+- Store embeddings in Supabase with pgvector extension
+- HNSW index for fast similarity search
+- Namespace organization by document type
+- Metadata filtering support
+- Batch insert optimization
+
+**LLR-007: Local Embedding Pipeline (Development)**
+```python
+from langchain.embeddings import OllamaEmbeddings
+
+embeddings = OllamaEmbeddings(
+    base_url="http://localhost:11434",
+    model="bge-m3"
+)
+
+# Generate embeddings for chunks
+vectors = embeddings.embed_documents(chunk_texts)
+
+# Store in Supabase
+for chunk, vector in zip(chunks, vectors):
+    supabase.table('document_chunks').insert({
+        'document_id': doc_id,
+        'content': chunk.content,
+        'embedding': vector,
+        'chunk_metadata': chunk.metadata
+    }).execute()
+```
+
+**FR-019: Hybrid Search**
+- Priority: Essential
+- **Dense Search**: Vector similarity (BGE-M3 embeddings)
+- **Sparse Search**: BM25 keyword matching
+- **ILIKE Search**: PostgreSQL pattern matching
+- **Fuzzy Search**: Levenshtein distance for typos
+- **Result Fusion**: Reciprocal Rank Fusion (RRF)
+- Configurable weights per search type
+
+**FR-020: Query Expansion**
+- Priority: High
+- **Claude Haiku** generates 4-5 query variations
+- Parallel search with all variations
+- Combine results with RRF
+- Improves recall for ambiguous queries
+- Latency target: <500ms total
+
+**Query Expansion Implementation:**
+```python
+async def expand_query(original_query: str) -> list[str]:
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+    prompt = f"""Generate 4-5 alternative phrasings for this search query: "{original_query}"
+
+    Each variation should:
+    1. Use different keywords but same intent
+    2. Cover different aspects of the topic
+    3. Be concise (max 10 words each)
+
+    Return as JSON array of strings."""
+
+    response = client.messages.create(
+        model="claude-3-5-haiku-20241022",  # Fast and cheap
+        max_tokens=150,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    variations = json.loads(response.content[0].text)
+    return [original_query] + variations
+```
+
+**FR-021: Reranking**
+- Priority: High
+- **Development**: BGE-Reranker-v2 via Ollama (local testing)
+- **Production**: Claude API or hosted reranker
+- Rerank top 20-30 results
+- Score each result (0-1 relevance)
+- Return top 10 after reranking
+- Latency target: <200ms (local)
+
+**FR-022: Context Expansion**
+- Priority: Medium
+- Retrieve neighboring chunks for context
+- Expand to full document sections
+- Include parent/child document relationships
+- Configurable context window (1-3 surrounding chunks)
+
+**FR-023: Neo4j Graph Integration**
+- Priority: High
+- Store entities and relationships in Neo4j
+- **Production**: Neo4j Community on Mac Studio Docker (FREE)
+- Knowledge graph queries for related content
+- Entity-centric search ("all documents mentioning X")
+- Relationship traversal (2-3 hop queries)
+- Graph-enhanced context retrieval
+
+**Neo4j Schema (Knowledge Graph):**
+```cypher
+// Document nodes
+CREATE (d:Document {
+    document_id: $doc_id,
+    title: $title,
+    department: $department,
+    created_at: datetime()
+})
+
+// Entity nodes (Person, Organization, Location, Concept)
+CREATE (e:Entity {
+    entity_id: $entity_id,
+    name: $name,
+    type: $type,  // PERSON, ORG, LOCATION, CONCEPT
+    mentions_count: 0
+})
+
+// Relationships
+CREATE (d)-[:MENTIONS {
+    count: $count,
+    confidence: $confidence,
+    context: $context
+}]->(e)
+
+CREATE (d1)-[:RELATED_TO {
+    similarity_score: $score,
+    relationship_type: $type
+}]->(d2)
+
+// Vector index for graph-based similarity
+CREATE VECTOR INDEX document_embeddings
+FOR (d:Document)
+ON (d.embedding)
+OPTIONS {indexConfig: {
+    `vector.dimensions`: 1024,
+    `vector.similarity_function`: 'cosine'
+}}
+```
+
+**FR-024: LightRAG Graph Integration**
+- Priority: Medium
+- Entity extraction from documents
+- Relationship discovery between entities
+- Graph-based query expansion
+- Community detection for topic clustering
+- Integration with Neo4j for persistence
+
+**FR-025: Caching Strategy**
+- Priority: High
+- Redis cache for frequent queries
+- Cache embeddings (avoid recomputation)
+- Cache search results (5-minute TTL)
+- Cache hit rate target: 60-80%
+- Tiered caching: L1 (Redis) → L2 (PostgreSQL)
+
+**Semantic Cache Thresholds:**
+- **Exact match**: Similarity > 0.98 (immediate cache hit)
+- **High similarity**: 0.93-0.97 (use cached, log potential drift)
+- **Medium similarity**: 0.88-0.92 (execute fresh search, update cache)
+- **Low similarity**: < 0.88 (execute fresh search)
+
+**Database Schema (RAG):**
+```sql
+-- Vector search index
+CREATE INDEX ON document_chunks
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+-- Metadata indexes for filtering
+CREATE INDEX ON document_chunks USING gin (chunk_metadata);
+CREATE INDEX ON document_chunks (document_id);
+
+-- Search cache
+CREATE TABLE search_cache (
+    cache_key VARCHAR(64) PRIMARY KEY,
+    query_text TEXT NOT NULL,
+    query_embedding vector(1024),
+    results JSONB NOT NULL,
+    hit_count INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_accessed_at TIMESTAMPTZ DEFAULT NOW(),
+    ttl_seconds INTEGER DEFAULT 300
+);
+
+CREATE INDEX ON search_cache (created_at DESC);
+CREATE INDEX ON search_cache USING hnsw (query_embedding vector_cosine_ops);
+```
+
+**Success Metrics:**
+- Search relevance: >95%
+- Hybrid search improvement: +40-60% vs vector-only
+- Query latency: <500ms (p95)
+- Cache hit rate: 60-80%
+- Reranking precision: +15-25% vs no reranking
+
+================================================================================
+MILESTONE 4: QUERY PROCESSING & RETRIEVAL
+================================================================================
+
+Purpose: Implement intelligent query routing, type detection, and result synthesis
+
+Requirements:
+
+**FR-026: Query Type Detection**
+- Priority: High
+- Classify queries: semantic, relational, hybrid, metadata
+- **Semantic**: "explain quantum computing" → vector search
+- **Relational**: "documents citing Einstein" → graph traversal
+- **Hybrid**: "courses about Python taught by experts" → vector + graph
+- **Metadata**: "all PDFs uploaded this week" → PostgreSQL filter
+- Auto-routing to optimal search strategy
+
+**FR-027: Query Processing Pipeline**
+- Priority: Essential
+- Query normalization (lowercase, trim, remove stop words)
+- Query expansion via Claude Haiku (4-5 variations)
+- Parallel search execution (all variations + methods)
+- Result deduplication
+- Reciprocal Rank Fusion (RRF) for result merging
+- Reranking top results
+
+**FR-028: Semantic Search**
+- Priority: Essential
+- Embed query with BGE-M3
+- Cosine similarity search in Supabase pgvector
+- Top-k retrieval (k=20-30 before reranking)
+- Metadata filtering support
+- Namespace filtering (department, type)
+
+**FR-029: Graph Search (Neo4j)**
+- Priority: High
+- Entity-centric queries via Neo4j MCP
+- Relationship traversal (2-3 hops)
+- Cypher generation via Claude Sonnet
+- Natural language → Cypher translation
+- Subgraph extraction for context
+
+**Cypher Generation Example:**
+```python
+async def generate_cypher(natural_language_query: str) -> str:
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+    schema = """
+    Neo4j Schema:
+    - Document nodes: (d:Document {document_id, title, department})
+    - Entity nodes: (e:Entity {entity_id, name, type})
+    - Relationships: (d)-[:MENTIONS]->(e), (d)-[:RELATED_TO]->(d2)
+    """
+
+    prompt = f"""{schema}
+
+    Generate a Cypher query for: "{natural_language_query}"
+
+    Return only the Cypher query, no explanation."""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=500,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    return response.content[0].text.strip()
+```
+
+**FR-030: Hybrid Result Merging**
+- Priority: High
+- Combine vector search results (Supabase)
+- Combine graph search results (Neo4j)
+- Reciprocal Rank Fusion (RRF) algorithm
+- Score normalization across sources
+- Diversity-aware ranking (avoid redundant results)
+
+**FR-031: Faceted Search**
+- Priority: Medium
+- Filter by department (10 departments)
+- Filter by file type (PDF, DOCX, audio, video)
+- Filter by date range
+- Filter by entities (people, organizations)
+- Filter by confidence score
+- Multi-select facets
+
+**FR-032: Result Presentation**
+- Priority: High
+- Snippet generation (2-3 sentences context)
+- Highlight matching keywords
+- Show relevance score (0-1)
+- Show source (document, page number)
+- Show department and tags
+- Link to full document (B2 URL)
+
+**FR-033: Query Analytics**
+- Priority: Medium
+- Log all queries for analysis
+- Track query latency per stage
+- Track result click-through rate (CTR)
+- Identify slow queries for optimization
+- A/B testing support for ranking algorithms
+
+**Database Schema (Query Processing):**
+```sql
+-- Query logs
+CREATE TABLE query_logs (
+    query_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(100),
+    query_text TEXT NOT NULL,
+    query_type VARCHAR(20), -- 'semantic', 'relational', 'hybrid', 'metadata'
+    query_embedding vector(1024),
+    search_methods TEXT[], -- ['vector', 'graph', 'bm25']
+    results_count INTEGER,
+    query_latency_ms INTEGER,
+    clicked_results UUID[],
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Result clicks (for CTR tracking)
+CREATE TABLE result_clicks (
+    click_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    query_id UUID REFERENCES query_logs(query_id),
+    document_id VARCHAR(64) REFERENCES documents(document_id),
+    result_rank INTEGER,
+    clicked_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX ON query_logs (created_at DESC);
+CREATE INDEX ON query_logs (user_id);
+CREATE INDEX ON result_clicks (query_id);
+```
+
+**Success Metrics:**
+- Query processing latency: <500ms (p95)
+- Search quality (NDCG@10): >0.85
+- Click-through rate (CTR): >40%
+- Zero-result queries: <5%
+- Hybrid search improvement: +40-60% vs single method
+
+================================================================================
+MILESTONE 5: CHAT UI & MEMORY SYSTEM
+================================================================================
+
+Purpose: Implement real-time chat interface with WebSocket and graph-based memory
+
+Requirements:
+
+**FR-034: Chat Interface**
+- Priority: Essential
+- WebSocket-based real-time chat
+- Token-by-token streaming responses
+- Message history (last 20 messages)
+- Typing indicators
+- Error handling with retry
+- Mobile-responsive design
+
+**FR-035: WebSocket Integration**
+- Priority: Essential
+- FastAPI WebSocket endpoint
+- Connection management (heartbeat, reconnect)
+- Message queuing (handle disconnects)
+- Rate limiting (10 messages per minute)
+- Concurrent user support (100+ simultaneous)
+
+**WebSocket Implementation:**
+```python
+from fastapi import WebSocket, WebSocketDisconnect
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, WebSocket] = {}
+
+    async def connect(self, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+
+    def disconnect(self, user_id: str):
+        del self.active_connections[user_id]
+
+    async def send_message(self, user_id: str, message: dict):
+        websocket = self.active_connections.get(user_id)
+        if websocket:
+            await websocket.send_json(message)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/chat/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    await manager.connect(user_id, websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            query = data.get("message")
+
+            # Stream response token by token
+            async for token in stream_chat_response(query, user_id):
+                await manager.send_message(user_id, {"token": token})
+
+    except WebSocketDisconnect:
+        manager.disconnect(user_id)
+```
+
+**FR-036: Streaming Responses**
+- Priority: High
+- Token-by-token streaming from Claude API
+- Chunk-based streaming for long responses
+- Progress indicators for search/retrieval
+- Graceful error handling mid-stream
+- Cancel support (stop generation)
+
+**FR-037: Conversation Memory (Production - Supabase Graph)**
+- Priority: Essential
+- Store conversations in PostgreSQL graph tables
+- **Production tables**: user_memory_nodes, user_memory_edges
+- Graph-based memory with relationships
+- User preference learning
+- Context window management (last 5 messages)
+- Long-term memory (graph relationships persist)
+
+**Memory Architecture (v7.3 PRODUCTION):**
+- **Production User Memory**: PostgreSQL graph tables in Supabase
+  - user_memory_nodes: Store conversation facts, user preferences, entities
+  - user_memory_edges: Store relationships between memory nodes
+  - Row-level security (RLS) per user
+  - Graph-based retrieval for relevant context
+
+- **Development Memory**: Graphiti MCP with Neo4j (Mac Studio, testing only)
+  - Used by developers for testing memory features
+  - NOT used in production workflows
+  - Project-based naming (project_empire, project_empire_dev)
+
+- **Personal Memory**: Separated ChatGPT history
+  - 332 conversations imported to Graphiti
+  - Complete personal/work separation
+
+**Database Schema (Memory - Production):**
+```sql
+-- User memory nodes (facts, preferences, entities)
+CREATE TABLE user_memory_nodes (
+    node_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(100) NOT NULL,
+    node_type VARCHAR(50) NOT NULL, -- 'fact', 'preference', 'entity', 'intent'
+    content TEXT NOT NULL,
+    embedding vector(1024),
+    confidence_score DECIMAL(3,2),
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    access_count INTEGER DEFAULT 0,
+    last_accessed_at TIMESTAMPTZ
+);
+
+-- User memory edges (relationships)
+CREATE TABLE user_memory_edges (
+    edge_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(100) NOT NULL,
+    from_node_id UUID REFERENCES user_memory_nodes(node_id) ON DELETE CASCADE,
+    to_node_id UUID REFERENCES user_memory_nodes(node_id) ON DELETE CASCADE,
+    relationship_type VARCHAR(50) NOT NULL, -- 'relates_to', 'caused_by', 'implies', 'contradicts'
+    strength DECIMAL(3,2) DEFAULT 1.0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Conversation history
+CREATE TABLE chat_messages (
+    message_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(100) NOT NULL,
+    session_id UUID NOT NULL,
+    role VARCHAR(20) NOT NULL, -- 'user', 'assistant', 'system'
+    content TEXT NOT NULL,
+    message_embedding vector(1024),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX ON user_memory_nodes (user_id, created_at DESC);
+CREATE INDEX ON user_memory_nodes USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX ON user_memory_edges (user_id, from_node_id);
+CREATE INDEX ON user_memory_edges (user_id, to_node_id);
+CREATE INDEX ON chat_messages (user_id, session_id, created_at DESC);
+
+-- RLS policies
+ALTER TABLE user_memory_nodes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY user_memory_nodes_policy ON user_memory_nodes
+    USING (auth.uid()::text = user_id);
+
+ALTER TABLE user_memory_edges ENABLE ROW LEVEL SECURITY;
+CREATE POLICY user_memory_edges_policy ON user_memory_edges
+    USING (auth.uid()::text = user_id);
+
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY chat_messages_policy ON chat_messages
+    USING (auth.uid()::text = user_id);
+```
+
+**FR-038: Context Management**
+- Priority: High
+- Retrieve relevant memory nodes for query context
+- Graph traversal for related memories (1-2 hops)
+- Recency-weighted retrieval (recent > old)
+- Access-count-weighted retrieval (frequent > rare)
+- Context window: 4K tokens (last 5 messages + memory)
+
+**FR-039: User Preferences**
+- Priority: Medium
+- Learn user preferences from interactions
+- Store as memory nodes with high confidence
+- Apply preferences to search results (boost/filter)
+- Explicit preference setting (UI controls)
+- Privacy controls (opt-out of memory)
+
+**FR-040: Session Management**
+- Priority: Medium
+- Multiple concurrent sessions per user
+- Session persistence (reload conversation)
+- Session timeout (30 minutes idle)
+- Clear session (delete history)
+- Export conversation history (JSON, Markdown)
+
+**Success Metrics:**
+- WebSocket latency: <50ms (p95)
+- Message delivery success: >99.9%
+- Streaming token latency: <100ms first token
+- Memory retrieval latency: <200ms
+- Context relevance: >90%
+
+================================================================================
+MILESTONE 6: MONITORING & OBSERVABILITY
+================================================================================
+
+Purpose: Implement comprehensive monitoring with Prometheus, Grafana, and alerting
+
+Requirements:
+
+**FR-041: Metrics Collection (Prometheus)**
+- Priority: Essential
+- FastAPI request metrics (latency, throughput, errors)
+- Celery task metrics (queue size, processing time, failures)
+- Database metrics (query latency, connection pool)
+- Cache metrics (hit rate, evictions, memory usage)
+- Custom business metrics (documents processed, queries executed)
+
+**Prometheus Metrics:**
+```python
+from prometheus_client import Counter, Histogram, Gauge
+
+# Request metrics
+REQUEST_COUNT = Counter('empire_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
+REQUEST_LATENCY = Histogram('empire_request_latency_seconds', 'Request latency', ['endpoint'])
+
+# Document metrics
+DOCUMENTS_PROCESSED = Counter('empire_documents_processed_total', 'Documents processed', ['status', 'type'])
+DOCUMENT_PROCESSING_TIME = Histogram('empire_document_processing_seconds', 'Processing time', ['type'])
+
+# Query metrics
+QUERIES_EXECUTED = Counter('empire_queries_total', 'Queries executed', ['type'])
+QUERY_LATENCY = Histogram('empire_query_latency_seconds', 'Query latency', ['type'])
+
+# Cache metrics
+CACHE_HITS = Counter('empire_cache_hits_total', 'Cache hits')
+CACHE_MISSES = Counter('empire_cache_misses_total', 'Cache misses')
+
+# Celery metrics
+CELERY_QUEUE_SIZE = Gauge('empire_celery_queue_size', 'Queue size', ['queue'])
+CELERY_ACTIVE_WORKERS = Gauge('empire_celery_active_workers', 'Active workers')
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    latency = time.time() - start_time
+
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+
+    REQUEST_LATENCY.labels(endpoint=request.url.path).observe(latency)
+
+    return response
+```
+
+**FR-042: Visualization (Grafana)**
+- Priority: Essential
+- Pre-built Empire dashboard
+- Real-time metrics visualization
+- Historical trend analysis
+- Query performance breakdown
+- Resource utilization graphs
+- Custom panels for business KPIs
+
+**Grafana Dashboard Panels:**
+1. Request rate (requests/sec)
+2. P50, P95, P99 latency
+3. Error rate (%)
+4. Document processing throughput
+5. Query execution time distribution
+6. Cache hit rate (%)
+7. Celery queue size
+8. Database connection pool usage
+9. Memory usage (RSS, heap)
+10. Cost per query (estimated)
+
+**FR-043: Alerting (Alertmanager)**
+- Priority: High
+- Alert rules for critical metrics
+- Multi-channel notifications (email, Slack)
+- Alert grouping and deduplication
+- Silence rules for maintenance
+- Escalation policies
+
+**Alert Rules:**
+```yaml
+# alert_rules.yml
+groups:
+  - name: empire_alerts
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: rate(empire_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      - alert: HighQueryLatency
+        expr: histogram_quantile(0.95, rate(empire_query_latency_seconds_bucket[5m])) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High query latency"
+          description: "P95 latency is {{ $value | humanizeDuration }}"
+
+      - alert: LowCacheHitRate
+        expr: rate(empire_cache_hits_total[5m]) / (rate(empire_cache_hits_total[5m]) + rate(empire_cache_misses_total[5m])) < 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}"
+
+      - alert: CeleryQueueBacklog
+        expr: empire_celery_queue_size > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery queue backlog"
+          description: "Queue size is {{ $value }}"
+```
+
+**FR-044: Logging (Structured)**
+- Priority: Essential
+- JSON-formatted logs
+- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- Request tracing (correlation IDs)
+- Error stack traces
+- Performance profiling logs
+
+**FR-045: Health Checks**
+- Priority: Essential
+- `/health` endpoint for liveness
+- `/health/ready` endpoint for readiness
+- Component health checks (database, cache, queue)
+- Dependency health checks (external APIs)
+- Graceful degradation reporting
+
+**Health Check Implementation:**
+```python
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/health/ready")
+async def readiness_check():
+    checks = {
+        "database": await check_database(),
+        "redis": await check_redis(),
+        "celery": await check_celery(),
+        "neo4j": await check_neo4j(),
+        "external_apis": await check_external_apis()
+    }
+
+    all_healthy = all(checks.values())
+    status_code = 200 if all_healthy else 503
+
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "ready" if all_healthy else "not_ready", "checks": checks}
+    )
+```
+
+**FR-046: Cost Tracking**
+- Priority: Medium
+- Track API costs (Claude, Soniox, Mistral, LangExtract)
+- Track compute costs (Render services)
+- Track storage costs (Supabase, B2)
+- Monthly cost reports
+- Budget alerts (80% threshold)
+
+**Success Metrics:**
+- Monitoring uptime: >99.9%
+- Alert response time: <5 minutes
+- False positive rate: <10%
+- Metrics collection overhead: <2% CPU
+- Dashboard load time: <2s
+
+================================================================================
+MILESTONE 7: ADMIN TOOLS & RBAC
+================================================================================
+
+Purpose: Implement role-based access control, document management, and batch operations
+
+Requirements:
+
+**FR-047: Role-Based Access Control (RBAC)**
+- Priority: Essential
+- User roles: admin, editor, viewer
+- Permission-based access (create, read, update, delete)
+- Resource-level permissions (own documents vs all documents)
+- API key management (create, rotate, revoke)
+- Audit logs for admin actions
+
+**User Roles:**
+- **Admin**: Full access (user management, system config, all documents)
+- **Editor**: Create/edit/delete own documents, search all documents
+- **Viewer**: Read-only access, search all documents
+- **Guest**: Limited search, no upload
+
+**Database Schema (RBAC):**
+```sql
+-- Users
+CREATE TABLE users (
+    user_id VARCHAR(100) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'viewer', -- 'admin', 'editor', 'viewer', 'guest'
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_login_at TIMESTAMPTZ
+);
+
+-- API keys
+CREATE TABLE api_keys (
+    key_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(100) REFERENCES users(user_id),
+    key_hash VARCHAR(64) NOT NULL,
+    key_prefix VARCHAR(10) NOT NULL, -- First 8 chars for identification
+    name VARCHAR(100),
+    permissions JSONB DEFAULT '{}', -- {"documents": ["read", "write"], "queries": ["execute"]}
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ
+);
+
+-- Audit logs
+CREATE TABLE audit_logs (
+    log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id VARCHAR(100) REFERENCES users(user_id),
+    action VARCHAR(50) NOT NULL, -- 'create', 'update', 'delete', 'access'
+    resource_type VARCHAR(50) NOT NULL, -- 'document', 'user', 'api_key', 'config'
+    resource_id VARCHAR(100),
+    details JSONB DEFAULT '{}',
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Row-level security
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY documents_policy ON documents
+    USING (
+        auth.uid()::text = uploaded_by
+        OR auth.role() IN ('admin', 'editor')
+        OR (auth.role() = 'viewer' AND processing_complete = true)
+    );
+```
+
+**FR-048: Document Management**
+- Priority: High
+- Bulk document upload (up to 100 files)
+- Bulk document delete (with confirmation)
+- Bulk reprocessing (regenerate embeddings)
+- Bulk metadata update
+- Document versioning (track changes)
+- Document approval workflow (draft → review → published)
+
+**FR-049: User Management**
+- Priority: High
+- Create/edit/delete users (admin only)
+- Assign roles and permissions
+- Reset passwords
+- Suspend/activate accounts
+- View user activity logs
+- Export user data (GDPR compliance)
+
+**FR-050: System Configuration**
+- Priority: Medium
+- Configure embedding model (BGE-M3, OpenAI, etc.)
+- Configure LLM provider (Claude, OpenAI, local)
+- Configure search weights (vector, BM25, graph)
+- Configure cache TTL
+- Configure rate limits
+- Export/import configuration
+
+**FR-051: Batch Operations**
+- Priority: Medium
+- Bulk reindex documents
+- Bulk regenerate embeddings
+- Bulk update metadata
+- Bulk move to department
+- Bulk export to B2
+- Progress tracking for batch jobs
+
+**FR-052: Analytics Dashboard**
+- Priority: Medium
+- Total documents by type
+- Documents by department
+- Processing success/failure rates
+- Top queries (last 7 days)
+- Active users (last 30 days)
+- Storage usage (PostgreSQL, B2)
+- API usage by endpoint
+
+**Success Metrics:**
+- Admin action latency: <500ms
+- Batch operation throughput: >100 docs/minute
+- Audit log retention: 90 days
+- RBAC enforcement: 100% (no bypass)
+- User management uptime: >99.9%
+
+================================================================================
+MILESTONE 8: CREWAI MULTI-AGENT INTEGRATION
+================================================================================
+
+Purpose: Implement 15 specialized CrewAI agents for content analysis, asset generation, and workflow orchestration
+
+**CrewAI Service (Already Deployed):**
+- Service ID: srv-d2n0hh3uibrs73buafo0
+- URL: https://jb-crewai.onrender.com
+- Status: ACTIVE and REQUIRED for this milestone
+
+Requirements:
+
+**FR-053: CrewAI Framework Integration**
+- Priority: Essential
+- Deploy CrewAI on Render (already deployed)
+- Multi-agent orchestration for complex workflows
+- Task delegation and result aggregation
+- Agent collaboration for complex queries
+- Long-running async tasks via Celery
+
+**FR-110: Execute CrewAI Analysis (1-5 Agents)**
+- Priority: High
+- Location: Cloud (Render)
+- Adaptive agent count based on task complexity
+- Parallel and sequential execution modes
+- Context sharing between agents
+
+**FR-111: Adapt Agent Complexity**
+- Priority: Medium
+- Simple content: 1-2 agents (e.g., Classification + Summarizer)
+- Moderate content: 3-4 agents (add Analysis + Fact Checker)
+- Complex content: 5+ agents (add Writing + Review agents)
+
+**FR-115: Support Custom Agent Configurations**
+- Priority: Medium
+- User-defined agent roles and goals
+- Custom tool integration
+- Agent-specific LLM models
+- Agent-specific temperature and parameters
+
+**FR-116: Enable Agent Collaboration**
+- Priority: High
+- Inter-agent messaging
+- Task delegation between agents
+- Result sharing and aggregation
+- Conflict resolution (multiple agent outputs)
+
+**FR-012: Multi-Agent Orchestration**
+- Priority: High
+- Framework: CrewAI on Render
+- Coordination: Task delegation and result aggregation
+- Status: Active - All Versions
+
+**FR-MCP-001: MCP Integration**
+- Neo4j MCP for graph queries
+- Claude Code integration via MCP
+
+**FR-PROD-009: CrewAI Multi-Agent Workflows**
+- Production integration on Render
+- Async task execution
+
+**OCR-005: Agent Management**
+- Agent pool management (cloud via Render)
+- Dynamic agent creation
+- Agent lifecycle management
+- Resource allocation
+- Performance monitoring
+
+**OCR-006: Task Distribution**
+- Capability-based routing in Celery
+- Load-balanced distribution across workers
+- Task priority and affinity-based assignment
+- Worker specialization
+- Context preservation in PostgreSQL graph
+
+**OCR-007: Inter-Agent Messaging**
+- Direct agent communication
+- Broadcast messaging
+- Event publication
+- State synchronization
+- Result sharing
+
+================================================================================
+ALL 15 CREWAI AGENTS
+================================================================================
+
+**CATEGORY 1: ASSET GENERATION AGENTS (8 Agents)**
+
+**AGENT-001: Main Orchestrator (Master Content Analyzer & Asset Orchestrator)**
+- Role: Master Content Analyzer & Asset Orchestrator
+- Goal: Analyze incoming content and make intelligent decisions about:
+  1. Department classification (10 departments)
+  2. Asset type selection (skill vs command vs agent vs prompt vs workflow)
+  3. Content summary requirements (detailed PDF with visuals)
+  4. Delegation to appropriate specialized agents
+- Backstory: Expert orchestrator with deep knowledge of:
+  - Asset type decision logic (ASSET_TYPE_DECISION_LOGIC.md)
+  - Department taxonomy (10 departments from B2_FOLDER_STRUCTURE.md)
+  - Output guidelines (CREWAI_OUTPUT_GUIDELINES.md)
+- Tools: document_search, pattern_analyzer, department_classifier
+- Allow Delegation: Yes
+- LLM: Claude Sonnet 4.5
+
+**AGENT-002: Content Summarizer (PDF Generation with Visuals)**
+- Role: Content Summary & Visualization Expert
+- Goal: Generate comprehensive PDF summaries with:
+  1. Visual diagrams and flowcharts
+  2. Key concepts and frameworks
+  3. Implementation guides
+  4. Quick reference sections
+  5. Interactive tables and charts
+- Backstory: Expert at synthesizing complex content into visual summaries
+- Output: PDF files in processed/crewai-summaries/{department}/
+- Filename Pattern: {department}_summary_{timestamp}.pdf
+- Tools: pdf_generator, diagram_creator, chart_builder
+- LLM: Claude Sonnet 4.5
+
+**AGENT-003: Skill Generator (YAML for Claude Code)**
+- Role: Claude Skills Generator
+- Goal: Generate YAML skill definitions for Claude Code automation
+- Criteria: Complex reusable automation with parameters, multi-step processes
+- Output Format: YAML
+- Filename Pattern: {department}_skill-name.yaml
+- Tools: yaml_generator, skill_validator
+- Backstory: Expert at extracting actionable skills from course content
+- Knowledge Sources: CREWAI_OUTPUT_GUIDELINES.md (skill template)
+- LLM: Claude Sonnet 4.5
+
+**AGENT-004: Command Generator (Markdown Slash Commands)**
+- Role: Claude Commands Generator
+- Goal: Generate Markdown slash commands for quick one-liner actions
+- Criteria: Quick one-liner actions, /command format
+- Output Format: Markdown
+- Filename Pattern: {department}_command-name.md
+- Tools: markdown_generator, command_validator
+- Backstory: Expert at creating concise, executable commands
+- Knowledge Sources: CREWAI_OUTPUT_GUIDELINES.md (command template)
+- LLM: Claude Haiku (fast and cheap for simple commands)
+
+**AGENT-005: Agent Generator (CrewAI Configurations)**
+- Role: CrewAI Agent Configuration Specialist
+- Goal: Generate agent YAML configurations for role-based analysis tasks
+- Criteria: Multi-step role-based analysis tasks, intelligence required
+- Output Format: YAML
+- Filename Pattern: {department}_agent-name.yaml
+- Tools: agent_config_generator, role_analyzer
+- Backstory: Expert at designing intelligent agent configurations
+- Knowledge Sources: CREWAI_OUTPUT_GUIDELINES.md (agent template)
+- LLM: Claude Sonnet 4.5
+
+**AGENT-006: Prompt Generator (Reusable Templates)**
+- Role: AI Prompt Template Generator
+- Goal: Extract reusable prompt patterns for consistent AI interactions
+- Criteria: Template for consistent AI interactions, DEFAULT when unsure
+- Output Format: Markdown or YAML
+- Filename Pattern: {department}_prompt-name.md
+- Tools: prompt_pattern_extractor, template_generator
+- Backstory: Expert at identifying reusable prompt structures
+- Knowledge Sources: CREWAI_OUTPUT_GUIDELINES.md (prompt template)
+- LLM: Claude Haiku
+
+**AGENT-007: Workflow Generator (n8n JSON)**
+- Role: n8n Workflow Automation Specialist
+- Goal: Design multi-system sequential automation workflows
+- Criteria: Multi-system integration, sequential pipelines
+- Output Format: JSON (n8n workflow format)
+- Filename Pattern: {department}_workflow-name.json
+- Tools: workflow_designer, integration_mapper
+- Backstory: Expert at orchestrating multi-system workflows
+- Knowledge Sources: CREWAI_OUTPUT_GUIDELINES.md, 10_n8n_orchestration.md
+- LLM: Claude Sonnet 4.5
+
+**AGENT-008: Department Classifier (10-Department Taxonomy)**
+- Role: Department Classification Specialist
+- Goal: Accurately classify content into correct departments with confidence scores
+- Departments: it-engineering, sales-marketing, customer-support, operations-hr-supply,
+             finance-accounting, project-management, real-estate, private-equity-ma,
+             consulting, personal-continuing-ed
+- Tools: file_reader, department_classifier, keyword_extractor
+- Output: Department + confidence score (0-1)
+- Backstory: Expert at analyzing course content and classification keywords
+- Knowledge Sources: B2_FOLDER_STRUCTURE.md (10-department taxonomy with keywords)
+- LLM: Claude Haiku (fast for classification)
+
+**CATEGORY 2: DOCUMENT ANALYSIS AGENTS (3 Agents)**
+
+**AGENT-009: Research Analyst (Senior Research Analyst)**
+- Role: Senior Research Analyst
+- Goal: Analyze documents and extract key insights, entities, and themes
+- Task: Initial document analysis to extract:
+  1. Main topics and themes
+  2. Key entities (people, organizations, locations)
+  3. Important facts and claims
+  4. Document structure and organization
+  5. Content quality assessment
+- Backstory: Expert analyst with 15 years of experience in document analysis, research methodology, and information extraction
+- Tools: document_search, web_search, summarizer
+- Expected Output: Structured analysis with topics, entities, facts, and quality assessment
+- LLM: Claude Sonnet 4.5
+- Temperature: 0.5
+
+**AGENT-010: Content Strategist (Content Strategy Expert)**
+- Role: Content Strategy Expert
+- Goal: Synthesize information and create actionable insights
+- Task: Content synthesis based on Research Analyst output:
+  1. Executive summary (3-5 sentences)
+  2. Key findings and insights
+  3. Content categorization and taxonomy
+  4. Recommendations for further analysis
+- Backstory: Seasoned strategist specializing in content organization, taxonomy design, and strategic planning
+- Tools: pattern_analyzer, theme_extractor, categorizer
+- Expected Output: Comprehensive synthesis with summary, findings, and recommendations
+- LLM: Claude Sonnet 4.5
+- Temperature: 0.7
+
+**AGENT-011: Fact Checker (Senior Fact Verification Specialist)**
+- Role: Senior Fact Verification Specialist
+- Goal: Verify claims and validate information accuracy
+- Task: Fact verification based on previous analysis:
+  1. Identify all factual claims
+  2. Assess confidence level for each claim (0.0-1.0)
+  3. Flag potentially inaccurate or unsupported claims
+  4. Provide citations or sources where possible
+- Backstory: Meticulous fact-checker with expertise in verification methodologies and source validation
+- Tools: web_search, database_query, citation_validator
+- Expected Output: Fact verification report with confidence scores and citations
+- LLM: Claude Sonnet 4.5
+- Temperature: 0.3
+
+**CATEGORY 3: MULTI-AGENT ORCHESTRATION (4 Agents from FR-012)**
+
+**AGENT-012: Research Agent**
+- Role: Research Specialist
+- Goal: Perform research tasks for complex queries
+- Task: Web search, document retrieval, background research
+- Tools: web_search, academic_search, document_retriever
+- Use Cases: "What are the latest trends in X?", "Find related academic papers"
+- LLM: Claude Sonnet 4.5
+
+**AGENT-013: Analysis Agent**
+- Role: Data Analysis Specialist
+- Goal: Analyze structured and unstructured data
+- Task: Pattern detection, statistical analysis, trend identification
+- Tools: data_analyzer, pattern_matcher, statistical_tools
+- Use Cases: "Analyze the performance of X", "What patterns exist in Y?"
+- LLM: Claude Sonnet 4.5
+
+**AGENT-014: Writing Agent**
+- Role: Content Writer
+- Goal: Generate high-quality written content
+- Task: Reports, summaries, documentation, explanations
+- Tools: content_generator, grammar_checker, style_guide
+- Use Cases: "Write a summary of X", "Create documentation for Y"
+- LLM: Claude Sonnet 4.5
+
+**AGENT-015: Review Agent**
+- Role: Quality Reviewer
+- Goal: Review and validate outputs from other agents
+- Task: Quality assurance, error detection, consistency checking
+- Tools: quality_checker, consistency_validator, error_detector
+- Use Cases: Final review of all multi-agent workflow outputs
+- LLM: Claude Sonnet 4.5
+
+================================================================================
+ASSET TYPE DECISION LOGIC
+================================================================================
+
+**Decision Tree for Asset Type Selection:**
+
+1. **Is content automatable?**
+   - No → Generate **Prompt** (reusable template)
+   - Yes → Continue to step 2
+
+2. **Is it complex with parameters?**
+   - Yes → Generate **Skill** (YAML with parameters)
+   - No → Continue to step 3
+
+3. **Is it a quick one-liner?**
+   - Yes → Generate **Command** (Markdown slash command)
+   - No → Continue to step 4
+
+4. **Does it require intelligence/analysis?**
+   - Yes → Is it role-based?
+     - Yes → Generate **Agent** (CrewAI config)
+     - No → Continue to step 5
+   - No → Continue to step 5
+
+5. **Does it involve multi-system integration?**
+   - Yes → Generate **Workflow** (n8n JSON)
+   - No → Generate **Prompt** (default fallback)
+
+**Confidence Scoring (0.0-1.0):**
+- High confidence: >0.8 (clear indicators for asset type)
+- Medium confidence: 0.5-0.8 (some ambiguity)
+- Low confidence: <0.5 (generate multiple asset types)
+
+**Asset Type Examples by Department:**
+
+| Department | Skill Examples | Command Examples | Agent Examples | Prompt Examples | Workflow Examples |
+|------------|---------------|------------------|----------------|-----------------|-------------------|
+| it-engineering | API automation, CI/CD deployment | /test-endpoint, /check-logs | Code reviewer, Performance analyzer | Code review template | API testing pipeline |
+| sales-marketing | Lead scoring, Pipeline management | /find-lead, /update-crm | Deal analyzer, Competitor researcher | Proposal template | CRM-email sync |
+| finance-accounting | Budget calculation, Forecast model | /calc-budget, /check-invoice | Variance analyzer, Risk assessor | Financial report template | Report generation flow |
+
+================================================================================
+CREWAI WORKFLOW EXAMPLES
+================================================================================
+
+**Example 1: Educational Content Processing**
+```python
+# Workflow: Process online course with 10 modules
+# Agents Used: Main Orchestrator → Content Summarizer → Skill Generator + Prompt Generator
+
+workflow = {
+    "name": "Educational Content Complete Processing",
+    "trigger": "New course uploaded to /incoming/courses/",
+    "steps": [
+        {
+            "agent": "main_orchestrator",
+            "task": "Analyze course and decide asset types",
+            "decisions": {
+                "department": "personal-continuing-ed",
+                "complexity": "complex",
+                "assets_to_generate": ["summary", "skill", "prompt", "agent"]
+            }
+        },
+        {
+            "agent": "content_summarizer",
+            "task": "Generate PDF summary with visuals",
+            "output": "personal-continuing-ed_python_course_summary.pdf"
+        },
+        {
+            "agents": ["skill_generator", "prompt_generator", "agent_generator"],
+            "execution": "parallel",
+            "outputs": [
+                "personal-continuing-ed_exercise-runner.yaml",
+                "personal-continuing-ed_code-review-template.md",
+                "personal-continuing-ed_python-tutor.yaml"
+            ]
+        }
+    ],
+    "results": {
+        "assets_created": 4,
+        "processing_time": "12 minutes",
+        "cost": "$0.02"
+    }
+}
+```
+
+**Example 2: Corporate SOP Processing (Privacy-Sensitive)**
+```python
+# Workflow: Process 50 corporate SOPs (confidential)
+# Privacy: Local processing only (no cloud APIs)
+# Agents Used: Department Classifier → Skill + Workflow + Prompt Generators (per department)
+
+workflow = {
+    "name": "Corporate SOP Comprehensive Processing",
+    "trigger": "Batch upload to /incoming/corporate/",
+    "privacy_mode": "LOCAL_ONLY",
+    "steps": [
+        {
+            "agent": "department_classifier",
+            "task": "Classify all 50 documents",
+            "results": {
+                "operations-hr-supply": 20,
+                "finance-accounting": 15,
+                "customer-support": 10,
+                "it-engineering": 5
+            }
+        },
+        {
+            "by_department": {
+                "operations-hr-supply": {
+                    "agents": ["skill_generator", "workflow_generator", "prompt_generator"],
+                    "assets": {"skills": 5, "workflows": 3, "prompts": 8}
+                },
+                "finance-accounting": {
+                    "agents": ["workflow_generator", "agent_generator", "skill_generator"],
+                    "assets": {"workflows": 4, "agents": 2, "skills": 6}
+                }
+            }
+        }
+    ],
+    "results": {
+        "total_assets": 69,
+        "departments_covered": 4,
+        "processing_time": "45 minutes",
+        "cost": "$0 (fully local)",
+        "privacy_maintained": true
+    }
+}
+```
+
+**Example 3: Multi-Document Analysis with FR-012 Agents**
+```python
+# Workflow: Complex analysis requiring research, analysis, writing, review
+# Agents Used: Research Agent → Analysis Agent → Writing Agent → Review Agent
+
+workflow = {
+    "name": "Comprehensive Document Analysis",
+    "trigger": "User request: 'Analyze trends in 100 sales documents'",
+    "agents": [
+        {
+            "agent": "research_agent",
+            "task": "Research sales methodologies and best practices",
+            "output": "Background research report"
+        },
+        {
+            "agent": "analysis_agent",
+            "task": "Analyze 100 sales documents for patterns",
+            "output": "Statistical analysis with trends"
+        },
+        {
+            "agent": "writing_agent",
+            "task": "Write comprehensive report with insights",
+            "output": "Executive report (15 pages)"
+        },
+        {
+            "agent": "review_agent",
+            "task": "Review report for accuracy and consistency",
+            "output": "Final reviewed report"
+        }
+    ],
+    "execution": "sequential",
+    "results": {
+        "analysis_depth": "comprehensive",
+        "processing_time": "25 minutes",
+        "confidence": 0.94
+    }
+}
+```
+
+================================================================================
+CREWAI DATABASE SCHEMA
+================================================================================
+
+```sql
+-- Agent definitions
+CREATE TABLE crewai_agents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    agent_name VARCHAR(100) UNIQUE NOT NULL,
+    role VARCHAR(255) NOT NULL,
+    goal TEXT NOT NULL,
+    backstory TEXT NOT NULL,
+    tools JSONB DEFAULT '[]',
+    llm_config JSONB DEFAULT '{}',
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Crew definitions
+CREATE TABLE crewai_crews (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    crew_name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    process_type VARCHAR(50) DEFAULT 'sequential', -- 'sequential', 'hierarchical', 'parallel'
+    agent_ids UUID[] NOT NULL,
+    memory_enabled BOOLEAN DEFAULT true,
+    verbose BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Crew executions
+CREATE TABLE crewai_executions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    crew_id UUID NOT NULL REFERENCES crewai_crews(id) ON DELETE CASCADE,
+    document_id VARCHAR(64) REFERENCES documents(document_id) ON DELETE CASCADE,
+    user_id VARCHAR(100),
+    execution_type VARCHAR(50) NOT NULL, -- 'analysis', 'generation', 'validation', 'extraction'
+    input_data JSONB NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'running', 'completed', 'failed'
+    total_tasks INTEGER NOT NULL,
+    completed_tasks INTEGER DEFAULT 0,
+    failed_tasks INTEGER DEFAULT 0,
+    results JSONB,
+    error_message TEXT,
+    execution_time_ms INTEGER,
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Task executions (individual agent tasks)
+CREATE TABLE crewai_task_executions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_id UUID NOT NULL REFERENCES crewai_executions(id) ON DELETE CASCADE,
+    agent_id UUID NOT NULL REFERENCES crewai_agents(id) ON DELETE CASCADE,
+    task_description TEXT NOT NULL,
+    task_order INTEGER NOT NULL,
+    expected_output TEXT,
+    actual_output TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    tokens_used INTEGER,
+    execution_time_ms INTEGER,
+    error_message TEXT,
+    metadata JSONB DEFAULT '{}',
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Agent interactions (inter-agent communication)
+CREATE TABLE crewai_agent_interactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_id UUID NOT NULL REFERENCES crewai_executions(id) ON DELETE CASCADE,
+    from_agent_id UUID NOT NULL REFERENCES crewai_agents(id) ON DELETE CASCADE,
+    to_agent_id UUID REFERENCES crewai_agents(id) ON DELETE CASCADE,
+    interaction_type VARCHAR(50) NOT NULL, -- 'delegation', 'question', 'result_sharing'
+    message TEXT NOT NULL,
+    response TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Generated assets (CrewAI outputs)
+CREATE TABLE crewai_generated_assets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    execution_id UUID NOT NULL REFERENCES crewai_executions(id) ON DELETE CASCADE,
+    document_id VARCHAR(64) REFERENCES documents(document_id) ON DELETE CASCADE,
+    asset_type VARCHAR(50) NOT NULL, -- 'summary', 'skill', 'command', 'agent', 'prompt', 'workflow'
+    asset_name VARCHAR(255) NOT NULL,
+    content TEXT,
+    content_format VARCHAR(20) DEFAULT 'text', -- 'text', 'json', 'yaml', 'markdown'
+    department VARCHAR(50),
+    b2_path TEXT,
+    metadata JSONB DEFAULT '{}',
+    confidence_score FLOAT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Success Metrics (Milestone 8):**
+- Agent execution success rate: >95%
+- Average execution time (5 agents): <30 seconds
+- Asset generation accuracy: >90%
+- Department classification accuracy: >96%
+- Inter-agent communication latency: <100ms
+
+================================================================================
+NON-FUNCTIONAL REQUIREMENTS (CROSS-CUTTING)
+================================================================================
+
+**Performance Requirements:**
+
+**PFR-003: Response Time Targets**
+- API requests: <100ms (p50), <500ms (p95)
+- Document processing: <60s per document
+- Query execution: <1s (p95)
+- WebSocket latency: <50ms
+- Cache retrieval: <10ms
+
+**PFR-004: Throughput Targets**
+- Concurrent users: 100+ simultaneous
+- Documents processed: 1000+/day
+- Queries executed: 5000+/day
+- Celery tasks: 20+ concurrent workers
+- WebSocket connections: 100+ active
+
+**PFR-005: Scalability**
+- Horizontal scaling: Add Celery workers dynamically
+- Database scaling: Supabase Pro tier (unlimited connections)
+- Caching: Redis cluster for high availability
+- Load balancing: Render automatic load balancing
+- Auto-scaling triggers: CPU >70%, queue >50 tasks
+
+**Security Requirements:**
+
+**SEC-001: Authentication & Authorization**
+- JWT-based authentication
+- Role-based access control (RBAC)
+- API key authentication for programmatic access
+- Session management (30-minute idle timeout)
+- Password policies (min 12 chars, complexity requirements)
+
+**SEC-002: Data Encryption**
+- TLS 1.3 for all API communications
+- At-rest encryption: Supabase encrypted volumes
+- B2 zero-knowledge encryption (optional)
+- Encrypted environment variables
+- API keys hashed with bcrypt
+
+**SEC-003: Input Validation**
+- File type validation (whitelist approach)
+- File size limits (100MB per file)
+- SQL injection prevention (parameterized queries)
+- XSS prevention (sanitize user inputs)
+- CSRF protection (token-based)
+
+**SEC-004: Privacy & Compliance**
+- GDPR compliance (data export, right to deletion)
+- HIPAA-ready (local processing for sensitive data)
+- SOC 2 audit trail (all admin actions logged)
+- Data residency (configurable per deployment)
+- User consent management
+
+**Reliability Requirements:**
+
+**REL-001: Availability**
+- Target uptime: 99.9% (8.76 hours downtime/year)
+- Graceful degradation (fallback to cached results)
+- Health checks every 30 seconds
+- Auto-restart on failure
+- Multi-region deployment (future)
+
+**REL-002: Disaster Recovery**
+- RTO (Recovery Time Objective): 4 hours
+- RPO (Recovery Point Objective): 1 hour
+- Automated backups (daily to B2)
+- Quarterly disaster recovery drills
+- Infrastructure as Code (IaC) for fast rebuild
+
+**REL-003: Error Handling**
+- Retry logic: 3 attempts with exponential backoff
+- Circuit breaker pattern for external APIs
+- Dead letter queue for failed tasks
+- Detailed error messages (user-friendly)
+- Stack traces logged (not exposed to users)
+
+**Monitoring & Observability:**
+
+**MON-001: Metrics Collection**
+- Prometheus metrics (request rate, latency, errors)
+- Custom business metrics (docs processed, queries executed)
+- Resource metrics (CPU, memory, disk, network)
+- Cost metrics (API calls, storage, compute)
+- SLA metrics (uptime, response time)
+
+**MON-002: Logging**
+- Structured JSON logs
+- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- Correlation IDs for request tracing
+- Log retention: 90 days
+- Log aggregation (future: ELK stack)
+
+**MON-003: Alerting**
+- Critical alerts: Error rate >5%, latency >1s, queue >100
+- Warning alerts: Cache hit rate <50%, CPU >70%
+- Alert channels: Email, Slack
+- Alert escalation: Auto-escalate after 15 minutes
+- Alert deduplication and grouping
+
+================================================================================
+COST OPTIMIZATION & SAVINGS
+================================================================================
+
+**Cost Breakdown (v7.3 Target: $250-350/month)**
+
+**Production Services:**
+- FastAPI Backend (Render): $20-30/month
+- Celery Workers (Render): $20-30/month
+- Supabase PostgreSQL Pro: $25/month
+- Redis (Upstash): $10-15/month
+- LlamaIndex Service (Render): $7-21/month
+- CrewAI Service (Render): $7-21/month
+- **Production Subtotal**: $89-142/month
+
+**External AI Services:**
+- Claude Sonnet 4.5 API: $50-100/month (synthesis, Cypher generation)
+- Claude Haiku API: $10-20/month (query expansion, classification)
+- Soniox Transcription: $10-20/month
+- Mistral OCR: $20/month
+- LangExtract: $10-20/month
+- **AI Services Subtotal**: $100-180/month
+
+**Storage:**
+- Backblaze B2: $10-20/month (5TB with intelligent organization)
+- Supabase Storage: Included in Pro plan
+- **Storage Subtotal**: $10-20/month
+
+**Development (FREE - Mac Studio):**
+- Neo4j Community Docker: $0 (self-hosted)
+- Ollama BGE-M3: $0 (local embeddings testing)
+- Ollama BGE-Reranker-v2: $0 (local reranking testing)
+- Graphiti MCP: $0 (developer memory testing)
+- **Development Subtotal**: $0/month
+
+**TOTAL: $199-342/month (Target: $250-350/month)**
+
+**Savings vs Cloud-Only Architecture:**
+- Cloud-only estimate: $450-550/month
+- v7.3 actual: $250-350/month
+- **Savings: $100-200/month (30-40%)**
+
+**Cost Optimizations:**
+- Neo4j self-hosted saves $100+/month vs Neo4j AuraDB
+- Local embedding testing (Ollama) saves API costs during development
+- Intelligent caching reduces API calls (60-80% cache hit rate)
+- Batch processing reduces per-document costs
+- Query expansion with Haiku (cheap) vs Sonnet (expensive)
+
+================================================================================
+HARDWARE SPECIFICATIONS (MAC STUDIO - DEVELOPMENT)
+================================================================================
+
+**Mac Studio M3 Ultra (Development Environment Only):**
+
+**Purpose**: Development testing, local model testing, Neo4j production hosting
+
+**Specifications:**
+- **CPU**: 28-core (20 performance + 8 efficiency)
+- **GPU**: 60-core (GPU acceleration for embedding testing)
+- **Neural Engine**: 32-core (ML acceleration)
+- **Memory**: 96GB unified memory (800 GB/s bandwidth)
+- **Storage**: 2TB SSD
+
+**Resource Allocation (Development Testing):**
+- Neo4j Docker: ~10GB RAM (PRODUCTION knowledge graphs)
+- Ollama (BGE-M3 + Reranker): ~10GB RAM (embedding testing)
+- Graphiti MCP: ~8GB RAM (developer memory testing)
+- System + Other: ~68GB available
+
+**Development Capabilities:**
+- Embedding generation testing: <10ms latency (BGE-M3)
+- Reranking testing: 10-20ms latency (BGE-Reranker-v2)
+- Concurrent workflows: 10+ parallel
+- GPU utilization: 60-core parallel processing
+- Zero API costs for development testing
+
+**NOT Used For:**
+- Production generative AI inference (use Claude APIs instead)
+- Production embeddings (testing only, production TBD)
+- End-user workloads (development and testing only)
+
+================================================================================
+EXTERNAL SERVICE INTEGRATIONS
+================================================================================
+
+**LlamaIndex Service (Already Deployed):**
+- Service ID: srv-d2nl1lre5dus73atm9u0
+- URL: https://jb-llamaindex.onrender.com
+- Purpose: Document parsing, indexing, vector retrieval
+- Status: ACTIVE
+- Integration: REST API for document processing
+- Cost: $7-21/month (Render hosting)
+
+**CrewAI Service (Already Deployed):**
+- Service ID: srv-d2n0hh3uibrs73buafo0
+- URL: https://jb-crewai.onrender.com
+- Purpose: Multi-agent orchestration (15 agents)
+- Status: ACTIVE - REQUIRED for Milestone 8
+- Integration: REST API for agent workflows
+- Cost: $7-21/month (Render hosting)
+
+**Backblaze B2:**
+- Purpose: Primary file storage with intelligent folder structure
+- Folder Structure: pending/ → processing/ → processed/ (10 departments) + crewai-summaries/ + crewai-suggestions/
+- Upload Methods: Mountain Duck (30s polling) or Web UI (immediate)
+- Cost: $10-20/month (5TB storage + egress)
+- Integration: Python SDK (b2sdk)
+
+**Soniox:**
+- Purpose: High-accuracy audio transcription
+- Features: Speaker diarization, timestamps, language detection
+- Cost: $10-20/month (pay per hour of audio)
+- Integration: REST API
+
+**Mistral OCR:**
+- Purpose: Complex PDF processing (scanned, tables, charts)
+- Cost: $20/month
+- Integration: REST API
+- Fallback: Tesseract OCR (free, local)
+
+**LangExtract:**
+- Purpose: Structured field extraction from documents
+- Features: Entities, key-value pairs, metadata
+- Cost: $10-20/month
+- Integration: REST API
+
+**Supabase:**
+- Purpose: PostgreSQL + pgvector + graph tables
+- Plan: Pro ($25/month)
+- Features: Unlimited connections, daily backups, RLS policies
+- Integration: Python SDK (supabase-py)
+
+**Upstash Redis:**
+- Purpose: Caching + Celery broker
+- Cost: $10-15/month
+- Features: Serverless, low latency, global replication
+- Integration: redis-py
+
+**Anthropic Claude API:**
+- Models: Sonnet 4.5 (synthesis), Haiku (expansion)
+- Cost: $60-120/month (estimated)
+- Integration: anthropic-py SDK
+
+================================================================================
+IMPLEMENTATION PRIORITIES
+================================================================================
+
+**Phase 1: Foundation (Weeks 1-2)**
+Priority: Milestones 1-2
+- Document intake and validation
+- Universal processing pipeline
+- B2 integration with folder structure
+- Supabase schema setup
+- Celery task queue
+
+**Phase 2: Search & Retrieval (Weeks 3-4)**
+Priority: Milestones 3-4
+- Embedding generation (BGE-M3 testing)
+- Hybrid search implementation
+- Query expansion (Claude Haiku)
+- Neo4j graph integration
+- Result reranking (BGE-Reranker-v2 testing)
+
+**Phase 3: User Interface (Week 5)**
+Priority: Milestone 5
+- WebSocket chat implementation
+- Streaming responses
+- Memory system (PostgreSQL graph tables)
+- Session management
+
+**Phase 4: Observability (Week 6)**
+Priority: Milestone 6
+- Prometheus metrics
+- Grafana dashboards
+- Alerting (Alertmanager)
+- Logging infrastructure
+- Health checks
+
+**Phase 5: Administration (Week 7)**
+Priority: Milestone 7
+- RBAC implementation
+- Document management
+- User management
+- Batch operations
+- Analytics dashboard
+
+**Phase 6: Multi-Agent Integration (Weeks 8-9)**
+Priority: Milestone 8
+- CrewAI agent setup (15 agents)
+- Asset generation workflows
+- Department classification
+- Multi-document analysis
+- Agent orchestration (FR-012)
+
+**Phase 7: Testing & Optimization (Week 10)**
+- Load testing
+- Performance optimization
+- Cost optimization
+- Security hardening
+- Documentation finalization
+
+================================================================================
+SUCCESS METRICS & KPIs
+================================================================================
+
+**Operational Metrics:**
+- Uptime: >99.9%
+- Document processing success rate: >98%
+- Query success rate: >99%
+- Cache hit rate: 60-80%
+- Alert false positive rate: <10%
+
+**Performance Metrics:**
+- API latency (p95): <500ms
+- Document processing time: <60s
+- Query execution time (p95): <1s
+- WebSocket latency: <50ms
+- Embedding generation: <100ms
+
+**Quality Metrics:**
+- Search relevance (NDCG@10): >0.85
+- Classification accuracy: >96%
+- OCR accuracy: >95%
+- Transcription accuracy: >98%
+- Entity extraction: >95%
+
+**Business Metrics:**
+- Documents processed: 1000+/day
+- Queries executed: 5000+/day
+- Active users: 100+
+- Monthly cost: $250-350
+- Cost per query: <$0.01
+
+**AI Agent Metrics (Milestone 8):**
+- Agent execution success rate: >95%
+- Asset generation accuracy: >90%
+- Average execution time (5 agents): <30s
+- Department classification: >96%
+- Multi-agent coordination latency: <100ms
+
+================================================================================
+RISK MITIGATION
+================================================================================
+
+**Technical Risks:**
+
+**Risk 1: External API Failures**
+- Mitigation: Implement circuit breaker pattern
+- Fallback: Use cached results or simpler methods
+- Monitoring: Alert on API error rate >5%
+
+**Risk 2: Database Performance Degradation**
+- Mitigation: Index optimization, query analysis
+- Fallback: Read replicas for read-heavy workloads
+- Monitoring: Alert on query latency >200ms
+
+**Risk 3: Cost Overruns**
+- Mitigation: Cost tracking per service, budget alerts
+- Fallback: Scale down non-critical services
+- Monitoring: Alert at 80% of monthly budget
+
+**Risk 4: CrewAI Agent Coordination Failures**
+- Mitigation: Timeout limits, retry logic, graceful degradation
+- Fallback: Single-agent execution for simple tasks
+- Monitoring: Track agent success rate, execution time
+
+**Operational Risks:**
+
+**Risk 5: Data Loss**
+- Mitigation: Daily backups to B2, point-in-time recovery
+- Fallback: Restore from most recent backup
+- Testing: Quarterly disaster recovery drills
+
+**Risk 6: Security Breach**
+- Mitigation: Encryption, RBAC, audit logs, security scanning
+- Fallback: Incident response plan, immediate lockdown
+- Testing: Annual penetration testing
+
+**Business Risks:**
+
+**Risk 7: Scalability Bottlenecks**
+- Mitigation: Horizontal scaling (Celery workers), load testing
+- Fallback: Throttling, priority queues
+- Testing: Monthly load testing at 2x expected traffic
+
+**Risk 8: User Adoption**
+- Mitigation: User onboarding, documentation, training
+- Fallback: Simplified UI for less technical users
+- Measurement: Track active users, feature usage
+
+================================================================================
+APPENDIX: REQUIREMENT IDS REFERENCE
+================================================================================
+
+**Document Intake (Milestone 1):**
+FR-001 to FR-007
+
+**Universal Processing (Milestone 2):**
+FR-008 to FR-016
+
+**Advanced RAG (Milestone 3):**
+FR-017 to FR-025, LLR-007
+
+**Query Processing (Milestone 4):**
+FR-026 to FR-033
+
+**Chat UI & Memory (Milestone 5):**
+FR-034 to FR-040
+
+**Monitoring (Milestone 6):**
+FR-041 to FR-046
+
+**Admin Tools (Milestone 7):**
+FR-047 to FR-052
+
+**CrewAI Integration (Milestone 8):**
+FR-053, FR-110, FR-111, FR-115, FR-116, FR-012, FR-MCP-001, FR-PROD-009
+OCR-005 (Agent Management)
+OCR-006 (Task Distribution)
+OCR-007 (Inter-Agent Messaging)
+
+**15 CrewAI Agents:**
+AGENT-001 to AGENT-015
+
+**Performance Requirements:**
+PFR-001 to PFR-005
+
+**Security Requirements:**
+SEC-001 to SEC-004
+
+**Reliability Requirements:**
+REL-001 to REL-003
+
+**Monitoring Requirements:**
+MON-001 to MON-003
+
+================================================================================
+END OF PRD
+================================================================================
+
+Version: 7.3
+Status: Complete and Ready for TaskMaster Parsing
+Total Requirements: 340+ across 8 milestones
+Total CrewAI Agents: 15 (8 asset generation + 3 analysis + 4 orchestration)
+Total Pages: Comprehensive coverage of all features
+Date: 2025-01-02

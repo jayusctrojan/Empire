@@ -175,10 +175,13 @@ This document outlines all tools, MCPs, and development environments available f
   - "What entities are connected to John Smith?"
 
 **Connection Details**:
-- **URI**: `bolt://localhost:7687`
+- **URI (TLS Enabled)**: `bolt+ssc://localhost:7687` (local) or `bolt+ssc://100.119.86.6:7687` (via Tailscale)
+- **Legacy URI**: `bolt://localhost:7687` (still supported, OPTIONAL mode)
 - **Username**: `neo4j`
-- **Password**: `***REMOVED***`
+- **Password**: `<from .env>`  *(See .env file for actual password)*
 - **Web Interface**: http://localhost:7474
+- **TLS**: Enabled with self-signed certificates (365-day validity)
+- **Certificates**: Mounted at `/certificates/bolt/` in container
 
 **Usage Examples**:
 ```cypher
@@ -207,7 +210,7 @@ This document outlines all tools, MCPs, and development environments available f
       "run", "-i", "--rm",
       "-e", "NEO4J_URI=bolt://host.docker.internal:7687",
       "-e", "NEO4J_USERNAME=neo4j",
-      "-e", "NEO4J_PASSWORD=***REMOVED***",
+      "-e", "NEO4J_PASSWORD=<your-password>",  # From .env
       "neo4j/mcp-server-neo4j:latest"
     ]
   }
@@ -687,6 +690,32 @@ documents = parser.load_data("./contract.pdf")
 
 ### Existing Render Services (Already Deployed)
 
+#### Empire FastAPI Service (Production)
+**URL**: https://jb-empire-api.onrender.com
+**Service ID**: `srv-d44o2dq4d50c73elgupg`
+**Plan**: Starter ($7/month)
+**Region**: Oregon
+
+**Purpose**: Main FastAPI REST API for Empire v7.3
+**Health Check**: https://jb-empire-api.onrender.com/health
+**Docs**: https://jb-empire-api.onrender.com/docs
+
+#### Empire Celery Worker (Production)
+**Service ID**: `srv-d44oclodl3ps73bg8rmg`
+**Plan**: Starter ($7/month)
+**Region**: Oregon
+
+**Purpose**: Background task processing with Celery
+**Tasks**: Document processing, embeddings, graph sync, CrewAI workflows
+
+#### Empire Redis (Production)
+**Service ID**: `red-d44og3n5r7bs73b2ctbg`
+**Plan**: Free tier
+**Region**: Oregon
+
+**Purpose**: Caching and Celery message broker
+**Internal URL**: redis://red-d44og3n5r7bs73b2ctbg
+
 #### LlamaIndex Service
 **URL**: https://jb-llamaindex.onrender.com
 **Service ID**: `srv-d2nl1lre5dus73atm9u0`
@@ -927,11 +956,12 @@ All credentials should be in `.env` file (see PRE_DEV_CHECKLIST.md):
 
 ```bash
 # Databases
-NEO4J_URI=bolt://localhost:7687
+NEO4J_URI=bolt+ssc://localhost:7687  # TLS-enabled (local)
+# NEO4J_URI=bolt+ssc://100.119.86.6:7687  # TLS-enabled (via Tailscale)
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=***REMOVED***
+NEO4J_PASSWORD=<your-secure-password>
 
-SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_URL=https://<your-project-id>.supabase.co
 SUPABASE_SERVICE_KEY=...
 
 # AI Services
@@ -1053,7 +1083,7 @@ docker-compose restart neo4j
 docker logs empire-neo4j
 ```
 
-##***REMOVED*** Connection Issues:
+### Supabase Connection Issues:
 1. Verify credentials in `.env`
 2. Check Supabase project status
 3. Test with curl:

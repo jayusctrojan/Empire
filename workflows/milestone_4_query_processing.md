@@ -265,7 +265,7 @@ volumes:
 ```bash
 # .env
 
-***REMOVED*** Configuration
+# Supabase Configuration
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_supabase_anon_key
 

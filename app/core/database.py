@@ -7,7 +7,7 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 
-***REMOVED***
+# Supabase
 from supabase import create_client, Client as SupabaseClient
 
 # Neo4j
@@ -28,7 +28,7 @@ class DatabaseManager:
         self._neo4j: Optional[Neo4jDriver] = None
         self._redis: Optional[Redis] = None
 
-    ***REMOVED*** Connection
+    # Supabase Connection
     def get_supabase(self) -> SupabaseClient:
         """Get or create Supabase client"""
         if self._supabase is None:
@@ -130,7 +130,7 @@ class DatabaseManager:
             self._redis.close()
             print("👋 Closed Redis connection")
 
-        ***REMOVED*** client doesn't need explicit closing
+        # Supabase client doesn't need explicit closing
         print("👋 All database connections closed")
 
 

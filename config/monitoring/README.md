@@ -53,7 +53,7 @@ This directory contains the configuration for Empire's comprehensive monitoring 
 
 ### 2. Access the services:
 - **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/empiregrafana123)
+- **Grafana**: http://localhost:3001 (admin/empiregrafana123)
 - **Flower**: http://localhost:5555 (admin/empireflower123)
 - **Alertmanager**: http://localhost:9093
 

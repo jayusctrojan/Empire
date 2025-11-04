@@ -219,7 +219,7 @@ empire-web-service/
 │   │
 │   ├── db/
 │   │   ├── __init__.py
-│   │   ├── supabase_client.py       ***REMOVED*** connection
+│   │   ├── supabase_client.py       # Supabase connection
 │   │   └── redis_client.py          # Redis connection
 │   │
 │   ├── core/
@@ -309,7 +309,7 @@ All configuration via environment variables using Pydantic Settings:
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    ***REMOVED***
+    # Supabase
     supabase_url: str
     supabase_key: str
 

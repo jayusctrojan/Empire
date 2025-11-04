@@ -1104,9 +1104,9 @@ class Neo4jClient:
 ```bash
 # .env
 # Neo4j Configuration (Production)
-NEO4J_URI=bolt://localhost:7687  # Or Tailscale IP if remote
+NEO4J_URI=bolt+ssc://localhost:7687  # TLS enabled, or bolt+ssc://TAILSCALE_IP:7687 if remote
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=***REMOVED***
+NEO4J_PASSWORD=<your-secure-password>  # See .env file
 NEO4J_DATABASE=neo4j
 NEO4J_MAX_CONNECTION_POOL_SIZE=50
 ```
@@ -1129,10 +1129,14 @@ services:
       - ./neo4j/import:/import
       - ./neo4j/plugins:/plugins
     environment:
-      - NEO4J_AUTH=neo4j/***REMOVED***
+      - NEO4J_AUTH=neo4j/<your-secure-password>
       - NEO4J_PLUGINS=["apoc", "graph-data-science"]
       - NEO4J_dbms_memory_heap_initial__size=2g
       - NEO4J_dbms_memory_heap_max__size=4g
+      # TLS Configuration
+      - NEO4J_dbms_ssl_policy_bolt_enabled=true
+      - NEO4J_dbms_ssl_policy_bolt_base__directory=/certificates/bolt
+      - NEO4J_dbms_connector_bolt_tls__level=OPTIONAL
     restart: unless-stopped
 ```
 

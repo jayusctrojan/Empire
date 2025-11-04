@@ -361,7 +361,7 @@
 - **User Auth**: Supabase Auth with JWT tokens
 - **API Keys**: Rotate quarterly, store in environment variables (never commit)
 - **RBAC**: Role-Based Access Control (admin, user, readonly)
-- **MCP Auth**: Secure Neo4j credentials (***REMOVED***) for MCP connections
+- **MCP Auth**: Secure Neo4j credentials (stored in .env) for MCP connections
 - **Session Management**: 24-hour token expiry, refresh token rotation
 
 ### 6.3 Security Best Practices

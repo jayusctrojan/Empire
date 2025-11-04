@@ -17,7 +17,7 @@ Your Neo4j graph database is now fully configured and ready for the dual-interfa
 
 ### ✅ Authentication
 - **Username:** `neo4j`
-- **Password:** `***REMOVED***`
+- **Password:** `<your-neo4j-password>`  *(See .env file)*
 
 ### ✅ Node Types (5 total)
 1. **Document** - Uploaded files with content and embeddings
@@ -68,12 +68,13 @@ All nodes have unique ID constraints:
 ```
 URL: http://localhost:7474
 Username: neo4j
-Password: ***REMOVED***
+Password: <your-neo4j-password>  # See .env file
 ```
 
 ### Option 2: Cypher Shell (CLI)
 ```bash
-docker exec -it empire-neo4j cypher-shell -u neo4j -p ***REMOVED***
+docker exec -it empire-neo4j cypher-shell -u neo4j -p <your-password>
+# Replace <your-password> with value from .env file
 ```
 
 ### Option 3: Neo4j MCP (Claude Desktop/Code) - Coming Soon
@@ -283,7 +284,7 @@ docker-compose up -d
 ### Can't Login to Neo4j Browser
 - Wait 30 seconds after starting (Neo4j takes time to initialize)
 - Verify container: `docker logs empire-neo4j`
-- Check password: `***REMOVED***`
+- Check password in .env file
 
 ### Schema Changes Not Applied
 ```bash

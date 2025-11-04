@@ -510,7 +510,7 @@ class MyService:
 ### 4.2 Transaction Pattern
 
 ```python
-***REMOVED*** doesn't support transactions directly,
+# Supabase doesn't support transactions directly,
 # but here's a pattern for batch operations
 
 async def create_document_with_chunks(
