@@ -1,5 +1,38 @@
 # Claude Code Development Guide for Empire v7.2
 
+## ⚠️ CRITICAL SECURITY POLICY - READ FIRST ⚠️
+
+**ABSOLUTE RULE: NEVER PUT CREDENTIALS IN ANY DOCUMENTATION FILES**
+
+**FORBIDDEN - The following MUST NEVER appear in .md, .txt, or ANY committed files:**
+- ❌ API Keys (Anthropic, OpenAI, Supabase, B2, Soniox, etc.)
+- ❌ Passwords (Neo4j, databases, services)
+- ❌ Project IDs (Supabase project IDs, service IDs)
+- ❌ Connection strings with real credentials
+- ❌ Authentication tokens or secrets
+- ❌ Private URLs or endpoints with sensitive data
+
+**REQUIRED - ALL credentials MUST be:**
+- ✅ Stored ONLY in `.env` file (which is gitignored)
+- ✅ Referenced in docs as `<from .env>` or `<your-password>`
+- ✅ Used as environment variables in code
+- ✅ Never hardcoded anywhere
+
+**REQUIRED - ALL documentation examples MUST use:**
+- ✅ Placeholders: `<from .env>`, `<your-password>`, `<your-api-key>`
+- ✅ Generic examples: `your-project-id`, `your-service-name`
+- ✅ Clear references directing to `.env` file for actual values
+
+**IF YOU FIND REAL CREDENTIALS IN DOCS:**
+1. STOP immediately
+2. Alert the user
+3. Replace with placeholders
+4. Add reference to `.env` file
+
+**This is a ZERO-TOLERANCE policy. Security incidents have consequences.**
+
+---
+
 ## 🚀 Quick Reference: AI Development Tools Available
 
 **Primary IDE:** Visual Studio Code with Claude Code, Cline, and Continue.dev extensions
