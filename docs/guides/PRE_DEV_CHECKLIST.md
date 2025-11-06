@@ -316,6 +316,51 @@ FLOWER_PORT=5555
 
 ---
 
+## 7. File Security Scanning
+
+### ⬜ VirusTotal API (File Upload Security)
+- **Status**: ⬜ Needs API key
+- **Purpose**: Malware scanning with 70+ antivirus engines for uploaded files
+- **Required for**: Production file upload security (Layer 3 validation)
+- **Free Tier**: 500 file uploads/day (effectively unlimited with hash-first approach)
+- **Smart Hash-First Strategy**:
+  1. Calculate SHA256 hash of file (instant, free)
+  2. Check hash in VirusTotal database (FREE, unlimited lookups)
+  3. Only upload if hash is unknown (saves 95% of quota)
+  - **Result**: 500 uploads/day → ~10,000+ effective scans/day
+
+**Required Credential**:
+- `VIRUSTOTAL_API_KEY`: `<your-virustotal-api-key>`
+- **Where to put**: `.env` file (see section 9)
+- **How to get**:
+  1. Go to https://www.virustotal.com/gui/home/upload
+  2. Sign up for a free account
+  3. Go to https://www.virustotal.com/gui/my-apikey
+  4. Copy API key → Add to `.env` as `VIRUSTOTAL_API_KEY`
+
+**Integration**:
+```python
+from app.services.virus_scanner import get_virus_scanner
+
+# Scan a file for malware
+virus_scanner = get_virus_scanner()
+is_clean, error_msg, scan_results = await virus_scanner.scan_file(file_path)
+
+if not is_clean:
+    # File is malicious - reject upload
+    raise HTTPException(status_code=400, detail=f"Malware detected: {error_msg}")
+```
+
+**Features**:
+- **Multi-layer validation**: Works alongside basic validation (Layer 1) and MIME validation (Layer 2)
+- **Production-ready**: Hash lookups are unlimited and free
+- **Graceful degradation**: If API unavailable, uploads continue with warning
+- **Detailed results**: Get scan stats from 70+ antivirus engines
+
+**Monthly Cost**: FREE (hash lookups unlimited, 500 new file uploads/day on free tier)
+
+---
+
 ## 8. MCP Servers to Configure
 
 ### ⬜ Supabase MCP

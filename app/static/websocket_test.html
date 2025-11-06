@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empire v7.3 - WebSocket Notifications Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #718096;
+            font-size: 14px;
+        }
+
+        .connection-status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+
+        .status-connecting {
+            background: #fbbf24;
+            color: #78350f;
+        }
+
+        .status-connected {
+            background: #10b981;
+            color: #064e3b;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+            color: #7f1d1d;
+        }
+
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .notifications {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .notifications h2 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .notification-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .notification {
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .notification-connection {
+            border-left-color: #3b82f6;
+        }
+
+        .notification-task {
+            border-left-color: #8b5cf6;
+        }
+
+        .notification-progress {
+            border-left-color: #10b981;
+        }
+
+        .notification-error {
+            border-left-color: #ef4444;
+        }
+
+        .notification-success {
+            border-left-color: #10b981;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .notification-type {
+            font-weight: 600;
+            color: #4b5563;
+            font-size: 13px;
+        }
+
+        .notification-time {
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .notification-message {
+            color: #1f2937;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .notification-data {
+            margin-top: 8px;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: #4b5563;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: #f7fafc;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔔 Empire WebSocket Notifications</h1>
+            <p class="subtitle">Real-time task notifications via WebSocket</p>
+            <div class="connection-status status-disconnected" id="connection-status">
+                ● Disconnected
+            </div>
+        </div>
+
+        <div class="controls">
+            <h2 style="margin-bottom: 15px; color: #2d3748; font-size: 16px;">Controls</h2>
+            <div class="button-group">
+                <button class="btn-primary" onclick="connect()">Connect</button>
+                <button class="btn-danger" onclick="disconnect()">Disconnect</button>
+                <button class="btn-success" onclick="sendPing()">Send Ping</button>
+                <button class="btn-warning" onclick="getStats()">Get Stats</button>
+                <button class="btn-secondary" onclick="clearNotifications()">Clear</button>
+            </div>
+        </div>
+
+        <div class="notifications">
+            <h2>Notifications</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="notification-count">0</div>
+                    <div class="stat-label">Total Notifications</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="task-count">0</div>
+                    <div class="stat-label">Task Updates</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="error-count">0</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+            </div>
+            <div class="notification-list" id="notification-list">
+                <div class="empty-state">
+                    No notifications yet. Connect to start receiving updates.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let sessionId = generateSessionId();
+        let notificationCount = 0;
+        let taskCount = 0;
+        let errorCount = 0;
+
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addNotification('info', 'Already connected', {});
+                return;
+            }
+
+            updateConnectionStatus('connecting');
+
+            // Use the current host and port for WebSocket connection
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/api/v1/notifications/ws?session_id=${sessionId}`;
+
+            console.log('Connecting to:', wsUrl);
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                updateConnectionStatus('connected');
+                addNotification('connection', 'Connected to WebSocket server', {});
+            };
+
+            ws.onmessage = function(event) {
+                console.log('Message received:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    handleNotification(data);
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                addNotification('error', 'WebSocket error occurred', {error: error.message});
+                updateConnectionStatus('disconnected');
+            };
+
+            ws.onclose = function() {
+                console.log('WebSocket disconnected');
+                updateConnectionStatus('disconnected');
+                addNotification('connection', 'Disconnected from server', {});
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function sendPing() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected!');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                action: 'ping'
+            }));
+        }
+
+        function getStats() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected!');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                action: 'get_stats'
+            }));
+        }
+
+        function handleNotification(data) {
+            notificationCount++;
+            updateStats();
+
+            const type = data.type || 'info';
+
+            if (type === 'task_notification') {
+                taskCount++;
+                updateStats();
+            } else if (type === 'error') {
+                errorCount++;
+                updateStats();
+            }
+
+            addNotification(type, data.message || JSON.stringify(data), data);
+        }
+
+        function addNotification(type, message, data) {
+            const list = document.getElementById('notification-list');
+
+            // Remove empty state if exists
+            if (list.querySelector('.empty-state')) {
+                list.innerHTML = '';
+            }
+
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+
+            const now = new Date().toLocaleTimeString();
+
+            let content = `
+                <div class="notification-header">
+                    <span class="notification-type">${type.toUpperCase()}</span>
+                    <span class="notification-time">${now}</span>
+                </div>
+                <div class="notification-message">${message}</div>
+            `;
+
+            // Add progress bar for progress notifications
+            if (data.percentage !== undefined) {
+                content += `
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${data.percentage}%"></div>
+                    </div>
+                `;
+            }
+
+            // Add data section for additional info
+            if (Object.keys(data).length > 0 && type !== 'connection') {
+                const filteredData = { ...data };
+                delete filteredData.type;
+                delete filteredData.timestamp;
+
+                if (Object.keys(filteredData).length > 0) {
+                    content += `<div class="notification-data">${JSON.stringify(filteredData, null, 2)}</div>`;
+                }
+            }
+
+            notification.innerHTML = content;
+            list.insertBefore(notification, list.firstChild);
+
+            // Keep only last 50 notifications
+            while (list.children.length > 50) {
+                list.removeChild(list.lastChild);
+            }
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = `connection-status status-${status}`;
+
+            const statusText = {
+                'connecting': '● Connecting...',
+                'connected': '● Connected',
+                'disconnected': '● Disconnected'
+            };
+
+            statusEl.textContent = statusText[status] || '● Unknown';
+        }
+
+        function updateStats() {
+            document.getElementById('notification-count').textContent = notificationCount;
+            document.getElementById('task-count').textContent = taskCount;
+            document.getElementById('error-count').textContent = errorCount;
+        }
+
+        function clearNotifications() {
+            document.getElementById('notification-list').innerHTML = '<div class="empty-state">No notifications yet. Connect to start receiving updates.</div>';
+            notificationCount = 0;
+            taskCount = 0;
+            errorCount = 0;
+            updateStats();
+        }
+
+        // Auto-connect on page load
+        window.addEventListener('load', function() {
+            console.log('Page loaded, auto-connecting...');
+            setTimeout(connect, 500);
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (ws) {
+                ws.close();
+            }
+        });
+    </script>
+</body>
+</html>

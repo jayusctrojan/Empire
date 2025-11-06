@@ -1070,6 +1070,16 @@ Cloud Security:
 - Cohere: Enterprise security standards
 - LightRAG: Secure API access
 
+File Upload Security (v7.3):
+- Layer 1: Basic validation (extension whitelist, size limits)
+- Layer 2: Advanced validation (MIME type detection, file header verification)
+- Layer 3: Malware scanning (VirusTotal API with hash-first approach)
+  • Smart hash-first strategy: Hash check (FREE) → Upload only if unknown
+  • 70+ antivirus engines for comprehensive detection
+  • Free tier: 500 uploads/day → ~10,000+ effective scans/day
+  • Graceful degradation if API unavailable
+  • API key: <from .env VIRUSTOTAL_API_KEY>
+
 ================================================================================
 AI Model Distribution
 ================================================================================

@@ -8,22 +8,31 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi import Response
 import time
 from typing import Optional
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
 
-# Import routers (to be created)
-# from app.api import documents, search, chat, admin
+# Import routers
+from app.api import upload, notifications
 
-# Prometheus metrics
+# Import services
+from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
+from app.services.monitoring_service import get_monitoring_service
+from app.services.supabase_storage import get_supabase_storage
+
+# Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
 REQUEST_LATENCY = Histogram('empire_request_duration_seconds', 'HTTP request latency', ['method', 'endpoint'])
-PROCESSING_TASKS = Counter('empire_processing_tasks_total', 'Total processing tasks', ['task_type', 'status'])
+
+# Note: Business metrics for document processing are defined in monitoring_service.py
+# This includes: DOCUMENT_PROCESSING_TOTAL, DOCUMENT_PROCESSING_DURATION, EMBEDDING_GENERATION_TOTAL, etc.
 
 
 @asynccontextmanager
@@ -39,6 +48,17 @@ async def lifespan(app: FastAPI):
     print(f"📦 LlamaIndex Service: {os.getenv('LLAMAINDEX_SERVICE_URL')}")
     print(f"🤖 CrewAI Service: {os.getenv('CREWAI_SERVICE_URL')}")
 
+    # Initialize monitoring service with Supabase storage
+    supabase_storage = get_supabase_storage()
+    monitoring_service = get_monitoring_service(supabase_storage)
+    app.state.monitoring = monitoring_service
+    print("📈 Monitoring service initialized")
+
+    # Start Mountain Duck file monitoring (if enabled)
+    if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
+        start_mountain_duck_monitoring()
+        print("📁 Mountain Duck monitoring started")
+
     # TODO: Initialize database connections
     # TODO: Initialize Redis connection
     # TODO: Initialize Neo4j connection
@@ -48,6 +68,12 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: Close connections
     print("👋 Empire v7.3 FastAPI shutting down...")
+
+    # Stop Mountain Duck monitoring
+    if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
+        stop_mountain_duck_monitoring()
+        print("📁 Mountain Duck monitoring stopped")
+
     # TODO: Close database connections
     # TODO: Close Redis connection
     # TODO: Close Neo4j connection
@@ -71,6 +97,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 # Middleware for request tracking
@@ -210,7 +241,10 @@ async def general_exception_handler(request, exc):
     )
 
 
-# TODO: Include routers
+# Include routers
+app.include_router(upload.router, prefix="/api/v1/upload", tags=["Upload"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+# TODO: Additional routers
 # app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
 # app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])

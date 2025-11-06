@@ -9,7 +9,7 @@
         "testStrategy": "Validate service connectivity, health endpoints, and database schema migrations. Run integration tests for API endpoints and Celery task execution. Confirm Redis and Neo4j connectivity.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -18,7 +18,8 @@
             "dependencies": [],
             "details": "Set up two separate Render services: one for FastAPI (API server) and one for Celery (background worker). Use recommended versions (FastAPI >=0.110, Celery >=5.3). Configure environment variables securely and ensure both services are reachable over the network.",
             "status": "done",
-            "testStrategy": "Verify service deployment via Render dashboards. Access FastAPI health endpoint and confirm Celery worker logs show successful startup."
+            "testStrategy": "Verify service deployment via Render dashboards. Access FastAPI health endpoint and confirm Celery worker logs show successful startup.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -27,7 +28,8 @@
             "dependencies": [],
             "details": "In Supabase dashboard, enable the 'vector' extension (pgvector) via Extensions panel or SQL command. Create tables for storing embeddings (e.g., documents with embedding vector columns) and graph structures as needed. Use recommended supabase-py >=2.0 for client access.\n<info added on 2025-11-03T04:12:52.520Z>\nSupabase PostgreSQL is already provisioned at qohsmuevxuetjpuherzo.supabase.co with credentials stored in the .env file. The database is accessible via Supabase Management Console Panel (MCP). \n\nTo complete this subtask:\n\n1. Connect to the Supabase PostgreSQL instance using the MCP or SQL editor.\n\n2. Enable the pgvector extension by executing:\n   ```sql\n   CREATE EXTENSION IF NOT EXISTS vector;\n   ```\n\n3. Create all 37+ required tables from /workflows/database_setup.md, including:\n   - documents\n   - document_chunks\n   - chat_sessions\n   - user_memory_nodes\n   - crewai_agents\n   - crewai_crews\n   - vector tables with embedding columns\n   - graph structure tables\n   - and all other tables specified in the database setup file\n\n4. Verify table creation and ensure proper relationships and constraints are established according to the schema definitions.\n\n5. Test database connectivity using supabase-py >=2.0 client from the application.\n</info added on 2025-11-03T04:12:52.520Z>",
             "status": "done",
-            "testStrategy": "Run SQL queries to confirm pgvector is enabled and tables exist. Insert and retrieve sample data, including vector columns."
+            "testStrategy": "Run SQL queries to confirm pgvector is enabled and tables exist. Insert and retrieve sample data, including vector columns.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -36,7 +38,8 @@
             "dependencies": [],
             "details": "Create a new Redis database on Upstash. Obtain connection URL and credentials. Configure FastAPI and Celery to use this Redis instance for caching and as the Celery broker. Use redis-py >=5.0 for integration.",
             "status": "done",
-            "testStrategy": "Connect to Redis from both FastAPI and Celery. Set and retrieve cache keys. Confirm Celery can enqueue and process tasks using Redis broker."
+            "testStrategy": "Connect to Redis from both FastAPI and Celery. Set and retrieve cache keys. Confirm Celery can enqueue and process tasks using Redis broker.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -45,7 +48,8 @@
             "dependencies": [],
             "details": "Pull the official Neo4j Community Docker image (version 5.x). Configure Docker container with appropriate ports, volumes for data persistence, and secure environment variables. Ensure Neo4j is accessible from the local network.",
             "status": "done",
-            "testStrategy": "Access Neo4j Browser UI, run basic Cypher queries, and verify data persistence after container restart."
+            "testStrategy": "Access Neo4j Browser UI, run basic Cypher queries, and verify data persistence after container restart.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -59,7 +63,8 @@
             ],
             "details": "Update service configurations to enforce TLS 1.3 (e.g., Render custom domains with TLS, Upstash Redis with TLS, Supabase with SSL, Neo4j Docker with TLS certificates). Store all secrets and environment variables using encrypted storage mechanisms provided by each platform.",
             "status": "done",
-            "testStrategy": "Attempt connections using only TLS 1.3. Inspect certificates and verify environment variables are not exposed in logs or process listings."
+            "testStrategy": "Attempt connections using only TLS 1.3. Inspect certificates and verify environment variables are not exposed in logs or process listings.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -73,10 +78,14 @@
               5
             ],
             "details": "Implement health checks and integration tests: FastAPI connects to Supabase and Neo4j, Celery tasks use Redis broker and access Supabase, all over TLS. Run end-to-end tests for API endpoints and background tasks.",
-            "status": "pending",
-            "testStrategy": "Run automated integration tests. Check logs for successful connections. Use tools like curl or Postman to verify TLS and endpoint health."
+            "status": "done",
+            "testStrategy": "Run automated integration tests. Check logs for successful connections. Use tools like curl or Postman to verify TLS and endpoint health.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down the backend environment setup into subtasks for provisioning each service (FastAPI, Celery, Supabase PostgreSQL with pgvector, Redis, Neo4j), configuring secure communication (TLS 1.3), and validating integration and connectivity."
       },
       {
         "id": 2,
@@ -86,9 +95,9 @@
         "testStrategy": "Upload various file types and sizes, verify progress indicators, and confirm files appear in B2 pending/courses/. Test both Mountain Duck and web UI flows.",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -96,8 +105,9 @@
             "description": "Create a user interface using Streamlit or Gradio that supports uploading up to 10 files (max 100MB each) via drag-and-drop, with progress indicators and file type/size validation.",
             "dependencies": [],
             "details": "Use Streamlit's st.file_uploader with accept_multiple_files=True or Gradio's file upload component. Implement drag-and-drop functionality, enforce file type and size limits, and display progress indicators for each file. Ensure the UI is intuitive and provides feedback on upload status and errors.",
-            "status": "pending",
-            "testStrategy": "Upload various file types and sizes, verify drag-and-drop works, progress indicators display correctly, and validation prevents unsupported files."
+            "status": "done",
+            "testStrategy": "Upload various file types and sizes, verify drag-and-drop works, progress indicators display correctly, and validation prevents unsupported files.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -107,8 +117,9 @@
               1
             ],
             "details": "Configure b2sdk for authentication and folder management. Implement logic to upload files directly from the UI to the pending/courses/ folder, ensuring files are organized according to the required B2 structure. Handle upload errors and provide feedback to the user.",
-            "status": "pending",
-            "testStrategy": "Upload files through the UI and confirm they appear in the correct B2 folder. Test error handling and folder organization."
+            "status": "done",
+            "testStrategy": "Upload files through the UI and confirm they appear in the correct B2 folder. Test error handling and folder organization.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -118,10 +129,14 @@
               2
             ],
             "details": "Set up a polling mechanism to detect new files in the local folder synced by Mountain Duck every 30 seconds. For files uploaded via the web UI, initiate processing immediately after upload. Ensure both flows enforce file limits and integrate with the B2 upload logic.",
-            "status": "pending",
-            "testStrategy": "Simulate uploads via Mountain Duck and web UI, verify polling detects new files, immediate processing works, and all files are uploaded to B2 with correct feedback."
+            "status": "done",
+            "testStrategy": "Simulate uploads via Mountain Duck and web UI, verify polling detects new files, immediate processing works, and all files are uploaded to B2 with correct feedback.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on file upload interface & backblaze b2 integration."
       },
       {
         "id": 3,
@@ -131,9 +146,9 @@
         "testStrategy": "Attempt uploads of valid, corrupted, and malicious files. Confirm correct rejection and error messaging. Validate security scan logs.",
         "priority": "high",
         "dependencies": [
-          2
+          "2"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -141,8 +156,9 @@
             "description": "Detect and validate the file's MIME type and extension before upload using python-magic and extension checks.",
             "dependencies": [],
             "details": "Use the python-magic library to inspect the file's magic number and determine its true MIME type. Cross-check this with the file extension to ensure consistency. Reject files with mismatched or unsupported MIME types/extensions, and provide clear error messages. Consider using additional libraries like file-validator for comprehensive checks if needed.",
-            "status": "pending",
-            "testStrategy": "Attempt uploads with valid and invalid file types and extensions. Confirm correct acceptance or rejection and error messaging."
+            "status": "done",
+            "testStrategy": "Attempt uploads with valid and invalid file types and extensions. Confirm correct acceptance or rejection and error messaging.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -152,8 +168,9 @@
               1
             ],
             "details": "For each supported file type, implement header validation (e.g., check PDF header for '%PDF', image headers for magic numbers). Reject files that fail integrity or header checks. Ensure that only structurally valid files proceed to the next stage.",
-            "status": "pending",
-            "testStrategy": "Upload corrupted or partially valid files and verify that they are rejected with appropriate error messages."
+            "status": "done",
+            "testStrategy": "Upload corrupted or partially valid files and verify that they are rejected with appropriate error messages.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -163,10 +180,14 @@
               2
             ],
             "details": "After passing format and integrity checks, submit files to ClamAV for malware scanning. Reject any files flagged as malicious and log the incident. Ensure the scanning process is efficient and does not introduce significant upload latency.",
-            "status": "pending",
-            "testStrategy": "Upload files containing known malware signatures and verify detection, rejection, and logging. Confirm clean files are accepted."
+            "status": "done",
+            "testStrategy": "Upload files containing known malware signatures and verify detection, rejection, and logging. Confirm clean files are accepted.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on file format validation & security scanning."
       },
       {
         "id": 4,
@@ -176,9 +197,9 @@
         "testStrategy": "Upload files of each supported type, verify metadata extraction accuracy, and confirm correct Supabase storage.",
         "priority": "high",
         "dependencies": [
-          3
+          "3"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -186,8 +207,9 @@
             "description": "Develop Python functions to extract basic and advanced metadata from images, audio/video, DOCX, and PDF files using appropriate libraries.",
             "dependencies": [],
             "details": "Use exifread for image EXIF data, mutagen for audio/video metadata, python-docx for DOCX files, and PyPDF2 or pdfminer.six for PDF metadata extraction. Ensure extraction covers filename, size, type, timestamps, and relevant advanced fields (EXIF, audio/video info, document properties). Structure output as per Supabase schema requirements.",
-            "status": "pending",
-            "testStrategy": "Unit test each extractor with sample files of each type. Validate that all required metadata fields are present and accurate."
+            "status": "done",
+            "testStrategy": "Unit test each extractor with sample files of each type. Validate that all required metadata fields are present and accurate.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -196,9 +218,10 @@
             "dependencies": [
               1
             ],
-            "details": "Modify the upload handler to invoke the correct extraction function based on file type immediately after upload. Collect and format extracted metadata into a dictionary/object matching the Supabase documents table schema.",
-            "status": "pending",
-            "testStrategy": "Simulate file uploads via the interface and verify that metadata extraction is triggered and output is correctly formatted for storage."
+            "details": "Modify the upload handler to invoke the correct extraction function based on file type immediately after upload. Collect and format extracted metadata into a dictionary/object matching the Supabase documents table schema.\n<info added on 2025-11-05T22:11:51.333Z>\nImplementation completed for metadata extraction integration with upload workflow:\n\n1. Added metadata_extractor import to upload.py\n2. Modified upload flow to:\n   - Create temp file if not already created (for virus scanning)\n   - Extract metadata from temp file using MetadataExtractor\n   - Include extracted metadata in upload results\n3. Installed required libraries: exifread 3.5.1 and mutagen 1.47.0\n4. Metadata extraction happens after validation and virus scanning, before B2 upload\n5. Graceful error handling - if extraction fails, error is logged but upload continues\n6. Metadata is included in JSON response under \"metadata\" key for each uploaded file\n</info added on 2025-11-05T22:11:51.333Z>",
+            "status": "done",
+            "testStrategy": "Simulate file uploads via the interface and verify that metadata extraction is triggered and output is correctly formatted for storage.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -207,11 +230,15 @@
             "dependencies": [
               2
             ],
-            "details": "Use the Supabase Python client to insert metadata records into the documents table. Implement error handling for failed inserts and log issues for debugging. Confirm that all required fields are populated and that the data matches the schema.",
-            "status": "pending",
-            "testStrategy": "Upload files of each supported type, then query the Supabase documents table to verify that metadata is stored correctly and completely."
+            "details": "Use the Supabase Python client to insert metadata records into the documents table. Implement error handling for failed inserts and log issues for debugging. Confirm that all required fields are populated and that the data matches the schema.\n<info added on 2025-11-05T22:21:11.569Z>\nSuccessfully implemented the SupabaseStorage class in app/services/supabase_storage.py with methods for managing document metadata: store_document_metadata(), get_document_by_file_id(), update_document_status(), and list_documents(). The implementation has been integrated into the upload workflow immediately after the B2 upload process. The API response now includes a \"supabase_stored\" boolean flag to indicate successful metadata storage. The system gracefully degrades if Supabase is not configured, allowing the application to function without interruption. Testing confirms that the complete upload workflow functions as expected - metadata extraction works perfectly and Supabase storage attempts are handled gracefully, returning false if not configured.\n</info added on 2025-11-05T22:21:11.569Z>",
+            "status": "done",
+            "testStrategy": "Upload files of each supported type, then query the Supabase documents table to verify that metadata is stored correctly and completely.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on metadata extraction & supabase storage."
       },
       {
         "id": 5,
@@ -221,9 +248,9 @@
         "testStrategy": "Upload duplicate and near-duplicate files, verify detection and user options. Confirm deduplication accuracy.",
         "priority": "high",
         "dependencies": [
-          4
+          "4"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -231,8 +258,9 @@
             "description": "Compute SHA-256 hashes for each file and compare against existing hashes in the Supabase documents table to identify exact duplicates.",
             "dependencies": [],
             "details": "Use a reliable hashing library to generate SHA-256 hashes for all files. Query the Supabase documents table for existing hashes and flag files with matching hashes as duplicates. Ensure efficient scanning and parallel processing for large file sets.",
-            "status": "pending",
-            "testStrategy": "Upload files with identical content and verify that duplicates are detected solely by hash comparison. Confirm that files with different content are not flagged as duplicates."
+            "status": "done",
+            "testStrategy": "Upload files with identical content and verify that duplicates are detected solely by hash comparison. Confirm that files with different content are not flagged as duplicates.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -242,8 +270,9 @@
               1
             ],
             "details": "After hash-based filtering, use rapidfuzz to compute similarity scores for filenames and optionally file contents. Set configurable thresholds for similarity to flag near-duplicates. Optimize for performance when comparing large numbers of files.",
-            "status": "pending",
-            "testStrategy": "Upload files with similar but not identical names and/or content. Verify that near-duplicates are detected according to the configured similarity threshold."
+            "status": "done",
+            "testStrategy": "Upload files with similar but not identical names and/or content. Verify that near-duplicates are detected according to the configured similarity threshold.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -254,10 +283,14 @@
               2
             ],
             "details": "Design UI prompts and backend logic to allow users to choose whether to skip uploading duplicates, overwrite existing files, or take other actions. Ensure options are clearly presented and actions are reliably executed.",
-            "status": "pending",
-            "testStrategy": "Simulate duplicate and near-duplicate uploads, test all user options (skip, overwrite), and verify correct file handling and user feedback."
+            "status": "done",
+            "testStrategy": "Simulate duplicate and near-duplicate uploads, test all user options (skip, overwrite), and verify correct file handling and user feedback.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on duplicate detection (sha-256 & fuzzy matching)."
       },
       {
         "id": 6,
@@ -267,9 +300,9 @@
         "testStrategy": "Submit tasks with varying priorities, simulate failures, and verify retry and dead letter queue behavior.",
         "priority": "high",
         "dependencies": [
-          5
+          "5"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -277,8 +310,9 @@
             "description": "Set up Celery to use Redis as the broker and implement priority-based task queues (urgent, normal, low).",
             "dependencies": [],
             "details": "Update Celery configuration to use Redis as the broker. Define separate queues for each priority level (e.g., urgent, normal, low) and configure the broker_transport_options with 'queue_order_strategy': 'priority'. Adjust worker_prefetch_multiplier to 1 for effective prioritization. Ensure workers are started with the correct queue order.",
-            "status": "pending",
-            "testStrategy": "Submit tasks with different priorities and verify that urgent tasks are processed before normal and low priority tasks."
+            "status": "done",
+            "testStrategy": "Submit tasks with different priorities and verify that urgent tasks are processed before normal and low priority tasks.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -288,8 +322,9 @@
               1
             ],
             "details": "Modify Celery tasks to update the status field in the Supabase file_uploads table at key stages (queued, started, succeeded, failed). Ensure atomic updates and handle race conditions. Use Supabase client libraries for database operations.",
-            "status": "pending",
-            "testStrategy": "Trigger tasks and verify that status changes are accurately reflected in the Supabase file_uploads table throughout the task lifecycle."
+            "status": "done",
+            "testStrategy": "Trigger tasks and verify that status changes are accurately reflected in the Supabase file_uploads table throughout the task lifecycle.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -299,8 +334,9 @@
               1
             ],
             "details": "Configure Celery task decorators to include retry parameters: max_retries=3 and a backoff strategy (e.g., exponential). Ensure that exceptions trigger retries and that retry attempts are logged or tracked for observability.",
-            "status": "pending",
-            "testStrategy": "Simulate task failures and verify that tasks are retried up to 3 times with increasing delays between attempts."
+            "status": "done",
+            "testStrategy": "Simulate task failures and verify that tasks are retried up to 3 times with increasing delays between attempts.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -310,8 +346,10 @@
               3
             ],
             "details": "Create a dedicated dead letter queue in Celery/Redis. Update task failure handlers to route tasks to this queue after exhausting retries. Optionally, log or notify on dead letter events for monitoring.",
-            "status": "pending",
-            "testStrategy": "Force tasks to fail beyond retry limits and verify their presence in the dead letter queue."
+            "status": "done",
+            "testStrategy": "Force tasks to fail beyond retry limits and verify their presence in the dead letter queue.",
+            "updatedAt": "2025-11-05T23:00:18.337Z",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -322,10 +360,16 @@
               4
             ],
             "details": "Design and execute test cases covering all priority levels, status transitions, retry scenarios, and dead letter queue routing. Validate system behavior under normal and failure conditions.",
-            "status": "pending",
-            "testStrategy": "Run integration tests that submit tasks with various priorities, induce failures, and confirm correct processing, status updates, retries, and dead letter handling."
+            "status": "done",
+            "testStrategy": "Run integration tests that submit tasks with various priorities, induce failures, and confirm correct processing, status updates, retries, and dead letter handling.",
+            "parentId": "undefined",
+            "updatedAt": "2025-11-05T23:00:42.292Z"
           }
-        ]
+        ],
+        "complexity": 6.5,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Decompose Celery task queue management into subtasks for priority queue configuration, status tracking integration, retry logic implementation, dead letter queue setup, and end-to-end testing.",
+        "updatedAt": "2025-11-05T23:00:42.292Z"
       },
       {
         "id": 7,
@@ -335,9 +379,9 @@
         "testStrategy": "Trigger uploads and processing, verify real-time notifications and email delivery for long tasks.",
         "priority": "medium",
         "dependencies": [
-          6
+          "6"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -345,8 +389,10 @@
             "description": "Develop FastAPI WebSocket endpoints to deliver real-time upload and processing progress and completion notifications to connected clients.",
             "dependencies": [],
             "details": "Set up FastAPI WebSocket routes (e.g., /ws/notifications). Manage client connections and broadcast progress/completion events. Ensure endpoints can handle multiple simultaneous connections and send actionable error messages. Integrate with backend processing logic to emit updates as tasks progress or complete.",
-            "status": "pending",
-            "testStrategy": "Simulate uploads and processing tasks; verify clients receive real-time progress and completion notifications via WebSocket."
+            "status": "done",
+            "testStrategy": "Simulate uploads and processing tasks; verify clients receive real-time progress and completion notifications via WebSocket.",
+            "parentId": "undefined",
+            "updatedAt": "2025-11-05T23:01:15.700Z"
           },
           {
             "id": 2,
@@ -356,8 +402,9 @@
               1
             ],
             "details": "Configure SMTP or SendGrid integration for sending emails. Implement logic to detect long-running tasks and trigger email alerts with relevant status and error details. Ensure emails are sent only when user opts in or when thresholds are exceeded. Handle email delivery failures gracefully.",
-            "status": "pending",
-            "testStrategy": "Trigger long-running tasks and confirm that email alerts are sent to the correct recipients with accurate information."
+            "status": "done",
+            "testStrategy": "Trigger long-running tasks and confirm that email alerts are sent to the correct recipients with accurate information.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -368,10 +415,15 @@
               2
             ],
             "details": "Update frontend to establish and manage WebSocket connections, display progress/completion notifications, and show errors in a user-friendly manner. Add UI controls for users to opt in/out of email alerts. Ensure seamless user experience for both notification channels.",
-            "status": "pending",
-            "testStrategy": "Test frontend by uploading files and processing tasks; verify real-time updates and error messages appear, and email preferences are respected."
+            "status": "done",
+            "testStrategy": "Test frontend by uploading files and processing tasks; verify real-time updates and error messages appear, and email preferences are respected.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on user notification system (websocket & email).",
+        "updatedAt": "2025-11-05T23:01:15.700Z"
       },
       {
         "id": 8,
@@ -381,9 +433,9 @@
         "testStrategy": "Process files through all folder stages, verify correct organization and encryption for flagged files.",
         "priority": "high",
         "dependencies": [
-          7
+          "7"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -391,8 +443,9 @@
             "description": "Initialize b2sdk, authenticate, and set up interfaces for pending, processing, processed, and failed folders in the B2 bucket.",
             "dependencies": [],
             "details": "Use b2sdk's AccountInfo and B2Api to authenticate and connect to the B2 bucket. Instantiate B2Folder objects for each logical folder (pending, processing, processed, failed) to enable file operations between them.",
-            "status": "pending",
-            "testStrategy": "Verify connection and folder listing for each B2 folder using b2sdk methods."
+            "status": "done",
+            "testStrategy": "Verify connection and folder listing for each B2 folder using b2sdk methods.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -402,8 +455,9 @@
               1
             ],
             "details": "Create functions to list files in each folder and move them to the next stage based on status. Ensure atomicity and handle errors during move operations using b2sdk's file copy and delete methods.",
-            "status": "pending",
-            "testStrategy": "Simulate status changes and verify files are moved to the correct folders without duplication or loss."
+            "status": "done",
+            "testStrategy": "Simulate status changes and verify files are moved to the correct folders without duplication or loss.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -413,8 +467,9 @@
               1
             ],
             "details": "Use PyCryptodome to encrypt files with a user-supplied key before uploading to B2. Ensure encryption is optional and only applied to flagged files. Store encrypted files in the appropriate B2 folder.",
-            "status": "pending",
-            "testStrategy": "Upload both encrypted and unencrypted files, then download and verify decryption for encrypted files."
+            "status": "done",
+            "testStrategy": "Upload both encrypted and unencrypted files, then download and verify decryption for encrypted files.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -425,8 +480,9 @@
               3
             ],
             "details": "Add logic to detect and recover from failed moves or uploads. Implement retry mechanisms and ensure files are not lost or duplicated during transitions. Log all status changes and errors for auditability.",
-            "status": "pending",
-            "testStrategy": "Intentionally trigger errors (e.g., network failures) and verify that files are correctly retried or moved to the failed folder."
+            "status": "done",
+            "testStrategy": "Intentionally trigger errors (e.g., network failures) and verify that files are correctly retried or moved to the failed folder.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -438,10 +494,14 @@
               4
             ],
             "details": "Write tests that process files through all folder stages, check their presence in the correct folders, and confirm that encryption is correctly applied and reversible for flagged files.",
-            "status": "pending",
-            "testStrategy": "Run end-to-end tests covering all transitions and encryption scenarios, ensuring files are organized and protected as specified."
+            "status": "done",
+            "testStrategy": "Run end-to-end tests covering all transitions and encryption scenarios, ensuring files are organized and protected as specified.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Divide B2 folder management and encryption into subtasks for implementing folder movement logic, integrating b2sdk, supporting AES encryption with PyCryptodome, handling status-based transitions, and verifying organization/encryption through tests."
       },
       {
         "id": 9,
@@ -451,9 +511,9 @@
         "testStrategy": "Upload sample documents for each department, verify classification accuracy and Supabase updates.",
         "priority": "high",
         "dependencies": [
-          8
+          "8"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -461,8 +521,9 @@
             "description": "Set up the Claude Haiku API and anthropic-py SDK to enable classification of uploaded documents into 10 departments.",
             "dependencies": [],
             "details": "Install and configure the anthropic-py SDK. Implement API authentication and error handling (e.g., retries, rate limits). Ensure the async auto_classify_course function is ready to send document content to Claude Haiku and receive department predictions. Tune parameters such as temperature and max_tokens for optimal classification accuracy.",
-            "status": "pending",
-            "testStrategy": "Send sample documents to the API and verify department predictions are returned correctly. Test error handling by simulating API failures."
+            "status": "done",
+            "testStrategy": "Send sample documents to the API and verify department predictions are returned correctly. Test error handling by simulating API failures.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -472,8 +533,9 @@
               1
             ],
             "details": "Write the async function to handle document input, call the Claude Haiku API, and parse the response for department, confidence score, and subdepartment. Ensure the function supports batch processing and handles edge cases (e.g., ambiguous classifications). Document the function and its parameters for maintainability.",
-            "status": "pending",
-            "testStrategy": "Unit test the function with mock API responses. Validate output structure and accuracy against expected department labels."
+            "status": "done",
+            "testStrategy": "Unit test the function with mock API responses. Validate output structure and accuracy against expected department labels.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -483,10 +545,14 @@
               2
             ],
             "details": "Map the classification output to the correct schema fields in Supabase. Implement transactional writes to ensure data consistency. Add logging for successful and failed writes. Verify that updates are reflected in both documents and courses tables as required.",
-            "status": "pending",
-            "testStrategy": "Upload test documents, run classification, and confirm Supabase tables are updated with correct department, confidence, and subdepartment values. Check for data integrity and error handling."
+            "status": "done",
+            "testStrategy": "Upload test documents, run classification, and confirm Supabase tables are updated with correct department, confidence, and subdepartment values. Check for data integrity and error handling.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on ai department classification workflow (claude haiku)."
       },
       {
         "id": 10,
@@ -496,9 +562,9 @@
         "testStrategy": "Process each file type, verify extraction accuracy, structure preservation, and fallback logic.",
         "priority": "high",
         "dependencies": [
-          9
+          "9"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -506,8 +572,9 @@
             "description": "Design and build the pipeline's ingestion layer to accept documents from various sources and classify them by type (PDF, DOCX, image, audio/video).",
             "dependencies": [],
             "details": "Set up connectors for file sources (e.g., S3 buckets, local uploads). Integrate document type detection logic to route files to appropriate extraction modules. Log ingestion events and maintain audit trails for each document.",
-            "status": "pending",
-            "testStrategy": "Submit sample files of each supported type, verify correct classification and routing, and check ingestion logs for completeness."
+            "status": "done",
+            "testStrategy": "Submit sample files of each supported type, verify correct classification and routing, and check ingestion logs for completeness.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -517,8 +584,9 @@
               1
             ],
             "details": "Integrate LlamaIndex REST API for clean PDFs, Mistral OCR for scanned PDFs, Tesseract OCR as fallback, python-docx for DOCX, mutagen for audio/video, Claude Vision API for images. Implement logic to select extraction method based on classification and handle failures by cascading to fallback services.",
-            "status": "pending",
-            "testStrategy": "Process a diverse set of documents, intentionally trigger extraction failures, and verify fallback mechanisms activate and extract data as expected."
+            "status": "done",
+            "testStrategy": "Process a diverse set of documents, intentionally trigger extraction failures, and verify fallback mechanisms activate and extract data as expected.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -528,10 +596,14 @@
               2
             ],
             "details": "Implement table and image extraction for supported formats. Track and store page/section information alongside extracted text and structured data. Ensure outputs are normalized for downstream consumption.",
-            "status": "pending",
-            "testStrategy": "Validate extracted outputs for structure, completeness, and correct association of metadata (page/section info) using test documents with known layouts."
+            "status": "done",
+            "testStrategy": "Validate extracted outputs for structure, completeness, and correct association of metadata (page/section info) using test documents with known layouts.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on universal document processing pipeline."
       },
       {
         "id": 11,
@@ -541,9 +613,9 @@
         "testStrategy": "Process audio and video files, verify transcript accuracy, speaker identification, and frame analysis.",
         "priority": "high",
         "dependencies": [
-          10
+          "10"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -551,8 +623,9 @@
             "description": "Use ffmpeg-python to extract audio tracks and video frames from input video files for downstream processing.",
             "dependencies": [],
             "details": "Implement a Python module using ffmpeg-python to separate audio from video files and extract video frames at configurable intervals. Ensure extracted audio is in a Soniox-compatible format (e.g., 16kHz mono WAV). Store extracted frames and audio in a structured directory or object storage for later processing.",
-            "status": "pending",
-            "testStrategy": "Run extraction on sample video files, verify correct number and quality of frames, and check audio format compatibility with Soniox."
+            "status": "done",
+            "testStrategy": "Run extraction on sample video files, verify correct number and quality of frames, and check audio format compatibility with Soniox.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -562,8 +635,9 @@
               1
             ],
             "details": "Authenticate with Soniox API using a project API key. Send extracted audio files for transcription using the async or streaming endpoints. Enable speaker diarization and timestamp options in the API request. Parse and store the returned transcript, speaker labels, and word-level timestamps in the database or metadata files.",
-            "status": "pending",
-            "testStrategy": "Submit test audio files, verify transcript accuracy, correct speaker segmentation, and presence of timestamps. Compare results with ground truth if available."
+            "status": "done",
+            "testStrategy": "Submit test audio files, verify transcript accuracy, correct speaker segmentation, and presence of timestamps. Compare results with ground truth if available.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -573,10 +647,14 @@
               1
             ],
             "details": "Batch or stream video frames to the Claude Vision API, handling authentication and rate limits. Parse the returned analysis (e.g., scene description, object detection) and associate results with corresponding timestamps. Store all metadata in a structured format, linking frame analysis to transcript timeline.",
-            "status": "pending",
-            "testStrategy": "Process sample frames, verify that analysis results are received and correctly mapped to frame timestamps. Check integration with transcript timeline and metadata storage."
+            "status": "done",
+            "testStrategy": "Process sample frames, verify that analysis results are received and correctly mapped to frame timestamps. Check integration with transcript timeline and metadata storage.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on audio & video processing (soniox, claude vision)."
       },
       {
         "id": 12,
@@ -586,9 +664,9 @@
         "testStrategy": "Process documents with structured fields, verify entity extraction and metadata accuracy.",
         "priority": "high",
         "dependencies": [
-          11
+          "11"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -596,8 +674,9 @@
             "description": "Specify the entity types, key-value pairs, and course metadata fields to be extracted. Create example prompts and sample extractions to guide the LangExtract API.",
             "dependencies": [],
             "details": "List all required fields (e.g., course title, module number, lesson number, instructor, date) and define their expected formats. Write natural language prompts and provide high-quality example extractions using LangExtract's ExampleData objects to ensure consistent output schema and accurate extraction.",
-            "status": "pending",
-            "testStrategy": "Review extracted fields from test documents to confirm schema coverage and prompt effectiveness."
+            "status": "done",
+            "testStrategy": "Review extracted fields from test documents to confirm schema coverage and prompt effectiveness.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -607,8 +686,9 @@
               1
             ],
             "details": "Set up API authentication and request handling. For each uploaded course document, send the text and extraction instructions/examples to LangExtract. Parse the returned structured data, ensuring source grounding and attribute mapping. Handle errors and edge cases (e.g., missing fields, ambiguous extractions).",
-            "status": "pending",
-            "testStrategy": "Process a variety of course documents and verify that all required entities and metadata are extracted with correct attributes and source positions."
+            "status": "done",
+            "testStrategy": "Process a variety of course documents and verify that all required entities and metadata are extracted with correct attributes and source positions.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -618,10 +698,14 @@
               2
             ],
             "details": "Map extracted fields to Supabase table schemas, ensuring correct data types and relationships. Implement logic to generate filenames (e.g., M01-L02) from extracted metadata and associate them with stored records. Validate data integrity and handle duplicate or conflicting entries.",
-            "status": "pending",
-            "testStrategy": "Insert extracted data from sample documents into Supabase, verify correct mapping and filename generation, and check for consistency across multiple uploads."
+            "status": "done",
+            "testStrategy": "Insert extracted data from sample documents into Supabase, verify correct mapping and filename generation, and check for consistency across multiple uploads.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on structured data extraction (langextract)."
       },
       {
         "id": 13,
@@ -631,9 +715,9 @@
         "testStrategy": "Chunk various document types, verify chunk boundaries, overlap, and context preservation.",
         "priority": "high",
         "dependencies": [
-          12
+          "12"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -641,8 +725,9 @@
             "description": "Develop and configure semantic chunking for text documents using LlamaIndex, supporting adjustable chunk size and overlap to preserve context.",
             "dependencies": [],
             "details": "Use LlamaIndex's semantic chunker to split documents into contextually coherent chunks. Expose configuration for chunk size and overlap (e.g., via parameters or settings). Ensure chunk metadata (source_doc_id, chunk boundaries, overlap) is captured for each chunk and stored in the document_chunks table. Validate that semantic boundaries are respected and context is preserved across chunks.",
-            "status": "pending",
-            "testStrategy": "Chunk a variety of document types, verify chunk boundaries align with semantic units, check overlap, and confirm metadata is correctly stored."
+            "status": "done",
+            "testStrategy": "Chunk a variety of document types, verify chunk boundaries align with semantic units, check overlap, and confirm metadata is correctly stored.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -652,8 +737,9 @@
               1
             ],
             "details": "Implement code chunking logic that parses source code into AST nodes (e.g., functions, classes) and groups them into chunks based on configurable parameters (lines per chunk, overlap). Support multiple programming languages if required. Store resulting code chunks with relevant metadata (e.g., language, function/class names, overlap) in the document_chunks table.",
-            "status": "pending",
-            "testStrategy": "Process code files in different languages, verify chunking aligns with logical code units, check overlap, and ensure metadata accuracy."
+            "status": "done",
+            "testStrategy": "Process code files in different languages, verify chunking aligns with logical code units, check overlap, and ensure metadata accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -663,10 +749,14 @@
               1
             ],
             "details": "Develop logic to segment transcripts using either fixed time windows or detected topic boundaries. Allow configuration of chunk duration or topic sensitivity, as well as overlap between chunks. Store transcript chunks with metadata (e.g., start/end time, topic label, overlap) in the document_chunks table. Ensure context is preserved across chunk boundaries.",
-            "status": "pending",
-            "testStrategy": "Chunk transcripts with varying lengths and topics, verify chunk boundaries match time/topic criteria, check overlap, and validate metadata storage."
+            "status": "done",
+            "testStrategy": "Chunk transcripts with varying lengths and topics, verify chunk boundaries match time/topic criteria, check overlap, and validate metadata storage.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on adaptive chunking strategy implementation."
       },
       {
         "id": 14,
@@ -676,9 +766,9 @@
         "testStrategy": "Simulate service failures, verify retries, partial saves, and error logs.",
         "priority": "high",
         "dependencies": [
-          13
+          "13"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -686,8 +776,9 @@
             "description": "Integrate structured Python exception handling and Celery retry policies for all pipeline stages to ensure resilience against transient and expected failures.",
             "dependencies": [],
             "details": "Wrap all critical pipeline operations in try/except blocks. Use Celery's retry mechanisms (e.g., autoretry_for, max_retries, retry_backoff) to handle transient errors such as network or service outages. Configure per-task retry parameters and ensure idempotency to avoid side effects on repeated execution. Avoid retrying on non-transient exceptions.",
-            "status": "pending",
-            "testStrategy": "Simulate transient and permanent failures in pipeline tasks. Verify that retries occur as configured, and that non-retriable errors do not trigger retries."
+            "status": "done",
+            "testStrategy": "Simulate transient and permanent failures in pipeline tasks. Verify that retries occur as configured, and that non-retriable errors do not trigger retries.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -697,8 +788,9 @@
               1
             ],
             "details": "For each pipeline stage, define fallback logic (e.g., simplified processing, skipping non-critical steps) to be invoked when primary processing fails after retries. Ensure that partial results are saved where possible, and that the system continues processing unaffected files or stages. Move unrecoverable files to the B2 failed/ folder for later inspection.",
-            "status": "pending",
-            "testStrategy": "Force failures in primary processing logic and verify that fallback methods are invoked, partial results are saved, and failed files are moved appropriately."
+            "status": "done",
+            "testStrategy": "Force failures in primary processing logic and verify that fallback methods are invoked, partial results are saved, and failed files are moved appropriately.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -709,10 +801,14 @@
               2
             ],
             "details": "On every exception or failure, capture the full stack trace and relevant context. Insert detailed error records into the processing_logs table, including task identifiers, error types, messages, and timestamps. Ensure logs are structured for easy querying and monitoring. Integrate with monitoring tools if available.",
-            "status": "pending",
-            "testStrategy": "Trigger various error scenarios and verify that all relevant details are logged in the processing_logs table, including stack traces and context."
+            "status": "done",
+            "testStrategy": "Trigger various error scenarios and verify that all relevant details are logged in the processing_logs table, including stack traces and context.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on error handling & graceful degradation."
       },
       {
         "id": 15,
@@ -722,9 +818,9 @@
         "testStrategy": "Process documents, verify Prometheus metrics, Grafana dashboard updates, and Supabase logs.",
         "priority": "high",
         "dependencies": [
-          14
+          "14"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -732,8 +828,9 @@
             "description": "Instrument FastAPI and Celery services to expose Prometheus-compatible metrics endpoints for processing progress, resource usage, and cost tracking.",
             "dependencies": [],
             "details": "Install prometheus_client in both FastAPI and Celery environments. For FastAPI, mount the /metrics endpoint using make_asgi_app and add counters, histograms, and gauges for request counts, processing time, and resource usage. For Celery, use available Prometheus exporters or integrate prometheus_client to expose worker and task metrics. Ensure all relevant business and custom metrics are included.",
-            "status": "pending",
-            "testStrategy": "Verify /metrics endpoints in FastAPI and Celery return expected metrics. Use Prometheus to scrape these endpoints and confirm metrics are ingested."
+            "status": "done",
+            "testStrategy": "Verify /metrics endpoints in FastAPI and Celery return expected metrics. Use Prometheus to scrape these endpoints and confirm metrics are ingested.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -743,8 +840,9 @@
               1
             ],
             "details": "Extend processing logic to record metrics at each pipeline stage. Store metrics such as start/end timestamps, CPU/memory usage, and cost estimates in the processing_logs table. Ensure schema supports all required fields and that writes are efficient and reliable.",
-            "status": "pending",
-            "testStrategy": "Process sample documents and verify that processing_logs table contains accurate, stage-wise metrics matching Prometheus data."
+            "status": "done",
+            "testStrategy": "Process sample documents and verify that processing_logs table contains accurate, stage-wise metrics matching Prometheus data.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -755,10 +853,14 @@
               2
             ],
             "details": "Simulate document processing and monitor Prometheus for real-time metrics updates. Confirm that Grafana dashboards reflect current and historical metrics. Cross-check database logs with Prometheus data for consistency. Validate cost calculations and resource usage reporting.",
-            "status": "pending",
-            "testStrategy": "Run end-to-end tests: process documents, check Prometheus and Grafana for live metrics, and verify processing_logs entries. Ensure all metrics are accurate and actionable."
+            "status": "done",
+            "testStrategy": "Run end-to-end tests: process documents, check Prometheus and Grafana for live metrics, and verify processing_logs entries. Ensure all metrics are accurate and actionable.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on processing monitoring & metrics collection."
       },
       {
         "id": 16,
@@ -768,9 +870,9 @@
         "testStrategy": "Generate embeddings for sample chunks, verify latency, caching, and Supabase storage.",
         "priority": "high",
         "dependencies": [
-          15
+          "15"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -778,8 +880,9 @@
             "description": "Set up and integrate the BGE-M3 embedding model using Ollama for local development, enabling batch processing of document chunks.",
             "dependencies": [],
             "details": "Install and configure langchain_ollama and OllamaEmbeddings with the BGE-M3 model. Implement batch processing for 100 document chunks at a time. Ensure the pipeline can handle content updates by triggering re-embedding as needed. Optimize for local inference speed and resource usage.",
-            "status": "pending",
-            "testStrategy": "Generate embeddings for a sample batch of 100 chunks, verify output shape and latency, and confirm embeddings are regenerated on content updates."
+            "status": "done",
+            "testStrategy": "Generate embeddings for a sample batch of 100 chunks, verify output shape and latency, and confirm embeddings are regenerated on content updates.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -789,8 +892,9 @@
               1
             ],
             "details": "Configure the Claude API integration within the embedding pipeline. Ensure batch processing of 100 chunks per request, with error handling and retry logic. Provide a configuration switch to toggle between Ollama (dev) and Claude API (prod). Ensure compatibility of embedding formats and dimensions.",
-            "status": "pending",
-            "testStrategy": "Run embedding generation for a sample batch via Claude API, verify output consistency with dev pipeline, and test failover and error handling."
+            "status": "done",
+            "testStrategy": "Run embedding generation for a sample batch via Claude API, verify output consistency with dev pipeline, and test failover and error handling.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -800,10 +904,14 @@
               2
             ],
             "details": "Integrate with Supabase pgvector to store and retrieve embeddings. Implement logic to check for content changes and invalidate or update cached embeddings as needed. Ensure efficient batch inserts and retrievals. Maintain metadata for tracking embedding versions and update timestamps.",
-            "status": "pending",
-            "testStrategy": "Insert, retrieve, and update embeddings in Supabase for sample documents. Simulate content updates and verify that embeddings are correctly regenerated and cached."
+            "status": "done",
+            "testStrategy": "Insert, retrieve, and update embeddings in Supabase for sample documents. Simulate content updates and verify that embeddings are correctly regenerated and cached.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on embedding generation pipeline (bge-m3, claude api)."
       },
       {
         "id": 17,
@@ -813,9 +921,9 @@
         "testStrategy": "Insert and search embeddings, verify index performance and metadata filtering.",
         "priority": "high",
         "dependencies": [
-          16
+          "16"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -823,8 +931,9 @@
             "description": "Activate the pgvector extension in the Supabase PostgreSQL database to support vector data types and similarity search operations.",
             "dependencies": [],
             "details": "Access the Supabase dashboard, navigate to the Extensions section, and enable the 'vector' extension. This step is required before creating tables with vector columns and using vector search features.",
-            "status": "pending",
-            "testStrategy": "Verify that the 'vector' extension is listed as enabled in the Supabase dashboard and that SQL commands using the 'vector' data type execute without errors."
+            "status": "done",
+            "testStrategy": "Verify that the 'vector' extension is listed as enabled in the Supabase dashboard and that SQL commands using the 'vector' data type execute without errors.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -834,8 +943,9 @@
               1
             ],
             "details": "Define a table schema with columns for id, embedding (vector), metadata (JSONB), and namespace (text or UUID). Use SQL to create the table and then create an HNSW index on the embedding column for efficient ANN search.",
-            "status": "pending",
-            "testStrategy": "Insert sample embeddings and confirm that the HNSW index exists and is used in EXPLAIN query plans for similarity searches."
+            "status": "done",
+            "testStrategy": "Insert sample embeddings and confirm that the HNSW index exists and is used in EXPLAIN query plans for similarity searches.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -845,8 +955,9 @@
               2
             ],
             "details": "Use supabase-py or another supported client to insert multiple embeddings in a single operation, minimizing transaction overhead and maximizing throughput. Ensure the code handles large batches and error cases.",
-            "status": "pending",
-            "testStrategy": "Benchmark batch insert performance with varying batch sizes and verify that all records are correctly stored in the table."
+            "status": "done",
+            "testStrategy": "Benchmark batch insert performance with varying batch sizes and verify that all records are correctly stored in the table.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -856,8 +967,9 @@
               2
             ],
             "details": "Add a namespace column to the embeddings table if not already present. Ensure all insert and query operations include namespace filtering to logically separate data for different use cases or clients.",
-            "status": "pending",
-            "testStrategy": "Insert embeddings with different namespaces and verify that queries scoped to a namespace only return relevant records."
+            "status": "done",
+            "testStrategy": "Insert embeddings with different namespaces and verify that queries scoped to a namespace only return relevant records.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -867,10 +979,14 @@
               2
             ],
             "details": "Use PostgreSQL's JSONB operators to filter embeddings by metadata fields in combination with vector similarity queries. Update search queries to support metadata-based filtering (e.g., by document type, tags, or timestamps).",
-            "status": "pending",
-            "testStrategy": "Run similarity searches with and without metadata filters, confirming that results are correctly filtered and performance remains acceptable."
+            "status": "done",
+            "testStrategy": "Run similarity searches with and without metadata filters, confirming that results are correctly filtered and performance remains acceptable.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7.5,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Expand vector storage and indexing into subtasks for enabling pgvector, creating HNSW index, optimizing batch inserts, organizing by namespace, and implementing metadata filtering."
       },
       {
         "id": 18,
@@ -880,9 +996,9 @@
         "testStrategy": "Run hybrid searches, verify result fusion, relevance, and latency targets.",
         "priority": "high",
         "dependencies": [
-          17
+          "17"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -890,8 +1006,9 @@
             "description": "Develop individual search pipelines for dense (vector), sparse (BM25), and fuzzy (ILIKE, rapidfuzz) retrieval methods.",
             "dependencies": [],
             "details": "Set up pgvector for dense search, configure PostgreSQL full-text search for BM25, implement ILIKE for pattern matching, and integrate rapidfuzz for fuzzy matching. Ensure each pipeline can independently retrieve and score results for a given query.",
-            "status": "pending",
-            "testStrategy": "Run isolated queries for each pipeline and verify result relevance, accuracy, and latency."
+            "status": "done",
+            "testStrategy": "Run isolated queries for each pipeline and verify result relevance, accuracy, and latency.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -901,8 +1018,9 @@
               1
             ],
             "details": "Develop RRF logic to merge result lists from all pipelines, applying configurable weights. Ensure the algorithm penalizes lower-ranked results and boosts consensus across methods. Validate with sample queries and edge cases.",
-            "status": "pending",
-            "testStrategy": "Test fusion with controlled input lists, verify ranking consistency, and check that top results reflect combined relevance."
+            "status": "done",
+            "testStrategy": "Test fusion with controlled input lists, verify ranking consistency, and check that top results reflect combined relevance.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -912,10 +1030,14 @@
               2
             ],
             "details": "Orchestrate parallel execution of all search methods, collect results, apply RRF fusion, and return unified ranked results. Implement API endpoint with configurable fusion weights and query parameters. Ensure robust error handling and logging.",
-            "status": "pending",
-            "testStrategy": "Run end-to-end hybrid search queries through the API, validate result quality, latency, and error handling."
+            "status": "done",
+            "testStrategy": "Run end-to-end hybrid search queries through the API, validate result quality, latency, and error handling.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on hybrid search implementation (dense, sparse, fuzzy, rrf)."
       },
       {
         "id": 19,
@@ -925,9 +1047,9 @@
         "testStrategy": "Test query expansion and reranking, verify improved recall and precision.",
         "priority": "high",
         "dependencies": [
-          18
+          "18"
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
@@ -935,8 +1057,9 @@
             "description": "Implement query expansion using Claude Haiku via anthropic-py, ensuring queries are enriched for improved recall.",
             "dependencies": [],
             "details": "Set up anthropic-py client and configure Claude Haiku 4.5 API parameters (e.g., max_tokens, temperature, top_p). Design prompt templates to expand user queries, leveraging advanced prompt engineering techniques for optimal output. Handle API errors and retries for reliability.",
-            "status": "pending",
-            "testStrategy": "Send sample queries and verify that expanded queries are generated as expected. Compare recall and diversity of results before and after expansion."
+            "status": "done",
+            "testStrategy": "Send sample queries and verify that expanded queries are generated as expected. Compare recall and diversity of results before and after expansion.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -946,8 +1069,9 @@
               1
             ],
             "details": "Implement asynchronous or concurrent search logic to execute multiple queries in parallel. Aggregate results from all searches, ensuring deduplication and efficient handling of large result sets. Optimize for latency and throughput.",
-            "status": "pending",
-            "testStrategy": "Test with multiple expanded queries and measure search latency. Confirm that all relevant results are retrieved and aggregated correctly."
+            "status": "done",
+            "testStrategy": "Test with multiple expanded queries and measure search latency. Confirm that all relevant results are retrieved and aggregated correctly.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -957,10 +1081,14 @@
               2
             ],
             "details": "Integrate Ollama BGE-Reranker-v2 (dev) or Claude API (prod) to rerank aggregated results. Configure reranker model and permissions, and tune reranking parameters. Validate reranked output for relevance and consistency.",
-            "status": "pending",
-            "testStrategy": "Compare original and reranked result sets using relevance metrics (precision, recall, NDCG). Conduct manual review of top results for quality assurance."
+            "status": "in-progress",
+            "testStrategy": "Compare original and reranked result sets using relevance metrics (precision, recall, NDCG). Conduct manual review of top results for quality assurance.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on query expansion & reranking (claude haiku, bge-reranker-v2)."
       },
       {
         "id": 20,
@@ -970,7 +1098,7 @@
         "testStrategy": "Insert entities/relationships, run Cypher queries, verify graph traversal and context retrieval.",
         "priority": "high",
         "dependencies": [
-          19
+          "19"
         ],
         "status": "pending",
         "subtasks": [
@@ -981,7 +1109,8 @@
             "dependencies": [],
             "details": "Use pip to install the neo4j Python driver (neo4j >=5.10). Configure connection parameters (URI, username, password) and verify connectivity using GraphDatabase.driver and driver.verify_connectivity(). Ensure the database instance is running and accessible.",
             "status": "pending",
-            "testStrategy": "Attempt connection and run a simple Cypher query to confirm connectivity."
+            "testStrategy": "Attempt connection and run a simple Cypher query to confirm connectivity.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -992,7 +1121,8 @@
             ],
             "details": "Define node labels (e.g., Document, Entity) and relationship types. Use MERGE or CREATE Cypher statements to add nodes and relationships. Implement Python functions to batch insert entities and relationships, ensuring idempotency and data integrity.",
             "status": "pending",
-            "testStrategy": "Insert sample entities and relationships, then query the graph to verify correct node and relationship creation."
+            "testStrategy": "Insert sample entities and relationships, then query the graph to verify correct node and relationship creation.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1003,9 +1133,13 @@
             ],
             "details": "Implement Cypher queries for traversing relationships (e.g., MATCH, OPTIONAL MATCH). Integrate vector index for similarity search if required. Provide Python functions to retrieve context around entities and relationships, supporting advanced graph queries.",
             "status": "pending",
-            "testStrategy": "Run entity-centric and relationship traversal queries, validate context retrieval, and test vector index search if applicable."
+            "testStrategy": "Run entity-centric and relationship traversal queries, validate context retrieval, and test vector index search if applicable.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on neo4j graph integration & entity storage."
       },
       {
         "id": 21,
@@ -1015,7 +1149,7 @@
         "testStrategy": "Run repeated queries, verify cache hits/misses, and cache update logic.",
         "priority": "high",
         "dependencies": [
-          20
+          "20"
         ],
         "status": "pending",
         "subtasks": [
@@ -1026,7 +1160,8 @@
             "dependencies": [],
             "details": "Use redis-py to connect to Redis. Define cache keys for queries, embeddings, and search results. Implement logic to only cache results that meet semantic similarity thresholds. Set a 5-minute expiration (TTL) for all cache entries to ensure freshness. Ensure cache-aside pattern is used for read-heavy workloads, checking Redis first and falling back to the database on cache miss.",
             "status": "pending",
-            "testStrategy": "Run repeated queries and verify that results are cached in Redis, TTL is respected, and only semantically relevant results are cached."
+            "testStrategy": "Run repeated queries and verify that results are cached in Redis, TTL is respected, and only semantically relevant results are cached.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1037,7 +1172,8 @@
             ],
             "details": "On cache miss in Redis, query PostgreSQL for the required data. If found, repopulate Redis with the result, applying the same semantic threshold and TTL logic. Ensure the fallback mechanism is robust and does not introduce significant latency. Use efficient serialization for storing and retrieving data between Redis and PostgreSQL.",
             "status": "pending",
-            "testStrategy": "Simulate cache misses and verify that data is correctly fetched from PostgreSQL, then cached in Redis for subsequent requests."
+            "testStrategy": "Simulate cache misses and verify that data is correctly fetched from PostgreSQL, then cached in Redis for subsequent requests.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1049,9 +1185,13 @@
             ],
             "details": "Instrument the caching logic to record cache hits, misses, and repopulation events. Aggregate metrics such as hit rate, miss rate, and average response time. Set up dashboards or logs to visualize cache performance and identify optimization opportunities. Use these metrics to tune semantic thresholds and TTL values.",
             "status": "pending",
-            "testStrategy": "Generate load with a mix of repeated and unique queries, then verify that hit/miss metrics are accurately tracked and reported."
+            "testStrategy": "Generate load with a mix of repeated and unique queries, then verify that hit/miss metrics are accurately tracked and reported.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on caching strategy (redis, tiered cache)."
       },
       {
         "id": 22,
@@ -1061,7 +1201,7 @@
         "testStrategy": "Submit queries of each type, verify correct classification and routing.",
         "priority": "high",
         "dependencies": [
-          21
+          "21"
         ],
         "status": "pending",
         "subtasks": [
@@ -1072,7 +1212,8 @@
             "dependencies": [],
             "details": "Analyze typical incoming queries and categorize them into clear types. Document routing rules for each category, mapping them to the appropriate search pipeline (vector, graph, metadata). Consider hierarchical classification if the taxonomy is complex, and ensure the design supports future extensibility.",
             "status": "pending",
-            "testStrategy": "Review taxonomy coverage against a sample set of queries. Validate routing logic with test cases for each query type."
+            "testStrategy": "Review taxonomy coverage against a sample set of queries. Validate routing logic with test cases for each query type.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1083,7 +1224,8 @@
             ],
             "details": "Use prompt engineering and, if needed, hierarchical classification to maximize accuracy. Integrate Claude Haiku via API, ensuring the classifier outputs only the defined category names. Optimize for speed and reliability, and consider using vector similarity retrieval for highly variable queries.",
             "status": "pending",
-            "testStrategy": "Submit queries of each type and edge cases to the classifier. Measure classification accuracy and latency. Confirm output matches taxonomy."
+            "testStrategy": "Submit queries of each type and edge cases to the classifier. Measure classification accuracy and latency. Confirm output matches taxonomy.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1094,9 +1236,13 @@
             ],
             "details": "Implement the routing logic that receives the classified query type and triggers the corresponding search pipeline (vector, graph, metadata, or hybrid). Ensure robust error handling and logging. Validate that each pipeline receives only relevant queries and that fallback logic is in place for unclassified or ambiguous queries.",
             "status": "pending",
-            "testStrategy": "End-to-end test: submit queries, verify correct classification and routing to the intended pipeline. Check logs and error handling for misrouted or unclassified queries."
+            "testStrategy": "End-to-end test: submit queries, verify correct classification and routing to the intended pipeline. Check logs and error handling for misrouted or unclassified queries.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on query type detection & routing."
       },
       {
         "id": 23,
@@ -1106,7 +1252,7 @@
         "testStrategy": "Process complex queries, verify result quality, deduplication, and latency.",
         "priority": "high",
         "dependencies": [
-          22
+          "22"
         ],
         "status": "pending",
         "subtasks": [
@@ -1117,7 +1263,8 @@
             "dependencies": [],
             "details": "Create functions to standardize query formats (e.g., lowercasing, removing stopwords) and apply expansion techniques using external models or APIs. Ensure logging of all normalized and expanded queries for traceability.",
             "status": "pending",
-            "testStrategy": "Test with diverse query inputs, verify normalization accuracy, and check that expansions improve recall without introducing irrelevant results."
+            "testStrategy": "Test with diverse query inputs, verify normalization accuracy, and check that expansions improve recall without introducing irrelevant results.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1128,7 +1275,8 @@
             ],
             "details": "Set up parallel execution logic to run expanded queries against all relevant data sources. After retrieval, apply deduplication algorithms to remove duplicate results based on content similarity or unique identifiers. Log execution times and deduplication statistics.",
             "status": "pending",
-            "testStrategy": "Simulate concurrent queries, measure execution latency, and verify that deduplication removes all duplicates while retaining unique results."
+            "testStrategy": "Simulate concurrent queries, measure execution latency, and verify that deduplication removes all duplicates while retaining unique results.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1139,9 +1287,13 @@
             ],
             "details": "Implement RRF to combine results from multiple sources, then apply reranking using models such as BGE-Reranker-v2 or Claude API. Ensure all queries and merged results are logged for audit and debugging purposes.",
             "status": "pending",
-            "testStrategy": "Process sample queries, validate that RRF merging and reranking improve relevance, and check that final output matches expected quality benchmarks."
+            "testStrategy": "Process sample queries, validate that RRF merging and reranking improve relevance, and check that final output matches expected quality benchmarks.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on query processing pipeline & result merging."
       },
       {
         "id": 24,
@@ -1151,7 +1303,7 @@
         "testStrategy": "Run filtered searches, verify result presentation and facet accuracy.",
         "priority": "medium",
         "dependencies": [
-          23
+          "23"
         ],
         "status": "pending",
         "subtasks": [
@@ -1162,7 +1314,8 @@
             "dependencies": [],
             "details": "Design and build user interface elements for each facet (department, type, date, entities) with multi-select capability. Ensure facets are easy to find, mobile-friendly, and update results quickly when filters are applied. Facet values should be ordered logically (alphabetical, numerical, or by relevance) and selected values should be clearly indicated. Only display relevant facets for the current result set.",
             "status": "pending",
-            "testStrategy": "Test by applying various combinations of facet filters and verifying that the displayed results update accordingly and facet selections persist. Check usability on both desktop and mobile."
+            "testStrategy": "Test by applying various combinations of facet filters and verifying that the displayed results update accordingly and facet selections persist. Check usability on both desktop and mobile.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1173,7 +1326,8 @@
             ],
             "details": "For each search result, extract a relevant snippet containing the matched keywords. Highlight these keywords in the snippet. Display additional metadata such as relevance score, source, and department. Ensure that snippets are concise and informative, and that highlights are visually distinct.",
             "status": "pending",
-            "testStrategy": "Run searches with various queries and verify that snippets are generated, keywords are highlighted, and metadata is displayed correctly for each result."
+            "testStrategy": "Run searches with various queries and verify that snippets are generated, keywords are highlighted, and metadata is displayed correctly for each result.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1184,9 +1338,13 @@
             ],
             "details": "For each result, provide a clickable link to the B2 URL. Display the relevance score prominently, ensuring it is calculated and presented consistently. Confirm that the source and department fields are shown as specified. Validate that all links are functional and direct users to the correct B2 resource.",
             "status": "pending",
-            "testStrategy": "Click through result links to verify correct B2 URL redirection. Check that relevance scores match backend calculations and are displayed for all results."
+            "testStrategy": "Click through result links to verify correct B2 URL redirection. Check that relevance scores match backend calculations and are displayed for all results.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on faceted search & result presentation."
       },
       {
         "id": 25,
@@ -1196,7 +1354,7 @@
         "testStrategy": "Analyze logs, verify CTR tracking, and run A/B tests.",
         "priority": "medium",
         "dependencies": [
-          24
+          "24"
         ],
         "status": "pending",
         "subtasks": [
@@ -1207,7 +1365,8 @@
             "dependencies": [],
             "details": "Design Supabase tables to store query logs, including query text, timestamps, latency, and user interactions (clicks). Integrate logging into the query execution pipeline to ensure all relevant metrics are captured for each search event.",
             "status": "pending",
-            "testStrategy": "Verify that queries, latency, and clicks are correctly logged in Supabase by running test queries and inspecting the stored data for completeness and accuracy."
+            "testStrategy": "Verify that queries, latency, and clicks are correctly logged in Supabase by running test queries and inspecting the stored data for completeness and accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1218,7 +1377,8 @@
             ],
             "details": "Use a dashboarding tool (e.g., Grafana or Streamlit) to connect to Supabase and display real-time and historical analytics for query metrics. Include filters for date ranges and ranking algorithm versions to support analysis.",
             "status": "pending",
-            "testStrategy": "Check that the dashboard accurately reflects Supabase data by comparing dashboard metrics with direct database queries. Test responsiveness and filtering capabilities."
+            "testStrategy": "Check that the dashboard accurately reflects Supabase data by comparing dashboard metrics with direct database queries. Test responsiveness and filtering capabilities.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1229,9 +1389,13 @@
             ],
             "details": "Randomly assign users or sessions to control and treatment groups, each using a different ranking algorithm. Log group assignment and outcomes in Supabase. Analyze results using statistical tests (e.g., t-test or Z-test) to determine significance of observed differences in metrics like CTR and latency[1][2][3].",
             "status": "pending",
-            "testStrategy": "Simulate A/B tests with test users, verify correct group assignment and metric logging, and validate statistical analysis pipeline with sample data."
+            "testStrategy": "Simulate A/B tests with test users, verify correct group assignment and metric logging, and validate statistical analysis pipeline with sample data.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on query analytics & a/b testing."
       },
       {
         "id": 26,
@@ -1241,7 +1405,7 @@
         "testStrategy": "Test chat interactions, streaming, and mobile responsiveness.",
         "priority": "high",
         "dependencies": [
-          25
+          "25"
         ],
         "status": "pending",
         "subtasks": [
@@ -1252,7 +1416,8 @@
             "dependencies": [],
             "details": "Implement the chat UI using Gradio's ChatInterface or Streamlit's chat elements (st.chat_message, st.chat_input). Ensure the layout is mobile-friendly and supports dynamic resizing. Integrate session state or equivalent for chat history persistence.",
             "status": "pending",
-            "testStrategy": "Manually test UI on desktop and mobile browsers for responsiveness, usability, and correct message display."
+            "testStrategy": "Manually test UI on desktop and mobile browsers for responsiveness, usability, and correct message display.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1263,7 +1428,8 @@
             ],
             "details": "Create FastAPI WebSocket routes for chat message exchange. Ensure proper connection handling, message broadcasting, and support for multiple clients. Integrate authentication if required.",
             "status": "pending",
-            "testStrategy": "Use WebSocket client tools and frontend integration to verify real-time message delivery and connection stability."
+            "testStrategy": "Use WebSocket client tools and frontend integration to verify real-time message delivery and connection stability.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1274,7 +1440,8 @@
             ],
             "details": "Modify backend to call Claude API with streaming enabled. Forward each token or chunk to the frontend as it arrives via WebSocket. Update frontend to append streamed tokens to the chat window in real time.",
             "status": "pending",
-            "testStrategy": "Send prompts and verify that responses appear incrementally in the chat UI, matching Claude API streaming output."
+            "testStrategy": "Send prompts and verify that responses appear incrementally in the chat UI, matching Claude API streaming output.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1285,7 +1452,8 @@
             ],
             "details": "Emit typing events from backend to frontend while waiting for Claude API responses. Display a typing indicator in the UI. Handle and display errors gracefully, such as API timeouts or connection drops.",
             "status": "pending",
-            "testStrategy": "Simulate slow responses and errors; verify typing indicator visibility and user-friendly error messages."
+            "testStrategy": "Simulate slow responses and errors; verify typing indicator visibility and user-friendly error messages.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -1296,9 +1464,13 @@
             ],
             "details": "Use browser dev tools and real devices to test UI scaling, input usability, and scrolling. Adjust CSS or component properties as needed for optimal mobile experience.",
             "status": "pending",
-            "testStrategy": "Perform cross-device testing and collect feedback to ensure consistent, responsive behavior on phones and tablets."
+            "testStrategy": "Perform cross-device testing and collect feedback to ensure consistent, responsive behavior on phones and tablets.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 6.5,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Expand chat UI implementation into subtasks for frontend development (Gradio/Streamlit), WebSocket endpoint implementation, streaming response handling, typing indicator/error handling, and mobile responsiveness testing."
       },
       {
         "id": 27,
@@ -1308,7 +1480,7 @@
         "testStrategy": "Simulate conversations, verify memory storage, retrieval, and RLS enforcement.",
         "priority": "high",
         "dependencies": [
-          26
+          "26"
         ],
         "status": "pending",
         "subtasks": [
@@ -1319,7 +1491,8 @@
             "dependencies": [],
             "details": "Define schemas for user_memory_nodes and user_memory_edges, ensuring each node represents a memory item (e.g., message, context) and edges capture relationships (e.g., temporal, reference). Implement table creation scripts and indexes for efficient traversal. Ensure compatibility with Supabase and prepare for RLS enforcement.",
             "status": "pending",
-            "testStrategy": "Verify table creation, schema correctness, and ability to insert and query nodes/edges representing conversation history."
+            "testStrategy": "Verify table creation, schema correctness, and ability to insert and query nodes/edges representing conversation history.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1330,7 +1503,8 @@
             ],
             "details": "Implement backend functions to add new conversation turns as nodes, link them with edges, and prune or limit history based on a context window (e.g., last N messages). Ensure recency and access-weighted retrieval logic is in place to prioritize relevant memory during retrieval. Integrate with Supabase API for transactional consistency.",
             "status": "pending",
-            "testStrategy": "Simulate conversations, add and remove nodes/edges, and verify that context window and recency/access-weighted retrieval return expected results."
+            "testStrategy": "Simulate conversations, add and remove nodes/edges, and verify that context window and recency/access-weighted retrieval return expected results.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1342,9 +1516,13 @@
             ],
             "details": "Define and apply RLS policies on user_memory_nodes and user_memory_edges to restrict access by user identity. Test for unauthorized access attempts and verify that only the correct user's data is accessible. Document RLS configuration and integrate with Supabase authentication.",
             "status": "pending",
-            "testStrategy": "Attempt cross-user access, verify RLS enforcement, and run automated tests to confirm only authorized access to memory nodes and edges."
+            "testStrategy": "Attempt cross-user access, verify RLS enforcement, and run automated tests to confirm only authorized access to memory nodes and edges.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on conversation memory system (supabase graph tables)."
       },
       {
         "id": 28,
@@ -1354,7 +1532,7 @@
         "testStrategy": "Test session persistence, preference learning, and privacy controls.",
         "priority": "medium",
         "dependencies": [
-          27
+          "27"
         ],
         "status": "pending",
         "subtasks": [
@@ -1365,7 +1543,8 @@
             "dependencies": [],
             "details": "Design a session management system that assigns unique, secure session IDs, supports concurrent sessions per user, and persists session data using a shared store (e.g., Redis). Implement session timeout, export, and deletion features. Ensure session data is securely stored and can be invalidated or removed on demand.",
             "status": "pending",
-            "testStrategy": "Simulate multiple concurrent sessions, verify session persistence after server restart, and test session export and deletion functionality."
+            "testStrategy": "Simulate multiple concurrent sessions, verify session persistence after server restart, and test session export and deletion functionality.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1376,7 +1555,8 @@
             ],
             "details": "Implement logic to capture user actions and infer preferences, storing them as structured memory nodes linked to user profiles. Ensure updates are atomic and preferences persist across sessions. Provide mechanisms to retrieve and update preferences efficiently.",
             "status": "pending",
-            "testStrategy": "Test preference capture, retrieval, and update across multiple sessions and users. Validate that preferences persist and are correctly associated with users."
+            "testStrategy": "Test preference capture, retrieval, and update across multiple sessions and users. Validate that preferences persist and are correctly associated with users.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1388,9 +1568,13 @@
             ],
             "details": "Develop UI components that allow users to view and manage their active sessions, export or delete session data, and opt out of preference learning. Ensure privacy controls are clear, accessible, and enforceable at the backend.",
             "status": "pending",
-            "testStrategy": "Perform UI/UX testing for privacy controls, verify backend enforcement of opt-out and deletion, and ensure users can manage sessions and preferences as intended."
+            "testStrategy": "Perform UI/UX testing for privacy controls, verify backend enforcement of opt-out and deletion, and ensure users can manage sessions and preferences as intended.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on session & preference management."
       },
       {
         "id": 29,
@@ -1400,7 +1584,7 @@
         "testStrategy": "Simulate load, verify metrics, dashboard updates, alert triggers, and log accuracy.",
         "priority": "high",
         "dependencies": [
-          28
+          "28"
         ],
         "status": "pending",
         "subtasks": [
@@ -1411,7 +1595,8 @@
             "dependencies": [],
             "details": "Install and configure prometheus_client in each service. Expose /metrics endpoints for FastAPI, Celery, Redis, and Neo4j. Ensure custom business metrics are included where relevant. Validate that metrics are accessible and correctly formatted for Prometheus scraping.",
             "status": "pending",
-            "testStrategy": "Simulate service activity and verify metrics are exposed and collected by Prometheus. Check for completeness and accuracy of metrics."
+            "testStrategy": "Simulate service activity and verify metrics are exposed and collected by Prometheus. Check for completeness and accuracy of metrics.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1422,7 +1607,8 @@
             ],
             "details": "Connect Grafana to Prometheus as a data source. Design dashboards for FastAPI, Celery, Redis, and Neo4j, including panels for key metrics (e.g., request rates, error rates, resource usage). Use Grafana's dashboard editor to organize panels and set up useful visualizations for operational monitoring.",
             "status": "pending",
-            "testStrategy": "Verify dashboards update in real-time with incoming metrics. Confirm panels display accurate and actionable data for each service."
+            "testStrategy": "Verify dashboards update in real-time with incoming metrics. Confirm panels display accurate and actionable data for each service.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1433,9 +1619,13 @@
             ],
             "details": "Install and configure Alertmanager. Define alert rules in Prometheus and Grafana for critical metrics. Set up Alertmanager contact points for email, Slack, and other channels. Configure notification policies and silences as needed. Integrate Alertmanager with Grafana to manage and route alerts, ensuring unified notification handling[1][3][4][5][6].",
             "status": "pending",
-            "testStrategy": "Trigger test alerts and verify notifications are sent to all configured channels. Check alert deduplication, grouping, and routing logic."
+            "testStrategy": "Trigger test alerts and verify notifications are sent to all configured channels. Check alert deduplication, grouping, and routing logic.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on monitoring & observability (prometheus, grafana, alertmanager)."
       },
       {
         "id": 30,
@@ -1445,7 +1635,7 @@
         "testStrategy": "Simulate usage, verify cost reports and alert triggers.",
         "priority": "medium",
         "dependencies": [
-          29
+          "29"
         ],
         "status": "pending",
         "subtasks": [
@@ -1456,7 +1646,8 @@
             "dependencies": [],
             "details": "Set up data pipelines or use APIs to collect cost and usage data from each provider. Normalize and aggregate costs by service and resource type. Ensure tracking supports multi-cloud and SaaS sources, and enables per-service breakdowns for accurate reporting.",
             "status": "pending",
-            "testStrategy": "Simulate usage across all services, verify that cost data is collected, normalized, and attributed correctly for each provider."
+            "testStrategy": "Simulate usage across all services, verify that cost data is collected, normalized, and attributed correctly for each provider.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1467,7 +1658,8 @@
             ],
             "details": "Design and implement a reporting system that compiles monthly cost data into clear, actionable reports. Include breakdowns by service, resource type, and time period. Reports should be exportable and support visualization for trend analysis.",
             "status": "pending",
-            "testStrategy": "Trigger monthly report generation with sample data, verify report accuracy, completeness, and clarity for all tracked services."
+            "testStrategy": "Trigger monthly report generation with sample data, verify report accuracy, completeness, and clarity for all tracked services.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1478,9 +1670,13 @@
             ],
             "details": "Configure monitoring logic to evaluate cumulative spend against budget thresholds in real time. Integrate with notification channels (e.g., email, Slack) to deliver timely alerts. Ensure alerts are actionable and include relevant cost breakdowns.",
             "status": "pending",
-            "testStrategy": "Simulate cost increases to exceed 80% of budget, confirm that alerts are triggered promptly and contain accurate, actionable information."
+            "testStrategy": "Simulate cost increases to exceed 80% of budget, confirm that alerts are triggered promptly and contain accurate, actionable information.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on cost tracking & optimization."
       },
       {
         "id": 31,
@@ -1490,7 +1686,7 @@
         "testStrategy": "Test role permissions, API key flows, and audit log accuracy.",
         "priority": "high",
         "dependencies": [
-          30
+          "30"
         ],
         "status": "pending",
         "subtasks": [
@@ -1501,7 +1697,8 @@
             "dependencies": [],
             "details": "Create a roles table and associate users with roles. Use Supabase's RLS policies to restrict access to tables based on user roles. Ensure that each role has clearly defined permissions for CRUD operations on users, documents, and API keys. Reference Supabase documentation and best practices for RLS and RBAC implementation.",
             "status": "pending",
-            "testStrategy": "Test RLS policies by creating users with different roles and verifying access to resources. Attempt unauthorized actions to confirm enforcement of restrictions."
+            "testStrategy": "Test RLS policies by creating users with different roles and verifying access to resources. Attempt unauthorized actions to confirm enforcement of restrictions.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1512,7 +1709,8 @@
             ],
             "details": "Create endpoints for generating, rotating, and revoking API keys. Store only hashed versions of API keys using bcrypt in the database. Ensure that API keys are associated with users and roles, and that their permissions align with RBAC policies. Document the API key management process and enforce secure handling throughout the lifecycle.",
             "status": "pending",
-            "testStrategy": "Verify API key creation, rotation, and revocation flows. Confirm that only hashed keys are stored and that revoked keys cannot be used for access."
+            "testStrategy": "Verify API key creation, rotation, and revocation flows. Confirm that only hashed keys are stored and that revoked keys cannot be used for access.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1524,9 +1722,13 @@
             ],
             "details": "Set up audit logging for all RBAC-related actions, including role assignments, permission changes, and API key lifecycle events. Store logs in a dedicated audit table with relevant metadata (user, action, timestamp, resource). Ensure logs are immutable and accessible for compliance reviews.",
             "status": "pending",
-            "testStrategy": "Trigger various RBAC and API key events, then review audit logs to confirm accurate and complete recording of all relevant actions."
+            "testStrategy": "Trigger various RBAC and API key events, then review audit logs to confirm accurate and complete recording of all relevant actions.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on role-based access control (rbac) & api key management."
       },
       {
         "id": 32,
@@ -1536,7 +1738,7 @@
         "testStrategy": "Perform bulk operations, verify throughput, versioning, and approval transitions.",
         "priority": "high",
         "dependencies": [
-          31
+          "31"
         ],
         "status": "pending",
         "subtasks": [
@@ -1547,7 +1749,8 @@
             "dependencies": [],
             "details": "Design and implement backend endpoints that accept batch requests for document operations. Ensure endpoints handle large payloads efficiently, support progress tracking, and provide clear error reporting for partial failures. Integrate with storage and indexing layers to maintain consistency and performance.",
             "status": "pending",
-            "testStrategy": "Submit bulk operation requests (upload, delete, reprocess, metadata update) with varying batch sizes. Verify throughput, error handling, and data integrity for all operations."
+            "testStrategy": "Submit bulk operation requests (upload, delete, reprocess, metadata update) with varying batch sizes. Verify throughput, error handling, and data integrity for all operations.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1558,7 +1761,8 @@
             ],
             "details": "Extend the document model to support version history and approval status. Implement logic for batch versioning (e.g., uploading new versions in bulk) and batch approval/rejection. Ensure audit trails are maintained for all version and approval changes.",
             "status": "pending",
-            "testStrategy": "Perform bulk version uploads and approval transitions. Verify correct version history, approval state changes, and audit trail entries for all affected documents."
+            "testStrategy": "Perform bulk version uploads and approval transitions. Verify correct version history, approval state changes, and audit trail entries for all affected documents.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1570,9 +1774,13 @@
             ],
             "details": "Develop mechanisms to monitor the status of ongoing batch operations, including per-document success/failure. Provide APIs or dashboards for users to query operation progress and review detailed audit logs. Ensure compliance with organizational and regulatory requirements for traceability.",
             "status": "pending",
-            "testStrategy": "Initiate various batch operations and monitor progress tracking endpoints or dashboards. Validate that audit logs accurately reflect all actions, including errors and rollbacks."
+            "testStrategy": "Initiate various batch operations and monitor progress tracking endpoints or dashboards. Validate that audit logs accurately reflect all actions, including errors and rollbacks.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on bulk document management & batch operations."
       },
       {
         "id": 33,
@@ -1582,7 +1790,7 @@
         "testStrategy": "Test user flows, activity logging, and GDPR export/deletion.",
         "priority": "high",
         "dependencies": [
-          32
+          "32"
         ],
         "status": "pending",
         "subtasks": [
@@ -1593,7 +1801,8 @@
             "dependencies": [],
             "details": "Create RESTful endpoints for user CRUD operations, role assignment, and password management. Ensure endpoints allow for user suspension/reactivation and support both pre-defined and custom roles. Integrate secure authentication and authorization checks for all admin actions.",
             "status": "pending",
-            "testStrategy": "Test user creation, editing, role assignment, password reset, and suspension via API and UI. Verify role-based access control and error handling."
+            "testStrategy": "Test user creation, editing, role assignment, password reset, and suspension via API and UI. Verify role-based access control and error handling.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1604,7 +1813,8 @@
             ],
             "details": "Design and implement a logging mechanism to capture all admin and user actions related to user management. Store logs securely with timestamps, user IDs, action types, and relevant metadata. Ensure logs are immutable and accessible for compliance audits.",
             "status": "pending",
-            "testStrategy": "Trigger user management actions and verify that logs are created with correct details. Test log retrieval and integrity."
+            "testStrategy": "Trigger user management actions and verify that logs are created with correct details. Test log retrieval and integrity.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1616,9 +1826,13 @@
             ],
             "details": "Implement endpoints to export all user-related data in a machine-readable format and to delete user data in accordance with GDPR requirements. Ensure deletion covers user profile, roles, and associated activity logs, and that exports are complete and secure.",
             "status": "pending",
-            "testStrategy": "Request data export and deletion for test users. Verify completeness of exported data and confirm all user data is removed after deletion, including logs."
+            "testStrategy": "Request data export and deletion for test users. Verify completeness of exported data and confirm all user data is removed after deletion, including logs.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on user management & gdpr compliance."
       },
       {
         "id": 34,
@@ -1628,7 +1842,7 @@
         "testStrategy": "Verify dashboard accuracy and responsiveness under load.",
         "priority": "medium",
         "dependencies": [
-          33
+          "33"
         ],
         "status": "pending",
         "subtasks": [
@@ -1639,7 +1853,8 @@
             "dependencies": [],
             "details": "Install and configure Grafana or Streamlit. Design the dashboard structure, applying best practices such as focusing on key metrics, using consistent layouts, and providing clear panel documentation. Ensure the UI is intuitive and supports dynamic filtering or variable selection as needed.",
             "status": "pending",
-            "testStrategy": "Verify that all required metric categories are represented and the UI is navigable. Check for adherence to dashboard design best practices."
+            "testStrategy": "Verify that all required metric categories are represented and the UI is navigable. Check for adherence to dashboard design best practices.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1650,7 +1865,8 @@
             ],
             "details": "Develop scripts or queries to extract relevant metrics (document stats, query metrics, user activity, storage usage, API endpoint usage) from Supabase and Prometheus. Transform and aggregate data as needed for efficient dashboard consumption. Ensure data freshness and reliability.",
             "status": "pending",
-            "testStrategy": "Validate that all required metrics are accurately aggregated and available for the dashboard. Test with sample data and edge cases."
+            "testStrategy": "Validate that all required metrics are accurately aggregated and available for the dashboard. Test with sample data and edge cases.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1661,7 +1877,8 @@
             ],
             "details": "Select appropriate visualization types (e.g., graphs, tables, gauges) for each metric. Configure panels to highlight key signals and trends. Apply consistent color schemes and labeling. Add annotations or context where relevant to aid interpretation.",
             "status": "pending",
-            "testStrategy": "Review each visualization for accuracy, clarity, and alignment with dashboard goals. Solicit feedback from stakeholders and iterate as needed."
+            "testStrategy": "Review each visualization for accuracy, clarity, and alignment with dashboard goals. Solicit feedback from stakeholders and iterate as needed.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1672,9 +1889,13 @@
             ],
             "details": "Simulate concurrent users and high data volumes. Monitor dashboard load times, panel refresh rates, and responsiveness. Apply optimizations such as query aggregation, efficient variable usage, and appropriate refresh intervals. Document and address any bottlenecks.",
             "status": "pending",
-            "testStrategy": "Run load tests and measure key performance indicators (KPIs) such as load time and refresh latency. Confirm dashboard remains usable and responsive under stress."
+            "testStrategy": "Run load tests and measure key performance indicators (KPIs) such as load time and refresh latency. Confirm dashboard remains usable and responsive under stress.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 6,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Break down analytics dashboard implementation into subtasks for dashboard UI development (Grafana/Streamlit), metrics aggregation from Supabase/Prometheus, data visualization, and load/responsiveness testing."
       },
       {
         "id": 35,
@@ -1684,7 +1905,7 @@
         "testStrategy": "Run multi-agent workflows, verify orchestration, agent lifecycle, and result aggregation.",
         "priority": "high",
         "dependencies": [
-          34
+          "34"
         ],
         "status": "pending",
         "subtasks": [
@@ -1695,7 +1916,8 @@
             "dependencies": [],
             "details": "Establish secure connectivity to the CrewAI REST API (srv-d2n0hh3uibrs73buafo0). Implement endpoints and logic for creating, updating, and deleting agents dynamically. Support agent configuration (roles, goals, tools, memory, etc.) as per CrewAI's agent model. Ensure agents can be instantiated with custom parameters and maintain their lifecycle state.",
             "status": "pending",
-            "testStrategy": "Create, update, and delete agents via API calls. Verify agent state transitions and configuration persistence."
+            "testStrategy": "Create, update, and delete agents via API calls. Verify agent state transitions and configuration persistence.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1706,7 +1928,8 @@
             ],
             "details": "Design and implement orchestration mechanisms using CrewAI's crew-and-flow model. Enable both sequential and parallel task execution modes. Assign tasks to agents based on their roles and goals, and manage dependencies between tasks. Implement resource allocation strategies to optimize agent utilization and prevent overload.",
             "status": "pending",
-            "testStrategy": "Run sample multi-agent workflows with varying complexity. Verify correct task sequencing, parallelism, and resource allocation."
+            "testStrategy": "Run sample multi-agent workflows with varying complexity. Verify correct task sequencing, parallelism, and resource allocation.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1717,9 +1940,13 @@
             ],
             "details": "Set up Celery workers to handle asynchronous task execution for CrewAI workflows. Ensure tasks can be queued, executed, and monitored independently. Capture logs and state changes for each agent and workflow. Implement error handling and alerting for failed tasks or agent exceptions.",
             "status": "pending",
-            "testStrategy": "Submit multiple concurrent workflows, monitor execution progress, and verify correct handling of asynchronous tasks and error scenarios."
+            "testStrategy": "Submit multiple concurrent workflows, monitor execution progress, and verify correct handling of asynchronous tasks and error scenarios.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on crewai multi-agent integration & orchestration."
       },
       {
         "id": 36,
@@ -1729,7 +1956,7 @@
         "testStrategy": "Trigger asset generation for sample documents, verify output formats and B2 storage.",
         "priority": "high",
         "dependencies": [
-          35
+          "35"
         ],
         "status": "pending",
         "subtasks": [
@@ -1740,7 +1967,8 @@
             "dependencies": [],
             "details": "Draft detailed agent definitions in the crewai_agents table, ensuring each agent's role, goal, toolset, and LLM configuration aligns with PRD requirements. Use YAML or database schema as appropriate. Validate configuration completeness for all 8 agents.",
             "status": "pending",
-            "testStrategy": "Review crewai_agents table for correct entries and completeness. Validate agent configs load without errors in CrewAI."
+            "testStrategy": "Review crewai_agents table for correct entries and completeness. Validate agent configs load without errors in CrewAI.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1751,7 +1979,8 @@
             ],
             "details": "Implement integration logic to instantiate and orchestrate the 8 agents using the CrewAI API. Ensure agents can receive tasks, execute asset generation, and interact as needed. Handle API authentication and error management.",
             "status": "pending",
-            "testStrategy": "Trigger asset generation for sample inputs via CrewAI API and verify that each agent performs its designated function."
+            "testStrategy": "Trigger asset generation for sample inputs via CrewAI API and verify that each agent performs its designated function.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1762,9 +1991,13 @@
             ],
             "details": "Develop or update storage routines to ensure all generated assets are saved in the correct B2 processed/ directory structure. Confirm metadata and output formats match requirements. Handle storage errors and ensure data integrity.",
             "status": "pending",
-            "testStrategy": "Generate assets through the workflow and verify their presence, structure, and metadata in B2 processed/ folders."
+            "testStrategy": "Generate assets through the workflow and verify their presence, structure, and metadata in B2 processed/ folders.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on crewai asset generation agents implementation."
       },
       {
         "id": 37,
@@ -1774,7 +2007,7 @@
         "testStrategy": "Run analysis workflows, verify structured outputs and fact verification accuracy.",
         "priority": "high",
         "dependencies": [
-          36
+          "36"
         ],
         "status": "pending",
         "subtasks": [
@@ -1785,7 +2018,8 @@
             "dependencies": [],
             "details": "Specify agent roles, goals, and backstories in the crewai_agents table or agents.yaml. Ensure each agent is configured for its analysis specialization and can be referenced by workflows. Use CrewAI's agent configuration standards for compatibility.",
             "status": "pending",
-            "testStrategy": "Verify agents appear in the crewai_agents table and can be instantiated by CrewAI workflows."
+            "testStrategy": "Verify agents appear in the crewai_agents table and can be instantiated by CrewAI workflows.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1796,7 +2030,8 @@
             ],
             "details": "Implement API integration logic to allow the agents to receive tasks, process documents, and return structured outputs. Ensure agents can be triggered via the CrewAI API and handle input/output formats as required by the workflow.",
             "status": "pending",
-            "testStrategy": "Trigger sample analysis workflows via the API and confirm agents process and return structured results."
+            "testStrategy": "Trigger sample analysis workflows via the API and confirm agents process and return structured results.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1807,7 +2042,8 @@
             ],
             "details": "Define workflow logic that assigns documents to the appropriate agents, sequences their tasks (e.g., research, content strategy, fact checking), and aggregates their outputs. Use CrewAI's workflow orchestration features to manage task flow.",
             "status": "pending",
-            "testStrategy": "Run end-to-end workflow executions and verify that each agent performs its designated analysis step."
+            "testStrategy": "Run end-to-end workflow executions and verify that each agent performs its designated analysis step.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1818,7 +2054,8 @@
             ],
             "details": "Implement logic to map agent outputs to Supabase tables for structured results and upload any relevant files or artifacts to B2. Ensure outputs are linked to the correct document and agent metadata.",
             "status": "pending",
-            "testStrategy": "Check Supabase and B2 for correct storage of outputs after workflow execution; verify data integrity and retrievability."
+            "testStrategy": "Check Supabase and B2 for correct storage of outputs after workflow execution; verify data integrity and retrievability.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -1829,9 +2066,13 @@
             ],
             "details": "Develop test cases with known document inputs and expected outputs. Evaluate the correctness of research, content strategy, and fact-checking results. Measure fact-checker precision and recall, and validate output structure.",
             "status": "pending",
-            "testStrategy": "Run automated and manual tests comparing outputs to ground truth; review fact-checking results for accuracy and completeness."
+            "testStrategy": "Run automated and manual tests comparing outputs to ground truth; review fact-checking results for accuracy and completeness.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 7,
+        "recommendedSubtasks": 5,
+        "expansionPrompt": "Break down document analysis agent implementation into subtasks for agent configuration, CrewAI API integration, workflow execution, output storage in Supabase/B2, and accuracy testing."
       },
       {
         "id": 38,
@@ -1841,7 +2082,7 @@
         "testStrategy": "Run multi-agent orchestration workflows, verify execution order and output quality.",
         "priority": "high",
         "dependencies": [
-          37
+          "37"
         ],
         "status": "pending",
         "subtasks": [
@@ -1852,7 +2093,8 @@
             "dependencies": [],
             "details": "Specify agent roles, goals, backstories, and advanced options (e.g., LLM, delegation, tools) for each agent. Ensure each agent is correctly mapped to its crew and that the crew structure supports both sequential and parallel execution modes.",
             "status": "pending",
-            "testStrategy": "Verify agents and crews are correctly listed in the crewai_crews table and can be retrieved via API."
+            "testStrategy": "Verify agents and crews are correctly listed in the crewai_crews table and can be retrieved via API.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1863,7 +2105,8 @@
             ],
             "details": "Design execution engine to trigger agents in order (sequential) or concurrently (parallel) based on workflow configuration. Ensure correct handling of dependencies and data flow between agents.",
             "status": "pending",
-            "testStrategy": "Run sample workflows in both modes, confirm correct execution order and data handoff."
+            "testStrategy": "Run sample workflows in both modes, confirm correct execution order and data handoff.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1874,7 +2117,8 @@
             ],
             "details": "Implement API calls for agent task submission, monitor agent progress, and handle callbacks or polling for completion. Ensure robust error handling and retries.",
             "status": "pending",
-            "testStrategy": "Trigger agent workflows via API, verify correct agent lifecycle events and result collection."
+            "testStrategy": "Trigger agent workflows via API, verify correct agent lifecycle events and result collection.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1885,7 +2129,8 @@
             ],
             "details": "Implement state machine or workflow tracker to monitor each agent's status, handle transitions, and manage workflow metadata. Support resumption and recovery from failures.",
             "status": "pending",
-            "testStrategy": "Simulate workflow interruptions and restarts, verify accurate state tracking and recovery."
+            "testStrategy": "Simulate workflow interruptions and restarts, verify accurate state tracking and recovery.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -1896,7 +2141,8 @@
             ],
             "details": "Define validation rules for each agent type (e.g., research completeness, analysis accuracy, writing coherence, review thoroughness). Integrate automated and optional human-in-the-loop checks.",
             "status": "pending",
-            "testStrategy": "Run workflows with known-good and intentionally flawed inputs, verify validation catches errors and approves correct outputs."
+            "testStrategy": "Run workflows with known-good and intentionally flawed inputs, verify validation catches errors and approves correct outputs.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -1907,9 +2153,13 @@
             ],
             "details": "Design test cases for sequential and parallel workflows, error handling, state recovery, and output validation. Use both unit and integration tests to ensure system robustness.",
             "status": "pending",
-            "testStrategy": "Run full test suite, confirm all orchestration paths and edge cases are covered and pass."
+            "testStrategy": "Run full test suite, confirm all orchestration paths and edge cases are covered and pass.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 8,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Expand orchestration agent implementation into subtasks for agent/crew configuration, sequential/parallel execution logic, CrewAI API integration, workflow management, output validation, and orchestration testing."
       },
       {
         "id": 39,
@@ -1919,7 +2169,7 @@
         "testStrategy": "Simulate collaborative workflows, verify messaging, delegation, and result aggregation.",
         "priority": "high",
         "dependencies": [
-          38
+          "38"
         ],
         "status": "pending",
         "subtasks": [
@@ -1930,7 +2180,8 @@
             "dependencies": [],
             "details": "Create or update the crewai_agent_interactions table to capture direct/broadcast messages, event logs, delegation records, and state changes. Ensure extensibility for future collaboration features.",
             "status": "pending",
-            "testStrategy": "Review schema against requirements; validate with sample interaction records."
+            "testStrategy": "Review schema against requirements; validate with sample interaction records.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1941,7 +2192,8 @@
             ],
             "details": "Implement API endpoints and internal functions for direct (agent-to-agent) and broadcast (agent-to-crew) messaging. Store messages in the interaction table and trigger notifications as needed.",
             "status": "pending",
-            "testStrategy": "Unit test message delivery, verify correct routing and storage for both direct and broadcast cases."
+            "testStrategy": "Unit test message delivery, verify correct routing and storage for both direct and broadcast cases.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1952,7 +2204,8 @@
             ],
             "details": "Implement event publishing logic, allowing agents to emit structured events to the crewai_agent_interactions table. Support event subscription and notification for relevant agents.",
             "status": "pending",
-            "testStrategy": "Simulate event publication and subscription; verify event propagation and logging."
+            "testStrategy": "Simulate event publication and subscription; verify event propagation and logging.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1963,7 +2216,8 @@
             ],
             "details": "Design and implement mechanisms for agents to synchronize state changes (e.g., task status, shared data) via the interaction table or dedicated state sync service. Handle concurrent updates and conflict scenarios.",
             "status": "pending",
-            "testStrategy": "Test state updates under concurrent agent actions; verify consistency and conflict handling."
+            "testStrategy": "Test state updates under concurrent agent actions; verify consistency and conflict handling.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -1976,7 +2230,8 @@
             ],
             "details": "Implement automated and/or human-in-the-loop conflict resolution workflows. Log conflict events, trigger resolution protocols, and update agent states accordingly.",
             "status": "pending",
-            "testStrategy": "Simulate conflict scenarios; verify detection, resolution, and state updates."
+            "testStrategy": "Simulate conflict scenarios; verify detection, resolution, and state updates.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -1990,9 +2245,13 @@
             ],
             "details": "Design test scenarios covering typical and edge-case collaborative workflows. Automate simulation runs and verify expected outcomes in the interaction table and agent states.",
             "status": "pending",
-            "testStrategy": "Run integration tests for full workflows; check messaging, event logs, state consistency, and conflict resolution."
+            "testStrategy": "Run integration tests for full workflows; check messaging, event logs, state consistency, and conflict resolution.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 8.5,
+        "recommendedSubtasks": 6,
+        "expansionPrompt": "Break down inter-agent messaging and collaboration into subtasks for designing the interaction schema, implementing direct/broadcast messaging, event publication, state synchronization, conflict resolution, and workflow simulation testing."
       },
       {
         "id": 40,
@@ -2002,7 +2261,7 @@
         "testStrategy": "Generate and retrieve assets, verify storage, organization, and retrieval accuracy.",
         "priority": "high",
         "dependencies": [
-          39
+          "39"
         ],
         "status": "pending",
         "subtasks": [
@@ -2013,7 +2272,8 @@
             "dependencies": [],
             "details": "Define the schema for asset metadata, including department, type, and confidence score. Integrate asset generation outputs with the database and B2 storage. Ensure assets are stored in organized B2 folders based on department and type, and metadata is consistently tracked in the database.",
             "status": "pending",
-            "testStrategy": "Create sample assets, store them, and verify correct database entries and B2 folder organization."
+            "testStrategy": "Create sample assets, store them, and verify correct database entries and B2 folder organization.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2024,7 +2284,8 @@
             ],
             "details": "Design RESTful endpoints for asset retrieval. Implement query logic to filter assets using department, type, and confidence score from the crewai_generated_assets table and B2 storage. Ensure efficient and secure access to asset files and metadata.",
             "status": "pending",
-            "testStrategy": "Test API endpoints with various filter combinations and validate that correct assets and metadata are returned."
+            "testStrategy": "Test API endpoints with various filter combinations and validate that correct assets and metadata are returned.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2035,9 +2296,13 @@
             ],
             "details": "Add logic to update confidence scores and metadata in the crewai_generated_assets table as assets are processed or reviewed. Ensure changes are reflected in both the database and B2 storage organization if relevant. Provide audit trails for metadata updates.",
             "status": "pending",
-            "testStrategy": "Simulate asset review and update workflows, verify that confidence scores and metadata are correctly updated and tracked."
+            "testStrategy": "Simulate asset review and update workflows, verify that confidence scores and metadata are correctly updated and tracked.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on crewai asset storage & retrieval."
       },
       {
         "id": 41,
@@ -2047,7 +2312,7 @@
         "testStrategy": "Run security tests, penetration testing, and compliance checks.",
         "priority": "high",
         "dependencies": [
-          40
+          "40"
         ],
         "status": "pending",
         "subtasks": [
@@ -2058,7 +2323,8 @@
             "dependencies": [],
             "details": "Configure PyJWT to use strong signing algorithms (e.g., RS256), set short expiration times, validate all claims (issuer, audience, expiration), and store tokens securely (prefer HttpOnly cookies). Avoid storing sensitive data in JWTs and ensure all token transmission uses HTTPS.",
             "status": "pending",
-            "testStrategy": "Unit test token issuance and validation, attempt token tampering, and verify rejection of invalid or expired tokens."
+            "testStrategy": "Unit test token issuance and validation, attempt token tampering, and verify rejection of invalid or expired tokens.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2069,7 +2335,8 @@
             ],
             "details": "Design a roles and permissions schema. Implement middleware to check user roles (from identity, not from JWT claims) on each protected endpoint. Ensure permissions are managed in the authorization layer, not embedded in JWTs.",
             "status": "pending",
-            "testStrategy": "Test endpoints with users of different roles, verify access is correctly granted or denied according to RBAC rules."
+            "testStrategy": "Test endpoints with users of different roles, verify access is correctly granted or denied according to RBAC rules.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2078,7 +2345,8 @@
             "dependencies": [],
             "details": "Enable encryption for Supabase storage volumes and configure server-side encryption for B2 buckets. Ensure encryption keys are securely managed and rotated according to policy.",
             "status": "pending",
-            "testStrategy": "Verify files and database volumes are encrypted at rest, attempt unauthorized access to raw storage, and confirm data is unreadable without decryption keys."
+            "testStrategy": "Verify files and database volumes are encrypted at rest, attempt unauthorized access to raw storage, and confirm data is unreadable without decryption keys.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -2087,7 +2355,8 @@
             "dependencies": [],
             "details": "Apply strict input validation on all endpoints using whitelisting and schema validation. Sanitize inputs to prevent SQL injection, XSS, and other common attacks. Use libraries for validation where possible.",
             "status": "pending",
-            "testStrategy": "Fuzz endpoints with invalid and malicious inputs, verify that invalid data is rejected and no vulnerabilities are introduced."
+            "testStrategy": "Fuzz endpoints with invalid and malicious inputs, verify that invalid data is rejected and no vulnerabilities are introduced.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -2099,7 +2368,8 @@
             ],
             "details": "Log authentication events, access control decisions, data exports/deletions, and administrative actions. Ensure logs are tamper-evident and securely stored. Provide tools for querying and exporting audit logs.",
             "status": "pending",
-            "testStrategy": "Trigger various security events, verify logs are generated, immutable, and contain all required information."
+            "testStrategy": "Trigger various security events, verify logs are generated, immutable, and contain all required information.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -2112,7 +2382,8 @@
             ],
             "details": "Support user data export and deletion (GDPR), ensure auditability and access controls (SOC 2), and implement privacy and security safeguards (HIPAA). Document compliance measures and provide user interfaces for data requests.",
             "status": "pending",
-            "testStrategy": "Perform compliance checks, simulate data subject requests, and verify all regulatory requirements are met."
+            "testStrategy": "Perform compliance checks, simulate data subject requests, and verify all regulatory requirements are met.",
+            "parentId": "undefined"
           },
           {
             "id": 7,
@@ -2128,9 +2399,13 @@
             ],
             "details": "Run automated security scans, manual penetration tests, and compliance audits. Address any vulnerabilities or compliance gaps identified. Document test results and remediation steps.",
             "status": "pending",
-            "testStrategy": "Review test reports, verify all critical issues are resolved, and confirm compliance with GDPR, HIPAA, and SOC 2."
+            "testStrategy": "Review test reports, verify all critical issues are resolved, and confirm compliance with GDPR, HIPAA, and SOC 2.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 9,
+        "recommendedSubtasks": 7,
+        "expansionPrompt": "Decompose security hardening and compliance into subtasks for JWT authentication, RBAC enforcement, encrypted storage setup, input validation, audit trail implementation, compliance feature integration (GDPR, HIPAA, SOC 2), and security/compliance testing."
       },
       {
         "id": 42,
@@ -2140,7 +2415,7 @@
         "testStrategy": "Simulate failures, verify backup/restore, health checks, and recovery procedures.",
         "priority": "high",
         "dependencies": [
-          41
+          "41"
         ],
         "status": "pending",
         "subtasks": [
@@ -2151,7 +2426,8 @@
             "dependencies": [],
             "details": "Configure daily automated backups to Backblaze B2 using Infrastructure as Code (Terraform/Ansible). Regularly test backup integrity and perform restore drills to verify data can be recovered quickly and accurately. Document backup schedules, retention policies, and restoration steps.",
             "status": "pending",
-            "testStrategy": "Simulate data loss scenarios and perform full and partial restores from backups to verify data integrity and recovery time objectives."
+            "testStrategy": "Simulate data loss scenarios and perform full and partial restores from backups to verify data integrity and recovery time objectives.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2162,7 +2438,8 @@
             ],
             "details": "Develop and expose health check endpoints for all critical services. Integrate monitoring tools to continuously check service health. Configure auto-restart policies (e.g., systemd, Kubernetes liveness probes) to automatically recover failed services. Ensure monitoring alerts are in place for failed health checks and restarts.",
             "status": "pending",
-            "testStrategy": "Induce service failures and verify that health checks detect issues and auto-restart mechanisms restore service availability without manual intervention."
+            "testStrategy": "Induce service failures and verify that health checks detect issues and auto-restart mechanisms restore service availability without manual intervention.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2174,9 +2451,13 @@
             ],
             "details": "Develop comprehensive disaster recovery documentation covering failover, rebuild, and recovery steps using Infrastructure as Code. Schedule and execute regular DR drills simulating various failure scenarios (e.g., region outage, data corruption). Update documentation based on drill outcomes and lessons learned.",
             "status": "pending",
-            "testStrategy": "Conduct scheduled disaster recovery drills, measure recovery time and data loss, and review documentation for completeness and clarity after each drill."
+            "testStrategy": "Conduct scheduled disaster recovery drills, measure recovery time and data loss, and review documentation for completeness and clarity after each drill.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on reliability & disaster recovery implementation."
       },
       {
         "id": 43,
@@ -2186,7 +2467,7 @@
         "testStrategy": "Run load tests at 2x expected traffic, verify performance metrics and optimize as needed.",
         "priority": "high",
         "dependencies": [
-          42
+          "42"
         ],
         "status": "pending",
         "subtasks": [
@@ -2197,7 +2478,8 @@
             "dependencies": [],
             "details": "Identify key user flows and endpoints for document processing, query execution, and WebSocket communication. Create load test scripts in Locust (Python) or k6 (JavaScript), simulating realistic traffic patterns and scaling up to at least 2x expected peak load. Collect baseline metrics for throughput, latency, and error rates.",
             "status": "pending",
-            "testStrategy": "Verify that load tests execute as intended, generate reproducible results, and cover all critical workflows. Ensure metrics are collected for throughput, latency, and error rates under varying load conditions."
+            "testStrategy": "Verify that load tests execute as intended, generate reproducible results, and cover all critical workflows. Ensure metrics are collected for throughput, latency, and error rates under varying load conditions.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2208,7 +2490,8 @@
             ],
             "details": "Use profiling tools and application logs to monitor CPU, memory, database query times, and network utilization during load tests. Focus on Celery worker queues, database slow queries, cache hit/miss ratios, and WebSocket throughput. Document all identified bottlenecks with supporting metrics.",
             "status": "pending",
-            "testStrategy": "Correlate load test results with profiling data to confirm bottleneck locations. Validate findings by reproducing issues under controlled load and measuring impact of each suspected bottleneck."
+            "testStrategy": "Correlate load test results with profiling data to confirm bottleneck locations. Validate findings by reproducing issues under controlled load and measuring impact of each suspected bottleneck.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2219,9 +2502,13 @@
             ],
             "details": "Apply optimizations based on profiling results: adjust Celery worker counts, add or tune database indexes, refine caching logic, and optimize API/WebSocket configurations. Re-run load tests to measure improvements in throughput and latency. Iterate as needed until performance targets are met.",
             "status": "pending",
-            "testStrategy": "Compare pre- and post-optimization metrics for throughput, latency, and error rates. Confirm that optimizations resolve identified bottlenecks and that the system meets or exceeds performance goals under 2x expected load."
+            "testStrategy": "Compare pre- and post-optimization metrics for throughput, latency, and error rates. Confirm that optimizations resolve identified bottlenecks and that the system meets or exceeds performance goals under 2x expected load.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on load testing & performance optimization."
       },
       {
         "id": 44,
@@ -2231,7 +2518,7 @@
         "testStrategy": "Review documentation for completeness and clarity. Test onboarding flows with new users.",
         "priority": "medium",
         "dependencies": [
-          43
+          "43"
         ],
         "status": "pending",
         "subtasks": [
@@ -2244,7 +2531,8 @@
             ],
             "details": "Document each API endpoint with request/response examples, authentication details, and error codes. Outline workflows with diagrams and step-by-step instructions. Describe agent configuration options and UI navigation paths. Use clear headings, code samples, and visuals to enhance readability and accessibility[1][2]. Ensure documentation is reviewed by technical stakeholders for accuracy before finalization.",
             "status": "pending",
-            "testStrategy": "Conduct peer reviews with developers and QA to verify completeness, clarity, and technical accuracy. Test documented workflows against the live system to ensure they match actual behavior."
+            "testStrategy": "Conduct peer reviews with developers and QA to verify completeness, clarity, and technical accuracy. Test documented workflows against the live system to ensure they match actual behavior.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2255,7 +2543,8 @@
             ],
             "details": "Write onboarding guides for new users and developers, focusing on getting started, common tasks, and troubleshooting. Create training videos (e.g., using Loom or similar tools) demonstrating key features and workflows. Include exercises and real-world examples to reinforce learning. Structure content for easy navigation and quick reference, using consistent formatting and visual aids[1][2]. Collaborate with support and training teams to ensure materials address common user pain points.",
             "status": "pending",
-            "testStrategy": "Pilot onboarding materials with a group of new users and gather feedback on clarity, usefulness, and ease of understanding. Revise materials based on feedback before broad release."
+            "testStrategy": "Pilot onboarding materials with a group of new users and gather feedback on clarity, usefulness, and ease of understanding. Revise materials based on feedback before broad release.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2266,15 +2555,26 @@
             ],
             "details": "Set up a schedule for regular documentation reviews, especially after product updates or releases. Implement a feedback loop where users can report issues or suggest improvements. Use version control to track changes and ensure all stakeholders have access to the latest documentation. Standardize templates and update procedures to maintain consistency across all docs[2][4]. Assign clear ownership for documentation maintenance within the team.",
             "status": "pending",
-            "testStrategy": "Monitor documentation usage analytics and user feedback channels. Periodically audit docs for outdated information and verify that updates are correctly propagated. Test revised documentation with both new and experienced users to ensure continued effectiveness."
+            "testStrategy": "Monitor documentation usage analytics and user feedback channels. Periodically audit docs for outdated information and verify that updates are correctly propagated. Test revised documentation with both new and experienced users to ensure continued effectiveness.",
+            "parentId": "undefined"
           }
-        ]
+        ],
+        "complexity": 5,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Break down this task with a focus on documentation finalization & user onboarding."
       }
     ],
     "metadata": {
-      "created": "2025-11-03T03:57:29.789Z",
-      "updated": "2025-11-04T05:24:50.706Z",
-      "description": "Tasks for master context"
+      "version": "1.0.0",
+      "lastModified": "2025-11-05T23:01:15.702Z",
+      "taskCount": 44,
+      "completedCount": 6,
+      "tags": [
+        "master"
+      ],
+      "created": "2025-11-06T00:56:31.361Z",
+      "description": "Tasks for master context",
+      "updated": "2025-11-06T04:37:48.075Z"
     }
   }
 }
