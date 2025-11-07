@@ -2562,6 +2562,74 @@
         "complexity": 5,
         "recommendedSubtasks": 3,
         "expansionPrompt": "Break down this task with a focus on documentation finalization & user onboarding."
+      },
+      {
+        "id": 45,
+        "title": "Integrate RAGAS Metrics Evaluation and Visualization for RAG Pipeline",
+        "description": "Implement automated RAG quality evaluation using the RAGAS framework with 4 core metrics (Faithfulness, Answer Relevancy, Context Precision, Context Recall). Store results in Supabase and visualize in Grafana dashboards.",
+        "details": "- Set up RAGAS framework integration for automated evaluation of RAG pipeline quality\n- Implement evaluation of 4 core metrics:\n  * Faithfulness (0-1): Measures if the generated answer is factually consistent with the retrieved context\n  * Answer Relevancy (0-1): Measures if the answer addresses the query intent\n  * Context Precision (0-1): Measures the proportion of relevant context chunks\n  * Context Recall (0-1): Measures if all necessary information is present in context\n- Create a test dataset of 30 curated samples from Empire documentation stored in .taskmaster/docs/ragas_test_dataset.json\n- Design and implement Supabase ragas_evaluations table with schema including:\n  * evaluation_id (UUID)\n  * timestamp (TIMESTAMP)\n  * query_text (TEXT)\n  * answer_text (TEXT)\n  * context_chunks (JSONB array)\n  * faithfulness_score (FLOAT)\n  * answer_relevancy_score (FLOAT)\n  * context_precision_score (FLOAT)\n  * context_recall_score (FLOAT)\n  * overall_score (FLOAT)\n  * metadata (JSONB)\n- Develop scripts/ragas_evaluation.py for batch evaluation with:\n  * Command-line interface for running evaluations\n  * Integration with existing RAG pipeline components\n  * Configurable parameters for evaluation settings\n  * Automatic storage of results in Supabase\n- Create Grafana dashboards showing:\n  * Metric trends over time\n  * Comparison between different RAG configurations\n  * Alerts when metrics fall below threshold (0.70)\n  * Drill-down capability to examine specific evaluation runs\n- Document expected baseline performance (0.70-0.85 overall scores)\n- Calculate and document cost estimates (~$0.20 per evaluation run for 30 samples)\n- Integrate with existing observability infrastructure from Task 25",
+        "testStrategy": "1. Prepare test environment with sample RAG pipeline and test dataset\n2. Run baseline evaluation on the 30-sample test dataset from .taskmaster/docs/ragas_test_dataset.json\n3. Validate all 4 metrics (Faithfulness, Answer Relevancy, Context Precision, Context Recall) are calculated correctly\n4. Verify scores are within expected ranges (0-1) and reasonable for test data\n5. Confirm results are properly stored in Supabase ragas_evaluations table\n6. Check that all required fields in the schema are populated correctly\n7. Verify Grafana dashboard correctly displays:\n   - Individual metric scores\n   - Overall score trends\n   - Comparison between evaluation runs\n8. Test alert triggers by artificially setting scores below the 0.70 threshold\n9. Validate dashboard filtering and drill-down capabilities\n10. Perform a complete end-to-end test with a new document to ensure the entire evaluation pipeline works\n11. Measure performance and resource usage during evaluation runs\n12. Document baseline scores for the current RAG implementation",
+        "status": "pending",
+        "dependencies": [
+          18,
+          25
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up RAGAS framework integration and test dataset",
+            "description": "Integrate the RAGAS framework into the project and prepare the test dataset for evaluation.",
+            "dependencies": [],
+            "details": "Install RAGAS library and dependencies. Configure the framework to work with the existing RAG pipeline. Prepare and validate the test dataset of 30 curated samples from Empire documentation stored in .taskmaster/docs/ragas_test_dataset.json. Ensure the dataset contains appropriate query-answer-context triplets for evaluation.",
+            "status": "pending",
+            "testStrategy": "Verify RAGAS installation and imports work correctly. Validate test dataset structure and content. Ensure sample queries cover diverse use cases from Empire documentation."
+          },
+          {
+            "id": 2,
+            "title": "Implement core metrics evaluation logic",
+            "description": "Develop the core functionality to evaluate the 4 RAGAS metrics: Faithfulness, Answer Relevancy, Context Precision, and Context Recall.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create evaluation functions for each metric. Implement Faithfulness calculation to measure factual consistency between answers and context. Develop Answer Relevancy evaluation to assess query intent alignment. Build Context Precision measurement for relevant chunk proportion. Implement Context Recall to verify information completeness. Calculate overall combined score from individual metrics.",
+            "status": "pending",
+            "testStrategy": "Run evaluations on sample data and verify each metric produces values between 0-1. Compare results with manual assessments of a subset of examples to validate accuracy."
+          },
+          {
+            "id": 3,
+            "title": "Create Supabase ragas_evaluations table and storage logic",
+            "description": "Design and implement the Supabase database schema for storing RAGAS evaluation results and develop storage functionality.",
+            "dependencies": [
+              2
+            ],
+            "details": "Create ragas_evaluations table with schema including evaluation_id, timestamp, query_text, answer_text, context_chunks, all metric scores (faithfulness, answer_relevancy, context_precision, context_recall), overall_score, and metadata fields. Implement functions to store evaluation results in the database. Add batch processing capabilities for multiple evaluations.",
+            "status": "pending",
+            "testStrategy": "Test database schema creation and data insertion. Verify all fields are properly stored and retrieved. Check batch processing with multiple evaluation records."
+          },
+          {
+            "id": 4,
+            "title": "Develop scripts/ragas_evaluation.py with CLI interface",
+            "description": "Create a command-line script for running RAGAS evaluations with configurable parameters and Supabase integration.",
+            "dependencies": [
+              3
+            ],
+            "details": "Develop scripts/ragas_evaluation.py with command-line arguments for evaluation settings. Integrate with existing RAG pipeline components to access retrieval and generation functions. Implement configurable parameters for batch size, metric weights, and thresholds. Add automatic storage of results in Supabase. Include logging and error handling. Document cost estimates (~$0.20 per evaluation run for 30 samples).",
+            "status": "pending",
+            "testStrategy": "Test CLI with various parameter combinations. Verify integration with RAG pipeline components. Confirm results are properly stored in Supabase. Validate error handling for edge cases."
+          },
+          {
+            "id": 5,
+            "title": "Create Grafana dashboards for metrics visualization",
+            "description": "Design and implement Grafana dashboards to visualize RAGAS metrics and integrate with existing observability infrastructure.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create Grafana dashboards showing metric trends over time. Implement comparison views between different RAG configurations. Set up alerts when metrics fall below threshold (0.70). Add drill-down capability to examine specific evaluation runs. Document expected baseline performance (0.70-0.85 overall scores). Integrate with existing observability infrastructure from Task 25.",
+            "status": "pending",
+            "testStrategy": "Verify dashboard displays all metrics correctly. Test alert functionality with below-threshold values. Confirm drill-down navigation works properly. Validate integration with existing observability infrastructure."
+          }
+        ]
       }
     ],
     "metadata": {
@@ -2574,7 +2642,7 @@
       ],
       "created": "2025-11-06T00:56:31.361Z",
       "description": "Tasks for master context",
-      "updated": "2025-11-06T19:08:55.728Z"
+      "updated": "2025-11-07T04:46:27.728Z"
     }
   }
 }
