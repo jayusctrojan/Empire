@@ -11,6 +11,7 @@ import time
 from app.workflows.langgraph_workflows import LangGraphWorkflows, QueryState
 from app.workflows.workflow_router import workflow_router, WorkflowType
 from app.services.arcade_service import arcade_service
+from app.services.crewai_service import crewai_service
 from app.tasks.query_tasks import (
     process_adaptive_query,
     process_auto_routed_query,
@@ -242,19 +243,42 @@ async def auto_routed_query(
             return await adaptive_query_endpoint(request, background_tasks)
 
         elif classification.workflow_type == WorkflowType.CREWAI:
-            # Route to CrewAI service (stub for now)
-            logger.warning("CrewAI routing not yet implemented, falling back to simple")
-            processing_time = int((time.time() - start_time) * 1000)
+            # Route to CrewAI multi-agent service
+            try:
+                logger.info("Routing to CrewAI multi-agent workflow")
 
-            return AdaptiveQueryResponse(
-                answer="CrewAI routing not yet implemented. This would process via multi-agent workflow.",
-                workflow_type="crewai",
-                processing_time_ms=processing_time,
-                iterations=0,
-                refined_queries=[],
-                sources=[],
-                tool_calls=[]
-            )
+                # Call CrewAI service
+                crewai_result = crewai_service.process_query(
+                    query=request.query,
+                    workflow_type="document_analysis",
+                    max_iterations=request.max_iterations
+                )
+
+                processing_time = int((time.time() - start_time) * 1000)
+
+                return AdaptiveQueryResponse(
+                    answer=crewai_result.get("answer", ""),
+                    refined_queries=crewai_result.get("refined_queries", []),
+                    sources=crewai_result.get("sources", []),
+                    tool_calls=crewai_result.get("agents_used", []),
+                    iterations=len(crewai_result.get("steps", [])),
+                    workflow_type="crewai",
+                    processing_time_ms=processing_time
+                )
+
+            except Exception as e:
+                logger.error("CrewAI processing failed", error=str(e))
+                # Fallback to simple RAG on CrewAI failure
+                processing_time = int((time.time() - start_time) * 1000)
+                return AdaptiveQueryResponse(
+                    answer=f"CrewAI service error (falling back to simple): {str(e)}",
+                    workflow_type="simple",
+                    processing_time_ms=processing_time,
+                    iterations=0,
+                    refined_queries=[],
+                    sources=[],
+                    tool_calls=[]
+                )
 
         else:  # SIMPLE
             # Direct RAG pipeline (stub for now)
@@ -534,6 +558,8 @@ async def query_health():
         "status": "healthy",
         "langgraph_enabled": True,
         "arcade_enabled": arcade_service.enabled,
+        "crewai_enabled": crewai_service.enabled,
+        "crewai_healthy": crewai_service.health_check() if crewai_service.enabled else False,
         "workflow_router_enabled": True,
         "available_workflows": ["langgraph", "crewai", "simple"],
         "async_processing": True,
