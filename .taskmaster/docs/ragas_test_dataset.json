@@ -1,0 +1,435 @@
+{
+  "dataset_info": {
+    "name": "Empire v7.2 RAG Evaluation Dataset",
+    "version": "1.0",
+    "created_at": "2025-01-06",
+    "description": "Test dataset for evaluating Empire RAG pipeline quality using RAGAS metrics",
+    "total_samples": 30,
+    "categories": [
+      "architecture_queries",
+      "feature_queries",
+      "cost_queries",
+      "technical_implementation",
+      "comparison_queries",
+      "multi_hop_queries"
+    ]
+  },
+  "test_samples": [
+    {
+      "id": "arch_001",
+      "category": "architecture_queries",
+      "question": "What are the main components of the Empire v7.2 architecture?",
+      "ground_truth": "Empire v7.2 uses a hybrid database architecture with PostgreSQL (Supabase) for vector search and user data, Neo4j (Mac Studio Docker) for knowledge graphs, Redis for caching and Celery broker, FastAPI for REST/WebSocket APIs, and Celery for background task processing on Render.",
+      "contexts": [
+        "Empire v7.2 uses a hybrid database production architecture: PostgreSQL (Supabase) for vector search, user data, and sessions; Neo4j (Mac Studio Docker) for knowledge graphs and entity relationships; Redis (Upstash/Local) for caching and Celery broker.",
+        "Production Services: FastAPI + Celery on Render provide REST/WebSocket APIs and background task processing."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "easy"
+    },
+    {
+      "id": "arch_002",
+      "category": "architecture_queries",
+      "question": "How does the dual-interface architecture work in Empire v7.2?",
+      "ground_truth": "The dual-interface architecture provides two access methods: (1) Neo4j MCP for Claude Desktop/Code enabling natural language to Cypher translation for developer graph queries, and (2) Chat UI (Gradio/Streamlit) for end users with WebSocket-based real-time messaging and token streaming.",
+      "contexts": [
+        "Multi-Modal Access: REST/WebSocket APIs (FastAPI) and Neo4j MCP (Claude Desktop/Code for natural language graph queries).",
+        "Dual-Interface Architecture provides Neo4j MCP for Claude Desktop/Code natural language graph queries and Chat UI (Gradio/Streamlit) for end users."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "feat_001",
+      "category": "feature_queries",
+      "question": "What search methods does Empire use for retrieval?",
+      "ground_truth": "Empire uses a hybrid 4-method search combining dense vector search with BGE-M3 embeddings, sparse BM25 full-text search, ILIKE pattern matching, and fuzzy string similarity (pg_trgm), merged using Reciprocal Rank Fusion (RRF). Results are then reranked using BGE-Reranker-v2 running locally.",
+      "contexts": [
+        "Hybrid Search: Dense vector search (pgvector with BGE-M3), Sparse full-text search (PostgreSQL FTS with BM25), ILIKE pattern matching, Fuzzy string similarity (pg_trgm), RRF fusion for optimal results.",
+        "BGE-Reranker-v2 local reranking provides 25-35% better result ordering. Query expansion via Claude Haiku generates 4-5 variations for 15-30% better recall."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "feat_002",
+      "category": "feature_queries",
+      "question": "What embedding model does Empire use and what are its dimensions?",
+      "ground_truth": "Empire uses BGE-M3 embeddings running locally via Ollama on Mac Studio. BGE-M3 produces 1024-dimensional vectors with built-in sparse vectors, replacing the previous nomic-embed-text model.",
+      "contexts": [
+        "BGE-M3 Embeddings: 1024-dimensional with built-in sparse vectors, replacing nomic-embed-text.",
+        "Local Models: OLLAMA_BASE_URL=http://localhost:11434, EMBEDDING_MODEL=bge-m3, RERANKER_MODEL=bge-reranker-v2-m3."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "easy"
+    },
+    {
+      "id": "cost_001",
+      "category": "cost_queries",
+      "question": "What is the total monthly cost for running Empire v7.2?",
+      "ground_truth": "Empire v7.2 costs $300-400 per month, with $150-200 for core infrastructure (FastAPI, Celery, Claude APIs, Supabase, B2) and $150-300 for advanced features (LightRAG, Redis, monitoring, transcription). Neo4j runs free on Mac Studio Docker.",
+      "contexts": [
+        "Monthly Cost: $300-400/month. Core Infrastructure ($150-200/month): FastAPI Backend (Render) $20-30, Celery Workers $20-30, Claude Sonnet 4.5 API $50-80, Claude Haiku $1.50-9, CrewAI $20, Supabase $25, Backblaze B2 $15-25.",
+        "Neo4j: $0 (FREE Docker on Mac Studio). Ollama: $0 (BGE-M3 embeddings, BGE-Reranker-v2 local). Advanced Features ($150-300/month): LightRAG API $30-50, Redis Cache (Upstash) $10-15, Monitoring Stack $20-30."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "easy"
+    },
+    {
+      "id": "cost_002",
+      "category": "cost_queries",
+      "question": "How much does Empire save by running Neo4j locally instead of in the cloud?",
+      "ground_truth": "Empire saves approximately $100+ per month by running Neo4j free on Mac Studio Docker instead of using a cloud GraphDB service. The monthly cost breakdown shows Neo4j as $0 (FREE) where cloud alternatives would cost $100+ per month.",
+      "contexts": [
+        "Neo4j: $0 (FREE - Mac Studio Docker). Neo4j Value: $100+ saved (free instead of cloud GraphDB).",
+        "Why v7.2 is a Game Changer: Neo4j FREE on Mac Studio + local embeddings ($0) eliminates major costs. Cost Efficiency: Neo4j FREE on Mac Studio + local embeddings eliminates expensive cloud GraphDB costs."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "tech_001",
+      "category": "technical_implementation",
+      "question": "How does query expansion work in Empire?",
+      "ground_truth": "Query expansion in Empire uses Claude Haiku to generate 4-5 query variations for each user query, improving recall by 15-30%. These variations are then used to search in parallel across the hybrid search methods before results are merged with RRF fusion.",
+      "contexts": [
+        "Query Expansion: Claude Haiku generates 4-5 variations (15-30% better recall).",
+        "v7.1 Breakthrough Optimizations: Query Expansion - Claude Haiku generates 4-5 variations (15-30% better recall). Advanced Context Expansion - get_chunks_by_ranges() with hierarchical context."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "tech_002",
+      "category": "technical_implementation",
+      "question": "What is the HNSW index used for in Empire?",
+      "ground_truth": "The HNSW (Hierarchical Navigable Small World) index in Empire is used on the pgvector embeddings in Supabase PostgreSQL for fast approximate nearest neighbor search. It enables 28x lower latency compared to traditional vector databases when searching the 1024-dimensional BGE-M3 embeddings.",
+      "contexts": [
+        "HNSW indexing for fast similarity search. 28x lower latency vs traditional vector DBs.",
+        "Supabase Unified Database: pgvector (1024-dim) for semantic search. HNSW indexing for fast similarity search. 28x lower latency vs traditional vector DBs."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "comp_001",
+      "category": "comparison_queries",
+      "question": "What are the key differences between Empire v7.0 and v7.2?",
+      "ground_truth": "Empire v7.2 adds a dual-interface architecture with Neo4j Graph Database (free on Mac Studio), natural language to Cypher translation, Neo4j MCP for Claude Desktop/Code, and a Chat UI for end users. It keeps all v7.1 improvements (BGE-M3, query expansion, local reranker) while adding bi-directional Supabase ↔ Neo4j sync and advanced graph traversal capabilities.",
+      "contexts": [
+        "v7.2 (Dual-Interface Architecture): Neo4j Graph Database (FREE on Mac Studio Docker), Natural language to Cypher translation, Neo4j MCP for Claude Desktop/Code, Chat UI (Gradio/Streamlit) for end users, Bi-directional Supabase ↔ Neo4j sync.",
+        "v7.1 (State-of-the-Art RAG): BGE-M3 embeddings (1024-dim + sparse), Query expansion via Claude Haiku, BGE-Reranker-v2 local, Adaptive document-type chunking, Tiered semantic caching."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "comp_002",
+      "category": "comparison_queries",
+      "question": "How does Empire v7.2 improve upon Total RAG?",
+      "ground_truth": "Empire v7.2 exceeds Total RAG with: better AI stack (Claude Sonnet 4.5 > GPT-4), superior memory (mem-agent MCP vs Zep), more efficient embeddings (768-dim vs 1536-dim for 28x faster searches), advanced extraction (LlamaIndex + LangExtract), full observability (Prometheus + Grafana + OpenTelemetry), better database schema, and built-in cost tracking - all features Total RAG lacks.",
+      "contexts": [
+        "Empire v7.0 Advantages Over Total RAG: Better AI Stack: Claude Sonnet 4.5 > GPT-4 for document understanding. Superior Memory: mem-agent MCP > Zep (better privacy + performance). More Efficient: 768-dim embeddings vs 1536-dim (28x faster searches). Advanced Extraction: LlamaIndex + LangExtract (Total RAG lacks this).",
+        "Infrastructure Advantages: Full Observability: Prometheus + Grafana + OpenTelemetry (Total RAG lacks). Better Database Schema: error_logs, processing_queue, audit_log tables. Cost Tracking: Built-in optimization and monitoring (Total RAG lacks)."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "multi_001",
+      "category": "multi_hop_queries",
+      "question": "What are the 8 production milestones in Empire v7.2 and what does Milestone 3 involve?",
+      "ground_truth": "The 8 production milestones are: 1) Document Intake, 2) Universal Processing, 3) Advanced RAG, 4) Query Processing, 5) Chat UI & Memory, 6) Monitoring, 7) Admin Tools, and 8) CrewAI Integration. Milestone 3 (Advanced RAG) involves BGE-M3 embeddings via Ollama (local), pgvector storage with HNSW indexing for fast similarity search.",
+      "contexts": [
+        "8 Production Milestones (v7.2): 1. Milestone 1: Document Intake - FastAPI upload API, B2 storage, SHA-256 deduplication. 2. Milestone 2: Universal Processing - Celery async tasks, text extraction (40+ formats), OCR. 3. Milestone 3: Advanced RAG - BGE-M3 embeddings via Ollama (local), pgvector storage, HNSW indexing.",
+        "4. Milestone 4: Query Processing - Hybrid search, Claude Haiku expansion, BGE-Reranker-v2 local. 5. Milestone 5: Chat UI & Memory - WebSocket chat with token streaming, PostgreSQL graph memory. 6. Milestone 6: Monitoring - Prometheus metrics, Grafana dashboards, structured logging."
+      ],
+      "query_type": "relational",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "multi_002",
+      "category": "multi_hop_queries",
+      "question": "What monitoring services are available and what ports do they use?",
+      "ground_truth": "Empire's monitoring services include: Prometheus (Port 9090) for metrics collection, Grafana (Port 3000) for visualization with admin/empiregrafana123 credentials, Flower (Port 5555) for Celery monitoring with admin/empireflower123 credentials, Alertmanager (Port 9093) for alert routing, Redis (Port 6379) for Celery broker and cache.",
+      "contexts": [
+        "Monitoring Services Available: Prometheus (Port 9090) - Metrics collection and storage. Grafana (Port 3000) - Visualization dashboards, Credentials: admin/empiregrafana123. Redis (Port 6379) - Celery task broker and cache.",
+        "Flower (Port 5555) - Celery task monitoring UI, Credentials: admin/empireflower123. Alertmanager (Port 9093) - Alert routing and notifications, Email/Slack integration ready."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "arch_003",
+      "category": "architecture_queries",
+      "question": "What is the role of Celery in the Empire architecture?",
+      "ground_truth": "Celery provides asynchronous background task processing in Empire, handling document processing, embeddings generation, graph synchronization, and CrewAI workflows. It uses Redis as the message broker and runs on Render as a separate service (srv-d44oclodl3ps73bg8rmg) on the Starter plan.",
+      "contexts": [
+        "Empire Celery Worker (Production): Service ID: srv-d44oclodl3ps73bg8rmg, Plan: Starter ($7/month), Region: Oregon. Purpose: Background task processing with Celery. Tasks: Document processing, embeddings, graph sync, CrewAI workflows.",
+        "Redis (Port 6379) - Celery task broker, Cache backend, Session storage. Flower (Port 5555) - Celery task monitoring UI, Worker status and task history."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "feat_003",
+      "category": "feature_queries",
+      "question": "What is LightRAG and what does it provide to Empire?",
+      "ground_truth": "LightRAG is a knowledge graph API that costs $30-50/month and provides entity relationship mapping and graph traversal capabilities for Empire. It has been enhanced with Neo4j backend integration for production knowledge graphs, enabling advanced graph-based reasoning and multi-hop pathfinding.",
+      "contexts": [
+        "LightRAG API: $30-50 (knowledge graph, now with Neo4j sync). LightRAG Integration - Enhanced with Neo4j backend for knowledge graphs.",
+        "LightRAG Knowledge Graph - Entity relationships and traversal. Advanced Traversal - Multi-hop pathfinding, community detection, centrality analysis."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "tech_003",
+      "category": "technical_implementation",
+      "question": "How is data synchronized between Supabase and Neo4j?",
+      "ground_truth": "Empire uses bi-directional sync between Supabase PostgreSQL and Neo4j. Entities and relationships are stored in both systems, with Supabase handling vector embeddings and user data while Neo4j manages the knowledge graph structure. The sync ensures entity/relationship data consistency across both databases for comprehensive queries.",
+      "contexts": [
+        "Bi-directional Sync - Supabase ↔ Neo4j synchronization for entity/relationship data. Graph-based Entity Management - All entities stored as nodes with relationships.",
+        "Hybrid Strength: Vector search (PostgreSQL) + graph queries (Neo4j) working together in production. Best-of-both-worlds (vector + graph for comprehensive queries)."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "cost_003",
+      "category": "cost_queries",
+      "question": "What is the cost per document and cost per query in Empire?",
+      "ground_truth": "Empire v7.2 costs approximately $0.30-0.45 per document processed and $0.005-0.02 per cached query. The total monthly cost of $350-500 breaks down to these per-unit costs based on expected throughput of 500-1000 documents/day and 5000+ queries/day.",
+      "contexts": [
+        "v7.2 Total (DUAL INTERFACES): Monthly Total: $350-500/month (includes both Chat UI AND Neo4j MCP). Cost per document: $0.30-0.45. Cost per query (cached): $0.005-0.02.",
+        "Performance: <500ms query latency (with caching). 60-80% cache hit rate. 3-10x faster for cached queries. Scalable to 1000+ docs/day, 5000+ queries/day."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "tech_004",
+      "category": "technical_implementation",
+      "question": "What is the tiered semantic caching strategy?",
+      "ground_truth": "Empire uses tiered semantic caching with similarity thresholds in Redis: 0.98+ similarity returns direct cached results, 0.93-0.97 similarity suggests similar cached queries, and 0.88-0.92 similarity provides suggestions for related queries. This achieves a 60-80% cache hit rate and 3-10x faster response for cached queries.",
+      "contexts": [
+        "Tiered Caching - Similarity thresholds: 0.98+ direct, 0.93-0.97 similar, 0.88-0.92 suggestion. Semantic Caching (Redis): 60-80% hit rate, <50ms cached queries with tiered thresholds.",
+        "Redis (Upstash): Semantic caching layer. Semantic Caching: 60-80% hit rate. Query latency: <500ms (with caching). 3-10x faster for cached queries."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "feat_004",
+      "category": "feature_queries",
+      "question": "What document formats can Empire process?",
+      "ground_truth": "Empire can process 40+ document formats through MarkItDown MCP, including PDFs, Word documents, Excel spreadsheets, images (via Claude Vision), audio files (via Soniox transcription), YouTube videos (transcript extraction), web articles (newspaper3k), and MP4 videos. It also handles complex PDFs via Mistral OCR and uses LlamaParse for 10K free pages/month.",
+      "contexts": [
+        "Document Processing: 40+ format support via MarkItDown MCP. YouTube transcript extraction. Article to markdown conversion. MP4 transcription via Soniox. Batch upload via web interface.",
+        "Multi-Modal: Claude Vision + Soniox audio. Mistral OCR: $10-20 (complex PDF processing). LlamaCloud Free: $0 (LlamaParse OCR - 10K pages/month)."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "easy"
+    },
+    {
+      "id": "multi_003",
+      "category": "multi_hop_queries",
+      "question": "What are all the Render services deployed for Empire and their purposes?",
+      "ground_truth": "Empire has 5 Render services: 1) Empire FastAPI (srv-d44o2dq4d50c73elgupg) - Main REST API, 2) Empire Celery Worker (srv-d44oclodl3ps73bg8rmg) - Background processing, 3) Empire Redis (red-d44og3n5r7bs73b2ctbg) - Caching/broker, 4) LlamaIndex (srv-d2nl1lre5dus73atm9u0) - Document parsing, 5) CrewAI (srv-d2n0hh3uibrs73buafo0) - Multi-agent orchestration. Total cost is ~$21/month plus free Redis.",
+      "contexts": [
+        "Empire FastAPI Service (Production): URL: https://jb-empire-api.onrender.com, Service ID: srv-d44o2dq4d50c73elgupg, Plan: Starter ($7/month). Empire Celery Worker: Service ID: srv-d44oclodl3ps73bg8rmg, Plan: Starter ($7/month). Empire Redis: Service ID: red-d44og3n5r7bs73b2ctbg, Plan: Free tier.",
+        "LlamaIndex Service: URL: https://jb-llamaindex.onrender.com, Service ID: srv-d2nl1lre5dus73atm9u0. CrewAI Service: URL: https://jb-crewai.onrender.com, Service ID: srv-d2n0hh3uibrs73buafo0. Purpose: Multi-agent AI orchestration."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "comp_003",
+      "category": "comparison_queries",
+      "question": "How did the embedding model change from v7.0 to v7.1?",
+      "ground_truth": "Empire v7.1 upgraded from nomic-embed-text to BGE-M3 embeddings. BGE-M3 provides 1024 dimensions with built-in sparse vectors (versus nomic's simpler dense vectors), enabling better hybrid search capabilities and 15-25% better precision through document-type-aware adaptive chunking.",
+      "contexts": [
+        "v7.1 Breakthrough Optimizations: BGE-M3 Embeddings - 1024-dim with built-in sparse vectors (replaces nomic-embed-text). Adaptive Chunking - Document-type-aware chunking (15-25% better precision).",
+        "v7.0 Core Capabilities: Hybrid Search - Dense (BGE-M3) + Sparse (built-in) + ILIKE + Fuzzy with RRF. BGE-Reranker-v2 - 25-35% better result ordering (replaced Cohere)."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "arch_004",
+      "category": "architecture_queries",
+      "question": "What is the mem-agent MCP and how is it different from production memory?",
+      "ground_truth": "mem-agent MCP is a local development tool (8GB on Mac Studio) for Claude Desktop integration, NOT for production. Production user memory uses a graph-based system with PostgreSQL in Supabase, featuring three-layer graph architecture, multi-hop traversal, automatic fact extraction via Claude API, and confidence scoring. mem-agent is developer-only, while production memory serves end users.",
+      "contexts": [
+        "Two Distinct Memory Systems: 1. Developer Memory (Local Only): mem-agent MCP - Local development tool for Claude Desktop. Purpose: Developer context during local testing (NOT for production). Location: Mac Studio (8GB), NOT accessible in workflows.",
+        "2. Production User Memory (Graph-Based): Architecture: Three-layer graph (User Memory + Document Knowledge + Hybrid). Storage: Supabase PostgreSQL with pgvector. Features: Graph-based memory with relationships, Multi-hop graph traversal (2 hops, <100ms), Automatic fact extraction via Claude API."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "feat_005",
+      "category": "feature_queries",
+      "question": "What observability tools are integrated in Empire?",
+      "ground_truth": "Empire integrates Prometheus for metrics collection and storage, Grafana for visualization dashboards, OpenTelemetry for distributed tracing, and Alertmanager for automated alerts. The monitoring stack costs $20-30/month and provides full observability with performance and error monitoring across all services.",
+      "contexts": [
+        "Observability (v7.0 - NEW!): Prometheus: Metrics collection and storage. Grafana: Visualization dashboards. OpenTelemetry: Distributed tracing. Automated Alerts: Performance and error monitoring.",
+        "Monitoring Stack: $20-30 (Prometheus/Grafana/OpenTelemetry). Reliability: Full observability stack, Prometheus metrics + Grafana dashboards, OpenTelemetry distributed tracing, Automated alerts and monitoring, 99.9% uptime SLA."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "easy"
+    },
+    {
+      "id": "tech_005",
+      "category": "technical_implementation",
+      "question": "How does the RRF (Reciprocal Rank Fusion) algorithm work in Empire?",
+      "ground_truth": "RRF (Reciprocal Rank Fusion) in Empire combines results from the 4 search methods (dense vector, sparse BM25, ILIKE, fuzzy) by assigning scores based on reciprocal of rank positions. Each method's results are weighted, then merged into a unified ranking. This provides optimal result quality by leveraging strengths of each search method before reranking with BGE-Reranker-v2.",
+      "contexts": [
+        "Hybrid Search: Dense vector search (pgvector), Sparse full-text search (PostgreSQL FTS), ILIKE pattern matching, Fuzzy string similarity (pg_trgm), RRF fusion for optimal results.",
+        "Complete hybrid search SQL functions. Knowledge graph integration workflows. RRF fusion for optimal results. Dynamic Weight Tuning: Auto-adjusts search weights by query type."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "cost_004",
+      "category": "cost_queries",
+      "question": "What are the specific Claude API costs in Empire?",
+      "ground_truth": "Empire uses two Claude models: Claude Sonnet 4.5 API costs $50-80/month for synthesis and Cypher generation (main processing), and Claude Haiku costs $1.50-9/month for query optimization and expansion (generating 4-5 query variations). Total Claude API costs are $51.50-89/month out of the $300-400 total budget.",
+      "contexts": [
+        "Core Infrastructure ($150-200/month): Claude Sonnet 4.5 API: $50-80 (synthesis + Cypher generation). Claude Haiku: $1.50-9 (query optimization).",
+        "Claude Sonnet 4.5 API - Core intelligence: Document extraction (97-99% accuracy), Entity recognition and tagging, Summarization and validation, Structured JSON output, Vision capabilities for images."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "multi_004",
+      "category": "multi_hop_queries",
+      "question": "What is the complete document processing pipeline from upload to retrieval?",
+      "ground_truth": "The pipeline is: 1) Milestone 1: Upload to FastAPI, store in B2, SHA-256 deduplication. 2) Milestone 2: Celery async processing, extract text (40+ formats), OCR if needed. 3) Milestone 3: Generate BGE-M3 embeddings via Ollama, store in Supabase pgvector with HNSW index. 4) Milestone 4: On query, run hybrid 4-method search, Claude Haiku expansion, BGE-Reranker-v2 local reranking. 5) Milestone 5: Synthesize with Claude Sonnet, stream via WebSocket.",
+      "contexts": [
+        "8 Production Milestones: 1. Document Intake - FastAPI upload API, B2 storage, SHA-256 deduplication. 2. Universal Processing - Celery async tasks, text extraction (40+ formats), OCR. 3. Advanced RAG - BGE-M3 embeddings via Ollama (local), pgvector storage, HNSW indexing.",
+        "4. Query Processing - Hybrid search, Claude Haiku expansion, BGE-Reranker-v2 local. 5. Chat UI & Memory - WebSocket chat with token streaming, PostgreSQL graph memory. Performance: <500ms query latency (with caching), 60-80% cache hit rate."
+      ],
+      "query_type": "relational",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "feat_006",
+      "category": "feature_queries",
+      "question": "What is CrewAI used for in Empire?",
+      "ground_truth": "CrewAI (srv-d2n0hh3uibrs73buafo0 at https://jb-crewai.onrender.com) provides multi-agent AI orchestration for content analysis workflows, multi-document processing, framework extraction, and long-running async tasks via Celery. It costs $20/month and is critical for Milestone 8 implementation of complex multi-step research and analysis tasks.",
+      "contexts": [
+        "CrewAI Service (CRITICAL - Milestone 8): Service ID: srv-d2n0hh3uibrs73buafo0, URL: https://jb-crewai.onrender.com. Purpose: Multi-agent AI orchestration and content analysis workflows. Status: ACTIVE - REQUIRED for Milestone 8 implementation.",
+        "Workflows: Multi-agent task coordination, Content analysis automation, Multi-document processing, Framework extraction, Long-running async tasks via Celery. CrewAI (Render): $20 (multi-agent orchestration, Milestone 8)."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "tech_006",
+      "category": "technical_implementation",
+      "question": "How does Empire handle security and compliance?",
+      "ground_truth": "Empire implements JWT authentication with PyJWT, RBAC with Supabase RLS policies, encrypted storage (TLS in transit, AES-256 at rest), and GDPR-compliant data export/deletion. It's SOC 2 compliant via Claude API and Supabase, supports client-side encryption for B2, and includes comprehensive audit logging for all access events.",
+      "contexts": [
+        "Security & Compliance: GDPR Ready: Privacy controls implemented. SOC 2: Claude API and Supabase both SOC 2 compliant. Encryption: TLS in transit, AES-256 at rest. Zero-Knowledge: Client-side encryption for B2.",
+        "RBAC: Use Supabase RLS policies, implement user roles (admin, editor, viewer, guest), API key creation/rotation/revocation, and audit logs. Hash API keys with bcrypt. Test role permissions, API key flows, and audit log accuracy."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "comp_004",
+      "category": "comparison_queries",
+      "question": "What improvements does v7.2 provide over v7.1?",
+      "ground_truth": "v7.2 adds the dual-interface architecture with Neo4j Graph Database (free on Mac Studio), natural language to Cypher translation, Neo4j MCP access for Claude Desktop/Code, Chat UI (Gradio/Streamlit), bi-directional Supabase ↔ Neo4j sync, advanced graph traversal (pathfinding, centrality, communities), and semantic entity resolution. It keeps all v7.1 improvements while adding graph-native reasoning capabilities.",
+      "contexts": [
+        "v7.2 (Dual-Interface Architecture): Neo4j Graph Database (FREE on Mac Studio Docker), Natural language to Cypher translation, Neo4j MCP for Claude Desktop/Code, Chat UI (Gradio/Streamlit) for end users, Bi-directional Supabase ↔ Neo4j sync, Advanced graph traversal, Semantic entity resolution.",
+        "Keeps all v7.1 improvements (BGE-M3, query expansion, local reranker). Why v7.2 is the Game Changer: Dual Interfaces (developers and end users), Neo4j FREE, Graph Power (10-100x faster for relationship queries), Hybrid Strength (Vector + Graph)."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "arch_005",
+      "category": "architecture_queries",
+      "question": "What is the role of Tailscale in the Empire architecture?",
+      "ground_truth": "Tailscale provides secure VPN connectivity for remote access to Mac Studio services (Neo4j, Ollama) from cloud services on Render. It enables Render-hosted FastAPI and Celery workers to access local Mac Studio resources (embeddings, reranking, Neo4j) securely. It's free and uses the tailscale CLI for management including funnel exposure and exit node functionality.",
+      "contexts": [
+        "Tailscale: $0 (VPN for secure access from cloud services to Mac Studio). Tailscale VPN: Available via terminal using tailscale command for remote access, funnel exposure, and exit node management.",
+        "Production Infrastructure (Mac Studio - $0 additional): Neo4j: $0 (FREE Docker on Mac Studio). Ollama: $0 (BGE-M3 embeddings, BGE-Reranker-v2 local). Tailscale: $0 (VPN for secure access from cloud services to Mac Studio)."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    },
+    {
+      "id": "feat_007",
+      "category": "feature_queries",
+      "question": "What is the performance target for query latency in Empire?",
+      "ground_truth": "Empire targets <500ms query latency with caching enabled, achieving 60-80% cache hit rate. For cached queries, response time is 3-10x faster. The system is designed to handle 5000+ queries per day while maintaining sub-500ms latency for most requests through tiered semantic caching in Redis.",
+      "contexts": [
+        "Performance: <500ms query latency (with caching). 60-80% cache hit rate. 3-10x faster for cached queries. Scalable to 1000+ docs/day, 5000+ queries/day.",
+        "Performance Metrics: Query latency: <500ms (with caching). Cache hit rate: 60-80%. Vector search latency: 28x faster. Tiered Caching - Similarity thresholds: 0.98+ direct, 0.93-0.97 similar, 0.88-0.92 suggestion."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "easy"
+    },
+    {
+      "id": "multi_005",
+      "category": "multi_hop_queries",
+      "question": "What are all the local services running on Mac Studio and their purposes?",
+      "ground_truth": "Mac Studio runs 4 production services all FREE: 1) Neo4j (Docker) - Production knowledge graph database with TLS on port 7687, 2) Ollama - BGE-M3 embeddings (1024-dim) and BGE-Reranker-v2 for local reranking, 3) mem-agent MCP (8GB) - Developer-only conversation memory for Claude Desktop, 4) Tailscale - VPN for secure cloud-to-local connectivity. Combined these save $100+/month versus cloud alternatives.",
+      "contexts": [
+        "Production Infrastructure (Mac Studio - $0 additional): Neo4j: $0 (FREE Docker - PRODUCTION knowledge graph). Ollama: $0 (BGE-M3 embeddings, BGE-Reranker-v2 local - PRODUCTION). Tailscale: $0 (VPN). mem-agent MCP: Persistent conversation memory (8GB, local).",
+        "Neo4j Connection Details: URI (TLS Enabled): bolt+ssc://localhost:7687 (local), Username: neo4j, Web Interface: http://localhost:7474. BGE-Reranker-v2 local (saves $30-50/month). Neo4j Value: $100+ saved (free instead of cloud GraphDB)."
+      ],
+      "query_type": "metadata",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "hard"
+    },
+    {
+      "id": "tech_007",
+      "category": "technical_implementation",
+      "question": "How does Empire handle document deduplication?",
+      "ground_truth": "Empire uses SHA-256 hash-based deduplication in Milestone 1 (Document Intake). When a file is uploaded, its SHA-256 content hash is computed and checked against existing documents. If the hash already exists, the document is not reprocessed, preventing redundant processing and storage costs. This is tracked in the FastAPI upload API and B2 storage layer.",
+      "contexts": [
+        "Milestone 1: Document Intake - FastAPI upload API, B2 storage, SHA-256 deduplication. Hash-Based Deduplication - SHA-256 content hashing to prevent redundant processing.",
+        "Workflow Architecture: Sub-Workflow Architecture, Asynchronous Processing Patterns, Error Handling & Retry, Document Lifecycle Management - Complete CRUD with versioning, Hash-Based Deduplication - SHA-256 content hashing."
+      ],
+      "query_type": "semantic",
+      "expected_search_method": "hybrid_4method_rrf",
+      "difficulty": "medium"
+    }
+  ]
+}

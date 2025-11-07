@@ -1,0 +1,23 @@
+# RAGAS Evaluation Requirements for Empire v7.2
+# Install with: pip install -r ragas_requirements.txt
+
+# Core RAGAS framework
+ragas>=0.1.0
+
+# LLM providers (Empire uses Claude via Anthropic)
+anthropic>=0.18.0
+openai>=1.0.0  # Optional fallback
+
+# Data handling
+datasets>=2.14.0
+pandas>=2.0.0
+
+# Supabase client
+supabase>=2.0.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Async support
+aiohttp>=3.9.0
+asyncio>=3.4.3
