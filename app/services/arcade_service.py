@@ -5,7 +5,7 @@ Provides access to external tools (Google Search, Slack, GitHub, etc.) via Arcad
 import os
 from typing import List, Optional
 from arcadepy import Arcade
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 import structlog
 
 logger = structlog.get_logger(__name__)
