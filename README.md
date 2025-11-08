@@ -67,6 +67,60 @@ This directory contains the complete Software Requirements Specification (SRS) f
 7. **Milestone 7: Admin Tools** - RBAC system, document management, batch operations
 8. **Milestone 8: CrewAI Integration** - Multi-agent workflows, content analysis automation
 
+**Task 46: LangGraph + Arcade.dev Integration (COMPLETED - Nov 2024):**
+- ✅ **LangGraph Adaptive Workflows** - 5-node StateGraph with iterative refinement, conditional branching
+- ✅ **Workflow Router** - Intelligent query classification (LangGraph vs CrewAI vs Simple RAG)
+- ✅ **Arcade.dev Tool Integration** - External API access (Google Search, Slack, GitHub, etc.)
+- ✅ **Async Query Processing** - Celery background tasks for long-running queries
+- ✅ **8 Production API Endpoints** - Sync/async adaptive queries, batch processing, auto-routing
+- ✅ **Deployed on Render** - https://jb-empire-api.onrender.com/api/query/*
+
+**Task 46 API Endpoints:**
+
+```bash
+# Health check for query services
+curl https://jb-empire-api.onrender.com/api/query/health
+
+# Auto-routed query (LangGraph/CrewAI/Simple based on classification)
+curl -X POST https://jb-empire-api.onrender.com/api/query/auto \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What are California insurance requirements?", "max_iterations": 3}'
+
+# Adaptive LangGraph query (sync)
+curl -X POST https://jb-empire-api.onrender.com/api/query/adaptive \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Compare our policies with CA regulations", "max_iterations": 3}'
+
+# Adaptive query (async via Celery)
+curl -X POST https://jb-empire-api.onrender.com/api/query/adaptive/async \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Complex research query", "max_iterations": 3}'
+# Returns: {"task_id": "abc-123", "status": "processing"}
+
+# Check async task status
+curl https://jb-empire-api.onrender.com/api/query/status/abc-123
+
+# Batch query processing
+curl -X POST https://jb-empire-api.onrender.com/api/query/batch \
+  -H "Content-Type: application/json" \
+  -d '{"queries": ["Query 1", "Query 2", "Query 3"], "max_iterations": 2}'
+
+# List available tools
+curl https://jb-empire-api.onrender.com/api/query/tools
+```
+
+**Response Format:**
+```json
+{
+  "answer": "Generated answer based on adaptive research",
+  "refined_queries": ["Variation 1", "Variation 2"],
+  "iterations": 2,
+  "sources": [{"type": "vector", "content": "..."}],
+  "tool_calls": [{"tool": "Google.Search", "args": {...}}],
+  "status": "completed"
+}
+```
+
 **Why v7.2 is a Game Changer:**
 1. **Hybrid Database Production:** PostgreSQL for vectors/users + Neo4j for knowledge graphs (both production)
 2. **Cost Efficiency:** Neo4j FREE on Mac Studio + local embeddings ($0) eliminates major costs
@@ -78,13 +132,14 @@ This directory contains the complete Software Requirements Specification (SRS) f
 ### v7.2 Cost Breakdown - $300-400/month
 
 **Core Infrastructure ($150-200/month):**
-- **FastAPI Backend (Render):** $20-30 (REST + WebSocket APIs, Milestones 1-5)
-- **Celery Workers (Render):** $20-30 (async task processing, Milestone 2)
+- **FastAPI Backend (Render):** $20-30 (REST + WebSocket APIs, Milestones 1-5, Task 46 LangGraph)
+- **Celery Workers (Render):** $20-30 (async task processing, Milestone 2, Task 46 async queries)
 - **Claude Sonnet 4.5 API:** $50-80 (synthesis + Cypher generation)
-- **Claude Haiku:** $1.50-9 (query optimization)
+- **Claude Haiku:** $1.50-9 (query optimization + LangGraph workflows)
 - **CrewAI (Render):** $20 (multi-agent orchestration, Milestone 8)
 - **Supabase:** $25 (PostgreSQL + pgvector + graph tables)
 - **Backblaze B2:** $15-25 (file storage)
+- **Arcade.dev:** $0-10 (external tool access - Google Search, Slack, GitHub)
 
 **Production Infrastructure (Mac Studio - $0 additional):**
 - **Neo4j:** $0 (FREE Docker on Mac Studio - PRODUCTION knowledge graph database)

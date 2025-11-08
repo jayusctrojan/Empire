@@ -135,6 +135,13 @@
 - **Knowledge Graphs**: LightRAG API with Neo4j backend sync
 - **Semantic Cache**: Redis with tiered similarity thresholds (0.98+, 0.93-0.97, 0.88-0.92)
 - **Search**: Hybrid 4-method (dense, sparse, ILIKE, fuzzy) with RRF fusion
+- **Task 46 - LangGraph + Arcade.dev Integration** (COMPLETED - November 2024):
+  - **LangGraph Workflows**: 5-node StateGraph for adaptive query processing
+  - **Workflow Router**: Intelligent classification (LangGraph/CrewAI/Simple RAG)
+  - **Arcade.dev Tools**: External API integration (Google Search, Slack, GitHub, etc.)
+  - **Async Processing**: Celery background tasks for long-running queries
+  - **API Endpoints**: 8 production endpoints at /api/query/*
+  - **Configuration**: ARCADE_API_KEY, ARCADE_ENABLED, LANGGRAPH_DEFAULT_MODEL
 
 ### 3.5 Monitoring & Observability Stack
 - **Metrics**: Prometheus (port 9090)
