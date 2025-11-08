@@ -219,8 +219,7 @@ with gr.Blocks(
             render_markdown=True,
             avatar_images=(None, "🤖"),
             show_label=False,
-            container=True,
-            bubble_full_width=False
+            container=True
         ),
         textbox=gr.Textbox(
             placeholder="Ask me anything about documents, policies, or regulations...",
@@ -229,16 +228,8 @@ with gr.Blocks(
             max_lines=3,
             show_label=False
         ),
-        submit_btn="📤 Send",
-        retry_btn="🔄 Retry",
-        undo_btn="↩️ Undo",
-        clear_btn="🗑️ Clear",
         examples=examples,
-        cache_examples=False,
-        description=(
-            "Ask questions and watch as the system automatically routes your query "
-            "to the best workflow. Responses include metadata about processing time and workflow type."
-        )
+        cache_examples=False
     )
 
     # Footer with detailed info
