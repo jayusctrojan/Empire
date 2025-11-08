@@ -6,7 +6,7 @@ Provides background task processing for:
 - Bulk query processing
 - Scheduled query refreshes
 """
-from celery_app import celery_app
+from app.celery_app import celery_app
 from app.workflows.langgraph_workflows import LangGraphWorkflows, QueryState
 from app.workflows.workflow_router import workflow_router, WorkflowType
 import structlog
