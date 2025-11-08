@@ -7,7 +7,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage
 from langchain_anthropic import ChatAnthropic
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 import operator
 import structlog
 import os
