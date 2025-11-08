@@ -7,6 +7,9 @@ uvicorn[standard]>=0.27.0
 pydantic>=2.6.0
 pydantic-settings>=2.1.0
 
+# Chat UI
+gradio>=4.19.0  # AI chat interface with streaming support
+
 # ASGI Server & HTTP
 httpx>=0.26.0
 python-multipart>=0.0.9

@@ -96,15 +96,35 @@ This document outlines all tools, MCPs, and development environments available f
 **Purpose**: Maintain conversation context and project memory across sessions
 
 **Capabilities**:
-- Remember project decisions and architecture
+- Remember project decisions and architecture choices
 - Track progress across multiple sessions
-- Reference previous conversations
+- Reference previous conversations and decisions
+- Recall "why" behind implementation choices
+- Maintain project history and evolution
 
-**Usage**:
+**When to Use**:
+- ✅ Starting a new Claude Code session
+- ✅ Need to recall what was decided previously
+- ✅ Continuing work from days/weeks ago
+- ✅ Asking "what did we decide about X?"
+- ✅ Understanding why a specific approach was chosen
+- ✅ Tracking long-term project evolution
+
+**Usage Examples**:
 ```
 "Refer to our previous discussion about the dual-interface architecture"
 "What did we decide about the embedding model?"
+"Why did we choose LangGraph over just using CrewAI?"
+"What was the reasoning behind the three-layer orchestration?"
+"Remind me what we implemented in Task 46"
+"What were the key decisions from last week's session?"
 ```
+
+**Best Practices**:
+- Use at the START of each session to recall context
+- Reference when making architectural decisions
+- Query when you need to understand historical choices
+- Helps maintain consistency across long projects
 
 ---
 
@@ -397,8 +417,8 @@ This document outlines all tools, MCPs, and development environments available f
 
 ## 3. AI Coding Assistants in VS Code
 
-### 3.1 Claude Code (CLI)
-**Role**: Primary architect and infrastructure setup
+### 3.1 Claude Code (CLI) - **YOU ARE HERE**
+**Role**: Primary architect, orchestrator, and task delegator
 
 **Best For**:
 - System architecture design
@@ -406,12 +426,14 @@ This document outlines all tools, MCPs, and development environments available f
 - MCP integration and testing
 - Complex multi-file refactoring
 - Git operations and PR management
+- **DELEGATING TO OTHER TOOLS**
 
 **Strengths**:
 - Access to all MCPs
 - Can read entire codebase
 - Long-form planning and documentation
 - Direct terminal access
+- **Can instruct user to switch to Cline or Continue.dev**
 
 **Usage Pattern**:
 ```bash
@@ -425,60 +447,111 @@ claude-code
 "Create a PR with the new graph sync feature"
 ```
 
+**CRITICAL - When to Delegate**:
+- **Delegate to Cline**: When implementing a complete feature in 1-3 files
+- **Delegate to Continue.dev**: When user is actively writing code and needs inline help
+- See section 4 below for explicit handoff triggers
+
 ---
 
 ### 3.2 Cline (VS Code Extension)
-**Role**: Rapid feature implementation within VS Code
+**Role**: Rapid feature implementation within VS Code with visual feedback
 
 **Best For**:
-- Quick feature additions
-- File-by-file editing
-- Inline code generation
-- Testing and debugging
-- Iterative development
+- Implementing a single complete feature (1-3 files)
+- File-by-file editing with visual diffs
+- Inline code generation with immediate preview
+- Testing and debugging specific functions
+- Iterative development with quick feedback
 
 **Strengths**:
 - Native VS Code integration
 - Fast context switching
-- Visual diff previews
+- **Visual diff previews** - see changes before accepting
 - Direct file manipulation
+- Can run tests and see results inline
 
-**Usage Pattern**:
-1. Open VS Code to the file you want to edit
-2. Activate Cline sidebar
-3. Describe the change needed
-4. Review and accept the diff
+**When Claude Code Should Delegate to Cline**:
+- ✅ User says: "implement X feature"
+- ✅ User says: "add error handling to Y service"
+- ✅ User says: "create a new endpoint for Z"
+- ✅ Task involves 1-3 specific files
+- ✅ User wants to see visual diffs
 
-**Example Prompts**:
+**How to Delegate**:
 ```
-"Add error handling to the embedding service"
-"Create a new route for document upload"
-"Refactor this function to use async/await"
-"Add type hints to all functions in this file"
+Claude Code should respond:
+"I've planned the implementation. Now I recommend using Cline in VS Code for the actual coding:
+
+1. Open VS Code to the Empire project
+2. Click the Cline icon in the sidebar (chat bubble)
+3. Copy this prompt to Cline:
+
+'Implement [feature] in [file]. Here's the plan:
+- [Step 1]
+- [Step 2]
+- [Step 3]
+
+Use the patterns from [reference file].'
+
+4. Review the visual diff before accepting
+5. Come back here when done and I'll help test it."
+```
+
+**Example Prompts for Cline**:
+```
+"Add error handling to app/services/embedding_service.py"
+"Create a new route /api/documents/upload in app/routes/documents.py"
+"Refactor the query_expansion function to use async/await"
+"Add type hints to all functions in app/services/graph_sync.py"
 ```
 
 ---
 
 ### 3.3 Continue.dev (VS Code Extension)
-**Role**: Code completion and inline suggestions
+**Role**: Real-time code completion and inline suggestions while coding
 
 **Best For**:
-- Autocomplete while typing
+- Autocomplete while typing (Tab completion)
 - Function generation from comments
-- Quick refactoring
-- Code explanation
-- Unit test generation
+- Quick inline refactoring (Cmd+I)
+- Code explanation for specific lines
+- Unit test generation from existing functions
 
 **Strengths**:
-- Real-time suggestions
+- Real-time suggestions as you type
 - Minimal context switching
-- Tab completion
+- Tab completion (no interruption)
 - Comment-to-code generation
+- Works alongside your active coding
 
-**Usage Pattern**:
-1. Write a comment describing what you need
-2. Press Tab to accept suggestion
-3. Use Cmd+I for inline chat
+**When Claude Code Should Recommend Continue.dev**:
+- ✅ User is actively writing code in VS Code
+- ✅ User needs autocomplete suggestions
+- ✅ User wants to write comments and generate code
+- ✅ User needs quick inline explanations
+- ❌ NOT for full feature implementation (use Cline)
+
+**How to Recommend**:
+```
+Claude Code should respond:
+"For this type of incremental coding, I recommend using Continue.dev:
+
+1. Open the file in VS Code: [filename]
+2. Press Cmd+L to open Continue.dev chat
+3. Or write a comment describing what you need and press Tab
+
+Example:
+# Calculate similarity score between query and document embeddings
+# [Press Tab - Continue.dev generates the function]
+
+Continue.dev will provide real-time suggestions as you type."
+```
+
+**Keyboard Shortcuts**:
+- `Cmd+L` - Open Continue chat
+- `Cmd+I` - Inline edit at cursor
+- `Tab` - Accept suggestion
 
 **Example Usage**:
 ```python
@@ -492,37 +565,280 @@ def generate_embeddings(text: str) -> list[float]:
 
 ---
 
-## 4. Recommended Development Workflow
+## 4. Recommended Development Workflow with Tool Delegation
 
-### Phase 1: Architecture & Planning (Claude Code)
-1. Use **Claude Code** to design system architecture
+### 🎯 DECISION TREE: Which Tool to Use?
+
+**Question 1: What type of work is this?**
+
+```
+┌─ Architecture/Planning/Multiple Files?
+│  └─> Use Claude Code (stay in CLI)
+│
+├─ Implementing 1-3 file feature with visual feedback?
+│  └─> DELEGATE TO CLINE (tell user to open VS Code)
+│
+├─ User is actively coding and needs autocomplete?
+│  └─> RECOMMEND CONTINUE.DEV (Cmd+L or Tab)
+│
+└─ Database operations/MCP tasks?
+   └─> Use Claude Code (stay in CLI)
+```
+
+### Phase 1: Architecture & Planning (Claude Code - YOU)
+
+**What YOU (Claude Code) Do**:
+1. Design system architecture using knowledge of codebase
 2. Create database schemas via **Neo4j MCP** and **Supabase MCP**
 3. Set up project structure and dependencies
 4. Create initial boilerplate code
+5. **THEN DELEGATE to Cline for implementation**
 
-### Phase 2: Core Implementation (Cline)
-1. Use **Cline** in VS Code for feature implementation
-2. Implement services (embedding, query, sync)
-3. Create API routes in FastAPI
-4. Add business logic
+**Example Session**:
+```
+User: "I need to add a new document upload feature"
 
-### Phase 3: Refinement (Continue.dev)
-1. Use **Continue.dev** for code completion
-2. Add type hints and documentation
-3. Refactor for clarity
-4. Generate unit tests
+Claude Code Response:
+"I'll plan this feature for you:
+
+ARCHITECTURE PLAN:
+1. New route: POST /api/documents/upload
+2. Service: app/services/upload_service.py
+3. Validation: Pydantic model for upload request
+4. Storage: B2 via existing client
+
+Now let's implement this with Cline for visual feedback:
+
+🔧 SWITCH TO CLINE:
+1. Open VS Code
+2. Click Cline icon (sidebar)
+3. Paste this prompt:
+
+'Create document upload endpoint in app/routes/documents.py:
+- POST /api/documents/upload
+- Accept multipart file upload
+- Validate file type (PDF, DOCX, TXT)
+- Use UploadService from app/services/upload_service.py
+- Return upload ID and status
+- Follow patterns from app/routes/query.py'
+
+Come back when Cline is done and I'll help you test it."
+```
+
+### Phase 2: Feature Implementation (DELEGATE TO CLINE)
+
+**EXPLICIT HANDOFF TRIGGERS** - When Claude Code should stop and delegate:
+
+**Trigger 1: "Implement [feature]"**
+```
+User: "Implement user authentication"
+
+Claude Code MUST respond:
+"I recommend using Cline for this implementation:
+
+📱 OPEN CLINE IN VS CODE:
+1. Click Cline icon in sidebar
+2. Use this prompt:
+
+'Implement JWT authentication in app/auth/:
+- Create auth_service.py with login/register functions
+- Use bcrypt for password hashing
+- Generate JWT tokens with 24hr expiry
+- Add authentication middleware
+- Follow FastAPI security patterns'
+
+Review the diffs carefully before accepting."
+```
+
+**Trigger 2: "Add [specific functionality] to [file]"**
+```
+User: "Add error handling to the embedding service"
+
+Claude Code MUST respond:
+"This is perfect for Cline's visual diff feature:
+
+📱 SWITCH TO CLINE:
+'Add comprehensive error handling to app/services/embedding_service.py:
+- Wrap Ollama calls in try/except
+- Handle connection errors
+- Log errors with structlog
+- Return meaningful error messages
+- Add retry logic (max 3 attempts)'
+
+You'll see exactly what's changing before accepting."
+```
+
+**Trigger 3: "Create new [file/route/service]"**
+```
+User: "Create a new analytics service"
+
+Claude Code MUST respond:
+"Let's use Cline to create this new service:
+
+📱 USE CLINE:
+'Create app/services/analytics_service.py:
+- Track query metrics (count, latency, errors)
+- Store metrics in Supabase analytics table
+- Export metrics to Prometheus
+- Use singleton pattern
+- Follow structure of app/services/arcade_service.py'
+
+Cline will create the file and show you a preview."
+```
+
+### Phase 3: Active Coding (RECOMMEND CONTINUE.DEV)
+
+**When to Recommend Continue.dev**:
+
+**Scenario 1: User is writing code in VS Code**
+```
+User: "I'm writing a function but need help with the implementation"
+
+Claude Code MUST respond:
+"Since you're actively coding, use Continue.dev for real-time help:
+
+⌨️ IN VS CODE:
+1. Write a comment describing what you need:
+   # Calculate cosine similarity between embeddings
+2. Press Tab to accept the suggestion
+3. Or press Cmd+I for inline edit
+
+Continue.dev will autocomplete as you type."
+```
+
+**Scenario 2: User needs autocomplete/suggestions**
+```
+User: "Can you help me write this function?"
+
+Claude Code MUST respond:
+"For autocomplete while coding, use Continue.dev:
+
+⌨️ CONTINUE.DEV (Cmd+L):
+1. Open your file in VS Code
+2. Press Cmd+L to open Continue chat
+3. Describe what you're building
+4. Get suggestions as you type
+
+Or write comments and press Tab for instant code generation."
+```
 
 ### Phase 4: Testing & Debugging
+
+**Claude Code Stays Active For**:
 1. Use **Chrome DevTools MCP** for frontend debugging
 2. Use **Neo4j MCP** to verify graph data
 3. Use **Supabase MCP** to check vector storage
 4. Use **Ref MCP** to verify API usage
+5. Run pytest and analyze failures
 
-### Phase 5: Deployment (Claude Code + Render MCP + GitHub CLI)
+**BUT DELEGATE TO CLINE for fixes**:
+```
+User: "The test is failing, can you fix it?"
+
+Claude Code:
+"I see the issue in the test. Let's fix it with Cline:
+
+📱 USE CLINE:
+'Fix the failing test in tests/test_upload.py:
+- The mock is not properly configured
+- Add missing return_value for B2 client
+- Update assertion to match actual response format'
+
+You'll see the exact changes in the diff."
+```
+
+### Phase 5: Deployment (Claude Code)
+
+**YOU Stay Active**:
 1. Use **Claude Code** with **Render MCP** to deploy to Render
 2. Use **GitHub CLI** (`gh`) to create PR and merge to main via terminal
 3. Monitor logs and metrics via **Render MCP**
 4. Set up environment variables via **Render MCP**
+
+---
+
+### 🔄 COMPLETE WORKFLOW EXAMPLE
+
+**User Request**: "Add rate limiting to the API"
+
+**Step 1: Claude Code Plans (YOU)**
+```
+"I'll plan the rate limiting implementation:
+
+ARCHITECTURE:
+1. Install slowapi: pip install slowapi
+2. Add middleware in app/main.py
+3. Configure limits: 100 requests/minute per IP
+4. Store state in Redis
+
+Now let's implement with Cline..."
+```
+
+**Step 2: Delegate to Cline**
+```
+"📱 SWITCH TO CLINE IN VS CODE:
+
+Prompt for Cline:
+'Add rate limiting to app/main.py:
+- Import slowapi and configure limiter
+- Add middleware with 100/minute limit
+- Use Redis for state storage
+- Add rate limit headers to responses
+- Handle 429 errors gracefully'
+
+Review the changes, then come back here."
+```
+
+**Step 3: User Returns to Claude Code**
+```
+User: "Done with Cline, what's next?"
+
+Claude Code:
+"Great! Now let's test the rate limiting:
+1. I'll update the requirements.txt
+2. We'll deploy to Render with the Render MCP
+3. Monitor the logs to verify it's working
+
+Let me handle the deployment..."
+```
+
+---
+
+### 📋 QUICK REFERENCE: When to Use Each Tool
+
+| Scenario | Tool | Why |
+|----------|------|-----|
+| Plan architecture | Claude Code | Full codebase access, MCP integration |
+| Implement feature (1-3 files) | **Cline** | Visual diffs, focused implementation |
+| Active coding with autocomplete | **Continue.dev** | Real-time suggestions, Tab completion |
+| Multi-file refactoring | Claude Code | See all dependencies |
+| Create database schema | Claude Code | Neo4j/Supabase MCP access |
+| Add error handling to service | **Cline** | See exact changes in diff |
+| Write function with autocomplete | **Continue.dev** | Comment-to-code generation |
+| Deploy to production | Claude Code | Render MCP integration |
+| Debug with browser tools | Claude Code | Chrome DevTools MCP |
+| Fix failing test | **Cline** | Visual diff of test changes |
+| Generate unit tests | **Continue.dev** | Quick test generation from code |
+| Git operations | Claude Code | Full git integration |
+| Recall previous decisions | Claude Code | Claude Context MCP for session memory |
+
+---
+
+### ⚠️ IMPORTANT RULES FOR CLAUDE CODE
+
+**When user requests implementation work, YOU MUST**:
+1. ✅ Plan the architecture first
+2. ✅ Identify which files will change
+3. ✅ If 1-3 files → **DELEGATE TO CLINE**
+4. ✅ If active coding → **RECOMMEND CONTINUE.DEV**
+5. ✅ Provide specific prompts for the other tools
+6. ✅ Tell user to come back after they're done
+
+**DO NOT**:
+- ❌ Implement features directly when Cline would be better
+- ❌ Write code inline when user is in VS Code (recommend Continue.dev)
+- ❌ Skip the delegation step
+- ❌ Assume user knows when to switch tools
 
 ---
 
@@ -723,7 +1039,7 @@ documents = parser.load_data("./contract.pdf")
 
 ### Existing Render Services (Already Deployed)
 
-#### Empire FastAPI Service (Production)
+#### Empire FastAPI Service (Production) - Task 46: LangGraph + Arcade.dev Integration
 **URL**: https://jb-empire-api.onrender.com
 **Service ID**: `srv-d44o2dq4d50c73elgupg`
 **Plan**: Starter ($7/month)
@@ -732,6 +1048,59 @@ documents = parser.load_data("./contract.pdf")
 **Purpose**: Main FastAPI REST API for Empire v7.3
 **Health Check**: https://jb-empire-api.onrender.com/health
 **Docs**: https://jb-empire-api.onrender.com/docs
+
+**Task 46 - Query Endpoints (LangGraph + Arcade.dev):**
+- **Health**: GET `/api/query/health` - Service health and component status
+- **Auto-routed Query**: POST `/api/query/auto` - Intelligent workflow routing (LangGraph/CrewAI/Simple)
+- **Adaptive Query (Sync)**: POST `/api/query/adaptive` - LangGraph 5-node adaptive workflow
+- **Adaptive Query (Async)**: POST `/api/query/adaptive/async` - Celery background task
+- **Auto-routed Query (Async)**: POST `/api/query/auto/async` - Async auto-routing
+- **Batch Processing**: POST `/api/query/batch` - Multiple queries in parallel
+- **Task Status**: GET `/api/query/status/{task_id}` - Check async task progress
+- **Available Tools**: GET `/api/query/tools` - List Arcade.dev + internal tools
+
+**Environment Variables (Configured on Render):**
+```bash
+ARCADE_API_KEY=<from .env>  # See .env file for actual value
+ARCADE_ENABLED=true
+LANGGRAPH_DEFAULT_MODEL=claude-3-5-haiku-20241022
+```
+
+**Workflow Router:**
+The system intelligently routes queries to the appropriate workflow:
+- **LangGraph**: Adaptive queries needing refinement, external data, iterative research
+- **CrewAI**: Multi-agent document processing, complex analysis workflows
+- **Simple RAG**: Direct knowledge base lookups, straightforward queries
+
+**Integration Example**:
+```python
+import requests
+
+# Auto-routed query (system chooses best workflow)
+response = requests.post(
+    "https://jb-empire-api.onrender.com/api/query/auto",
+    json={
+        "query": "What are California insurance requirements?",
+        "max_iterations": 3
+    }
+)
+
+# Returns workflow type + results
+result = response.json()
+# {"answer": "...", "workflow_type": "langgraph", "iterations": 2, ...}
+
+# Async query for long-running tasks
+response = requests.post(
+    "https://jb-empire-api.onrender.com/api/query/adaptive/async",
+    json={"query": "Complex research task", "max_iterations": 3}
+)
+task_id = response.json()["task_id"]
+
+# Poll for results
+status = requests.get(
+    f"https://jb-empire-api.onrender.com/api/query/status/{task_id}"
+)
+```
 
 #### Empire Celery Worker (Production)
 **Service ID**: `srv-d44oclodl3ps73bg8rmg`
@@ -1173,6 +1542,13 @@ ollama run bge-m3 "test"
 - Testing vector search
 - Managing data
 - Checking table stats
+
+**Use Claude Context MCP When**:
+- Starting a new session and need to recall previous decisions
+- Need to reference architecture decisions from earlier conversations
+- Want to track project progress across multiple sessions
+- Need to recall "what we decided" about a specific feature
+- Continuing work from a previous day/session
 
 **Use GitHub CLI (`gh`) When**:
 - GitHub operations (PR, issues, search) - use via terminal

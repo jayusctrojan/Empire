@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Backend Environment Setup (FastAPI, Celery, Supabase, Redis, Neo4j)",
         "description": "Establish the production backend infrastructure using FastAPI, Celery, Supabase PostgreSQL (with pgvector), Redis (Upstash), and Neo4j Community (Docker).",
         "details": "Provision Render services for FastAPI and Celery. Configure Supabase PostgreSQL with pgvector and graph tables. Set up Redis (Upstash) for caching and Celery broker. Deploy Neo4j Community via Docker on Mac Studio for knowledge graph storage. Ensure all services use TLS 1.3 and encrypted environment variables. Recommended versions: FastAPI >=0.110, Celery >=5.3, supabase-py >=2.0, redis-py >=5.0, Neo4j Community 5.x.",
@@ -88,7 +88,7 @@
         "expansionPrompt": "Break down the backend environment setup into subtasks for provisioning each service (FastAPI, Celery, Supabase PostgreSQL with pgvector, Redis, Neo4j), configuring secure communication (TLS 1.3), and validating integration and connectivity."
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "File Upload Interface & Backblaze B2 Integration",
         "description": "Implement multi-file upload (up to 10 files, 100MB each) with drag-and-drop UI, progress indicators, and direct upload to Backblaze B2 pending/courses/ folder.",
         "details": "Use Gradio or Streamlit for the web UI. Integrate Backblaze B2 via b2sdk (Python >=1.20). Support Mountain Duck polling (30s) and immediate processing for web UI uploads. Enforce file size/type limits and progress feedback. Organize files per B2 folder structure.",
@@ -139,7 +139,7 @@
         "expansionPrompt": "Break down this task with a focus on file upload interface & backblaze b2 integration."
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "File Format Validation & Security Scanning",
         "description": "Validate file formats, check integrity, scan for malware, and enforce MIME/extension rules before upload.",
         "details": "Use python-magic for MIME detection, validate extensions, and run integrity checks (e.g., PDF header validation). Integrate ClamAV (clamd) for malware scanning. Reject unsupported formats with clear error messages.",
@@ -190,7 +190,7 @@
         "expansionPrompt": "Break down this task with a focus on file format validation & security scanning."
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Metadata Extraction & Supabase Storage",
         "description": "Extract basic and advanced metadata (filename, size, type, timestamps, EXIF, audio/video info) and store in Supabase documents table.",
         "details": "Use Python libraries: exifread for images, mutagen for audio/video, python-docx for DOCX metadata. Store extracted metadata in Supabase documents table as per schema. Ensure upload triggers metadata extraction.",
@@ -241,7 +241,7 @@
         "expansionPrompt": "Break down this task with a focus on metadata extraction & supabase storage."
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Duplicate Detection (SHA-256 & Fuzzy Matching)",
         "description": "Detect duplicate and near-duplicate files using SHA-256 hashes and optional fuzzy matching.",
         "details": "Compute SHA-256 hash for each file and check against Supabase documents table. Implement fuzzy matching using Levenshtein distance for filenames and content (rapidfuzz >=2.0). Provide skip/overwrite options.",
@@ -293,7 +293,7 @@
         "expansionPrompt": "Break down this task with a focus on duplicate detection (sha-256 & fuzzy matching)."
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "Celery Task Queue Management",
         "description": "Implement priority-based Celery task queue for async document processing, with status tracking, retries, and dead letter queue.",
         "details": "Configure Celery with Redis broker. Use priority queues (urgent, normal, low). Implement status tracking in Supabase file_uploads table. Add retry logic (3 attempts, exponential backoff) and dead letter queue for failed tasks.",
@@ -372,7 +372,7 @@
         "updatedAt": "2025-11-05T23:00:42.292Z"
       },
       {
-        "id": 7,
+        "id": "7",
         "title": "User Notification System (WebSocket & Email)",
         "description": "Provide real-time upload and processing notifications via WebSocket, with optional email alerts for long-running tasks.",
         "details": "Implement FastAPI WebSocket endpoints for progress and completion notifications. Use SMTP or SendGrid for email alerts. Integrate with frontend for actionable error messages.",
@@ -426,7 +426,7 @@
         "updatedAt": "2025-11-05T23:01:15.700Z"
       },
       {
-        "id": 8,
+        "id": "8",
         "title": "Backblaze B2 Folder Management & Encryption",
         "description": "Automate file movement across B2 folders (pending → processing → processed/failed) and support zero-knowledge encryption for sensitive files.",
         "details": "Use b2sdk for folder operations. Implement file movement logic based on processing status. Integrate PyCryptodome for optional AES encryption before upload.",
@@ -504,7 +504,7 @@
         "expansionPrompt": "Divide B2 folder management and encryption into subtasks for implementing folder movement logic, integrating b2sdk, supporting AES encryption with PyCryptodome, handling status-based transitions, and verifying organization/encryption through tests."
       },
       {
-        "id": 9,
+        "id": "9",
         "title": "AI Department Classification Workflow (Claude Haiku)",
         "description": "Classify uploaded documents into 10 departments using Claude Haiku API, storing results in Supabase.",
         "details": "Integrate anthropic-py SDK. Implement async auto_classify_course function as per PRD. Store department, confidence, and subdepartment in documents and courses tables.",
@@ -555,7 +555,7 @@
         "expansionPrompt": "Break down this task with a focus on ai department classification workflow (claude haiku)."
       },
       {
-        "id": 10,
+        "id": "10",
         "title": "Universal Document Processing Pipeline",
         "description": "Extract text and structured data from all supported document types using specialized services and fallback methods.",
         "details": "Integrate LlamaIndex (REST API) for clean PDFs, Mistral OCR for scanned PDFs, Tesseract OCR for fallback. Use python-docx for DOCX, mutagen for audio/video, Claude Vision API for images. Implement table/image extraction and maintain page/section info.",
@@ -606,7 +606,7 @@
         "expansionPrompt": "Break down this task with a focus on universal document processing pipeline."
       },
       {
-        "id": 11,
+        "id": "11",
         "title": "Audio & Video Processing (Soniox, Claude Vision)",
         "description": "Transcribe audio, extract speakers/timestamps, and analyze video frames using Soniox and Claude Vision APIs.",
         "details": "Integrate Soniox REST API for transcription and diarization. Use ffmpeg-python for frame/audio extraction from video. Analyze frames with Claude Vision API. Store transcripts and timeline metadata.",
@@ -657,7 +657,7 @@
         "expansionPrompt": "Break down this task with a focus on audio & video processing (soniox, claude vision)."
       },
       {
-        "id": 12,
+        "id": "12",
         "title": "Structured Data Extraction (LangExtract)",
         "description": "Extract entities, key-value pairs, and course metadata using LangExtract API.",
         "details": "Integrate LangExtract REST API for field/entity extraction. Store results in Supabase courses and document_chunks tables. Implement intelligent filename generation (M01-L02 format).",
@@ -708,7 +708,7 @@
         "expansionPrompt": "Break down this task with a focus on structured data extraction (langextract)."
       },
       {
-        "id": 13,
+        "id": "13",
         "title": "Adaptive Chunking Strategy Implementation",
         "description": "Implement semantic, code, and transcript chunking with configurable size and overlap, preserving context.",
         "details": "Use LlamaIndex chunking for documents, custom logic for code (AST parsing), and time/topic-based chunking for transcripts. Store chunks in document_chunks table with metadata and overlap.",
@@ -759,7 +759,7 @@
         "expansionPrompt": "Break down this task with a focus on adaptive chunking strategy implementation."
       },
       {
-        "id": 14,
+        "id": "14",
         "title": "Error Handling & Graceful Degradation",
         "description": "Implement robust error handling, retry logic, partial processing, and detailed logging for all pipeline stages.",
         "details": "Use Python exception handling, Celery retry policies, and fallback to simpler methods. Log errors with stack traces in processing_logs table. Move failed files to B2 failed/ folder.",
@@ -811,7 +811,7 @@
         "expansionPrompt": "Break down this task with a focus on error handling & graceful degradation."
       },
       {
-        "id": 15,
+        "id": "15",
         "title": "Processing Monitoring & Metrics Collection",
         "description": "Track real-time processing progress, resource usage, and cost per document using Prometheus metrics.",
         "details": "Integrate prometheus_client for FastAPI, Celery, and custom business metrics. Track processing time, resource usage, and cost. Store stage-wise metrics in processing_logs table.",
@@ -863,7 +863,7 @@
         "expansionPrompt": "Break down this task with a focus on processing monitoring & metrics collection."
       },
       {
-        "id": 16,
+        "id": "16",
         "title": "Embedding Generation Pipeline (BGE-M3, Claude API)",
         "description": "Generate and cache embeddings for document chunks using BGE-M3 (Ollama for dev, Claude API for prod).",
         "details": "Integrate langchain.embeddings.OllamaEmbeddings for dev, Claude API for prod. Batch process 100 chunks, cache embeddings in Supabase pgvector. Regenerate on content updates.",
@@ -914,7 +914,7 @@
         "expansionPrompt": "Break down this task with a focus on embedding generation pipeline (bge-m3, claude api)."
       },
       {
-        "id": 17,
+        "id": "17",
         "title": "Vector Storage & Indexing (Supabase pgvector)",
         "description": "Store embeddings in Supabase pgvector, create HNSW index for fast similarity search, and optimize batch inserts.",
         "details": "Enable pgvector extension, create HNSW index, and optimize batch inserts using supabase-py bulk operations. Organize by namespace and support metadata filtering.",
@@ -989,7 +989,7 @@
         "expansionPrompt": "Expand vector storage and indexing into subtasks for enabling pgvector, creating HNSW index, optimizing batch inserts, organizing by namespace, and implementing metadata filtering."
       },
       {
-        "id": 18,
+        "id": "18",
         "title": "Hybrid Search Implementation (Dense, Sparse, Fuzzy, RRF)",
         "description": "Implement hybrid search combining vector similarity, BM25, ILIKE, fuzzy matching, and reciprocal rank fusion.",
         "details": "Use pgvector for dense search, PostgreSQL full-text search for BM25, ILIKE for pattern matching, rapidfuzz for fuzzy search. Implement RRF for result fusion with configurable weights.",
@@ -1040,7 +1040,7 @@
         "expansionPrompt": "Break down this task with a focus on hybrid search implementation (dense, sparse, fuzzy, rrf)."
       },
       {
-        "id": 19,
+        "id": "19",
         "title": "Query Expansion & Reranking (Claude Haiku, BGE-Reranker-v2)",
         "description": "Expand queries using Claude Haiku, execute parallel searches, and rerank results with BGE-Reranker-v2.",
         "details": "Integrate anthropic-py for query expansion, run parallel searches, and rerank top 20-30 results using Ollama BGE-Reranker-v2 (dev) or Claude API (prod).",
@@ -1091,7 +1091,7 @@
         "expansionPrompt": "Break down this task with a focus on query expansion & reranking (claude haiku, bge-reranker-v2)."
       },
       {
-        "id": 20,
+        "id": "20",
         "title": "Neo4j Graph Integration & Entity Storage",
         "description": "Store entities and relationships in Neo4j, enable graph-based queries and context retrieval.",
         "details": "Use neo4j Python driver (neo4j >=5.10) to create document and entity nodes, relationships, and vector index. Implement Cypher queries for entity-centric and relationship traversal.",
@@ -1142,7 +1142,7 @@
         "expansionPrompt": "Break down this task with a focus on neo4j graph integration & entity storage."
       },
       {
-        "id": 21,
+        "id": "21",
         "title": "Caching Strategy (Redis, Tiered Cache)",
         "description": "Implement Redis caching for frequent queries, embeddings, and search results with semantic thresholds and tiered cache.",
         "details": "Use redis-py for L1 cache (Redis), fallback to L2 (PostgreSQL). Implement semantic cache thresholds and 5-minute TTL. Track cache hit rate.",
@@ -1194,7 +1194,7 @@
         "expansionPrompt": "Break down this task with a focus on caching strategy (redis, tiered cache)."
       },
       {
-        "id": 22,
+        "id": "22",
         "title": "Query Type Detection & Routing",
         "description": "Classify incoming queries and route to optimal search strategy (semantic, relational, hybrid, metadata).",
         "details": "Implement query classifier using Claude Haiku. Route queries to vector, graph, or metadata search pipelines based on type.",
@@ -1245,7 +1245,7 @@
         "expansionPrompt": "Break down this task with a focus on query type detection & routing."
       },
       {
-        "id": 23,
+        "id": "23",
         "title": "Query Processing Pipeline & Result Merging",
         "description": "Normalize, expand, execute, deduplicate, and merge query results using RRF and reranking.",
         "details": "Implement query normalization, expansion, parallel execution, deduplication, RRF merging, and reranking. Log all queries and results.",
@@ -1296,7 +1296,7 @@
         "expansionPrompt": "Break down this task with a focus on query processing pipeline & result merging."
       },
       {
-        "id": 24,
+        "id": "24",
         "title": "Faceted Search & Result Presentation",
         "description": "Enable faceted filtering (department, type, date, entities) and present results with snippets, highlights, and relevance scores.",
         "details": "Implement multi-select facets in frontend. Generate snippets, highlight keywords, show relevance, source, and department. Link to B2 URLs.",
@@ -1347,7 +1347,7 @@
         "expansionPrompt": "Break down this task with a focus on faceted search & result presentation."
       },
       {
-        "id": 25,
+        "id": "25",
         "title": "Query Analytics & A/B Testing",
         "description": "Log queries, track latency, CTR, and support A/B testing for ranking algorithms.",
         "details": "Store query logs and result clicks in Supabase. Implement analytics dashboard and A/B test framework for ranking methods.",
@@ -1356,7 +1356,7 @@
         "dependencies": [
           "24"
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -1395,10 +1395,11 @@
         ],
         "complexity": 5,
         "recommendedSubtasks": 3,
-        "expansionPrompt": "Break down this task with a focus on query analytics & a/b testing."
+        "expansionPrompt": "Break down this task with a focus on query analytics & a/b testing.",
+        "updatedAt": "2025-11-08T18:01:36.843Z"
       },
       {
-        "id": 26,
+        "id": "26",
         "title": "Chat UI Implementation (WebSocket, Streaming)",
         "description": "Build a mobile-responsive chat UI with WebSocket-based real-time messaging and token-by-token streaming.",
         "details": "Use Gradio or Streamlit for frontend. Implement FastAPI WebSocket endpoints for chat. Support streaming responses from Claude API, typing indicators, and error handling.",
@@ -1407,7 +1408,7 @@
         "dependencies": [
           "25"
         ],
-        "status": "pending",
+        "status": "in-progress",
         "subtasks": [
           {
             "id": 1,
@@ -1470,10 +1471,11 @@
         ],
         "complexity": 6.5,
         "recommendedSubtasks": 5,
-        "expansionPrompt": "Expand chat UI implementation into subtasks for frontend development (Gradio/Streamlit), WebSocket endpoint implementation, streaming response handling, typing indicator/error handling, and mobile responsiveness testing."
+        "expansionPrompt": "Expand chat UI implementation into subtasks for frontend development (Gradio/Streamlit), WebSocket endpoint implementation, streaming response handling, typing indicator/error handling, and mobile responsiveness testing.",
+        "updatedAt": "2025-11-08T18:01:45.255Z"
       },
       {
-        "id": 27,
+        "id": "27",
         "title": "Conversation Memory System (Supabase Graph Tables)",
         "description": "Store and retrieve user conversation memory using PostgreSQL graph tables (user_memory_nodes, user_memory_edges).",
         "details": "Implement memory node/edge creation, context window management, and recency/access-weighted retrieval. Enforce RLS policies.",
@@ -1525,7 +1527,7 @@
         "expansionPrompt": "Break down this task with a focus on conversation memory system (supabase graph tables)."
       },
       {
-        "id": 28,
+        "id": "28",
         "title": "Session & Preference Management",
         "description": "Support multiple concurrent sessions, session persistence, user preference learning, and privacy controls.",
         "details": "Implement session tracking, timeout, export, and deletion. Store preferences as memory nodes. Provide opt-out and explicit preference UI.",
@@ -1577,7 +1579,7 @@
         "expansionPrompt": "Break down this task with a focus on session & preference management."
       },
       {
-        "id": 29,
+        "id": "29",
         "title": "Monitoring & Observability (Prometheus, Grafana, Alertmanager)",
         "description": "Collect metrics, visualize in Grafana, set up alerting, and structured logging for all services.",
         "details": "Integrate prometheus_client for FastAPI, Celery, Redis, Neo4j. Build Grafana dashboards with pre-built panels. Configure Alertmanager for multi-channel alerts. Implement JSON logs and health check endpoints.",
@@ -1628,7 +1630,7 @@
         "expansionPrompt": "Break down this task with a focus on monitoring & observability (prometheus, grafana, alertmanager)."
       },
       {
-        "id": 30,
+        "id": "30",
         "title": "Cost Tracking & Optimization",
         "description": "Track API, compute, and storage costs. Generate monthly reports and trigger budget alerts.",
         "details": "Integrate cost tracking for Claude, Soniox, Mistral, LangExtract, Render, Supabase, B2. Implement budget alert logic at 80% threshold.",
@@ -1679,7 +1681,7 @@
         "expansionPrompt": "Break down this task with a focus on cost tracking & optimization."
       },
       {
-        "id": 31,
+        "id": "31",
         "title": "Role-Based Access Control (RBAC) & API Key Management",
         "description": "Implement RBAC for users, documents, and API keys with audit logging and row-level security.",
         "details": "Use Supabase RLS policies, implement user roles (admin, editor, viewer, guest), API key creation/rotation/revocation, and audit logs. Hash API keys with bcrypt.",
@@ -1731,7 +1733,7 @@
         "expansionPrompt": "Break down this task with a focus on role-based access control (rbac) & api key management."
       },
       {
-        "id": 32,
+        "id": "32",
         "title": "Bulk Document Management & Batch Operations",
         "description": "Enable bulk upload, delete, reprocessing, metadata update, versioning, and approval workflow for documents.",
         "details": "Implement batch endpoints for document operations. Track progress and support document versioning and approval states.",
@@ -1783,7 +1785,7 @@
         "expansionPrompt": "Break down this task with a focus on bulk document management & batch operations."
       },
       {
-        "id": 33,
+        "id": "33",
         "title": "User Management & GDPR Compliance",
         "description": "Support user creation, editing, role assignment, password reset, suspension, activity logs, and GDPR-compliant data export.",
         "details": "Implement admin endpoints for user management. Store activity logs and support data export/deletion per GDPR.",
@@ -1835,7 +1837,7 @@
         "expansionPrompt": "Break down this task with a focus on user management & gdpr compliance."
       },
       {
-        "id": 34,
+        "id": "34",
         "title": "Analytics Dashboard Implementation",
         "description": "Build dashboard for document stats, query metrics, user activity, storage usage, and API endpoint usage.",
         "details": "Use Grafana or Streamlit for dashboard UI. Aggregate metrics from Supabase and Prometheus.",
@@ -1898,7 +1900,7 @@
         "expansionPrompt": "Break down analytics dashboard implementation into subtasks for dashboard UI development (Grafana/Streamlit), metrics aggregation from Supabase/Prometheus, data visualization, and load/responsiveness testing."
       },
       {
-        "id": 35,
+        "id": "35",
         "title": "CrewAI Multi-Agent Integration & Orchestration",
         "description": "Integrate CrewAI service (REST API) for multi-agent workflows, agent management, and orchestration.",
         "details": "Connect to CrewAI REST API (srv-d2n0hh3uibrs73buafo0). Implement agent pool management, dynamic agent creation, lifecycle, and resource allocation. Support async task execution via Celery.",
@@ -1949,7 +1951,7 @@
         "expansionPrompt": "Break down this task with a focus on crewai multi-agent integration & orchestration."
       },
       {
-        "id": 36,
+        "id": "36",
         "title": "CrewAI Asset Generation Agents Implementation",
         "description": "Implement 8 asset generation agents (orchestrator, summarizer, skill, command, agent, prompt, workflow, department classifier) per PRD specs.",
         "details": "Define agent roles, goals, tools, and LLM configs in crewai_agents table. Integrate with CrewAI API for asset generation. Store outputs in B2 processed/ folders.",
@@ -2000,7 +2002,7 @@
         "expansionPrompt": "Break down this task with a focus on crewai asset generation agents implementation."
       },
       {
-        "id": 37,
+        "id": "37",
         "title": "CrewAI Document Analysis Agents Implementation",
         "description": "Implement 3 document analysis agents (research analyst, content strategist, fact checker) for structured analysis and verification.",
         "details": "Configure agents in crewai_agents table. Integrate with CrewAI API for analysis workflows. Store analysis outputs in Supabase and B2.",
@@ -2075,7 +2077,7 @@
         "expansionPrompt": "Break down document analysis agent implementation into subtasks for agent configuration, CrewAI API integration, workflow execution, output storage in Supabase/B2, and accuracy testing."
       },
       {
-        "id": 38,
+        "id": "38",
         "title": "CrewAI Multi-Agent Orchestration Agents Implementation",
         "description": "Implement 4 orchestration agents (research, analysis, writing, review) for complex multi-document workflows.",
         "details": "Configure agents and crews in crewai_crews table. Support sequential and parallel execution modes. Integrate with CrewAI API for orchestration.",
@@ -2162,7 +2164,7 @@
         "expansionPrompt": "Expand orchestration agent implementation into subtasks for agent/crew configuration, sequential/parallel execution logic, CrewAI API integration, workflow management, output validation, and orchestration testing."
       },
       {
-        "id": 39,
+        "id": "39",
         "title": "CrewAI Inter-Agent Messaging & Collaboration",
         "description": "Enable inter-agent messaging, task delegation, result sharing, and conflict resolution within CrewAI workflows.",
         "details": "Implement agent interactions in crewai_agent_interactions table. Support direct/broadcast messaging, event publication, and state synchronization.",
@@ -2254,7 +2256,7 @@
         "expansionPrompt": "Break down inter-agent messaging and collaboration into subtasks for designing the interaction schema, implementing direct/broadcast messaging, event publication, state synchronization, conflict resolution, and workflow simulation testing."
       },
       {
-        "id": 40,
+        "id": "40",
         "title": "CrewAI Asset Storage & Retrieval",
         "description": "Store generated assets in crewai_generated_assets table and B2, enable retrieval by department, type, and confidence.",
         "details": "Implement asset storage logic, organize B2 folders, and support asset retrieval APIs. Track confidence scores and metadata.",
@@ -2305,7 +2307,7 @@
         "expansionPrompt": "Break down this task with a focus on crewai asset storage & retrieval."
       },
       {
-        "id": 41,
+        "id": "41",
         "title": "Security Hardening & Compliance",
         "description": "Implement JWT authentication, RBAC, encrypted storage, input validation, and compliance features (GDPR, HIPAA, SOC 2).",
         "details": "Use PyJWT for authentication, enforce RBAC, encrypt Supabase volumes and B2 files, validate inputs, and implement audit trails. Support data export/deletion for GDPR.",
@@ -2408,7 +2410,7 @@
         "expansionPrompt": "Decompose security hardening and compliance into subtasks for JWT authentication, RBAC enforcement, encrypted storage setup, input validation, audit trail implementation, compliance feature integration (GDPR, HIPAA, SOC 2), and security/compliance testing."
       },
       {
-        "id": 42,
+        "id": "42",
         "title": "Reliability & Disaster Recovery Implementation",
         "description": "Set up automated backups, health checks, auto-restart, and disaster recovery procedures.",
         "details": "Configure daily B2 backups, implement health endpoints, auto-restart on failure, and document disaster recovery drills. Use Infrastructure as Code (Terraform/Ansible) for fast rebuild.",
@@ -2460,7 +2462,7 @@
         "expansionPrompt": "Break down this task with a focus on reliability & disaster recovery implementation."
       },
       {
-        "id": 43,
+        "id": "43",
         "title": "Load Testing & Performance Optimization",
         "description": "Conduct load testing for document processing, query execution, and WebSocket connections. Optimize for throughput and latency.",
         "details": "Use locust or k6 for load testing. Profile bottlenecks, optimize Celery worker scaling, database indexes, and caching. Tune API and WebSocket performance.",
@@ -2511,7 +2513,7 @@
         "expansionPrompt": "Break down this task with a focus on load testing & performance optimization."
       },
       {
-        "id": 44,
+        "id": "44",
         "title": "Documentation Finalization & User Onboarding",
         "description": "Prepare comprehensive documentation for developers and users. Implement onboarding flows and training materials.",
         "details": "Document API endpoints, workflows, agent configurations, and UI usage. Create onboarding guides and training videos.",
@@ -2564,15 +2566,15 @@
         "expansionPrompt": "Break down this task with a focus on documentation finalization & user onboarding."
       },
       {
-        "id": 45,
+        "id": "45",
         "title": "Integrate RAGAS Metrics Evaluation and Visualization for RAG Pipeline",
         "description": "Implement automated RAG quality evaluation using the RAGAS framework with 4 core metrics (Faithfulness, Answer Relevancy, Context Precision, Context Recall). Store results in Supabase and visualize in Grafana dashboards.",
         "details": "- Set up RAGAS framework integration for automated evaluation of RAG pipeline quality\n- Implement evaluation of 4 core metrics:\n  * Faithfulness (0-1): Measures if the generated answer is factually consistent with the retrieved context\n  * Answer Relevancy (0-1): Measures if the answer addresses the query intent\n  * Context Precision (0-1): Measures the proportion of relevant context chunks\n  * Context Recall (0-1): Measures if all necessary information is present in context\n- Create a test dataset of 30 curated samples from Empire documentation stored in .taskmaster/docs/ragas_test_dataset.json\n- Design and implement Supabase ragas_evaluations table with schema including:\n  * evaluation_id (UUID)\n  * timestamp (TIMESTAMP)\n  * query_text (TEXT)\n  * answer_text (TEXT)\n  * context_chunks (JSONB array)\n  * faithfulness_score (FLOAT)\n  * answer_relevancy_score (FLOAT)\n  * context_precision_score (FLOAT)\n  * context_recall_score (FLOAT)\n  * overall_score (FLOAT)\n  * metadata (JSONB)\n- Develop scripts/ragas_evaluation.py for batch evaluation with:\n  * Command-line interface for running evaluations\n  * Integration with existing RAG pipeline components\n  * Configurable parameters for evaluation settings\n  * Automatic storage of results in Supabase\n- Create Grafana dashboards showing:\n  * Metric trends over time\n  * Comparison between different RAG configurations\n  * Alerts when metrics fall below threshold (0.70)\n  * Drill-down capability to examine specific evaluation runs\n- Document expected baseline performance (0.70-0.85 overall scores)\n- Calculate and document cost estimates (~$0.20 per evaluation run for 30 samples)\n- Integrate with existing observability infrastructure from Task 25",
         "testStrategy": "1. Prepare test environment with sample RAG pipeline and test dataset\n2. Run baseline evaluation on the 30-sample test dataset from .taskmaster/docs/ragas_test_dataset.json\n3. Validate all 4 metrics (Faithfulness, Answer Relevancy, Context Precision, Context Recall) are calculated correctly\n4. Verify scores are within expected ranges (0-1) and reasonable for test data\n5. Confirm results are properly stored in Supabase ragas_evaluations table\n6. Check that all required fields in the schema are populated correctly\n7. Verify Grafana dashboard correctly displays:\n   - Individual metric scores\n   - Overall score trends\n   - Comparison between evaluation runs\n8. Test alert triggers by artificially setting scores below the 0.70 threshold\n9. Validate dashboard filtering and drill-down capabilities\n10. Perform a complete end-to-end test with a new document to ensure the entire evaluation pipeline works\n11. Measure performance and resource usage during evaluation runs\n12. Document baseline scores for the current RAG implementation",
         "status": "pending",
         "dependencies": [
-          18,
-          25
+          "18",
+          "25"
         ],
         "priority": "high",
         "subtasks": [
@@ -2583,7 +2585,8 @@
             "dependencies": [],
             "details": "Install RAGAS library and dependencies. Configure the framework to work with the existing RAG pipeline. Prepare and validate the test dataset of 30 curated samples from Empire documentation stored in .taskmaster/docs/ragas_test_dataset.json. Ensure the dataset contains appropriate query-answer-context triplets for evaluation.",
             "status": "pending",
-            "testStrategy": "Verify RAGAS installation and imports work correctly. Validate test dataset structure and content. Ensure sample queries cover diverse use cases from Empire documentation."
+            "testStrategy": "Verify RAGAS installation and imports work correctly. Validate test dataset structure and content. Ensure sample queries cover diverse use cases from Empire documentation.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2594,7 +2597,8 @@
             ],
             "details": "Create evaluation functions for each metric. Implement Faithfulness calculation to measure factual consistency between answers and context. Develop Answer Relevancy evaluation to assess query intent alignment. Build Context Precision measurement for relevant chunk proportion. Implement Context Recall to verify information completeness. Calculate overall combined score from individual metrics.",
             "status": "pending",
-            "testStrategy": "Run evaluations on sample data and verify each metric produces values between 0-1. Compare results with manual assessments of a subset of examples to validate accuracy."
+            "testStrategy": "Run evaluations on sample data and verify each metric produces values between 0-1. Compare results with manual assessments of a subset of examples to validate accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2605,7 +2609,8 @@
             ],
             "details": "Create ragas_evaluations table with schema including evaluation_id, timestamp, query_text, answer_text, context_chunks, all metric scores (faithfulness, answer_relevancy, context_precision, context_recall), overall_score, and metadata fields. Implement functions to store evaluation results in the database. Add batch processing capabilities for multiple evaluations.",
             "status": "pending",
-            "testStrategy": "Test database schema creation and data insertion. Verify all fields are properly stored and retrieved. Check batch processing with multiple evaluation records."
+            "testStrategy": "Test database schema creation and data insertion. Verify all fields are properly stored and retrieved. Check batch processing with multiple evaluation records.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -2616,7 +2621,8 @@
             ],
             "details": "Develop scripts/ragas_evaluation.py with command-line arguments for evaluation settings. Integrate with existing RAG pipeline components to access retrieval and generation functions. Implement configurable parameters for batch size, metric weights, and thresholds. Add automatic storage of results in Supabase. Include logging and error handling. Document cost estimates (~$0.20 per evaluation run for 30 samples).",
             "status": "pending",
-            "testStrategy": "Test CLI with various parameter combinations. Verify integration with RAG pipeline components. Confirm results are properly stored in Supabase. Validate error handling for edge cases."
+            "testStrategy": "Test CLI with various parameter combinations. Verify integration with RAG pipeline components. Confirm results are properly stored in Supabase. Validate error handling for edge cases.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -2627,22 +2633,20 @@
             ],
             "details": "Create Grafana dashboards showing metric trends over time. Implement comparison views between different RAG configurations. Set up alerts when metrics fall below threshold (0.70). Add drill-down capability to examine specific evaluation runs. Document expected baseline performance (0.70-0.85 overall scores). Integrate with existing observability infrastructure from Task 25.",
             "status": "pending",
-            "testStrategy": "Verify dashboard displays all metrics correctly. Test alert functionality with below-threshold values. Confirm drill-down navigation works properly. Validate integration with existing observability infrastructure."
+            "testStrategy": "Verify dashboard displays all metrics correctly. Test alert functionality with below-threshold values. Confirm drill-down navigation works properly. Validate integration with existing observability infrastructure.",
+            "parentId": "undefined"
           }
         ]
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-11-05T23:01:15.702Z",
-      "taskCount": 44,
-      "completedCount": 6,
+      "lastModified": "2025-11-08T18:01:45.257Z",
+      "taskCount": 45,
+      "completedCount": 22,
       "tags": [
         "master"
-      ],
-      "created": "2025-11-06T00:56:31.361Z",
-      "description": "Tasks for master context",
-      "updated": "2025-11-07T04:46:27.728Z"
+      ]
     }
   }
 }
