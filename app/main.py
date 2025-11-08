@@ -21,6 +21,7 @@ load_dotenv()
 
 # Import routers
 from app.api import upload, notifications
+from app.api.routes import query
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -244,6 +245,7 @@ async def general_exception_handler(request, exc):
 # Include routers
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["Upload"])
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+app.include_router(query.router)  # Query router already has /api/query prefix defined
 # TODO: Additional routers
 # app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
