@@ -1,14 +1,14 @@
 """
-Empire v7.3 - Chat UI (Gradio)
-Mobile-responsive chat interface with streaming support
-
-Task 26: Chat UI Implementation with WebSocket and streaming responses
-Enhanced with comprehensive error handling and loading states
+Empire v7.3 - Chat UI with Clerk Authentication
+Wraps Gradio chat interface with Clerk authentication
 """
 
 import os
+from pathlib import Path
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 import gradio as gr
-import asyncio
 import structlog
 from dotenv import load_dotenv
 from app.services.chat_service import get_chat_service
@@ -32,33 +32,42 @@ structlog.configure(
 
 logger = structlog.get_logger(__name__)
 
+# Initialize FastAPI app
+app = FastAPI(title="Empire AI Chat - Authenticated")
+
+# Mount static files directory
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 # Initialize chat service
 chat_service = get_chat_service()
 
 
-async def chat_function(message: str, history: list[list[str]], request: gr.Request = None):
+async def chat_function_with_auth(message: str, history: list[list[str]], request: gr.Request):
     """
-    Chat function with streaming response and progress indicators
+    Chat function with authentication token from request
 
     Args:
         message: User's message
         history: Chat history in Gradio format [[user, bot], ...]
-        request: Gradio request object (optional, for auth token extraction)
+        request: Gradio request object (contains headers and session info)
 
     Yields:
         Response chunks as they arrive with loading indicators
     """
     start_time = datetime.now()
 
-    # Extract auth token if available
+    # Extract auth token from request headers or session
     auth_token = None
-    if request:
-        # Try to get token from custom header (set by JavaScript)
-        if hasattr(request, 'headers'):
-            auth_token = request.headers.get('X-Clerk-Session-Token')
-        # Try to get from session/cookies
-        if not auth_token and hasattr(request, 'session'):
-            auth_token = request.session.get('clerk_token')
+
+    # Try to get token from custom header (set by JavaScript)
+    if hasattr(request, 'headers'):
+        auth_token = request.headers.get('X-Clerk-Session-Token')
+
+    # Try to get from session/cookies
+    if not auth_token and hasattr(request, 'session'):
+        auth_token = request.session.get('clerk_token')
 
     logger.info(
         "Chat request received",
@@ -68,19 +77,19 @@ async def chat_function(message: str, history: list[list[str]], request: gr.Requ
         has_auth_token=bool(auth_token)
     )
 
-    # Track if we're still in loading state
+    # Track response state
     loading_shown = False
     error_occurred = False
     full_response = ""
 
     try:
-        # Stream response with progress indicators
+        # Stream response with authentication
         async for chunk in chat_service.stream_chat_response(
             message=message,
             history=history,
-            use_auto_routing=True,  # Use Task 46 auto-routing
+            use_auto_routing=True,
             max_iterations=3,
-            auth_token=auth_token  # Pass authentication token
+            auth_token=auth_token  # Pass token to service
         ):
             # Check if this is a loading indicator
             if "🔍 Processing your query" in chunk and not loading_shown:
@@ -88,13 +97,13 @@ async def chat_function(message: str, history: list[list[str]], request: gr.Requ
                 full_response = chunk
                 yield full_response
                 continue
-            
+
             # Check if this is an error message
             if any(emoji in chunk for emoji in ["❌", "⏱️", "🌐", "⚠️", "🔐", "🔍", "🚦", "🔧", "📄"]):
                 error_occurred = True
                 full_response = chunk
                 yield full_response
-                
+
                 logger.error(
                     "Chat request failed",
                     message_preview=message[:100],
@@ -102,14 +111,14 @@ async def chat_function(message: str, history: list[list[str]], request: gr.Requ
                     duration_ms=(datetime.now() - start_time).total_seconds() * 1000
                 )
                 continue
-            
+
             # Normal response - replace loading indicator
             if loading_shown:
                 full_response = chunk  # Replace loading indicator
                 loading_shown = False
             else:
                 full_response += chunk
-            
+
             yield full_response
 
         # Log successful completion
@@ -130,18 +139,18 @@ async def chat_function(message: str, history: list[list[str]], request: gr.Requ
             "Please refresh the page and try again.\n\n"
             f"*Technical details: {str(e)}*"
         )
-        
+
         logger.error(
             "Unexpected error in chat UI",
             error=str(e),
             error_type=type(e).__name__,
             message_preview=message[:100]
         )
-        
+
         yield error_msg
 
 
-# Custom CSS for better mobile responsiveness and error styling
+# Custom CSS for the chat interface
 custom_css = """
 .gradio-container {
     max-width: 100% !important;
@@ -158,7 +167,7 @@ custom_css = """
 }
 
 /* Style for error messages */
-.message-wrap:has-text("❌"), 
+.message-wrap:has-text("❌"),
 .message-wrap:has-text("⚠️"),
 .message-wrap:has-text("🚨") {
     background-color: #fee !important;
@@ -184,7 +193,7 @@ custom_css = """
 }
 """
 
-# Examples for users with helpful descriptions
+# Example queries
 examples = [
     "What are California insurance requirements?",
     "Compare our policies with CA regulations",
@@ -199,10 +208,38 @@ with gr.Blocks(
     css=custom_css,
     title="Empire AI Chat"
 ) as demo:
-    gr.Markdown("# 🏛️ Empire AI Chat")
+    with gr.Row():
+        with gr.Column(scale=4):
+            gr.Markdown("# 🏛️ Empire AI Chat")
+        with gr.Column(scale=1):
+            logout_btn = gr.Button("🚪 Sign Out", size="sm")
+
+    # Add JavaScript to inject auth token and handle logout
+    gr.HTML("""
+    <script>
+    // Inject Clerk session token into Gradio requests
+    window.addEventListener('load', function() {
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+            const token = localStorage.getItem('clerk_session_token');
+            if (token && args[1]) {
+                args[1].headers = args[1].headers || {};
+                args[1].headers['X-Clerk-Session-Token'] = token;
+            }
+            return originalFetch.apply(this, args);
+        };
+    });
+
+    // Handle logout
+    function handleLogout() {
+        localStorage.removeItem('clerk_session_token');
+        window.location.href = '/';
+    }
+    </script>
+    """)
 
     chatbot = gr.ChatInterface(
-        fn=chat_function,
+        fn=chat_function_with_auth,
         chatbot=gr.Chatbot(
             elem_id="chatbot",
             height=600,
@@ -232,31 +269,61 @@ with gr.Blocks(
         """
     )
 
+    # Wire up logout button
+    logout_btn.click(fn=None, js="handleLogout()")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def auth_page():
+    """Serve the Clerk authentication page with environment variable injection"""
+    auth_html_path = static_dir / "clerk_auth.html"
+
+    if not auth_html_path.exists():
+        return HTMLResponse(
+            content="<h1>Authentication page not found</h1><p>Please ensure clerk_auth.html exists in the static directory.</p>",
+            status_code=404
+        )
+
+    # Read HTML template and inject environment variables
+    with open(auth_html_path, 'r') as f:
+        html_content = f.read()
+
+    # Replace placeholder with actual publishable key from environment
+    clerk_publishable_key = os.getenv(
+        "CLERK_PUBLISHABLE_KEY",
+        os.getenv("VITE_CLERK_PUBLISHABLE_KEY", "")
+    )
+
+    html_content = html_content.replace(
+        "{{ CLERK_PUBLISHABLE_KEY }}",
+        clerk_publishable_key
+    )
+
+    return HTMLResponse(content=html_content)
+
+
+# Mount Gradio app at /chat
+app = gr.mount_gradio_app(app, demo, path="/chat")
+
 
 if __name__ == "__main__":
-    # Launch configuration
+    import uvicorn
+
     port = int(os.getenv("CHAT_UI_PORT", 7860))
-    server_name = os.getenv("CHAT_UI_HOST", "0.0.0.0")  # Bind to all interfaces for Render
+    host = os.getenv("CHAT_UI_HOST", "0.0.0.0")
 
     logger.info(
-        "Launching Empire Chat UI",
-        host=server_name,
+        "Launching Empire Chat UI with Authentication",
+        host=host,
         port=port,
+        auth_page="http://{}:{}/".format(host, port),
+        chat_page="http://{}:{}/chat".format(host, port),
         api_url=os.getenv("EMPIRE_API_URL", "https://jb-empire-api.onrender.com")
     )
 
-    # Launch Gradio app with enhanced settings
-    demo.queue(
-        max_size=20,  # Maximum queue size
-        default_concurrency_limit=10  # Concurrent requests limit
-    )
-    
-    demo.launch(
-        server_name=server_name,
-        server_port=port,
-        share=False,  # Don't create public share link
-        show_api=False,  # Hide API docs in UI
-        favicon_path=None,  # Add custom favicon later if desired
-        show_error=True,  # Show detailed errors in UI during development
-        quiet=False,  # Show startup logs
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info"
     )

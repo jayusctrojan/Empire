@@ -28,7 +28,7 @@ sqlalchemy>=2.0.25
 anthropic>=0.18.0
 llama-index>=0.10.0
 llama-parse>=0.4.0
-langextract>=0.1.0  # Structured data extraction with LLMs
+# langextract>=0.1.0  # Structured data extraction with LLMs (not available on PyPI)
 langchain>=0.1.0  # LangChain core framework
 langchain-core>=0.1.0  # LangChain core components
 langchain-anthropic>=0.1.0  # Anthropic integration for LangChain
@@ -87,6 +87,7 @@ httpx>=0.26.0
 cryptography>=42.0.0
 python-magic>=0.4.27
 vt-py>=0.18.0
+clerk-backend-api>=3.3.0  # Clerk authentication
 
 # Environment
 gunicorn>=21.2.0  # Alternative ASGI server for production

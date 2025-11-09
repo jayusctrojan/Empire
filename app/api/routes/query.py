@@ -2,7 +2,7 @@
 Query processing endpoints with LangGraph + Arcade.dev support for Empire v7.3
 Provides adaptive query processing with intelligent routing
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import structlog
@@ -17,6 +17,7 @@ from app.tasks.query_tasks import (
     process_auto_routed_query,
     batch_process_queries
 )
+from app.middleware.clerk_auth import verify_clerk_token
 
 router = APIRouter(prefix="/api/query", tags=["query"])
 logger = structlog.get_logger(__name__)
@@ -108,10 +109,13 @@ async def list_available_tools():
 @router.post("/adaptive", response_model=AdaptiveQueryResponse)
 async def adaptive_query_endpoint(
     request: AdaptiveQueryRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Execute adaptive query using LangGraph workflow with tool support.
+    
+    **Authentication Required**: Must provide valid Clerk JWT token.
 
     This endpoint provides:
     - Iterative query refinement
@@ -147,7 +151,8 @@ async def adaptive_query_endpoint(
         logger.info(
             "Adaptive query started",
             query=request.query[:50],
-            max_iterations=request.max_iterations
+            max_iterations=request.max_iterations,
+            user_id=user["user_id"]
         )
 
         # Initialize workflow
@@ -197,10 +202,13 @@ async def adaptive_query_endpoint(
 @router.post("/auto", response_model=AdaptiveQueryResponse)
 async def auto_routed_query(
     request: AdaptiveQueryRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Automatically route query to optimal framework (CrewAI, LangGraph, or Simple RAG).
+    
+    **Authentication Required**: Must provide valid Clerk JWT token.
 
     The router analyzes the query and decides:
     - LangGraph: For adaptive queries needing refinement/external data
@@ -234,7 +242,8 @@ async def auto_routed_query(
             "Query routed",
             workflow=classification.workflow_type.value,
             confidence=classification.confidence,
-            query=request.query[:50]
+            query=request.query[:50],
+            user_id=user["user_id"]
         )
 
         # Route to appropriate handler
@@ -302,9 +311,14 @@ async def auto_routed_query(
 
 
 @router.post("/adaptive/async", response_model=AsyncTaskResponse)
-async def adaptive_query_async(request: AdaptiveQueryRequest):
+async def adaptive_query_async(
+    request: AdaptiveQueryRequest,
+    user: dict = Depends(verify_clerk_token)
+):
     """
     Submit adaptive query for async processing via Celery.
+    
+    **Authentication Required**: Must provide valid Clerk JWT token.
 
     Use this for:
     - Long-running queries (30+ seconds)
@@ -341,7 +355,8 @@ async def adaptive_query_async(request: AdaptiveQueryRequest):
         logger.info(
             "Async adaptive query submitted",
             query=request.query[:50],
-            max_iterations=request.max_iterations
+            max_iterations=request.max_iterations,
+            user_id=user["user_id"]
         )
 
         # Submit to Celery
@@ -368,9 +383,14 @@ async def adaptive_query_async(request: AdaptiveQueryRequest):
 
 
 @router.post("/auto/async", response_model=AsyncTaskResponse)
-async def auto_routed_query_async(request: AdaptiveQueryRequest):
+async def auto_routed_query_async(
+    request: AdaptiveQueryRequest,
+    user: dict = Depends(verify_clerk_token)
+):
     """
     Submit auto-routed query for async processing via Celery.
+    
+    **Authentication Required**: Must provide valid Clerk JWT token.
 
     Automatically routes to LangGraph, CrewAI, or Simple RAG based on query analysis.
     Returns task_id to poll for results.
@@ -398,7 +418,11 @@ async def auto_routed_query_async(request: AdaptiveQueryRequest):
         ```
     """
     try:
-        logger.info("Async auto-routed query submitted", query=request.query[:50])
+        logger.info(
+            "Async auto-routed query submitted",
+            query=request.query[:50],
+            user_id=user["user_id"]
+        )
 
         # Submit to Celery with auto-routing
         task = process_auto_routed_query.apply_async(

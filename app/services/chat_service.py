@@ -20,8 +20,7 @@ class ChatService:
 
     Features:
     - Streaming responses from Claude API
-    - Integration with Task 46 LangGraph adaptive workflows
-    - Auto-routing to optimal workflow (LangGraph/CrewAI/Simple RAG)
+    - Knowledge base search and retrieval
     - Token-by-token response streaming for better UX
     - Retry logic with exponential backoff
     - Comprehensive error handling and user-friendly messages
@@ -182,7 +181,8 @@ class ChatService:
         message: str,
         history: list[list[str]],
         use_auto_routing: bool = True,
-        max_iterations: int = 3
+        max_iterations: int = 3,
+        auth_token: Optional[str] = None
     ) -> AsyncIterator[str]:
         """
         Stream chat response token-by-token with comprehensive error handling
@@ -192,6 +192,7 @@ class ChatService:
             history: Chat history [[user_msg, assistant_msg], ...]
             use_auto_routing: Use auto-routing vs direct LangGraph (default: True)
             max_iterations: Maximum LangGraph iterations (default: 3)
+            auth_token: Clerk JWT token for authentication (optional)
 
         Yields:
             Response tokens as they arrive, including progress indicators
@@ -216,7 +217,8 @@ class ChatService:
                 "chat_query",
                 endpoint,
                 message,
-                max_iterations
+                max_iterations,
+                auth_token
             )
 
             # Clear progress indicator and show result
@@ -325,7 +327,8 @@ class ChatService:
         self,
         endpoint: str,
         message: str,
-        max_iterations: int
+        max_iterations: int,
+        auth_token: Optional[str] = None
     ) -> str:
         """
         Make API request to Empire backend (extracted for retry logic)
@@ -334,6 +337,7 @@ class ChatService:
             endpoint: API endpoint path
             message: User's query
             max_iterations: Maximum iterations for adaptive workflows
+            auth_token: Clerk JWT token for authentication (optional)
 
         Returns:
             Formatted response string
@@ -342,6 +346,11 @@ class ChatService:
             Various httpx exceptions that will be handled by retry logic
         """
         async with httpx.AsyncClient(timeout=self.timeout) as client:
+            # Prepare headers
+            headers = {"Content-Type": "application/json"}
+            if auth_token:
+                headers["Authorization"] = f"Bearer {auth_token}"
+
             # Make request to Empire API
             response = await client.post(
                 f"{self.api_base_url}{endpoint}",
@@ -349,7 +358,8 @@ class ChatService:
                     "query": message,
                     "max_iterations": max_iterations,
                     "stream": False  # Get complete response for easier retry handling
-                }
+                },
+                headers=headers
             )
             
             # Raise exception for bad status codes
