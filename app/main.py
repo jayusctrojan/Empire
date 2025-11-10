@@ -22,11 +22,13 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
+from app.routes import sessions, preferences  # Task 28: Session & Preference Management
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
 from app.services.monitoring_service import get_monitoring_service
 from app.services.supabase_storage import get_supabase_storage
+from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
 
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
@@ -55,6 +57,13 @@ async def lifespan(app: FastAPI):
     app.state.monitoring = monitoring_service
     print("📈 Monitoring service initialized")
 
+    # Initialize Langfuse for LLM observability (Task 29)
+    langfuse_client = get_langfuse_client()
+    if langfuse_client:
+        print(f"🔍 Langfuse observability enabled: {os.getenv('LANGFUSE_HOST')}")
+    else:
+        print("⚠️  Langfuse observability disabled")
+
     # Start Mountain Duck file monitoring (if enabled)
     if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
         start_mountain_duck_monitoring()
@@ -69,6 +78,9 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: Close connections
     print("👋 Empire v7.3 FastAPI shutting down...")
+
+    # Flush and shutdown Langfuse
+    shutdown_langfuse()
 
     # Stop Mountain Duck monitoring
     if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
@@ -246,6 +258,10 @@ async def general_exception_handler(request, exc):
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["Upload"])
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(query.router)  # Query router already has /api/query prefix defined
+
+# Task 28: Session & Preference Management
+app.include_router(sessions.router, prefix="/api/v1", tags=["Sessions"])
+app.include_router(preferences.router, prefix="/api/v1", tags=["Preferences"])
 # TODO: Additional routers
 # app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])

@@ -11,6 +11,8 @@ from typing import AsyncIterator, Dict, Any, Optional
 from anthropic import Anthropic, AsyncAnthropic
 import structlog
 
+from app.core.langfuse_config import observe
+
 logger = structlog.get_logger(__name__)
 
 
@@ -176,6 +178,7 @@ class ChatService:
         # If we exhausted all retries, raise the last exception
         raise last_exception
 
+    @observe(name="stream_chat_response")
     async def stream_chat_response(
         self,
         message: str,
@@ -400,6 +403,7 @@ class ChatService:
 
             return formatted
 
+    @observe(name="direct_claude_stream")
     async def direct_claude_stream(
         self,
         message: str,

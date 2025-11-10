@@ -14,6 +14,7 @@ import os
 import json
 
 from app.services.arcade_service import arcade_service
+from app.core.langfuse_config import observe
 
 logger = structlog.get_logger(__name__)
 
@@ -100,6 +101,7 @@ class LangGraphWorkflows:
         logger.info("Total tools available", count=len(tools))
         return tools
 
+    @observe(name="build_langgraph_workflow")
     def build_adaptive_research_graph(self) -> StateGraph:
         """
         Build adaptive research workflow with tool support.
@@ -161,6 +163,7 @@ class LangGraphWorkflows:
         """Create ToolNode with all available tools."""
         return ToolNode(self.tools)
 
+    @observe(name="langgraph_analyze_query")
     async def _analyze_query(self, state: QueryState) -> QueryState:
         """
         Analyze query to determine search strategy.

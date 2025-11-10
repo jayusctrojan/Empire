@@ -34,6 +34,8 @@ from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message
 import anthropic
 
+from app.core.langfuse_config import observe
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,6 +113,7 @@ class QueryExpansionService:
 
         logger.info(f"QueryExpansionService initialized with model: {self.config.model}")
 
+    @observe(name="query_expansion")
     async def expand_query(
         self,
         query: str,
@@ -340,6 +343,7 @@ class QueryExpansionService:
 
         return prompt
 
+    @observe(name="claude_api_call")
     async def _call_claude_with_retry(
         self,
         prompt: str,
