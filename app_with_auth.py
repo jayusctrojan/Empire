@@ -1,6 +1,6 @@
 """
-Empire v7.3 - Chat UI with Clerk Authentication
-Wraps Gradio chat interface with Clerk authentication
+Empire v7.3 - Chat UI with Clerk Authentication & RBAC Dashboard
+Wraps Gradio chat interface with Clerk authentication and RBAC management
 """
 
 import os
@@ -12,6 +12,7 @@ import gradio as gr
 import structlog
 from dotenv import load_dotenv
 from app.services.chat_service import get_chat_service
+from rbac_dashboard import build_rbac_dashboard
 from datetime import datetime
 
 # Load environment variables
@@ -209,12 +210,14 @@ with gr.Blocks(
     title="Empire AI Chat"
 ) as demo:
     with gr.Row():
-        with gr.Column(scale=4):
+        with gr.Column(scale=3):
             gr.Markdown("# 🏛️ Empire AI Chat")
-        with gr.Column(scale=1):
-            logout_btn = gr.Button("🚪 Sign Out", size="sm")
+        with gr.Column(scale=2):
+            with gr.Row():
+                rbac_btn = gr.Button("🔐 RBAC Dashboard", size="sm", link="/rbac")
+                logout_btn = gr.Button("🚪 Sign Out", size="sm")
 
-    # Add JavaScript to inject auth token and handle logout
+    # Add JavaScript to inject auth token and handle logout/navigation
     gr.HTML("""
     <script>
     // Inject Clerk session token into Gradio requests
@@ -234,6 +237,11 @@ with gr.Blocks(
     function handleLogout() {
         localStorage.removeItem('clerk_session_token');
         window.location.href = '/';
+    }
+
+    // Handle RBAC dashboard navigation
+    function goToRBAC() {
+        window.location.href = '/rbac';
     }
     </script>
     """)
@@ -269,7 +277,8 @@ with gr.Blocks(
         """
     )
 
-    # Wire up logout button
+    # Wire up navigation and logout buttons
+    rbac_btn.click(fn=None, js="goToRBAC()")
     logout_btn.click(fn=None, js="handleLogout()")
 
 
@@ -302,8 +311,12 @@ async def auth_page():
     return HTMLResponse(content=html_content)
 
 
-# Mount Gradio app at /chat
+# Build RBAC dashboard
+rbac_demo = build_rbac_dashboard()
+
+# Mount Gradio apps
 app = gr.mount_gradio_app(app, demo, path="/chat")
+app = gr.mount_gradio_app(app, rbac_demo, path="/rbac")
 
 
 if __name__ == "__main__":
