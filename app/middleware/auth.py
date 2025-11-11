@@ -58,42 +58,47 @@ async def get_current_user(
         logger.debug("api_key_authentication_success", user_id=user_id, key_id=key_record["id"])
         return user_id
 
-    # Check if Bearer token (JWT)
+    # Check if Bearer token (JWT from Clerk)
     elif authorization.startswith("Bearer "):
         token = authorization.split(" ", 1)[1] if len(authorization.split(" ")) > 1 else ""
-        
+
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Bearer token format",
                 headers={"WWW-Authenticate": "Bearer"}
             )
-        
-        # TODO: Implement JWT validation (Clerk or custom)
-        # For now, this is a stub that can be integrated with Clerk
-        # or any other JWT authentication system
-        
-        # Example integration with Clerk (when ready):
-        # from app.middleware.clerk_auth import verify_clerk_token
-        # try:
-        #     user_info = await verify_clerk_token(token)
-        #     user_id = user_info["user_id"]
-        #     logger.debug("jwt_authentication_success", user_id=user_id)
-        #     return user_id
-        # except Exception as e:
-        #     logger.error("jwt_authentication_failed", error=str(e))
-        #     raise HTTPException(
-        #         status_code=status.HTTP_401_UNAUTHORIZED,
-        #         detail=f"JWT authentication failed: {str(e)}",
-        #         headers={"WWW-Authenticate": "Bearer"}
-        #     )
-        
-        logger.warning("jwt_authentication_not_implemented")
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="JWT authentication not yet implemented. Please use API keys (emp_xxx format) for now.",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
+
+        # Clerk JWT validation
+        from app.middleware.clerk_auth import clerk_client
+
+        try:
+            # Verify the session token with Clerk
+            session = clerk_client.sessions.verify_token(token)
+
+            if not session:
+                logger.warning("clerk_jwt_invalid")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired JWT token",
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+
+            # Get user ID from session
+            user_id = session.user_id
+            logger.debug("jwt_authentication_success", user_id=user_id)
+            return user_id
+
+        except HTTPException:
+            # Re-raise HTTP exceptions as-is
+            raise
+        except Exception as e:
+            logger.error("jwt_authentication_failed", error=str(e))
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"JWT authentication failed: {str(e)}",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
 
     else:
         raise HTTPException(
