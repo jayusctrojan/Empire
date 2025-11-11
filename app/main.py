@@ -22,7 +22,7 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs  # Task 28: Session & Preference Management, Task 30: Cost Tracking
+from app.routes import sessions, preferences, costs, rbac  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -265,6 +265,9 @@ app.include_router(preferences.router, prefix="/api/v1", tags=["Preferences"])
 
 # Task 30: Cost Tracking & Optimization
 app.include_router(costs.router, prefix="/api/v1", tags=["Costs"])
+
+# Task 31: RBAC & API Key Management
+app.include_router(rbac.router)  # RBAC router already has /api/rbac prefix defined
 
 # TODO: Additional routers
 # app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
