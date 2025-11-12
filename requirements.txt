@@ -6,6 +6,7 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.6.0
 pydantic-settings>=2.1.0
+email-validator>=2.1.0  # Required for Pydantic EmailStr validation
 
 # Chat UI
 gradio>=4.19.0  # AI chat interface with streaming support
