@@ -85,15 +85,69 @@ def execute_crew_async(
             # Workflow completed successfully
             workflow_result = response.json()
 
-            # Update execution with results
-            supabase.table("crewai_executions").update({
+            # Validate output quality (Task 38.5)
+            validation_result = None
+            quality_metrics = {}
+
+            try:
+                from app.services.crewai_output_validator import get_output_validator
+
+                # Get agent roles for validation
+                agent_roles_response = supabase.table("crewai_agents") \
+                    .select("role") \
+                    .in_("id", agent_ids) \
+                    .execute()
+
+                agent_roles = [a["role"] for a in agent_roles_response.data]
+
+                # Validate output
+                validator = get_output_validator()
+                validation_result = validator.validate_execution_output(
+                    workflow_result,
+                    agent_roles
+                )
+
+                quality_metrics = {
+                    "validation": {
+                        "is_valid": validation_result.is_valid,
+                        "quality_score": validation_result.quality_score,
+                        "errors": validation_result.errors,
+                        "warnings": validation_result.warnings,
+                        "recommendations": validation_result.recommendations,
+                        "metrics": validation_result.metrics
+                    }
+                }
+
+                logger.info(
+                    "Output validation completed",
+                    execution_id=execution_id,
+                    quality_score=validation_result.quality_score,
+                    is_valid=validation_result.is_valid,
+                    errors_count=len(validation_result.errors),
+                    warnings_count=len(validation_result.warnings)
+                )
+
+            except Exception as val_error:
+                logger.warning("Output validation failed", error=str(val_error))
+                quality_metrics = {"validation_error": str(val_error)}
+
+            # Update execution with results and validation
+            update_data = {
                 "status": "completed",
                 "completed_tasks": workflow_result.get("completed_tasks", len(agent_ids)),
                 "results": workflow_result.get("results"),
                 "execution_time_ms": workflow_result.get("execution_time_ms"),
                 "completed_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", execution_id).execute()
+            }
+
+            # Add quality metrics to metadata if validation succeeded
+            if quality_metrics:
+                existing_metadata = workflow_result.get("metadata", {})
+                existing_metadata.update(quality_metrics)
+                update_data["metadata"] = existing_metadata
+
+            supabase.table("crewai_executions").update(update_data).eq("id", execution_id).execute()
 
             logger.info(
                 "Async crew execution completed",
