@@ -1049,6 +1049,16 @@ documents = parser.load_data("./contract.pdf")
 **Health Check**: https://jb-empire-api.onrender.com/health
 **Docs**: https://jb-empire-api.onrender.com/docs
 
+#### Empire Chat UI (Production) - Task 26: Chat UI Implementation
+**URL**: https://jb-empire-chat.onrender.com
+**Service ID**: `srv-d47ptdmr433s739ljolg`
+**Plan**: Starter ($7/month)
+**Region**: Oregon
+
+**Purpose**: Gradio-based chat interface for end users
+**Features**: Real-time streaming, auto-routing, error handling with retry logic
+**Integration**: Direct connection to Task 46 LangGraph + Arcade.dev endpoints
+
 **Task 46 - Query Endpoints (LangGraph + Arcade.dev):**
 - **Health**: GET `/api/query/health` - Service health and component status
 - **Auto-routed Query**: POST `/api/query/auto` - Intelligent workflow routing (LangGraph/CrewAI/Simple)

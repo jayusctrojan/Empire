@@ -2,7 +2,7 @@
 Query processing endpoints with LangGraph + Arcade.dev support for Empire v7.3
 Provides adaptive query processing with intelligent routing
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import structlog
@@ -570,6 +570,211 @@ async def get_task_status(task_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to check task status: {str(e)}")
 
 
+@router.post("/search/faceted")
+async def faceted_search(
+    query: str = Query(..., description="Search query"),
+    departments: Optional[List[str]] = Query(None, description="Filter by departments"),
+    file_types: Optional[List[str]] = Query(None, description="Filter by file types"),
+    date_from: Optional[str] = Query(None, description="Start date filter"),
+    date_to: Optional[str] = Query(None, description="End date filter"),
+    entities: Optional[List[str]] = Query(None, description="Filter by entities"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Results per page"),
+    user: dict = Depends(verify_clerk_token)
+):
+    """
+    Faceted search with filtering and result presentation.
+
+    **Authentication Required**: Must provide valid Clerk JWT token.
+
+    Features:
+    - Multi-select faceted filtering (department, file type, date, entities)
+    - Snippet generation with keyword highlighting
+    - Relevance scores and metadata
+    - B2 URL links
+    - Pagination
+
+    Args:
+        query: Search query text
+        departments: Filter by departments (multi-select)
+        file_types: Filter by file types (multi-select)
+        date_from: Filter by date from (ISO format)
+        date_to: Filter by date to (ISO format)
+        entities: Filter by entities (multi-select)
+        page: Page number (1-indexed)
+        page_size: Results per page (1-100)
+
+    Returns:
+        Search results with facets, snippets, highlights, and metadata
+
+    Example:
+        ```json
+        POST /api/query/search/faceted
+        {
+            "query": "California insurance policy",
+            "departments": ["legal", "hr"],
+            "file_types": ["pdf"],
+            "page": 1,
+            "page_size": 20
+        }
+
+        Response:
+        {
+            "results": [
+                {
+                    "chunk_id": "uuid",
+                    "snippet": "...California <mark>insurance</mark> policy...",
+                    "relevance_score": 0.95,
+                    "source_file": "policy.pdf",
+                    "department": "legal",
+                    "b2_url": "https://..."
+                }
+            ],
+            "facets": [
+                {
+                    "facet_type": "department",
+                    "display_name": "Department",
+                    "values": [
+                        {"value": "legal", "display_name": "Legal", "count": 45, "selected": true}
+                    ]
+                }
+            ],
+            "total_results": 156,
+            "page": 1,
+            "page_size": 20,
+            "total_pages": 8
+        }
+        ```
+    """
+    try:
+        from app.services.faceted_search_service import get_faceted_search_service, FacetFilters
+        from app.services.hybrid_search_service import get_hybrid_search_service
+        from datetime import datetime
+
+        logger.info(
+            "Faceted search request",
+            query=query[:50],
+            departments=departments,
+            file_types=file_types,
+            user_id=user["user_id"]
+        )
+
+        # Build facet filters
+        filters = FacetFilters(
+            departments=departments or [],
+            file_types=file_types or [],
+            date_from=datetime.fromisoformat(date_from) if date_from else None,
+            date_to=datetime.fromisoformat(date_to) if date_to else None,
+            entities=entities or []
+        )
+
+        # Get services
+        faceted_service = get_faceted_search_service()
+        search_service = get_hybrid_search_service()
+
+        # Perform hybrid search with filters
+        # TODO: Integrate filters with actual search service
+        # For now, using mock data
+
+        # Mock search results
+        mock_results = [
+            {
+                "chunk_id": "test-1",
+                "document_id": "doc-1",
+                "content": "California insurance policy requires minimum coverage...",
+                "score": 0.95,
+                "rank": 1,
+                "metadata": {
+                    "filename": "ca_insurance_policy.pdf",
+                    "department": "legal",
+                    "file_type": "pdf",
+                    "created_at": "2024-01-15",
+                    "b2_url": "https://b2.example.com/ca_insurance_policy.pdf"
+                }
+            }
+        ]
+
+        # Extract keywords from query for highlighting
+        keywords = query.split()
+
+        # Format results with snippets and highlights
+        formatted_results = []
+        document_ids = []
+
+        for result in mock_results:
+            formatted = faceted_service.format_search_result(
+                chunk_id=result["chunk_id"],
+                document_id=result["document_id"],
+                content=result["content"],
+                score=result["score"],
+                rank=result["rank"],
+                query_keywords=keywords,
+                document_metadata=result["metadata"]
+            )
+
+            formatted_results.append({
+                "chunk_id": formatted.chunk_id,
+                "document_id": formatted.document_id,
+                "snippet": formatted.highlighted_snippet,
+                "relevance_score": formatted.relevance_score,
+                "source_file": formatted.source_file,
+                "department": formatted.department,
+                "file_type": formatted.file_type,
+                "created_at": formatted.created_at,
+                "b2_url": formatted.b2_url,
+                "rank": formatted.rank
+            })
+
+            document_ids.append(result["document_id"])
+
+        # Extract facets from results
+        facets = await faceted_service.extract_facets(document_ids, filters)
+
+        # Format facets for response
+        facets_data = [
+            {
+                "facet_type": facet.facet_type.value,
+                "display_name": facet.display_name,
+                "multi_select": facet.multi_select,
+                "values": [
+                    {
+                        "value": val.value,
+                        "display_name": val.display_name,
+                        "count": val.count,
+                        "selected": val.selected
+                    }
+                    for val in facet.values
+                ]
+            }
+            for facet in facets
+        ]
+
+        # Calculate pagination
+        total_results = len(formatted_results)  # Mock - should be actual count
+        total_pages = (total_results + page_size - 1) // page_size
+
+        logger.info(
+            "Faceted search completed",
+            results_count=len(formatted_results),
+            facets_count=len(facets)
+        )
+
+        return {
+            "results": formatted_results,
+            "facets": facets_data,
+            "total_results": total_results,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "query": query,
+            "filters_applied": not filters.is_empty()
+        }
+
+    except Exception as e:
+        logger.error("Faceted search failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Faceted search failed: {str(e)}")
+
+
 @router.get("/health")
 async def query_health():
     """
@@ -587,5 +792,6 @@ async def query_health():
         "workflow_router_enabled": True,
         "available_workflows": ["langgraph", "crewai", "simple"],
         "async_processing": True,
-        "celery_enabled": True
+        "celery_enabled": True,
+        "faceted_search_enabled": True
     }

@@ -22,13 +22,14 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
 from app.services.monitoring_service import get_monitoring_service
 from app.services.supabase_storage import get_supabase_storage
 from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
+from app.core.connections import connection_manager
 
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
@@ -69,10 +70,20 @@ async def lifespan(app: FastAPI):
         start_mountain_duck_monitoring()
         print("📁 Mountain Duck monitoring started")
 
-    # TODO: Initialize database connections
-    # TODO: Initialize Redis connection
-    # TODO: Initialize Neo4j connection
-    # TODO: Verify external services
+    # Task 36: Initialize database connections
+    try:
+        await connection_manager.initialize()
+        print("✅ Database connections initialized (Supabase, Redis, Neo4j)")
+
+        # Verify external services
+        is_ready = await connection_manager.check_readiness()
+        if is_ready:
+            print("✅ All critical services are ready")
+        else:
+            print("⚠️  Some services are not ready - check logs")
+    except Exception as e:
+        print(f"❌ Failed to initialize connections: {e}")
+        # Continue anyway - some features may work without all connections
 
     yield
 
@@ -87,9 +98,12 @@ async def lifespan(app: FastAPI):
         stop_mountain_duck_monitoring()
         print("📁 Mountain Duck monitoring stopped")
 
-    # TODO: Close database connections
-    # TODO: Close Redis connection
-    # TODO: Close Neo4j connection
+    # Task 36: Close database connections gracefully
+    try:
+        await connection_manager.shutdown()
+        print("✅ All database connections closed")
+    except Exception as e:
+        print(f"❌ Error closing connections: {e}")
 
 
 # Create FastAPI app
@@ -157,35 +171,47 @@ async def health_check():
 
 @app.get("/health/detailed", tags=["Health"])
 async def detailed_health_check():
-    """Detailed health check with dependency status"""
+    """Detailed health check with dependency status - Task 36"""
+
+    # Check all connections and services
+    dependencies = await connection_manager.check_health()
+
+    # Determine overall status
+    unhealthy_services = [
+        service for service, status in dependencies.items()
+        if "unhealthy" in str(status).lower()
+    ]
+
+    overall_status = "healthy" if not unhealthy_services else "degraded"
 
     health_status = {
-        "status": "healthy",
+        "status": overall_status,
         "version": "7.3.0",
         "service": "Empire FastAPI",
-        "dependencies": {
-            "supabase": "unknown",
-            "redis": "unknown",
-            "neo4j": "unknown",
-            "llamaindex": "unknown",
-            "crewai": "unknown"
-        }
+        "dependencies": dependencies,
+        "unhealthy_services": unhealthy_services if unhealthy_services else [],
+        "connections_initialized": connection_manager.connections_initialized
     }
-
-    # TODO: Check Supabase connection
-    # TODO: Check Redis connection
-    # TODO: Check Neo4j connection
-    # TODO: Check LlamaIndex service
-    # TODO: Check CrewAI service
 
     return health_status
 
 
 @app.get("/health/ready", tags=["Health"])
 async def readiness_check():
-    """Kubernetes readiness probe"""
-    # TODO: Check if all dependencies are ready
-    return {"ready": True}
+    """Kubernetes readiness probe - Task 36"""
+    # Check if all critical dependencies are ready
+    is_ready = await connection_manager.check_readiness()
+
+    if not is_ready:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ready": False,
+                "message": "Not all critical services are available"
+            }
+        )
+
+    return {"ready": True, "message": "All critical services are operational"}
 
 
 @app.get("/health/live", tags=["Health"])
@@ -269,8 +295,19 @@ app.include_router(costs.router, prefix="/api/v1", tags=["Costs"])
 # Task 31: RBAC & API Key Management
 app.include_router(rbac.router)  # RBAC router already has /api/rbac prefix defined
 
+# Task 32: Bulk Document Management & Batch Operations
+app.include_router(documents.router)  # Documents router already has /api/documents prefix defined
+
+# Task 33: User Management & GDPR Compliance
+app.include_router(users.router)  # Users router already has /api/users prefix defined
+
+# Task 34: Analytics Dashboard Implementation
+app.include_router(monitoring.router)  # Monitoring router already has /api/monitoring prefix defined
+
+# Task 35: CrewAI Multi-Agent Integration & Orchestration
+app.include_router(crewai.router)  # CrewAI router already has /api/crewai prefix defined
+
 # TODO: Additional routers
-# app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
 # app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 # app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
