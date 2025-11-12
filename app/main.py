@@ -22,7 +22,7 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -306,6 +306,9 @@ app.include_router(monitoring.router)  # Monitoring router already has /api/moni
 
 # Task 35: CrewAI Multi-Agent Integration & Orchestration
 app.include_router(crewai.router)  # CrewAI router already has /api/crewai prefix defined
+
+# Task 39: Agent Interactions - Inter-Agent Messaging & Collaboration
+app.include_router(agent_interactions.router)  # Agent Interactions router already has /api/crewai/agent-interactions prefix defined
 
 # TODO: Additional routers
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
