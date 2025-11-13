@@ -749,6 +749,373 @@ class AgentInteractionService:
             raise
 
 
+    # ==================== Analytics Methods ====================
+
+    async def get_interaction_history(
+        self,
+        execution_id: UUID,
+        agent_id: Optional[UUID] = None,
+        interaction_type: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 100,
+        offset: int = 0
+    ):
+        """
+        Get interaction history with filters and pagination.
+
+        Returns dict with: total, interactions, pagination
+        """
+        try:
+            # Build query
+            query = self.supabase.table("crewai_agent_interactions") \
+                .select("*", count="exact") \
+                .eq("execution_id", str(execution_id)) \
+                .order("created_at", desc=True)
+
+            # Apply filters
+            if agent_id:
+                # Filter by agent (either from or to)
+                query = query.or_(f"from_agent_id.eq.{str(agent_id)},to_agent_id.eq.{str(agent_id)}")
+
+            if interaction_type:
+                query = query.eq("interaction_type", interaction_type)
+
+            if start_date:
+                query = query.gte("created_at", start_date.isoformat())
+
+            if end_date:
+                query = query.lte("created_at", end_date.isoformat())
+
+            # Apply pagination
+            query = query.range(offset, offset + limit - 1)
+
+            response = query.execute()
+
+            total = response.count if hasattr(response, 'count') else len(response.data)
+            has_more = total > (offset + len(response.data))
+
+            from app.models.agent_interactions import (
+                InteractionHistoryResponse,
+                PaginationInfo,
+                AgentInteractionResponse
+            )
+
+            return InteractionHistoryResponse(
+                total=total,
+                interactions=[AgentInteractionResponse(**item) for item in response.data],
+                pagination=PaginationInfo(
+                    limit=limit,
+                    offset=offset,
+                    has_more=has_more
+                )
+            )
+
+        except Exception as e:
+            logger.error("Failed to get interaction history", error=str(e), exc_info=True)
+            raise
+
+    async def get_agent_activity(
+        self,
+        execution_id: UUID,
+        time_window: str = "24h"
+    ):
+        """
+        Get agent activity metrics for an execution.
+
+        Returns dict with: execution_id, time_window, agents (list of metrics)
+        """
+        try:
+            # Calculate time window
+            from dateutil import parser as date_parser
+
+            time_windows = {
+                "1h": timedelta(hours=1),
+                "6h": timedelta(hours=6),
+                "24h": timedelta(hours=24),
+                "7d": timedelta(days=7)
+            }
+
+            delta = time_windows.get(time_window, timedelta(hours=24))
+            since = datetime.now() - delta
+
+            # Get all interactions in time window
+            response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("execution_id", str(execution_id)) \
+                .gte("created_at", since.isoformat()) \
+                .execute()
+
+            # Calculate metrics per agent
+            agent_metrics = {}
+
+            for interaction in response.data:
+                from_agent = interaction["from_agent_id"]
+                to_agent = interaction.get("to_agent_id")
+                interaction_type = interaction["interaction_type"]
+                created_at = date_parser.isoparse(interaction["created_at"])
+
+                # Initialize agent metrics if needed
+                if from_agent not in agent_metrics:
+                    agent_metrics[from_agent] = {
+                        "agent_id": from_agent,
+                        "messages_sent": 0,
+                        "messages_received": 0,
+                        "events_published": 0,
+                        "conflicts_detected": 0,
+                        "last_activity": created_at
+                    }
+
+                if to_agent and to_agent not in agent_metrics:
+                    agent_metrics[to_agent] = {
+                        "agent_id": to_agent,
+                        "messages_sent": 0,
+                        "messages_received": 0,
+                        "events_published": 0,
+                        "conflicts_detected": 0,
+                        "last_activity": created_at
+                    }
+
+                # Update metrics
+                if interaction_type == "message":
+                    agent_metrics[from_agent]["messages_sent"] += 1
+                    if to_agent:
+                        agent_metrics[to_agent]["messages_received"] += 1
+                elif interaction_type == "event":
+                    agent_metrics[from_agent]["events_published"] += 1
+                elif interaction_type == "conflict":
+                    agent_metrics[from_agent]["conflicts_detected"] += 1
+
+                # Update last activity
+                if created_at > agent_metrics[from_agent]["last_activity"]:
+                    agent_metrics[from_agent]["last_activity"] = created_at
+
+                if to_agent and created_at > agent_metrics[to_agent]["last_activity"]:
+                    agent_metrics[to_agent]["last_activity"] = created_at
+
+            from app.models.agent_interactions import (
+                AgentActivityResponse,
+                AgentActivityMetrics
+            )
+
+            return AgentActivityResponse(
+                execution_id=execution_id,
+                time_window=time_window,
+                agents=[AgentActivityMetrics(**metrics) for metrics in agent_metrics.values()]
+            )
+
+        except Exception as e:
+            logger.error("Failed to get agent activity", error=str(e), exc_info=True)
+            raise
+
+    async def get_interaction_timeline(
+        self,
+        execution_id: UUID,
+        granularity: str = "hour"
+    ):
+        """
+        Get interaction timeline with time-series data.
+
+        Returns dict with: execution_id, granularity, timeline (list of data points)
+        """
+        try:
+            from dateutil import parser as date_parser
+            from collections import defaultdict
+
+            # Get all interactions
+            response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("execution_id", str(execution_id)) \
+                .order("created_at") \
+                .execute()
+
+            # Group by time bucket
+            timeline_data = defaultdict(lambda: {
+                "messages": 0,
+                "events": 0,
+                "state_syncs": 0,
+                "conflicts": 0
+            })
+
+            for interaction in response.data:
+                created_at = date_parser.isoparse(interaction["created_at"])
+                interaction_type = interaction["interaction_type"]
+
+                # Round to granularity
+                if granularity == "minute":
+                    bucket = created_at.replace(second=0, microsecond=0)
+                elif granularity == "hour":
+                    bucket = created_at.replace(minute=0, second=0, microsecond=0)
+                else:  # day
+                    bucket = created_at.replace(hour=0, minute=0, second=0, microsecond=0)
+
+                # Increment counters
+                if interaction_type == "message":
+                    timeline_data[bucket]["messages"] += 1
+                elif interaction_type == "event":
+                    timeline_data[bucket]["events"] += 1
+                elif interaction_type == "state_sync":
+                    timeline_data[bucket]["state_syncs"] += 1
+                elif interaction_type == "conflict":
+                    timeline_data[bucket]["conflicts"] += 1
+
+            from app.models.agent_interactions import (
+                InteractionTimelineResponse,
+                TimelineDataPoint
+            )
+
+            return InteractionTimelineResponse(
+                execution_id=execution_id,
+                granularity=granularity,
+                timeline=[
+                    TimelineDataPoint(timestamp=bucket, **data)
+                    for bucket, data in sorted(timeline_data.items())
+                ]
+            )
+
+        except Exception as e:
+            logger.error("Failed to get interaction timeline", error=str(e), exc_info=True)
+            raise
+
+    async def get_conflict_analytics(
+        self,
+        execution_id: UUID
+    ):
+        """
+        Get conflict analytics and resolution statistics.
+
+        Returns dict with: total, resolved, unresolved, by_type, resolution_strategies, avg_resolution_time
+        """
+        try:
+            from dateutil import parser as date_parser
+
+            # Get all conflict interactions
+            response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("execution_id", str(execution_id)) \
+                .eq("interaction_type", "conflict") \
+                .execute()
+
+            total_conflicts = len(response.data)
+            resolved_conflicts = sum(1 for c in response.data if c.get("conflict_resolved"))
+            unresolved_conflicts = total_conflicts - resolved_conflicts
+
+            # Count by type
+            by_type = {}
+            for conflict in response.data:
+                conflict_type = conflict.get("conflict_type")
+                if conflict_type:
+                    by_type[conflict_type] = by_type.get(conflict_type, 0) + 1
+
+            # Count by resolution strategy
+            resolution_strategies = {}
+            for conflict in response.data:
+                if conflict.get("conflict_resolved"):
+                    strategy = conflict.get("resolution_strategy")
+                    if strategy:
+                        resolution_strategies[strategy] = resolution_strategies.get(strategy, 0) + 1
+
+            # Calculate average resolution time
+            resolution_times = []
+            for conflict in response.data:
+                if conflict.get("conflict_resolved") and conflict.get("resolved_at"):
+                    created = date_parser.isoparse(conflict["created_at"])
+                    resolved = date_parser.isoparse(conflict["resolved_at"])
+                    resolution_times.append((resolved - created).total_seconds() / 60)
+
+            avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else None
+
+            from app.models.agent_interactions import ConflictAnalyticsResponse
+
+            return ConflictAnalyticsResponse(
+                execution_id=execution_id,
+                total_conflicts=total_conflicts,
+                resolved_conflicts=resolved_conflicts,
+                unresolved_conflicts=unresolved_conflicts,
+                by_type=by_type,
+                resolution_strategies=resolution_strategies,
+                avg_resolution_time_minutes=avg_resolution_time
+            )
+
+        except Exception as e:
+            logger.error("Failed to get conflict analytics", error=str(e), exc_info=True)
+            raise
+
+    async def get_message_flow(
+        self,
+        execution_id: UUID
+    ):
+        """
+        Get message flow graph showing communication patterns.
+
+        Returns dict with: execution_id, nodes (agents), edges (message flows)
+        """
+        try:
+            from dateutil import parser as date_parser
+            from collections import defaultdict
+
+            # Get all message interactions
+            response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("execution_id", str(execution_id)) \
+                .eq("interaction_type", "message") \
+                .execute()
+
+            # Build nodes (agents)
+            agent_message_counts = defaultdict(int)
+
+            # Build edges (flows)
+            flow_data = defaultdict(lambda: {"count": 0, "total_latency": 0})
+
+            for interaction in response.data:
+                from_agent = interaction["from_agent_id"]
+                to_agent = interaction.get("to_agent_id")
+
+                agent_message_counts[from_agent] += 1
+
+                if to_agent:
+                    agent_message_counts[to_agent] += 1
+                    flow_key = (from_agent, to_agent)
+                    flow_data[flow_key]["count"] += 1
+
+                    # You could calculate latency here if you have response timestamps
+                    # For now, we'll leave avg_latency_ms as None
+
+            from app.models.agent_interactions import (
+                MessageFlowResponse,
+                MessageFlowNode,
+                MessageFlowEdge
+            )
+
+            nodes = [
+                MessageFlowNode(
+                    agent_id=agent_id,
+                    name=f"Agent {str(agent_id)[:8]}",
+                    message_count=count
+                )
+                for agent_id, count in agent_message_counts.items()
+            ]
+
+            edges = [
+                MessageFlowEdge(
+                    **{"from": from_agent, "to": to_agent},
+                    count=data["count"],
+                    avg_latency_ms=None  # Could be calculated with response timestamps
+                )
+                for (from_agent, to_agent), data in flow_data.items()
+            ]
+
+            return MessageFlowResponse(
+                execution_id=execution_id,
+                nodes=nodes,
+                edges=edges
+            )
+
+        except Exception as e:
+            logger.error("Failed to get message flow", error=str(e), exc_info=True)
+            raise
+
+
 def get_agent_interaction_service(supabase: Client) -> AgentInteractionService:
     """Factory function to create AgentInteractionService instance"""
     return AgentInteractionService(supabase=supabase)
