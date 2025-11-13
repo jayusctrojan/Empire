@@ -9,6 +9,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 from supabase import Client
 import structlog
+from prometheus_client import Counter, Histogram, Gauge
 
 from app.models.agent_interactions import (
     DirectMessageRequest,
@@ -30,6 +31,49 @@ from app.models.agent_interactions import (
 )
 
 logger = structlog.get_logger(__name__)
+
+# Prometheus Metrics for Agent Interactions
+AGENT_INTERACTION_TOTAL = Counter(
+    'agent_interaction_total',
+    'Total agent interactions by type',
+    ['interaction_type', 'execution_id']
+)
+
+AGENT_INTERACTION_DURATION = Histogram(
+    'agent_interaction_duration_seconds',
+    'Time spent processing agent interactions',
+    ['interaction_type']
+)
+
+AGENT_CONFLICTS_DETECTED = Counter(
+    'agent_conflicts_detected_total',
+    'Total conflicts detected by type',
+    ['conflict_type', 'execution_id']
+)
+
+AGENT_CONFLICTS_RESOLVED = Counter(
+    'agent_conflicts_resolved_total',
+    'Total conflicts resolved by strategy',
+    ['resolution_strategy', 'execution_id']
+)
+
+AGENT_STATE_SYNC_CONFLICTS = Counter(
+    'agent_state_sync_conflicts_total',
+    'State synchronization version conflicts',
+    ['state_key', 'execution_id']
+)
+
+AGENT_ACTIVE_INTERACTIONS = Gauge(
+    'agent_active_interactions',
+    'Currently active interactions by execution',
+    ['execution_id']
+)
+
+AGENT_BROADCAST_RECIPIENTS = Histogram(
+    'agent_broadcast_recipients',
+    'Number of recipients for broadcast messages',
+    buckets=[1, 2, 5, 10, 20, 50, 100]
+)
 
 
 class AgentInteractionService:
@@ -61,6 +105,9 @@ class AgentInteractionService:
         Returns:
             Created interaction record
         """
+        # Track metrics
+        start_time = datetime.now()
+
         try:
             logger.info(
                 "Sending direct message",
@@ -86,6 +133,15 @@ class AgentInteractionService:
                 raise ValueError("Failed to create interaction record")
 
             interaction = response.data[0]
+
+            # Update Prometheus metrics
+            AGENT_INTERACTION_TOTAL.labels(
+                interaction_type="message",
+                execution_id=str(request.execution_id)
+            ).inc()
+
+            duration = (datetime.now() - start_time).total_seconds()
+            AGENT_INTERACTION_DURATION.labels(interaction_type="message").observe(duration)
 
             logger.info(
                 "Direct message sent",
@@ -159,6 +215,13 @@ class AgentInteractionService:
                 raise ValueError("Failed to create broadcast interaction")
 
             broadcast = broadcast_response.data[0]
+
+            # Update Prometheus metrics
+            AGENT_INTERACTION_TOTAL.labels(
+                interaction_type="broadcast",
+                execution_id=str(request.execution_id)
+            ).inc()
+            AGENT_BROADCAST_RECIPIENTS.observe(total_agents)
 
             logger.info(
                 "Broadcast message sent",
@@ -377,6 +440,12 @@ class AgentInteractionService:
                         actual_version=latest_version
                     )
 
+                    # Update Prometheus metrics for state sync conflict
+                    AGENT_STATE_SYNC_CONFLICTS.labels(
+                        state_key=request.state_key,
+                        execution_id=str(request.execution_id)
+                    ).inc()
+
                     # Auto-create conflict record
                     await self.report_conflict(ConflictReportRequest(
                         execution_id=request.execution_id,
@@ -509,6 +578,12 @@ class AgentInteractionService:
 
             conflict = response.data[0]
 
+            # Update Prometheus metrics for conflict detection
+            AGENT_CONFLICTS_DETECTED.labels(
+                conflict_type=request.conflict_type,
+                execution_id=str(request.execution_id)
+            ).inc()
+
             logger.warning(
                 "Conflict recorded",
                 conflict_id=conflict["id"],
@@ -555,6 +630,12 @@ class AgentInteractionService:
                 raise ValueError(f"Conflict {request.conflict_id} not found")
 
             conflict = update_response.data[0]
+
+            # Update Prometheus metrics for conflict resolution
+            AGENT_CONFLICTS_RESOLVED.labels(
+                resolution_strategy=request.resolution_strategy,
+                execution_id=str(conflict["execution_id"])
+            ).inc()
 
             logger.info(
                 "Conflict resolved",
