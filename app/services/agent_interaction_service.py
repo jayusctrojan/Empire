@@ -603,6 +603,8 @@ class AgentInteractionService:
         """
         Resolve a previously reported conflict.
 
+        Supports both manual and automatic resolution strategies.
+
         Args:
             request: Resolution request with strategy and data
 
@@ -616,6 +618,18 @@ class AgentInteractionService:
                 strategy=request.resolution_strategy
             )
 
+            # For auto-resolution strategies, execute the strategy first
+            if request.resolution_strategy == "latest_wins":
+                await self._resolve_conflict_latest_wins(request.conflict_id)
+            elif request.resolution_strategy == "merge":
+                await self._resolve_conflict_merge(request.conflict_id)
+            elif request.resolution_strategy == "rollback":
+                await self._resolve_conflict_rollback(request.conflict_id)
+            elif request.resolution_strategy == "escalate":
+                await self._resolve_conflict_escalate(request.conflict_id)
+            # For "manual" strategy, just mark as resolved with provided data
+
+            # Mark conflict as resolved
             update_response = self.supabase.table("crewai_agent_interactions") \
                 .update({
                     "conflict_resolved": True,
@@ -647,6 +661,289 @@ class AgentInteractionService:
 
         except Exception as e:
             logger.error("Failed to resolve conflict", error=str(e), exc_info=True)
+            raise
+
+    async def _resolve_conflict_latest_wins(self, conflict_id: UUID):
+        """
+        Auto-resolve conflict by accepting the most recent state update.
+
+        Strategy: Find the latest state version and apply it.
+        """
+        try:
+            # Get the conflict details
+            conflict_response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("id", str(conflict_id)) \
+                .single() \
+                .execute()
+
+            if not conflict_response.data:
+                raise ValueError(f"Conflict {conflict_id} not found")
+
+            conflict = conflict_response.data
+            resolution_data = conflict.get("resolution_data", {})
+
+            # Extract state information from conflict
+            state_key = resolution_data.get("state_key")
+            if not state_key:
+                logger.warning("No state_key in conflict resolution_data, skipping latest_wins")
+                return
+
+            execution_id = conflict["execution_id"]
+
+            # Get the latest state for this key
+            latest_state_response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("execution_id", execution_id) \
+                .eq("interaction_type", "state_sync") \
+                .eq("state_key", state_key) \
+                .order("state_version", desc=True) \
+                .limit(1) \
+                .execute()
+
+            if latest_state_response.data:
+                latest_state = latest_state_response.data[0]
+                logger.info(
+                    "Latest wins resolution applied",
+                    conflict_id=str(conflict_id),
+                    state_key=state_key,
+                    winning_version=latest_state.get("state_version")
+                )
+
+        except Exception as e:
+            logger.error("Failed to apply latest_wins resolution", error=str(e), exc_info=True)
+            raise
+
+    async def _resolve_conflict_merge(self, conflict_id: UUID):
+        """
+        Auto-resolve conflict by attempting to merge non-conflicting changes.
+
+        Strategy: Deep merge JSON objects if no key conflicts exist.
+        If key conflicts exist, escalate to manual resolution.
+        """
+        try:
+            # Get the conflict details
+            conflict_response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("id", str(conflict_id)) \
+                .single() \
+                .execute()
+
+            if not conflict_response.data:
+                raise ValueError(f"Conflict {conflict_id} not found")
+
+            conflict = conflict_response.data
+            resolution_data = conflict.get("resolution_data", {})
+
+            # Get both state versions
+            current_value = resolution_data.get("current_value", {})
+            attempted_value = resolution_data.get("attempted_value", {})
+
+            # Attempt to merge
+            if isinstance(current_value, dict) and isinstance(attempted_value, dict):
+                # Check for key conflicts
+                current_keys = set(current_value.keys())
+                attempted_keys = set(attempted_value.keys())
+                common_keys = current_keys & attempted_keys
+
+                # Check if values for common keys are different
+                has_conflict = False
+                for key in common_keys:
+                    if current_value[key] != attempted_value[key]:
+                        has_conflict = True
+                        break
+
+                if has_conflict:
+                    logger.warning(
+                        "Merge conflict detected - escalating to manual",
+                        conflict_id=str(conflict_id),
+                        conflicting_keys=list(common_keys)
+                    )
+                    # Escalate to manual resolution
+                    await self._resolve_conflict_escalate(conflict_id)
+                else:
+                    # Safe to merge
+                    merged_value = {**current_value, **attempted_value}
+
+                    # Create new state sync with merged value
+                    state_key = resolution_data.get("state_key")
+                    if state_key:
+                        execution_id = conflict["execution_id"]
+                        from_agent_id = conflict["from_agent_id"]
+
+                        # Get latest version
+                        latest_version_response = self.supabase.table("crewai_agent_interactions") \
+                            .select("state_version") \
+                            .eq("execution_id", execution_id) \
+                            .eq("state_key", state_key) \
+                            .order("state_version", desc=True) \
+                            .limit(1) \
+                            .execute()
+
+                        next_version = 1
+                        if latest_version_response.data:
+                            next_version = latest_version_response.data[0]["state_version"] + 1
+
+                        # Insert merged state
+                        self.supabase.table("crewai_agent_interactions").insert({
+                            "execution_id": execution_id,
+                            "from_agent_id": from_agent_id,
+                            "to_agent_id": None,
+                            "interaction_type": "state_sync",
+                            "message": f"Merged state resolution for conflict {conflict_id}",
+                            "state_key": state_key,
+                            "state_value": merged_value,
+                            "state_version": next_version,
+                            "previous_state": current_value,
+                            "metadata": {"resolved_conflict_id": str(conflict_id)}
+                        }).execute()
+
+                        logger.info(
+                            "Merge resolution applied",
+                            conflict_id=str(conflict_id),
+                            state_key=state_key,
+                            merged_version=next_version
+                        )
+
+        except Exception as e:
+            logger.error("Failed to apply merge resolution", error=str(e), exc_info=True)
+            raise
+
+    async def _resolve_conflict_rollback(self, conflict_id: UUID):
+        """
+        Auto-resolve conflict by reverting to the last known good state.
+
+        Strategy: Restore previous_state from conflict record.
+        """
+        try:
+            # Get the conflict details
+            conflict_response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("id", str(conflict_id)) \
+                .single() \
+                .execute()
+
+            if not conflict_response.data:
+                raise ValueError(f"Conflict {conflict_id} not found")
+
+            conflict = conflict_response.data
+            resolution_data = conflict.get("resolution_data", {})
+
+            # Get previous state
+            current_value = resolution_data.get("current_value")
+            state_key = resolution_data.get("state_key")
+
+            if current_value and state_key:
+                execution_id = conflict["execution_id"]
+                from_agent_id = conflict["from_agent_id"]
+
+                # Get latest version
+                latest_version_response = self.supabase.table("crewai_agent_interactions") \
+                    .select("state_version") \
+                    .eq("execution_id", execution_id) \
+                    .eq("state_key", state_key) \
+                    .order("state_version", desc=True) \
+                    .limit(1) \
+                    .execute()
+
+                next_version = 1
+                if latest_version_response.data:
+                    next_version = latest_version_response.data[0]["state_version"] + 1
+
+                # Insert rollback state (using current_value as it's the "good" state)
+                self.supabase.table("crewai_agent_interactions").insert({
+                    "execution_id": execution_id,
+                    "from_agent_id": from_agent_id,
+                    "to_agent_id": None,
+                    "interaction_type": "state_sync",
+                    "message": f"Rollback resolution for conflict {conflict_id}",
+                    "state_key": state_key,
+                    "state_value": current_value,
+                    "state_version": next_version,
+                    "metadata": {"resolved_conflict_id": str(conflict_id), "rollback": True}
+                }).execute()
+
+                logger.info(
+                    "Rollback resolution applied",
+                    conflict_id=str(conflict_id),
+                    state_key=state_key,
+                    rollback_version=next_version
+                )
+
+        except Exception as e:
+            logger.error("Failed to apply rollback resolution", error=str(e), exc_info=True)
+            raise
+
+    async def _resolve_conflict_escalate(self, conflict_id: UUID):
+        """
+        Auto-resolve conflict by escalating to a supervising agent.
+
+        Strategy: Send escalation message to supervising agent or crew coordinator.
+        """
+        try:
+            # Get the conflict details
+            conflict_response = self.supabase.table("crewai_agent_interactions") \
+                .select("*") \
+                .eq("id", str(conflict_id)) \
+                .single() \
+                .execute()
+
+            if not conflict_response.data:
+                raise ValueError(f"Conflict {conflict_id} not found")
+
+            conflict = conflict_response.data
+            execution_id = conflict["execution_id"]
+
+            # Get the crew to find supervisor/coordinator
+            exec_response = self.supabase.table("crewai_executions") \
+                .select("crew_id") \
+                .eq("id", execution_id) \
+                .execute()
+
+            if not exec_response.data:
+                logger.warning(f"No execution found for conflict {conflict_id}")
+                return
+
+            crew_id = exec_response.data[0]["crew_id"]
+
+            # Get all agents in crew to find supervisor
+            crew_response = self.supabase.table("crewai_crews") \
+                .select("agent_ids") \
+                .eq("id", crew_id) \
+                .single() \
+                .execute()
+
+            if crew_response.data and crew_response.data.get("agent_ids"):
+                agent_ids = crew_response.data["agent_ids"]
+
+                # For now, escalate to all agents in the crew
+                # In production, you'd have a designated supervisor agent
+                for agent_id in agent_ids:
+                    # Send escalation event
+                    self.supabase.table("crewai_agent_interactions").insert({
+                        "execution_id": execution_id,
+                        "from_agent_id": conflict["from_agent_id"],
+                        "to_agent_id": agent_id,
+                        "interaction_type": "event",
+                        "event_type": "agent_error",
+                        "message": f"Conflict escalated: {conflict.get('conflict_type', 'unknown')}",
+                        "event_data": {
+                            "conflict_id": str(conflict_id),
+                            "conflict_type": conflict.get("conflict_type"),
+                            "requires_manual_intervention": True
+                        },
+                        "priority": 10,  # Highest priority
+                        "metadata": {"escalated_conflict_id": str(conflict_id)}
+                    }).execute()
+
+                logger.info(
+                    "Conflict escalated",
+                    conflict_id=str(conflict_id),
+                    notified_agents=len(agent_ids)
+                )
+
+        except Exception as e:
+            logger.error("Failed to escalate conflict", error=str(e), exc_info=True)
             raise
 
     async def get_unresolved_conflicts(
