@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 from supabase import Client
 import structlog
 from prometheus_client import Counter, Histogram, Gauge
+import redis
+import json
 
 from app.models.agent_interactions import (
     DirectMessageRequest,
@@ -85,10 +87,38 @@ class AgentInteractionService:
     - Event publication for coordination (Subtask 39.3)
     - State synchronization with conflict detection (Subtask 39.4)
     - Automatic and manual conflict resolution (Subtask 39.5)
+    - Real-time WebSocket streaming via Redis pub/sub (Priority 4)
     """
 
-    def __init__(self, supabase: Client):
+    def __init__(self, supabase: Client, redis_client: Optional[redis.Redis] = None):
         self.supabase = supabase
+        self.redis = redis_client
+
+    def _publish_interaction(self, execution_id: UUID, interaction: Dict[str, Any]):
+        """
+        Publish interaction to Redis pub/sub for real-time WebSocket streaming.
+
+        Args:
+            execution_id: Execution ID to publish to
+            interaction: Interaction data to publish
+        """
+        if not self.redis:
+            return  # Redis not configured, skip pub/sub
+
+        try:
+            # Publish to execution-specific channel
+            channel = f"agent_interactions:{execution_id}"
+            message = json.dumps(interaction, default=str)  # default=str handles UUID serialization
+            self.redis.publish(channel, message)
+
+            logger.debug(
+                "Published interaction to Redis",
+                channel=channel,
+                interaction_id=interaction.get("id")
+            )
+        except Exception as e:
+            # Non-critical: log error but don't fail the request
+            logger.error("Failed to publish interaction to Redis", error=str(e))
 
     # ==================== Subtask 39.2: Direct and Broadcast Messaging ====================
 
@@ -133,6 +163,9 @@ class AgentInteractionService:
                 raise ValueError("Failed to create interaction record")
 
             interaction = response.data[0]
+
+            # Publish to Redis for WebSocket streaming
+            self._publish_interaction(request.execution_id, interaction)
 
             # Update Prometheus metrics
             AGENT_INTERACTION_TOTAL.labels(
@@ -216,6 +249,9 @@ class AgentInteractionService:
 
             broadcast = broadcast_response.data[0]
 
+            # Publish to Redis for WebSocket streaming
+            self._publish_interaction(request.execution_id, broadcast)
+
             # Update Prometheus metrics
             AGENT_INTERACTION_TOTAL.labels(
                 interaction_type="broadcast",
@@ -278,6 +314,10 @@ class AgentInteractionService:
 
             interaction = update_response.data[0]
 
+            # Publish to Redis for WebSocket streaming
+            # Note: Need to extract execution_id from the interaction
+            self._publish_interaction(UUID(interaction["execution_id"]), interaction)
+
             logger.info("Message response recorded", interaction_id=str(interaction_id))
 
             return AgentInteractionResponse(**interaction)
@@ -328,6 +368,9 @@ class AgentInteractionService:
                 raise ValueError("Failed to publish event")
 
             event = response.data[0]
+
+            # Publish to Redis for WebSocket streaming
+            self._publish_interaction(request.execution_id, event)
 
             logger.info(
                 "Event published",
@@ -489,6 +532,9 @@ class AgentInteractionService:
 
             state_sync = response.data[0]
 
+            # Publish to Redis for WebSocket streaming
+            self._publish_interaction(request.execution_id, state_sync)
+
             logger.info(
                 "State synchronized",
                 state_id=state_sync["id"],
@@ -578,6 +624,9 @@ class AgentInteractionService:
 
             conflict = response.data[0]
 
+            # Publish to Redis for WebSocket streaming
+            self._publish_interaction(request.execution_id, conflict)
+
             # Update Prometheus metrics for conflict detection
             AGENT_CONFLICTS_DETECTED.labels(
                 conflict_type=request.conflict_type,
@@ -644,6 +693,9 @@ class AgentInteractionService:
                 raise ValueError(f"Conflict {request.conflict_id} not found")
 
             conflict = update_response.data[0]
+
+            # Publish to Redis for WebSocket streaming
+            self._publish_interaction(UUID(conflict["execution_id"]), conflict)
 
             # Update Prometheus metrics for conflict resolution
             AGENT_CONFLICTS_RESOLVED.labels(
@@ -1413,6 +1465,6 @@ class AgentInteractionService:
             raise
 
 
-def get_agent_interaction_service(supabase: Client) -> AgentInteractionService:
-    """Factory function to create AgentInteractionService instance"""
-    return AgentInteractionService(supabase=supabase)
+def get_agent_interaction_service(supabase: Client, redis_client: Optional[redis.Redis] = None) -> AgentInteractionService:
+    """Factory function to create AgentInteractionService instance with Redis for WebSocket support"""
+    return AgentInteractionService(supabase=supabase, redis_client=redis_client)

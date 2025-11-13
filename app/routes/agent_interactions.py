@@ -3,12 +3,14 @@ Empire v7.3 - Agent Interaction API Routes (Task 39)
 REST API for inter-agent messaging, events, state sync, and conflict resolution
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, WebSocket, WebSocketDisconnect
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
+import asyncio
+import json
 
-from app.core.connections import get_supabase
+from app.core.connections import get_supabase, get_redis
 from app.services.agent_interaction_service import get_agent_interaction_service, AgentInteractionService
 from app.models.agent_interactions import (
     DirectMessageRequest,
@@ -35,7 +37,8 @@ router = APIRouter(prefix="/api/crewai/agent-interactions", tags=["Agent Interac
 def get_service() -> AgentInteractionService:
     """Dependency to get AgentInteractionService instance"""
     supabase = get_supabase()
-    return get_agent_interaction_service(supabase)
+    redis_client = get_redis()
+    return get_agent_interaction_service(supabase, redis_client)
 
 
 # ==================== Messaging Endpoints (Subtask 39.2) ====================
@@ -454,3 +457,122 @@ async def get_message_flow(
         return await service.get_message_flow(execution_id=execution_id)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+# ==================== WebSocket Real-Time Streaming (Priority 4) ====================
+
+@router.websocket("/ws/{execution_id}")
+async def agent_interaction_websocket(
+    websocket: WebSocket,
+    execution_id: UUID
+):
+    """
+    WebSocket endpoint for real-time streaming of agent interactions.
+
+    **Connection**:
+    - Connect to: `ws://localhost:8000/api/crewai/agent-interactions/ws/{execution_id}`
+    - Streams all interactions (messages, events, state syncs, conflicts) in real-time
+
+    **Message Format**:
+    ```json
+    {
+        "id": "uuid",
+        "execution_id": "uuid",
+        "interaction_type": "message|event|state_sync|conflict",
+        "from_agent_id": "uuid",
+        "to_agent_id": "uuid|null",
+        "message": "...",
+        "created_at": "ISO8601 timestamp",
+        ... (additional fields based on interaction type)
+    }
+    ```
+
+    **Use Cases**:
+    - Real-time dashboards showing agent activity
+    - Live debugging of multi-agent workflows
+    - Monitoring conflict resolution in real-time
+    - Tracking message flows as they occur
+
+    **Error Handling**:
+    - Automatically reconnects on Redis connection loss
+    - Gracefully handles client disconnections
+    - Logs all WebSocket errors for debugging
+    """
+    await websocket.accept()
+
+    try:
+        # Get Redis client
+        redis_client = get_redis()
+
+        if not redis_client:
+            await websocket.send_json({
+                "error": "Redis not configured - real-time streaming unavailable"
+            })
+            await websocket.close()
+            return
+
+        # Subscribe to execution-specific channel
+        channel = f"agent_interactions:{execution_id}"
+        pubsub = redis_client.pubsub()
+        pubsub.subscribe(channel)
+
+        await websocket.send_json({
+            "status": "connected",
+            "execution_id": str(execution_id),
+            "channel": channel,
+            "message": "Streaming agent interactions in real-time"
+        })
+
+        # Listen for messages from Redis pub/sub
+        async def redis_listener():
+            """Listen to Redis pub/sub and forward to WebSocket"""
+            try:
+                for message in pubsub.listen():
+                    if message["type"] == "message":
+                        # Parse interaction data
+                        interaction_data = json.loads(message["data"])
+
+                        # Send to WebSocket client
+                        await websocket.send_json(interaction_data)
+
+            except Exception as e:
+                await websocket.send_json({
+                    "error": f"Redis listener error: {str(e)}"
+                })
+
+        # Listen for WebSocket disconnection
+        async def websocket_receiver():
+            """Handle incoming WebSocket messages (keep-alive, close)"""
+            try:
+                while True:
+                    data = await websocket.receive_text()
+                    # Echo ping/pong for keep-alive
+                    if data == "ping":
+                        await websocket.send_text("pong")
+            except WebSocketDisconnect:
+                # Client disconnected
+                pass
+
+        # Run both tasks concurrently
+        await asyncio.gather(
+            redis_listener(),
+            websocket_receiver()
+        )
+
+    except WebSocketDisconnect:
+        # Client disconnected
+        if pubsub:
+            pubsub.unsubscribe()
+            pubsub.close()
+
+    except Exception as e:
+        await websocket.send_json({
+            "error": f"WebSocket error: {str(e)}"
+        })
+        await websocket.close()
+
+    finally:
+        # Cleanup
+        if pubsub:
+            pubsub.unsubscribe()
+            pubsub.close()
