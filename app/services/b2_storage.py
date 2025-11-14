@@ -27,6 +27,10 @@ class B2Folder(str, Enum):
     CONTENT_COURSE = "content/course"
     YOUTUBE_CONTENT = "youtube-content"
 
+    # CrewAI generated assets base path
+    # Actual path format: crewai/assets/{department}/{asset_type}/{execution_id}/
+    CREWAI_ASSETS = "crewai/assets"
+
     # Archive folder for long-term storage
     ARCHIVE = "archive/courses"
 

@@ -22,7 +22,7 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -30,6 +30,11 @@ from app.services.monitoring_service import get_monitoring_service
 from app.services.supabase_storage import get_supabase_storage
 from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
 from app.core.connections import connection_manager
+
+# Import security middleware (Task 41.1 & 41.2)
+from app.middleware.security import SecurityHeadersMiddleware
+from app.middleware.rate_limit import configure_rate_limiting, limiter
+from app.middleware.rls_context import configure_rls_context
 
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
@@ -116,14 +121,32 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
+# CORS Configuration (Task 41.1: Hardened CORS)
+# In production, restrict to specific origins. In development, allow all for testing.
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+if "*" in cors_origins and os.getenv("ENVIRONMENT") == "production":
+    print("⚠️  WARNING: CORS allowing all origins (*) in production - security risk!")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit methods
+    allow_headers=["*"],  # TODO: Restrict to specific headers in future
 )
+
+# Task 41.1: Security Headers Middleware
+# Adds HSTS, X-Frame-Options, CSP, and other security headers
+app.add_middleware(SecurityHeadersMiddleware, enable_hsts=os.getenv("ENVIRONMENT") == "production")
+print("🔒 Security headers middleware enabled")
+
+# Task 41.1: Rate Limiting
+# Configure rate limiting for all endpoints
+configure_rate_limiting(app)
+
+# Task 41.2: RLS Context Middleware
+# Sets PostgreSQL session variables for row-level security enforcement
+configure_rls_context(app)
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"
@@ -309,6 +332,9 @@ app.include_router(crewai.router)  # CrewAI router already has /api/crewai prefi
 
 # Task 39: Agent Interactions - Inter-Agent Messaging & Collaboration
 app.include_router(agent_interactions.router)  # Agent Interactions router already has /api/crewai/agent-interactions prefix defined
+
+# Task 40: CrewAI Asset Storage & Retrieval
+app.include_router(crewai_assets.router)  # CrewAI Assets router already has /api/crewai/assets prefix defined
 
 # TODO: Additional routers
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])

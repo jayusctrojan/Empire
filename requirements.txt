@@ -90,6 +90,7 @@ cryptography>=42.0.0
 python-magic>=0.4.27
 vt-py>=0.18.0
 clerk-backend-api>=3.3.0  # Clerk authentication
+slowapi>=0.1.9  # Rate limiting middleware for FastAPI
 
 # Environment
 gunicorn>=21.2.0  # Alternative ASGI server for production
