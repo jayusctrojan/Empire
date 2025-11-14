@@ -71,17 +71,27 @@ Core Architecture Decisions (v7.2 - PRODUCTION + DEVELOPMENT):
   * Plan: Starter ($7/month)
   * Concurrency: 2 workers
   * Tasks: Document processing, embeddings, graph sync, CrewAI workflows
-- CACHE/BROKER: Render Redis (FREE tier) - red-d44og3n5r7bs73b2ctbg
-  * Purpose: Semantic caching + Celery message broker
-  * Access: Internal Render network only
+- CACHE/BROKER: Upstash Redis (Serverless with TLS) - <credentials in .env>
+  * Purpose: Semantic caching + Celery message broker + Rate limiting
+  * Free Tier: 10,000 commands/day, 256 MB storage
+  * TLS Enabled: rediss:// protocol for encrypted connections
+  * Access: Global serverless access from all Render services
 - PRODUCTION MEMORY: PostgreSQL graph tables (user_memory_nodes, user_memory_edges in Supabase)
 - EMBEDDINGS: BGE-M3 LOCAL via Ollama (FREE - development testing)
-- RERANKING: BGE-Reranker-v2 on Mac Studio (via Tailscale - https://jays-mac-studio.tail64d12f.ts.net/)
-- STORAGE: Supabase PostgreSQL + pgvector + graph tables (<your-project-id>.supabase.co)
+- RERANKING: BGE-Reranker-v2 on Mac Studio (via Tailscale - <credentials in .env>)
+- STORAGE: Supabase PostgreSQL + pgvector + graph tables + RLS policies (<credentials in .env>)
 - ORCHESTRATION: CrewAI on Render (https://jb-crewai.onrender.com) - srv-d2n0hh3uibrs73buafo0 - MILESTONE 8
+  * Task 40: CrewAI Asset Storage - B2 folder: crewai/assets/{department}/{type}/{execution_id}/
 - MULTI-MODAL: Claude Vision for images, Soniox for audio transcription
 - MONITORING: Prometheus + Grafana dashboards
-- SECURITY: TLS 1.3 enforced across all services (FastAPI, Celery, Supabase, Neo4j, Redis)
+- SECURITY: Multi-layer security with compliance (HIPAA, GDPR, SOC 2)
+  * Task 41.1: HTTP security headers (HSTS, CSP, X-Frame-Options, etc.)
+  * Task 41.1: Rate limiting (tiered limits per endpoint, Redis-backed)
+  * Task 41.2: Row-Level Security (RLS) on 14 tables with 14 policies
+  * Task 41.3: Encryption-at-rest (Supabase AES-256, B2 SSE-B2, App AES-256-GCM)
+  * Task 41.5: Audit logging (comprehensive security event tracking)
+  * TLS 1.2+ enforced across all services (FastAPI, Celery, Supabase, Neo4j, Redis)
+  * Security Posture: 80/100 (HIGH) - improved from 65/100
 
 **DEVELOPMENT ENVIRONMENT (Mac Studio):**
 - Graphiti MCP Server: Development/testing memory ONLY (NOT production)

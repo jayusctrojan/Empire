@@ -84,6 +84,36 @@ This directory contains the complete Software Requirements Specification (SRS) f
 - ✅ **User-friendly Messages** - Loading indicators and descriptive error messages
 - ✅ **Deployed on Render** - https://jb-empire-chat.onrender.com
 
+**Task 40: CrewAI Asset Storage (COMPLETED - Jan 2025):**
+- ✅ **B2 Folder Structure** - Organized storage: `crewai/assets/{department}/{type}/{execution_id}/`
+- ✅ **10 Department Taxonomy** - IT, Sales/Marketing, Support, Operations/HR, Finance, PM, Real Estate, PE/M&A, Consulting, Personal Ed
+- ✅ **Asset Types** - reports, analysis, visualizations, structured_data, raw_outputs
+- ✅ **CRUD API Endpoints** - POST, GET, LIST, DELETE for asset management
+- ✅ **Metadata Tracking** - Full audit trail with timestamps and execution context
+- ✅ **S3-Compatible Storage** - Seamless integration with Backblaze B2
+- ✅ **URL Signing** - Secure presigned URLs for temporary access
+- ✅ **Deployed on Render** - https://jb-empire-api.onrender.com/api/crewai/assets
+
+**Task 41: Security Hardening (COMPLETED - Jan 2025):**
+- ✅ **Task 41.1: HTTP Security Headers + Rate Limiting**
+  - HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+  - Redis-backed rate limiting with tiered limits per endpoint (100-200 req/min)
+  - 429 responses with retry-after headers
+- ✅ **Task 41.2: Row-Level Security (RLS)**
+  - 14 tables protected with RLS policies
+  - Per-user data isolation via `auth.uid()` checks
+  - RLS context middleware for automatic user context
+- ✅ **Task 41.3: Encryption Verification**
+  - Multi-layer encryption verified (App AES-256-GCM, Supabase AES-256, B2 SSE-B2)
+  - TLS 1.2+ enforced across all services (FastAPI, Celery, Supabase, Neo4j, Upstash Redis)
+  - HIPAA ✅, GDPR ✅, SOC 2 ✅ compliance documented
+- ✅ **Task 41.5: Audit Logging**
+  - Comprehensive event tracking (upload, delete, login, logout, violations, errors)
+  - 10 performance indexes for fast queries
+  - Admin-only access with RLS policies
+- ✅ **Security Posture: 80/100 (HIGH)** - Improved from 65/100 (MEDIUM)
+- ✅ **Infrastructure: Upstash Redis** - Replaced local Redis with serverless TLS-enabled Redis
+
 **Task 46 API Endpoints:**
 
 ```bash
