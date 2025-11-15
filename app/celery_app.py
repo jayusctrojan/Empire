@@ -29,8 +29,12 @@ _monitoring_service = get_monitoring_service(_supabase_storage)
 _task_start_times = {}
 
 # Redis broker URL
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
+# Clean URL to remove invalid SSL parameters
+_raw_redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = _raw_redis_url.split("?")[0] if "?" in _raw_redis_url else _raw_redis_url
+
+_raw_result_backend = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
+CELERY_RESULT_BACKEND = _raw_result_backend.split("?")[0] if "?" in _raw_result_backend else _raw_result_backend
 
 # Create Celery app
 celery_app = Celery(

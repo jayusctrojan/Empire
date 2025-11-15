@@ -68,9 +68,23 @@ class DatabaseManager:
     def get_redis(self) -> Redis:
         """Get or create Redis client"""
         if self._redis is None:
+            import ssl
+
+            # Get Redis URL and clean invalid SSL parameters
             url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-            self._redis = redis.from_url(url, decode_responses=True)
-            print(f"✅ Connected to Redis: {url}")
+            clean_url = url.split("?")[0] if "?" in url else url
+
+            # For rediss:// URLs (TLS), configure SSL properly
+            if clean_url.startswith("rediss://"):
+                self._redis = redis.from_url(
+                    clean_url,
+                    decode_responses=True,
+                    ssl_cert_reqs=ssl.CERT_NONE  # Use ssl module constant, not string
+                )
+            else:
+                self._redis = redis.from_url(clean_url, decode_responses=True)
+
+            print(f"✅ Connected to Redis: {clean_url.split('@')[-1] if '@' in clean_url else clean_url}")
 
             # Verify connection
             self._redis.ping()

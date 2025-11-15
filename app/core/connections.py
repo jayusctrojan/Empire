@@ -87,17 +87,33 @@ class ConnectionManager:
                 return
 
             # Parse Redis URL and create connection
-            self.redis = redis.from_url(
-                redis_url,
-                decode_responses=True,
-                socket_connect_timeout=5,
-                socket_keepalive=True
-            )
+            # Handle SSL parameters properly for Upstash Redis
+            import ssl
+
+            # Remove invalid ssl_cert_reqs parameter from URL if present
+            clean_redis_url = redis_url.split("?")[0] if "?" in redis_url else redis_url
+
+            # For rediss:// URLs (TLS), configure SSL properly
+            if clean_redis_url.startswith("rediss://"):
+                self.redis = redis.from_url(
+                    clean_redis_url,
+                    decode_responses=True,
+                    socket_connect_timeout=5,
+                    socket_keepalive=True,
+                    ssl_cert_reqs=ssl.CERT_NONE  # Use ssl module constant, not string
+                )
+            else:
+                self.redis = redis.from_url(
+                    clean_redis_url,
+                    decode_responses=True,
+                    socket_connect_timeout=5,
+                    socket_keepalive=True
+                )
 
             # Test connection
             self.redis.ping()
 
-            logger.info("Redis connection established", url=redis_url.split("@")[-1] if "@" in redis_url else redis_url)
+            logger.info("Redis connection established", url=clean_redis_url.split("@")[-1] if "@" in clean_redis_url else clean_redis_url)
 
         except Exception as e:
             logger.error("Failed to initialize Redis", error=str(e))

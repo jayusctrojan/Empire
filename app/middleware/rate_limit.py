@@ -37,9 +37,24 @@ def get_rate_limit_backend():
     if environment == "production":
         try:
             # Use Redis for distributed rate limiting in production
-            redis_client = redis.from_url(redis_url, decode_responses=True)
+            # Handle SSL parameters properly for Upstash Redis
+            import ssl
+
+            # Remove invalid ssl_cert_reqs parameter from URL if present
+            clean_redis_url = redis_url.split("?")[0] if "?" in redis_url else redis_url
+
+            # For rediss:// URLs (TLS), configure SSL properly
+            if clean_redis_url.startswith("rediss://"):
+                redis_client = redis.from_url(
+                    clean_redis_url,
+                    decode_responses=True,
+                    ssl_cert_reqs=ssl.CERT_NONE  # Use ssl module constant, not string
+                )
+            else:
+                redis_client = redis.from_url(clean_redis_url, decode_responses=True)
+
             redis_client.ping()  # Test connection
-            print(f"✅ Rate limiting using Redis: {redis_url}")
+            print(f"✅ Rate limiting using Redis: {clean_redis_url.split('@')[-1] if '@' in clean_redis_url else clean_redis_url}")
             return redis_client
         except Exception as e:
             print(f"⚠️  Redis connection failed for rate limiting: {e}")
