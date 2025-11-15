@@ -64,6 +64,54 @@ locust -f locustfile.py --host=http://localhost:8000 --tags query,document --hea
 locust -f locustfile.py --host=http://localhost:8000 --exclude-tags resource-intensive --headless
 ```
 
+## Performance Profiling Workflow (Task 43.2)
+
+For comprehensive performance profiling, bottleneck identification, and optimization:
+
+### Complete Profiling Workflow
+
+```bash
+# Run full profiling workflow (collects baseline, runs test, analyzes results)
+./run_full_load_test.sh http://localhost:8000 moderate
+
+# Production profiling
+./run_full_load_test.sh https://jb-empire-api.onrender.com production
+```
+
+The complete workflow includes:
+1. **Baseline metrics collection** - System state before load test
+2. **Load test execution** - Locust test with configured profile
+3. **Post-test metrics collection** - System state after load test
+4. **Performance analysis** - Automated bottleneck identification
+5. **Recommendations** - Prioritized optimization suggestions
+
+### Manual Step-by-Step Profiling
+
+```bash
+# Step 1: Collect baseline metrics
+./collect_baseline_metrics.sh http://localhost:8000
+
+# Step 2: Run load test
+locust -f locustfile.py --config=locust_moderate.conf
+
+# Step 3: Collect post-test metrics
+./collect_post_test_metrics.sh http://localhost:8000
+
+# Step 4: Analyze performance
+python3 analyze_performance.py reports/baseline reports/post_test
+```
+
+### Profiling Outputs
+
+- **Baseline metrics**: `reports/baseline/`
+- **Post-test metrics**: `reports/post_test/`
+- **Locust reports**: `reports/load_test_*_report.html`
+- **Performance analysis**: `reports/performance_analysis_*.json`
+
+See **[PROFILING.md](PROFILING.md)** for complete profiling guide, bottleneck identification, and optimization strategies.
+
+---
+
 ## Test Scenarios
 
 ### User Types (Weight Distribution)
