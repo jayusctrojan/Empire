@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import structlog
 
 from app.core.supabase_client import get_supabase_client
-from app.core.auth import require_admin  # Assuming admin auth dependency exists
+from app.middleware.auth import require_admin
 
 logger = structlog.get_logger(__name__)
 
