@@ -142,6 +142,12 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware, enable_hsts=os.getenv("ENVIRONMENT") == "production")
 print("🔒 Security headers middleware enabled")
 
+# Task 43.3: Response Compression Middleware
+# Gzip compression for responses > 1KB to reduce bandwidth and improve transfer times
+from app.middleware.compression import add_compression_middleware
+add_compression_middleware(app, minimum_size=1000)
+print("📦 Response compression enabled (min_size=1KB)")
+
 # Task 41.1: Rate Limiting
 # Configure rate limiting for all endpoints
 configure_rate_limiting(app)

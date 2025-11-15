@@ -19,6 +19,9 @@ from app.tasks.query_tasks import (
 )
 from app.middleware.clerk_auth import verify_clerk_token
 
+# Task 43.3: Query result caching with semantic similarity
+from app.services.query_cache import cached_query
+
 router = APIRouter(prefix="/api/query", tags=["query"])
 logger = structlog.get_logger(__name__)
 
@@ -107,6 +110,7 @@ async def list_available_tools():
 
 
 @router.post("/adaptive", response_model=AdaptiveQueryResponse)
+@cached_query(cache_namespace="adaptive", ttl=1800)  # Task 43.3: 30 min cache
 async def adaptive_query_endpoint(
     request: AdaptiveQueryRequest,
     background_tasks: BackgroundTasks,
@@ -114,8 +118,9 @@ async def adaptive_query_endpoint(
 ):
     """
     Execute adaptive query using LangGraph workflow with tool support.
-    
+
     **Authentication Required**: Must provide valid Clerk JWT token.
+    **Optimization (Task 43.3)**: Results cached for 30 minutes with semantic similarity matching.
 
     This endpoint provides:
     - Iterative query refinement
@@ -123,6 +128,7 @@ async def adaptive_query_endpoint(
     - Internal tool access (vector, graph search)
     - External tool access via Arcade.dev (when enabled and needed)
     - Quality evaluation and retry logic
+    - Semantic caching for faster repeated/similar queries
 
     Use this for:
     - Research queries needing external context
@@ -200,6 +206,7 @@ async def adaptive_query_endpoint(
 
 
 @router.post("/auto", response_model=AdaptiveQueryResponse)
+@cached_query(cache_namespace="auto", ttl=1800)  # Task 43.3: 30 min cache
 async def auto_routed_query(
     request: AdaptiveQueryRequest,
     background_tasks: BackgroundTasks,
@@ -207,8 +214,9 @@ async def auto_routed_query(
 ):
     """
     Automatically route query to optimal framework (CrewAI, LangGraph, or Simple RAG).
-    
+
     **Authentication Required**: Must provide valid Clerk JWT token.
+    **Optimization (Task 43.3)**: Results cached for 30 minutes with semantic similarity matching.
 
     The router analyzes the query and decides:
     - LangGraph: For adaptive queries needing refinement/external data
