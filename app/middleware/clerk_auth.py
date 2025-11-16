@@ -6,6 +6,7 @@ from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from clerk_backend_api import Clerk
 import os
+import jwt
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -13,6 +14,7 @@ security = HTTPBearer()
 
 # Initialize Clerk client with secret key from .env
 clerk_client = Clerk(bearer_auth=os.getenv("CLERK_SECRET_KEY"))
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
 
 
 async def verify_clerk_token(
@@ -25,31 +27,52 @@ async def verify_clerk_token(
     try:
         token = credentials.credentials
 
-        # Verify the session token with Clerk
-        session = clerk_client.sessions.verify_token(token)
-
-        if not session:
+        # Decode and verify the JWT token using the Clerk secret key
+        # Clerk tokens are standard JWTs signed with the secret key
+        try:
+            payload = jwt.decode(
+                token,
+                CLERK_SECRET_KEY,
+                algorithms=["HS256"],
+                options={"verify_signature": True, "verify_exp": True}
+            )
+        except jwt.ExpiredSignatureError:
             raise HTTPException(
                 status_code=401,
-                detail="Invalid or expired token"
+                detail="Token has expired"
+            )
+        except jwt.InvalidTokenError as e:
+            raise HTTPException(
+                status_code=401,
+                detail=f"Invalid token: {str(e)}"
             )
 
-        # Get user details
-        user = clerk_client.users.get(session.user_id)
+        # Extract user info from JWT payload
+        user_id = payload.get("sub")
+        email = payload.get("email")
+
+        if not user_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Token missing user ID"
+            )
 
         logger.info(
             "User authenticated",
-            user_id=user.id,
-            email=user.email_addresses[0].email_address if user.email_addresses else None
+            user_id=user_id,
+            email=email
         )
 
         return {
-            "user_id": user.id,
-            "email": user.email_addresses[0].email_address if user.email_addresses else None,
-            "first_name": user.first_name,
-            "last_name": user.last_name
+            "user_id": user_id,
+            "email": email,
+            "first_name": payload.get("given_name"),
+            "last_name": payload.get("family_name")
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
         logger.error("Authentication failed", error=str(e))
         raise HTTPException(
