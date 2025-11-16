@@ -43,6 +43,8 @@ class AdaptiveQueryResponse(BaseModel):
     iterations: int
     workflow_type: str
     processing_time_ms: int
+    from_cache: bool = False
+    cache_namespace: Optional[str] = None
 
 
 class ToolListResponse(BaseModel):

@@ -350,30 +350,59 @@ def cached_query(cache_namespace: str = "query", ttl: int = 3600):
             )
 
             if cached_result:
-                # Add cache hit metadata
-                if isinstance(cached_result, dict):
-                    cached_result['from_cache'] = True
-                    cached_result['cache_namespace'] = cache_namespace
+                # Reconstruct response from cached dict
+                # Support both dict results and Pydantic models
+                logger.info(f"Cache HIT for query: {query_text[:50]}")
+
+                # If result is a dict, add metadata directly
+                if isinstance(cached_result, dict) and 'result' in cached_result:
+                    # Extract the actual result from cache wrapper
+                    actual_result = cached_result['result']
+
+                    # If it's a dict, add metadata
+                    if isinstance(actual_result, dict):
+                        actual_result['from_cache'] = True
+                        actual_result['cache_namespace'] = cache_namespace
+                        return actual_result
+
+                    # If it's serialized model data, reconstruct it
+                    return actual_result
+
                 return cached_result
 
             # Cache miss - execute function
+            logger.info(f"Cache MISS for query: {query_text[:50]}")
             result = await func(*args, **kwargs)
+
+            # Serialize Pydantic models before caching
+            cache_data = result
+            if hasattr(result, 'model_dump'):  # Pydantic v2
+                cache_data = result.model_dump()
+            elif hasattr(result, 'dict'):  # Pydantic v1
+                cache_data = result.dict()
 
             # Cache result (async, don't await to avoid blocking response)
             try:
                 await cache_service.cache_result(
                     query_text,
-                    result,
+                    cache_data,
                     cache_namespace=cache_namespace,
                     ttl=ttl
                 )
             except Exception as e:
                 logger.warning(f"Failed to cache result, continuing: {e}")
 
-            # Add cache miss metadata
+            # Add cache miss metadata if result is dict-like
             if isinstance(result, dict):
                 result['from_cache'] = False
                 result['cache_namespace'] = cache_namespace
+            elif hasattr(result, '__dict__'):
+                # For Pydantic models, set attributes if possible
+                try:
+                    result.from_cache = False
+                    result.cache_namespace = cache_namespace
+                except Exception:
+                    pass  # Some models may be frozen
 
             return result
 
