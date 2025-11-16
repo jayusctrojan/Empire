@@ -7,7 +7,46 @@
 
 ## Quick Start (Recommended Method)
 
-### Method 1: From Browser Console (Easiest)
+### Method 1: Generate from CLERK_SECRET_KEY (Easiest for Developers)
+
+**If you have access to the .env file with CLERK_SECRET_KEY** (which you do as a developer):
+
+1. **Run the token generator**:
+   ```bash
+   cd tests/load_testing
+   python3 generate_test_token.py
+   ```
+
+2. **Export the token**:
+   ```bash
+   source .clerk_test_token
+   ```
+
+3. **Run the load test**:
+   ```bash
+   python3 query_load_test.py
+   ```
+
+**Or all in one command**:
+```bash
+cd tests/load_testing && python3 generate_test_token.py && source .clerk_test_token && python3 query_load_test.py
+```
+
+**How it works**:
+- Uses your `CLERK_SECRET_KEY` from .env to generate a valid JWT token
+- Creates a test user: `loadtest@empire.local`
+- Token valid for 24 hours
+- No browser required!
+
+**Why this is better**:
+- ✅ No need to log in via browser
+- ✅ Works in CI/CD pipelines
+- ✅ Consistent test user every time
+- ✅ Easy to regenerate when expired
+
+---
+
+### Method 2: From Browser Console (For Non-Developers)
 
 1. **Open Empire Chat UI**:
    ```

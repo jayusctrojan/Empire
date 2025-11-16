@@ -29,3 +29,4 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+.clerk_test_token
