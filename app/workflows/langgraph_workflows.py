@@ -312,11 +312,10 @@ Provide a clear, accurate answer based on the available information."""
         Returns:
             "use_tools" or "synthesize"
         """
-        # For now, always use tools unless we have no tools available
-        if len(self.tools) == 0:
-            return "synthesize"
-
-        return "use_tools"
+        # TODO: Implement proper tool calling with LLM.bind_tools()
+        # For now, skip tool execution since ToolNode expects tool calls in messages
+        # and we're not making tool calls yet (tools are stubs anyway)
+        return "synthesize"
 
     def _should_refine(self, state: QueryState) -> str:
         """

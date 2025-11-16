@@ -49,6 +49,23 @@ class RedisCacheConfig:
     def from_env(cls) -> "RedisCacheConfig":
         """Create config from environment variables"""
         import os
+        from urllib.parse import urlparse
+
+        # Support REDIS_URL (Upstash format: rediss://default:password@host:port)
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            parsed = urlparse(redis_url)
+            return cls(
+                host=parsed.hostname or "localhost",
+                port=parsed.port or 6379,
+                db=int(os.getenv("REDIS_DB", "0")),
+                ttl_seconds=int(os.getenv("REDIS_TTL_SECONDS", "300")),
+                semantic_threshold=float(os.getenv("REDIS_SEMANTIC_THRESHOLD", "0.85")),
+                enable_metrics=os.getenv("REDIS_ENABLE_METRICS", "true").lower() == "true",
+                password=parsed.password
+            )
+
+        # Fallback to individual env vars
         return cls(
             host=os.getenv("REDIS_HOST", "localhost"),
             port=int(os.getenv("REDIS_PORT", "6379")),
@@ -120,13 +137,25 @@ class RedisCacheService:
         if redis_client:
             self.redis_client = redis_client
         else:
-            self.redis_client = redis.Redis(
-                host=self.config.host,
-                port=self.config.port,
-                db=self.config.db,
-                password=self.config.password,
-                decode_responses=False  # We'll handle encoding
-            )
+            import os
+            redis_url = os.getenv("REDIS_URL")
+
+            # If REDIS_URL is provided, use from_url (handles SSL automatically)
+            if redis_url:
+                self.redis_client = redis.Redis.from_url(
+                    redis_url,
+                    decode_responses=False,  # We'll handle encoding
+                    ssl_cert_reqs=None  # Disable SSL verification for Upstash
+                )
+            else:
+                # Fallback to manual connection
+                self.redis_client = redis.Redis(
+                    host=self.config.host,
+                    port=self.config.port,
+                    db=self.config.db,
+                    password=self.config.password,
+                    decode_responses=False  # We'll handle encoding
+                )
 
         # Metrics tracking
         self.metrics = CacheMetrics() if self.config.enable_metrics else None
