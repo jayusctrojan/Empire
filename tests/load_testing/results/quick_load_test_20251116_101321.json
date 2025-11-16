@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-11-16T10:13:21.697093",
+  "host": "https://jb-empire-api.onrender.com",
+  "num_requests": 20,
+  "health_endpoint": {
+    "average_ms": 242.37557649612427,
+    "p50_ms": 226.35400295257568,
+    "p95_ms": 479.902982711792,
+    "min_ms": 187.1349811553955,
+    "max_ms": 479.902982711792
+  },
+  "optimizations": {
+    "compression": "active",
+    "caching": "configured",
+    "indexes": "deployed",
+    "metrics": "available"
+  }
+}
