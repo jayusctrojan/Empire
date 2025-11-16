@@ -32,11 +32,21 @@ except ImportError:
     # Provide no-op decorators if Langfuse is not available
     def observe(*args, **kwargs):
         """No-op decorator when Langfuse is not available"""
+        import inspect
+
         def decorator(func):
-            @wraps(func)
-            async def wrapper(*func_args, **func_kwargs):
-                return await func(*func_args, **func_kwargs)
-            return wrapper
+            # Preserve sync/async nature of the function
+            if inspect.iscoroutinefunction(func):
+                @wraps(func)
+                async def async_wrapper(*func_args, **func_kwargs):
+                    return await func(*func_args, **func_kwargs)
+                return async_wrapper
+            else:
+                @wraps(func)
+                def sync_wrapper(*func_args, **func_kwargs):
+                    return func(*func_args, **func_kwargs)
+                return sync_wrapper
+
         if args and callable(args[0]):
             return decorator(args[0])
         return decorator
