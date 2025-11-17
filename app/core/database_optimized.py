@@ -230,9 +230,9 @@ class OptimizedDatabaseManager:
         }
 
         # For TLS connections (rediss://)
+        # Let redis-py handle SSL automatically with proper certificate validation
         if clean_url.startswith("rediss://"):
             kwargs["connection_class"] = redis.connection.SSLConnection
-            kwargs["ssl_cert_reqs"] = ssl.CERT_NONE  # Accept self-signed certs
 
         logger.info(
             "Creating Redis connection pool",

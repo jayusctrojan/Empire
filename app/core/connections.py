@@ -93,14 +93,13 @@ class ConnectionManager:
             # Remove invalid ssl_cert_reqs parameter from URL if present
             clean_redis_url = redis_url.split("?")[0] if "?" in redis_url else redis_url
 
-            # For rediss:// URLs (TLS), configure SSL properly
+            # For rediss:// URLs (TLS), let redis-py handle SSL automatically
             if clean_redis_url.startswith("rediss://"):
                 self.redis = redis.from_url(
                     clean_redis_url,
                     decode_responses=True,
                     socket_connect_timeout=5,
-                    socket_keepalive=True,
-                    ssl_cert_reqs=ssl.CERT_NONE  # Use ssl module constant, not string
+                    socket_keepalive=True
                 )
             else:
                 self.redis = redis.from_url(

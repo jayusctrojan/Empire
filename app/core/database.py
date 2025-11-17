@@ -74,12 +74,11 @@ class DatabaseManager:
             url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
             clean_url = url.split("?")[0] if "?" in url else url
 
-            # For rediss:// URLs (TLS), configure SSL properly
+            # For rediss:// URLs (TLS), let redis-py handle SSL automatically
             if clean_url.startswith("rediss://"):
                 self._redis = redis.from_url(
                     clean_url,
-                    decode_responses=True,
-                    ssl_cert_reqs=ssl.CERT_NONE  # Use ssl module constant, not string
+                    decode_responses=True
                 )
             else:
                 self._redis = redis.from_url(clean_url, decode_responses=True)
