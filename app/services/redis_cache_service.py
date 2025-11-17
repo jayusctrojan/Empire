@@ -144,8 +144,7 @@ class RedisCacheService:
             if redis_url:
                 self.redis_client = redis.Redis.from_url(
                     redis_url,
-                    decode_responses=False,  # We'll handle encoding
-                    ssl_cert_reqs=None  # Disable SSL verification for Upstash
+                    decode_responses=False  # We'll handle encoding
                 )
             else:
                 # Fallback to manual connection
