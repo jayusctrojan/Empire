@@ -87,7 +87,9 @@ class QueryCacheService:
                 embedding_service = await self._get_embedding_service()
 
                 # Generate embedding for query
-                query_embedding = await embedding_service.generate_embedding(query)
+                embedding_result = await embedding_service.generate_embedding(query)
+                # Extract embedding vector from EmbeddingResult
+                query_embedding = np.array(embedding_result.embedding)
 
                 # Search for similar queries in cache
                 similar_result = await self._find_similar_cached_query(
