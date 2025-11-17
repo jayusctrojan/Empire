@@ -451,6 +451,105 @@ class RedisCacheService:
         logger.info(f"Cached {sum(results)}/{len(items)} items")
         return results
 
+    # ============================================================================
+    # Generic Cache Interface (for compatibility with TieredCacheService)
+    # ============================================================================
+
+    def get(self, key: str) -> Optional[Any]:
+        """
+        Generic get method for cache compatibility
+
+        Args:
+            key: Cache key
+
+        Returns:
+            Cached value if found, else None
+        """
+        try:
+            if not self.redis_client:
+                return None
+
+            cached = self.redis_client.get(key)
+            if cached:
+                try:
+                    return json.loads(cached)
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to decode cached value for key: {key}")
+                    return None
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to get cached value for key {key}: {e}")
+            return None
+
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
+        """
+        Generic set method for cache compatibility
+
+        Args:
+            key: Cache key
+            value: Data to cache
+            ttl: Time to live in seconds (uses config default if None)
+
+        Returns:
+            True if cached successfully
+        """
+        try:
+            if not self.redis_client:
+                return False
+
+            cache_ttl = ttl if ttl is not None else self.config.default_ttl
+            serialized = json.dumps(value)
+
+            self.redis_client.setex(
+                key,
+                cache_ttl,
+                serialized
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to cache value for key {key}: {e}")
+            return False
+
+    async def scan_keys(self, pattern: str, count: int = 100) -> List[str]:
+        """
+        Scan Redis for keys matching pattern
+
+        Args:
+            pattern: Key pattern (e.g., "query:*")
+            count: Maximum number of keys to return
+
+        Returns:
+            List of matching keys
+        """
+        try:
+            if not self.redis_client:
+                return []
+
+            keys = []
+            cursor = 0
+
+            while len(keys) < count:
+                cursor, batch = self.redis_client.scan(
+                    cursor=cursor,
+                    match=pattern,
+                    count=min(count - len(keys), 100)
+                )
+
+                keys.extend([k.decode('utf-8') if isinstance(k, bytes) else k for k in batch])
+
+                if cursor == 0:  # Scan complete
+                    break
+
+            return keys[:count]
+
+        except Exception as e:
+            logger.error(f"Failed to scan keys with pattern {pattern}: {e}")
+            return []
+
 
 # Singleton instance
 _redis_cache_service: Optional[RedisCacheService] = None

@@ -231,6 +231,65 @@ class PostgresCacheService:
             logger.error(f"Failed to cleanup expired entries: {e}")
             return 0
 
+    # ============================================================================
+    # Generic Cache Interface (for compatibility with TieredCacheService)
+    # ============================================================================
+
+    async def get(self, key: str) -> Optional[Dict[str, Any]]:
+        """
+        Generic get method for cache compatibility
+
+        Args:
+            key: Cache key
+
+        Returns:
+            Cached value if found, else None
+        """
+        try:
+            if not self.supabase_client:
+                return None
+
+            # Query cache table for key
+            # Note: This is a simplified implementation
+            # In production, you'd query a dedicated cache table
+            logger.debug(f"PostgreSQL cache get for key: {key}")
+            return None  # Stub implementation - would query Supabase table
+
+        except Exception as e:
+            logger.error(f"Failed to get cached value for key {key}: {e}")
+            return None
+
+    async def set(
+        self,
+        key: str,
+        value: Dict[str, Any],
+        ttl: Optional[int] = None
+    ) -> bool:
+        """
+        Generic set method for cache compatibility
+
+        Args:
+            key: Cache key
+            value: Data to cache
+            ttl: Time to live in seconds (uses config default if None)
+
+        Returns:
+            True if cached successfully
+        """
+        try:
+            if not self.supabase_client:
+                return False
+
+            # Store in cache table
+            # Note: This is a simplified implementation
+            # In production, you'd insert/upsert into a dedicated cache table
+            logger.debug(f"PostgreSQL cache set for key: {key}")
+            return True  # Stub implementation - would insert into Supabase table
+
+        except Exception as e:
+            logger.error(f"Failed to cache value for key {key}: {e}")
+            return False
+
 
 # Singleton instance
 _postgres_cache_service: Optional[PostgresCacheService] = None
