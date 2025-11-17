@@ -139,8 +139,9 @@ class QueryCacheService:
             embedding = None
             try:
                 embedding_service = await self._get_embedding_service()
-                query_embedding = await embedding_service.generate_embedding(query)
-                embedding = query_embedding.tolist()
+                embedding_result = await embedding_service.generate_embedding(query)
+                # EmbeddingResult.embedding is already a List[float], no need for .tolist()
+                embedding = embedding_result.embedding
             except Exception as e:
                 logger.warning(f"Failed to generate embedding for cache, storing without: {e}")
 

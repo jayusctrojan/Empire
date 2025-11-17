@@ -362,6 +362,108 @@ class TieredCacheService:
 
         return 0
 
+    # ============================================================================
+    # Generic Cache Interface (for compatibility with query_cache.py)
+    # ============================================================================
+
+    async def get(self, key: str) -> Optional[Dict[str, Any]]:
+        """
+        Generic get method for cache compatibility
+
+        Args:
+            key: Cache key (format: "namespace:hash")
+
+        Returns:
+            Cached data if found, else None
+        """
+        try:
+            # Extract query from cache key if possible, otherwise use key directly
+            # Key format is typically "namespace:hash", but we treat it as opaque
+
+            # Try L1 (Redis) first
+            if self.config.l1_enabled and self.redis_cache:
+                try:
+                    result = self.redis_cache.get(key)
+                    if result is not None:
+                        logger.debug(f"L1 get hit for key: {key[:50]}")
+                        return result
+                except Exception as e:
+                    logger.warning(f"L1 get error, falling back to L2: {e}")
+
+            # Try L2 (PostgreSQL)
+            if self.config.l2_enabled and self.postgres_cache:
+                try:
+                    result = await self.postgres_cache.get(key)
+                    if result is not None:
+                        logger.debug(f"L2 get hit for key: {key[:50]}")
+
+                        # Promote to L1 if enabled
+                        if self.config.promote_to_l1 and self.redis_cache:
+                            try:
+                                self.redis_cache.set(key, result, ttl=self.config.l1_ttl)
+                                logger.debug(f"Promoted L2 hit to L1: {key[:50]}")
+                            except Exception as e:
+                                logger.warning(f"Failed to promote to L1: {e}")
+
+                        return result
+                except Exception as e:
+                    logger.error(f"L2 get error: {e}")
+
+            # Cache miss
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to get cached value for key {key}: {e}", exc_info=True)
+            return None
+
+    async def set(
+        self,
+        key: str,
+        value: Dict[str, Any],
+        ttl: Optional[int] = None
+    ) -> bool:
+        """
+        Generic set method for cache compatibility
+
+        Args:
+            key: Cache key (format: "namespace:hash")
+            value: Data to cache
+            ttl: Time to live in seconds (uses config defaults if None)
+
+        Returns:
+            True if cached in at least one level
+        """
+        success = False
+
+        try:
+            # Use provided TTL or defaults from config
+            l1_ttl = ttl if ttl is not None else self.config.l1_ttl
+            l2_ttl = ttl if ttl is not None else self.config.l2_ttl
+
+            # Cache in L1 (Redis)
+            if self.config.l1_enabled and self.redis_cache:
+                try:
+                    if self.redis_cache.set(key, value, ttl=l1_ttl):
+                        success = True
+                        logger.debug(f"Cached in L1: {key[:50]} (TTL: {l1_ttl}s)")
+                except Exception as e:
+                    logger.warning(f"Failed to cache in L1: {e}")
+
+            # Cache in L2 (PostgreSQL)
+            if self.config.l2_enabled and self.postgres_cache:
+                try:
+                    if await self.postgres_cache.set(key, value, ttl=l2_ttl):
+                        success = True
+                        logger.debug(f"Cached in L2: {key[:50]} (TTL: {l2_ttl}s)")
+                except Exception as e:
+                    logger.warning(f"Failed to cache in L2: {e}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to set cache value for key {key}: {e}", exc_info=True)
+            return False
+
 
 # Singleton instance
 _tiered_cache_service: Optional[TieredCacheService] = None
