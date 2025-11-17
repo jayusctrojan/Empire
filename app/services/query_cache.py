@@ -70,15 +70,28 @@ class QueryCacheService:
         Returns:
             Cached result if similar query found, else None
         """
+        import time
+        overall_start = time.time()
+
         try:
             # Try exact match first (L1/L2 cache)
             cache_key = f"{cache_namespace}:{self._hash_query(query)}"
 
+            exact_start = time.time()
             exact_match = await self.cache.get(cache_key)
+            exact_time = (time.time() - exact_start) * 1000  # Convert to ms
+
             if exact_match:
+                total_time = (time.time() - overall_start) * 1000
                 logger.info(
-                    f"Exact cache hit for query: {query[:50]}",
-                    extra={"cache_type": "exact", "namespace": cache_namespace}
+                    f"Exact cache hit for query: {query[:50]} "
+                    f"(exact_lookup: {exact_time:.0f}ms, total: {total_time:.0f}ms)",
+                    extra={
+                        "cache_type": "exact",
+                        "namespace": cache_namespace,
+                        "exact_lookup_ms": exact_time,
+                        "total_ms": total_time
+                    }
                 )
                 return exact_match
 
@@ -87,24 +100,35 @@ class QueryCacheService:
                 embedding_service = await self._get_embedding_service()
 
                 # Generate embedding for query
+                embed_start = time.time()
                 embedding_result = await embedding_service.generate_embedding(query)
                 # Extract embedding vector from EmbeddingResult
                 query_embedding = np.array(embedding_result.embedding)
+                embed_time = (time.time() - embed_start) * 1000
 
                 # Search for similar queries in cache
+                search_start = time.time()
                 similar_result = await self._find_similar_cached_query(
                     query_embedding,
                     cache_namespace
                 )
+                search_time = (time.time() - search_start) * 1000
 
                 if similar_result:
+                    total_time = (time.time() - overall_start) * 1000
                     logger.info(
                         f"Semantic cache hit for query: {query[:50]} "
-                        f"(similarity: {similar_result['similarity']:.3f})",
+                        f"(similarity: {similar_result['similarity']:.3f}, "
+                        f"exact_lookup: {exact_time:.0f}ms, embedding: {embed_time:.0f}ms, "
+                        f"search: {search_time:.0f}ms, total: {total_time:.0f}ms)",
                         extra={
                             "cache_type": "semantic",
                             "namespace": cache_namespace,
-                            "similarity": similar_result['similarity']
+                            "similarity": similar_result['similarity'],
+                            "exact_lookup_ms": exact_time,
+                            "embedding_ms": embed_time,
+                            "search_ms": search_time,
+                            "total_ms": total_time
                         }
                     )
                     return similar_result['result']
