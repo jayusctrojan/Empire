@@ -10,7 +10,7 @@ global:
   # IMPORTANT: Set SMTP_PASSWORD environment variable in .env file
   # For Gmail: Use an App Password (not your regular password)
   # Create one at: https://myaccount.google.com/apppasswords
-  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_auth_password: 'efpo widq plga gkyn'
   smtp_require_tls: true
 
 # Alert routing configuration

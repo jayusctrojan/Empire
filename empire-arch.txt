@@ -83,7 +83,18 @@ Core Architecture Decisions (v7.2 - PRODUCTION + DEVELOPMENT):
 - ORCHESTRATION: CrewAI on Render (https://jb-crewai.onrender.com) - srv-d2n0hh3uibrs73buafo0 - MILESTONE 8
   * Task 40: CrewAI Asset Storage - B2 folder: crewai/assets/{department}/{type}/{execution_id}/
 - MULTI-MODAL: Claude Vision for images, Soniox for audio transcription
-- MONITORING: Prometheus + Grafana dashboards
+- MONITORING & ALERTING (Task 44 - PRODUCTION): Prometheus + Grafana + Alertmanager
+  * Prometheus: Metrics collection (port 9090)
+  * Grafana: Visualization dashboards (port 3001, admin/empiregrafana123)
+  * Alertmanager: Email notifications via Gmail SMTP (port 9093)
+  * Node Exporter: System metrics (port 9100)
+  * 39 Alert Rules: Critical/Warning/Info severity levels
+  * Email Alerts: HTML formatted with severity-based styling
+  * Alert Delivery: jbajaj08@gmail.com (Gmail App Password auth)
+  * Alert Timing: Critical (10s), Warning (2m), Info (5m) delays
+  * Files: docker-compose.monitoring.yml, alert_rules.yml, alertmanager.yml
+  * Testing: ./test-alert.sh for verification
+  * Status: ✅ DEPLOYED AND TESTED - Email delivery confirmed
 - SECURITY: Multi-layer security with compliance (HIPAA, GDPR, SOC 2)
   * Task 41.1: HTTP security headers (HSTS, CSP, X-Frame-Options, etc.)
   * Task 41.1: Rate limiting (tiered limits per endpoint, Redis-backed)
@@ -617,23 +628,26 @@ Semantic Caching (v7.1 - OPTIMIZED):
     ├── 50x faster on cache hits
     └── Significant cost reduction
 
-Observability Stack (NEW - v7.0):
-├── Metrics Collection
-│   ├── Prometheus for metrics scraping
+Observability Stack (Task 44 - PRODUCTION DEPLOYED):
+├── Metrics Collection (Prometheus)
+│   ├── Prometheus for metrics scraping (port 9090)
 │   ├── Custom metrics: query latency, search quality, token usage
-│   ├── System metrics: CPU, memory, disk I/O
+│   ├── System metrics: CPU, memory, disk I/O (via Node Exporter port 9100)
 │   ├── Cost tracking: per-query and aggregate
-│   └── Self-hosted or cloud ($20-30/month)
+│   ├── Self-hosted via Docker Compose
+│   └── 30-day retention with TSDB storage
 │
-├── Visualization
-│   ├── Grafana dashboards
-│   ├── Real-time query performance
-│   ├── Search quality trends
-│   ├── Cost analytics
-│   └── Error rate monitoring
+├── Visualization (Grafana)
+│   ├── Grafana dashboards (port 3001)
+│   ├── Credentials: admin/empiregrafana123
+│   ├── Real-time query performance graphs
+│   ├── Search quality trend analysis
+│   ├── Cost analytics and budget tracking
+│   ├── Error rate monitoring by component
+│   └── Custom Empire dashboard pre-configured
 │
-├── Distributed Tracing
-│   ├── OpenTelemetry framework
+├── Distributed Tracing (Future - OpenTelemetry)
+│   ├── OpenTelemetry framework integration planned
 │   ├── Jaeger for trace storage
 │   ├── End-to-end request tracking
 │   ├── Component-level latency breakdown
@@ -641,17 +655,46 @@ Observability Stack (NEW - v7.0):
 │
 ├── Structured Logging
 │   ├── JSON format for all logs
-│   ├── Elasticsearch for log aggregation (optional)
+│   ├── Docker log aggregation
 │   ├── File-based logging (default)
 │   ├── 90-day retention
-│   └── Full audit trail
+│   └── Full audit trail for compliance
 │
-└── Alerting
-    ├── Error rate alerts (>5% for 5 minutes)
-    ├── Latency alerts (P95 >3 seconds)
-    ├── Cost anomaly alerts (>$10/hour)
-    ├── Delivery: Email, Slack, PagerDuty
-    └── Automated incident creation
+└── Alerting & Notifications (Alertmanager - Task 44 ✅)
+    ├── Alertmanager for alert routing (port 9093)
+    ├── Email notifications via Gmail SMTP
+    │   ├── Recipient: jbajaj08@gmail.com
+    │   ├── Gmail App Password authentication
+    │   ├── TLS required (smtp.gmail.com:587)
+    │   └── HTML formatted emails with severity styling
+    ├── 39 Alert Rules across 3 severity levels:
+    │   ├── Critical (🚨): 10s delay, 1hr repeat
+    │   │   ├── Service downtime (API, Redis, Neo4j) - >5 min
+    │   │   ├── Critical error rates (>5 errors/sec) - 2 min
+    │   │   ├── Very slow processing (>60s P95)
+    │   │   ├── Resource exhaustion (>95% CPU/Memory)
+    │   │   └── High queue backlog (>500 tasks)
+    │   ├── Warning (⚠️): 2m delay, 12hr repeat
+    │   │   ├── High error rates (>1/sec)
+    │   │   ├── Slow processing (>30s P95)
+    │   │   ├── High resource usage (>80%)
+    │   │   ├── Queue backlogs (>100 tasks)
+    │   │   └── Low cache hit rates (<40%)
+    │   └── Info (ℹ️): 5m delay, 24hr repeat
+    │       ├── System health summaries
+    │       ├── Usage statistics and trends
+    │       └── Performance benchmarks
+    ├── Alert Inhibition Rules:
+    │   ├── APIDown suppresses APISlowResponse
+    │   ├── CacheServiceDown suppresses LowCacheHitRate
+    │   └── NoQueriesProcessed suppresses business metric alerts
+    ├── Testing: ./test-alert.sh script for verification
+    ├── Deployment Status: ✅ PRODUCTION - Email delivery confirmed
+    └── Configuration Files:
+        ├── monitoring/alertmanager.yml - Email config
+        ├── monitoring/alert_rules.yml - 39 alert definitions
+        ├── monitoring/prometheus.yml - Scrape targets
+        └── docker-compose.monitoring.yml - Service orchestration
 
 ================================================================================
 Data Architecture - Advanced Implementation

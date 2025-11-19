@@ -24,8 +24,8 @@ fi
 echo "Sending test alert to Alertmanager..."
 echo ""
 
-# Send a test alert via Alertmanager API
-curl -XPOST http://localhost:9093/api/v1/alerts -H "Content-Type: application/json" -d '[
+# Send a test alert via Alertmanager v2 API
+curl -XPOST http://localhost:9093/api/v2/alerts -H "Content-Type: application/json" -d '[
   {
     "labels": {
       "alertname": "TestAlert",
@@ -37,8 +37,8 @@ curl -XPOST http://localhost:9093/api/v1/alerts -H "Content-Type: application/js
       "description": "This is a test alert to verify email notifications are working correctly. If you receive this email, your monitoring alerts are properly configured!",
       "runbook": "This is a test alert triggered manually via test-alert.sh"
     },
-    "startsAt": "'$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)'",
-    "endsAt": "'$(date -u -v+1M +%Y-%m-%dT%H:%M:%S.%3NZ)'"
+    "startsAt": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+    "endsAt": "'$(date -u -v+1M +%Y-%m-%dT%H:%M:%SZ)'"
   }
 ]'
 
