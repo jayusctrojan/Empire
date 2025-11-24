@@ -2712,5 +2712,359 @@
       "description": "Tasks for master context",
       "updated": "2025-11-17T18:28:30.661Z"
     }
+  },
+  "v7_3_features": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Establish OpenAPI Contracts for All Features",
+        "description": "Create OpenAPI 3.0 YAML specifications for each of the 9 features, defining endpoints, request/response schemas, error codes, and examples.",
+        "details": "Use Swagger Editor or Stoplight Studio to author OpenAPI 3.0 YAML files for each feature. Ensure all endpoints, parameters, authentication (JWT/OAuth2), and error responses are specified. Include example payloads and document all enums and JSONB fields. Store contracts in a /openapi directory and validate with openapi-cli.",
+        "testStrategy": "Validate YAML files using openapi-cli linting and ensure all endpoints are covered. Review with backend and frontend leads for completeness.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Design and Implement Database Migrations",
+        "description": "Create SQL migration files for all schema changes required by v7.3 features.",
+        "details": "Use Alembic (Python) or Prisma (TypeScript) for migration management. Write migrations to: (1) add 'R&D' to department enum, (2) add processing_status and source_metadata JSONB columns, (3) create agent_router_cache and agent_feedback tables, (4) create book metadata and course tables. Ensure migrations are idempotent and reversible.",
+        "testStrategy": "Run migrations on a test database, verify schema changes, and perform rollback tests. Use dbmate or Alembic test commands.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Set Up Feature Flags and Configuration Management",
+        "description": "Implement feature flag system and update environment configuration for all new features.",
+        "details": "Integrate a feature flag library such as Unleash or LaunchDarkly (open-source version if cost is a concern). Store flags in a centralized config file or service. Update .env files and Render.com environment variables for new settings. Document flag usage for each feature.",
+        "testStrategy": "Toggle flags in staging and verify feature enable/disable behavior. Write unit tests for flag checks in code.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Configure Monitoring: Prometheus, Grafana, and Alertmanager",
+        "description": "Set up monitoring and alerting for all new features using Prometheus, Grafana, and Alertmanager.",
+        "details": "Add Prometheus exporters to FastAPI and Celery services (use prometheus_fastapi_instrumentator and celery-prometheus-exporter). Create Grafana dashboards for processing status, agent routing, and upload metrics. Define alert rules for error rates, latency, and processing failures. Integrate email alerts for critical issues.",
+        "testStrategy": "Trigger test alerts and verify dashboard metrics update in real time. Simulate failures to ensure alerts fire.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Develop Data Model and API Documentation",
+        "description": "Document all data models, API endpoints, and implementation guides for development teams.",
+        "details": "Use tools like Sphinx (Python) or Docusaurus (JS) to generate developer documentation. Include ER diagrams, endpoint descriptions, request/response examples, and migration guides. Link OpenAPI YAML files and provide usage examples for each API.",
+        "testStrategy": "Review documentation for completeness and accuracy. Have developers follow guides to implement a sample feature.",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Set Up CI/CD Pipeline and Test Infrastructure",
+        "description": "Configure GitHub Actions for CI/CD, run migrations on staging, and set up integration test data.",
+        "details": "Update GitHub Actions workflows to run tests, lint code, and deploy to Render.com. Use pytest for backend and Playwright for frontend tests. Automate database migrations on staging. Seed test data for all new features.",
+        "testStrategy": "Verify CI/CD runs on PRs and pushes. Confirm deployments and migrations succeed without manual intervention.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Implement Rollback Plan and Performance Baselines",
+        "description": "Prepare rollback scripts and establish performance baselines for new features.",
+        "details": "Write SQL and infrastructure scripts to revert migrations and deployments. Use Locust or k6 to benchmark API endpoints and document baseline metrics for processing time, latency, and error rates.",
+        "testStrategy": "Perform rollback drills on staging. Run load tests and compare results to success metrics.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Prepare for Security Audit and Stakeholder Sign-off",
+        "description": "Conduct security review and obtain sign-off from stakeholders before feature rollout.",
+        "details": "Use Bandit (Python) and OWASP ZAP for static and dynamic security scans. Review authentication, authorization, and data validation. Schedule stakeholder demo and collect sign-off.",
+        "testStrategy": "Address all critical/high findings from security tools. Document sign-off in project tracker.",
+        "priority": "high",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Add R&D Department to Department Enum and Services",
+        "description": "Update backend and storage logic to support 'Research & Development' as a department.",
+        "details": "Update department enum in PostgreSQL and service layer constants. Update B2 storage logic to include 'rnd/' folder. Update Neo4j department nodes. Ensure all APIs and UIs reflect the new department.",
+        "testStrategy": "Verify R&D appears in all selection UIs and documents are correctly classified and stored. Write integration tests for classification.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Implement Real-Time Processing Status with WebSockets",
+        "description": "Create WebSocket manager and endpoints for real-time document and query status updates.",
+        "details": "Use FastAPI's WebSocket support (starlette.websockets) to implement a manager for broadcasting status. Create endpoints for bidirectional communication. Use Redis pub/sub for scaling across workers. Integrate with Celery task events.",
+        "testStrategy": "Simulate concurrent uploads and queries, verify status updates within 500ms. Use WebSocket test clients.",
+        "priority": "high",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Create REST Status Endpoint and Polling Logic",
+        "description": "Implement REST endpoint for polling processing/query status as a fallback to WebSockets.",
+        "details": "Add /status endpoint to FastAPI, returning current processing state from database. Ensure endpoint is rate-limited and returns consistent schema.",
+        "testStrategy": "Test polling from frontend, verify correct status at each stage. Write unit and integration tests.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Update Celery Tasks to Broadcast Status Changes",
+        "description": "Modify Celery tasks to emit status updates to WebSocket manager and REST endpoint.",
+        "details": "Use celery-signals to hook into task state changes. Publish updates to Redis channel for WebSocket manager. Update processing_status JSONB column in database.",
+        "testStrategy": "Run end-to-end upload and query flows, verify all status transitions are broadcast and persisted.",
+        "priority": "high",
+        "dependencies": [
+          10,
+          11
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "Integrate Gradio Processing Status Component",
+        "description": "Add progress bars and status indicators to Gradio upload and query UI.",
+        "details": "Use Gradio's custom components (Blocks API) to display real-time progress. Connect to WebSocket and REST endpoints for updates. Ensure accessibility and responsive design.",
+        "testStrategy": "Upload documents and run queries in UI, verify progress bars update in real time. Test on multiple browsers.",
+        "priority": "medium",
+        "dependencies": [
+          10,
+          11,
+          12
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Implement Source Metadata Extraction and Storage",
+        "description": "Extract and store source metadata (title, author, date, page) for all uploaded documents.",
+        "details": "Integrate LangExtract (latest version) for metadata extraction. Update upload pipeline to extract and store metadata in source_metadata JSONB column. Ensure support for PDFs, DOCX, and web articles.",
+        "testStrategy": "Upload sample documents, verify metadata extraction accuracy (>95%). Write unit tests for extraction logic.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Update Chat Endpoint to Include Inline Citations",
+        "description": "Modify chat API to return inline citations and source metadata for each AI response.",
+        "details": "Update FastAPI chat endpoint to include citations in response payload. Format citations with page numbers and metadata. Ensure compatibility with Gradio citation component.",
+        "testStrategy": "Send chat queries, verify citations are present and accurate. Write tests for citation formatting.",
+        "priority": "high",
+        "dependencies": [
+          14
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 16,
+        "title": "Create Gradio Citation Component with Expandable Cards",
+        "description": "Develop a Gradio UI component to display inline citations and allow users to expand for full source context.",
+        "details": "Use Gradio's Blocks API to create clickable citation cards. On click, show full metadata and excerpt. Ensure mobile responsiveness and accessibility.",
+        "testStrategy": "Test citation display and expansion in chat UI. Verify usability and correct linkage to sources.",
+        "priority": "medium",
+        "dependencies": [
+          15
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 17,
+        "title": "Implement Agent Router Data Models and Service",
+        "description": "Create data models and service logic for intelligent agent routing (LangGraph, CrewAI, Simple RAG).",
+        "details": "Define SQLAlchemy models for agent_router_cache and decision history. Implement routing logic in a dedicated FastAPI service. Use ML-based or rule-based approach for workflow selection. Cache recent decisions for performance.",
+        "testStrategy": "Unit test routing logic with diverse queries. Verify cache hits and correct workflow selection.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 18,
+        "title": "Create Agent Router API Endpoint",
+        "description": "Expose agent router logic via a REST endpoint for frontend and service integration.",
+        "details": "Add /agent-router endpoint to FastAPI. Accept query payload, return selected workflow and decision metadata. Enforce authentication and rate limiting.",
+        "testStrategy": "Send test queries, verify correct workflow is selected and response is within 100ms.",
+        "priority": "high",
+        "dependencies": [
+          17
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "Integrate and Monitor Agent Routing Decisions",
+        "description": "Log and monitor agent routing decisions for accuracy and performance.",
+        "details": "Log all routing decisions to agent_router_cache. Add Prometheus metrics for routing accuracy and latency. Create Grafana dashboard for monitoring.",
+        "testStrategy": "Review logs and metrics, verify >90% accuracy and <100ms latency under load.",
+        "priority": "medium",
+        "dependencies": [
+          18,
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 20,
+        "title": "Implement URL/Link Upload and Processing",
+        "description": "Enable upload and processing of YouTube videos and web articles via URLs.",
+        "details": "Integrate yt-dlp (latest) for YouTube transcription. Use BeautifulSoup4 for article scraping. Implement URL validator to detect content type. Add URL upload endpoint and Celery tasks for processing. Store extracted text and metadata.",
+        "testStrategy": "Upload various URLs, verify transcript or article extraction. Test invalid/unsupported URLs are rejected.",
+        "priority": "high",
+        "dependencies": [
+          6,
+          14
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 21,
+        "title": "Enable File and Image Upload in Chat",
+        "description": "Allow users to upload files and images directly in chat for context-aware Q&A.",
+        "details": "Implement file handler utility for multipart uploads. Integrate Claude Vision API for image analysis (latest version). Add chat file upload endpoint and Gradio component. Ensure file context is linked to chat session.",
+        "testStrategy": "Upload images and PDFs in chat, verify analysis and context retention. Test with various file types.",
+        "priority": "high",
+        "dependencies": [
+          6,
+          13
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 22,
+        "title": "Implement Book Processing and Chapter Detection",
+        "description": "Automatically detect chapters and create per-chapter knowledge base entries for uploaded books.",
+        "details": "Develop chapter detector using regex and ML (e.g., spaCy or transformers). Create book service for chapter-aware processing. Add Celery task for chapter processing. Update book metadata tables. Add Gradio book upload component.",
+        "testStrategy": "Upload books in various formats, verify chapters detected with >90% accuracy. Query by chapter and book-wide.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          6,
+          14
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 23,
+        "title": "Conduct End-to-End Integration and Load Testing",
+        "description": "Test all new features together under realistic load and edge cases.",
+        "details": "Use pytest, Playwright, and Locust for integration and load testing. Simulate concurrent uploads, queries, and agent routing. Validate against success metrics (latency, accuracy, error rate).",
+        "testStrategy": "Run automated test suites and manual exploratory tests. Document and fix any failures.",
+        "priority": "high",
+        "dependencies": [
+          9,
+          10,
+          13,
+          15,
+          16,
+          18,
+          19,
+          20,
+          21,
+          22
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 24,
+        "title": "Prepare Production Deployment and Release Notes",
+        "description": "Finalize deployment scripts, update release notes, and prepare for production rollout.",
+        "details": "Update Render.com deployment configuration. Write release notes summarizing new features, migrations, and breaking changes. Schedule deployment window and notify stakeholders.",
+        "testStrategy": "Perform blue/green deployment on production. Monitor for errors and rollback if needed.",
+        "priority": "high",
+        "dependencies": [
+          23
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 25,
+        "title": "Post-Deployment Monitoring and Success Metrics Validation",
+        "description": "Monitor system post-deployment and validate against defined success metrics.",
+        "details": "Use Prometheus and Grafana to monitor uptime, error rate, processing time, and feature-specific metrics. Collect user feedback and bug reports. Prepare post-mortem if metrics are not met.",
+        "testStrategy": "Review dashboards and logs for 48 hours post-launch. Confirm all metrics meet targets. Address any incidents immediately.",
+        "priority": "high",
+        "dependencies": [
+          24
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-24T19:36:45.295Z",
+      "updated": "2025-11-24T19:38:11.274Z",
+      "description": "Tasks for v7_3_features context"
+    }
   }
 }

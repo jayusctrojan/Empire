@@ -1,0 +1,273 @@
+# Empire v7.3 Features - Product Requirements Document
+
+## Project Overview
+
+Empire v7.3 introduces 9 new features organized into 3 implementation phases. This PRD maps directly to 72 GitHub issues (#10-#81) created for the project.
+
+**GitHub Milestones:**
+- Phase 0 - Foundation: 18 tasks (Due: Nov 29, 2025)
+- Phase 1 - Sprint 1: 32 tasks (Due: Dec 9, 2025)
+- Phase 2 - Sprint 2: 22 tasks (Due: Dec 19, 2025)
+
+**Total Tasks**: 72 tasks across 9 features
+
+---
+
+## Phase 0: Foundation (18 Tasks)
+
+### Infrastructure Setup
+Create OpenAPI contracts for all 9 features defining request/response schemas, error codes, and examples. Each feature needs an OpenAPI 3.0 YAML file.
+
+### Database Migrations
+Create SQL migration files for all database schema changes:
+- Add R&D to department enum
+- Add processing_status JSONB column
+- Add source_metadata JSONB column
+- Create agent_router_cache table
+- Create agent_feedback table
+- Create book metadata tables
+- Create course tables
+
+### Configuration & Monitoring
+Set up feature flags, Prometheus alert rules, Grafana dashboards, and test infrastructure for all 9 features.
+
+### Documentation
+Create data model documentation, API documentation, and implementation guides for development teams.
+
+### Environment Setup
+Run migrations on staging, update environment variables, create integration test data, set up CI/CD pipeline.
+
+### Audit & Security
+Create rollback plan, establish performance baselines, prepare for security audit, obtain stakeholder sign-off.
+
+---
+
+## Phase 1: Sprint 1 - Priority 1 Features (32 Tasks)
+
+### Feature 1: R&D Department Addition
+**Goal**: Add "Research & Development" as the 11th department to the existing 10-department taxonomy.
+
+**Tasks:**
+- Run database migration to add R&D to department enum
+- Update department constants and service layer
+- Update B2 storage paths to include rnd/ folder structure
+- Update Neo4j department nodes
+- Test R&D classification with sample documents
+
+**Acceptance Criteria:**
+- R&D appears in all department selection interfaces
+- Documents classified as R&D are correctly stored and retrievable
+- AI classification achieves >90% accuracy for R&D content
+
+### Feature 2: Loading Process Status UI
+**Goal**: Provide real-time visibility into document processing and query execution stages.
+
+**Tasks:**
+- Create WebSocket manager service for real-time status updates
+- Create WebSocket endpoint for bidirectional communication
+- Create REST status endpoint for polling
+- Run processing status migration (add JSONB column)
+- Update Celery tasks to broadcast status changes
+- Create Gradio processing status component with progress bars
+- Integrate status display in upload UI
+- Test WebSocket connections under load
+
+**Acceptance Criteria:**
+- Users see real-time progress for document uploads (uploading → parsing → embedding → indexing → complete)
+- Query processing shows current workflow stage
+- Status updates appear within 500ms of state changes
+
+### Feature 4: Source Attribution in Chat UI
+**Goal**: Display inline citations and source metadata for every AI response.
+
+**Tasks:**
+- Run source metadata migration (add JSONB column)
+- Integrate LangExtract for metadata extraction
+- Update document upload to extract metadata (title, author, date, page)
+- Update chat endpoint to include sources in responses
+- Create Gradio citation component with expandable cards
+- Test source attribution accuracy (>95% correct citations)
+
+**Acceptance Criteria:**
+- Every chat response includes inline citations with page numbers
+- Users can click citations to see full source context
+- Source metadata is extracted with >95% accuracy
+
+### Feature 9: Intelligent Agent Router
+**Goal**: Automatically route queries to the optimal workflow (LangGraph, CrewAI, or Simple RAG).
+
+**Tasks:**
+- Create agent router data models (routing cache, decision history)
+- Implement agent router service with routing logic
+- Create agent router endpoint
+- Test routing with diverse query types
+- Monitor routing decisions and accuracy
+
+**Acceptance Criteria:**
+- System automatically selects correct workflow >90% of the time
+- Routing decision made in <100ms
+- Users can override automatic routing selection
+
+---
+
+## Phase 2: Sprint 2 - Priority 2 Features (22 Tasks)
+
+### Feature 3: URL/Link Support on Upload
+**Goal**: Allow users to upload YouTube videos, web articles, and other URL-based content.
+
+**Tasks:**
+- Create YouTube service using yt-dlp for video transcription
+- Create article service using BeautifulSoup for web scraping
+- Create URL validator to detect content type
+- Create URL upload endpoint
+- Create Celery tasks for URL processing
+- Create Gradio URL upload component
+- Test URL processing end-to-end
+
+**Acceptance Criteria:**
+- System successfully processes YouTube videos (transcript extraction)
+- Web articles are scraped and cleaned (text extraction, metadata)
+- URL validation prevents invalid/unsupported URLs
+
+### Feature 7: Chat File/Image Upload
+**Goal**: Allow users to upload files and images directly in chat for context-aware Q&A.
+
+**Tasks:**
+- Create file handler utility for multipart uploads
+- Integrate Claude Vision API for image analysis
+- Create chat with file upload endpoint
+- Create Gradio file upload component in chat interface
+- Test file upload in chat (images, PDFs)
+
+**Acceptance Criteria:**
+- Users can drag-drop files into chat window
+- Images are analyzed using Claude Vision API
+- File context is maintained for follow-up questions
+
+### Feature 8: Book Processing
+**Goal**: Automatically detect chapters and create per-chapter knowledge base entries.
+
+**Tasks:**
+- Create chapter detector utility using regex and ML
+- Create book service for chapter-aware processing
+- Run book metadata migration (chapters, page ranges)
+- Create Celery chapter processing task
+- Create book upload endpoint
+- Create Gradio book upload component
+- Test book processing end-to-end
+
+**Acceptance Criteria:**
+- System automatically detects chapters with >90% accuracy
+- Each chapter is indexed as a separate knowledge base entry
+- Users can query by chapter or book-wide
+
+---
+
+## Phase 3: Sprint 3 - Priority 3 Features (Not in Current 72 Tasks)
+
+### Feature 5: Agent Chat & Improvement
+**Goal**: Allow users to chat with specific agents and provide feedback.
+
+**Tasks:**
+- Run agent feedback migration
+- Create agent service for agent-specific chat
+- Create agent chat endpoints
+- Create Gradio agent selector component
+- Test agent chat and feedback collection
+
+### Feature 6: Course Content Addition
+**Goal**: Enable CRUD operations for courses, modules, and lessons.
+
+**Tasks:**
+- Run course tables migration
+- Create course service
+- Create course addition endpoint
+- Create Gradio course manager component
+- Test course addition workflow
+
+---
+
+## Technical Context
+
+### Architecture
+- **Backend**: FastAPI with Celery (async task processing)
+- **Frontend**: Gradio UI for chat interface
+- **Databases**:
+  - PostgreSQL (Supabase) - Vector search, user data
+  - Neo4j - Knowledge graphs, entity relationships
+  - Redis (Upstash) - Caching, Celery broker
+- **Storage**: Backblaze B2 for file storage
+- **AI Services**:
+  - Claude API (Anthropic)
+  - LangGraph for adaptive workflows
+  - CrewAI for multi-agent orchestration
+
+### Existing Services (Render)
+- **jb-empire-api** (FastAPI) - Main API service
+- **jb-empire-chat** (Gradio) - Chat UI
+- **jb-crewai** - Multi-agent workflows
+- **jb-llamaindex** - Document parsing/indexing
+- **empire-celery-worker** - Background task processing
+
+### Deployment
+- **Platform**: Render.com
+- **CI/CD**: GitHub Actions
+- **Monitoring**: Prometheus + Grafana + Alertmanager
+- **Email Alerts**: Configured for critical issues
+
+---
+
+## Success Metrics
+
+### User Experience
+- Document processing status visible within 500ms
+- Source attribution accuracy >95%
+- Agent routing accuracy >90%
+- Chapter detection accuracy >90%
+
+### Performance
+- Upload processing time <30 seconds for typical documents
+- Query response time <3 seconds for simple queries
+- WebSocket message latency <500ms
+
+### Reliability
+- Uptime >99.5%
+- Error rate <1%
+- Successful processing rate >98%
+
+---
+
+## GitHub Issue Mapping
+
+All 72 tasks have been created as GitHub issues:
+- **Issues #10-#27**: Phase 0 (Foundation) - 18 issues
+- **Issues #28-#59**: Phase 1 (Sprint 1) - 32 issues
+- **Issues #60-#81**: Phase 2 (Sprint 2) - 22 issues
+
+Each issue includes:
+- Detailed task description and acceptance criteria
+- Proper labels (priority, type, feature, phase, status)
+- Milestone assignment (Phase 0, 1, 2, or Production)
+- Dependencies on other tasks
+- Time estimates
+
+**Repository**: https://github.com/jayusctrojan/Empire
+**Issues**: https://github.com/jayusctrojan/Empire/issues
+**Milestones**: https://github.com/jayusctrojan/Empire/milestones
+
+---
+
+## Development Workflow
+
+1. **Phase 0 (Foundation)**: Complete infrastructure setup (18 tasks)
+2. **Phase 1 (Sprint 1)**: Implement P1 features (32 tasks)
+3. **Phase 2 (Sprint 2)**: Implement P2 features (22 tasks)
+4. **Phase 3 (Sprint 3)**: Implement P3 features (pending)
+5. **Production Deployment**: Testing, security audit, deployment
+
+**Timeline**: 34-38 days total
+- Phase 0: 3-5 days (Due: Nov 29)
+- Phase 1: 10 days (Due: Dec 9)
+- Phase 2: 10 days (Due: Dec 19)
+- Phase 3: 5 days (Due: Dec 24)
+- Deployment: 6 days (Due: Jan 1, 2026)
