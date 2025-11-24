@@ -2,14 +2,15 @@
 
 **Feature Branch**: `2-empire-v73-features`
 **Created**: 2025-11-23
+**Updated**: 2025-11-23 (Added Feature 9)
 **Status**: Draft
-**Input**: User description: "8 new features for Empire v7.3 including R&D department, loading status, URL support, source attribution, agent chat, course additions, file uploads, and book processing"
+**Input**: User description: "9 new features for Empire v7.3 including R&D department, loading status, URL support, source attribution, agent chat, course additions, file uploads, book processing, and intelligent agent routing"
 
 ---
 
 ## Overview
 
-This specification covers 8 new features for Empire v7.3, organized by priority and implementation complexity.
+This specification covers 9 new features for Empire v7.3, organized by priority and implementation complexity.
 
 | # | Feature | Short Name | Priority |
 |---|---------|------------|----------|
@@ -21,6 +22,7 @@ This specification covers 8 new features for Empire v7.3, organized by priority 
 | 6 | Course Content Addition | `course-append` | P3 |
 | 7 | Chat File/Image Upload | `chat-upload` | P2 |
 | 8 | Book Processing | `book-processing` | P2 |
+| 9 | Intelligent Agent Router | `agent-router` | P1 |
 
 ---
 
@@ -476,6 +478,145 @@ As a user, I want to see book structure and navigate to specific chapters.
 
 ---
 
+## Feature 9: Intelligent Agent Router
+
+### User Scenarios & Testing
+
+#### User Story 9.1 - Automatic Execution Pattern Selection (Priority: P1)
+
+As a developer using the system, I want an intelligent router that automatically chooses the optimal execution pattern (skill, sub-agent, slash command, MCP) based on the task characteristics so that I get the most efficient and appropriate solution.
+
+**Why this priority**: Foundation for intelligent agent orchestration - prevents over-complication and ensures right-tool-for-right-job.
+
+**Independent Test**: Submit various task types and verify the router selects the appropriate pattern: one-off tasks → prompts/commands, repeat workflows → skills, parallel work → sub-agents, external data → MCP.
+
+**Acceptance Scenarios**:
+
+1. **Given** a one-off task request, **When** analyzed by router, **Then** it routes to a custom slash command
+2. **Given** a reusable workflow pattern, **When** analyzed, **Then** it routes to an agent skill
+3. **Given** a parallelizable task with isolated context, **When** analyzed, **Then** it routes to sub-agents
+4. **Given** a task requiring external integration, **When** analyzed, **Then** it routes to appropriate MCP server
+
+#### User Story 9.2 - CrewAI vs Claude Code Agent Selection (Priority: P1)
+
+As a system, I want to intelligently route between CrewAI multi-agent workflows and Claude Code skills/sub-agents based on task complexity and characteristics.
+
+**Why this priority**: Enables hybrid agent orchestration - leverage CrewAI for complex multi-step workflows, Claude Code for direct execution.
+
+**Independent Test**: Submit a complex multi-document analysis task, verify routing to CrewAI; submit a simple file operation, verify routing to Claude Code skill.
+
+**Acceptance Scenarios**:
+
+1. **Given** a multi-agent coordination task, **When** router analyzes, **Then** it routes to CrewAI service with appropriate agents
+2. **Given** a simple repeatable task, **When** router analyzes, **Then** it routes to Claude Code skill
+3. **Given** a task requiring domain expertise, **When** router analyzes, **Then** it selects specialized CrewAI agent or Claude skill based on specialization match
+
+#### User Story 9.3 - Composition and Fallback Strategy (Priority: P2)
+
+As a system, I want to compose multiple patterns when needed and fall back gracefully when the primary pattern fails.
+
+**Why this priority**: Enables robust execution - complex tasks may require hybrid approaches.
+
+**Independent Test**: Submit a task that requires both MCP integration and sub-agent parallelization, verify composition works correctly.
+
+**Acceptance Scenarios**:
+
+1. **Given** a task requires both external data and parallel execution, **When** router analyzes, **Then** it composes MCP + sub-agents
+2. **Given** a primary execution pattern fails, **When** error detected, **Then** router falls back to alternative pattern
+3. **Given** a skill needs to use sub-agents, **When** executing, **Then** circular composition is handled correctly
+
+#### Edge Cases
+
+- What happens when task characteristics match multiple patterns equally?
+- How does the system handle tasks that span Claude Code and CrewAI boundaries?
+- What if both CrewAI and Claude Code agents are unavailable?
+
+### Requirements
+
+#### Functional Requirements
+
+- **FR-9.1**: System MUST analyze task characteristics to determine optimal execution pattern
+- **FR-9.2**: System MUST route between CrewAI agents and Claude Code skills/sub-agents
+- **FR-9.3**: System MUST consider these decision factors:
+  - Task repeatability (one-off vs reusable)
+  - Context isolation requirements (shared vs isolated)
+  - Parallelization needs (sequential vs concurrent)
+  - External integration requirements
+  - Domain specialization needs
+  - Task complexity level
+- **FR-9.4**: System MUST support composition of multiple patterns (e.g., skill + MCP + sub-agent)
+- **FR-9.5**: System MUST handle circular composition safely (skill → sub-agent → skill)
+- **FR-9.6**: System MUST provide fallback mechanisms when primary pattern fails
+- **FR-9.7**: System MUST log routing decisions for debugging and improvement
+- **FR-9.8**: System MUST respect user-specified pattern overrides when provided
+
+#### Key Entities
+
+- **ExecutionPattern**: Enum (PROMPT, SKILL, SUB_AGENT, MCP, CREWAI_AGENT)
+- **TaskCharacteristics**: repeatability, parallelizable, requires_external_data, complexity_score, domain
+- **RoutingDecision**: chosen_pattern, confidence_score, reasoning, fallback_patterns
+- **AgentCapability**: agent_type (crewai/claude), specialization, availability_status
+
+### Success Criteria
+
+- **SC-9.1**: Router achieves >90% correct pattern selection on test suite of 100 diverse tasks
+- **SC-9.2**: CrewAI vs Claude routing achieves >85% accuracy based on task complexity scoring
+- **SC-9.3**: Composition of patterns succeeds without circular dependency issues
+- **SC-9.4**: Fallback mechanisms activate within 2 seconds of primary pattern failure
+- **SC-9.5**: Routing decision time adds <100ms overhead to task execution
+
+---
+
+## Router Decision Matrix (Reference)
+
+This matrix guides the intelligent routing decisions:
+
+### Task Type → Pattern Mapping
+
+| Task Characteristics | Primary Pattern | Alternative | Rationale |
+|---------------------|-----------------|-------------|-----------|
+| One-off, simple | Slash Command | Skill (if frequent) | Primitives for simple tasks |
+| Reusable workflow | Skill | Slash Command | Modularity for repeat solutions |
+| Parallel execution needed | Sub-agent | CrewAI (if complex) | Context isolation for concurrent work |
+| External API/DB integration | MCP Server | Skill + MCP | External data source access |
+| Multi-agent coordination | CrewAI | Skill + Sub-agents | Complex multi-step workflows |
+| Document analysis | CrewAI | Skill | Domain expertise required |
+| Git operations | Skill | Slash Command | Repeat workflow management |
+| Security audit | Sub-agent | CrewAI | Isolated, scalable analysis |
+| Database query | MCP | Skill + MCP | Direct integration |
+
+### CrewAI vs Claude Code Decision Criteria
+
+Route to **CrewAI** when:
+- Task requires multi-agent coordination (3+ specialized agents)
+- Long-running async workflow (>30 seconds)
+- Complex document processing with multiple analysis stages
+- Domain expertise from specialized agents (legal, financial, technical)
+- Task stored in CrewAI asset storage structure
+
+Route to **Claude Code** when:
+- Simple one-off or repeatable task
+- Direct file system operations
+- Git/version control operations
+- Quick context-aware operations (<10 seconds)
+- User wants to see execution steps in real-time
+
+### Composition Rules
+
+**Valid Compositions**:
+- Skill → MCP (skills can use external data)
+- Skill → Sub-agent (skills can parallelize work)
+- Skill → Slash Command (skills can invoke prompts)
+- Sub-agent → MCP (sub-agents can access external data)
+- Sub-agent → Slash Command (sub-agents can use prompts)
+
+**Invalid Compositions** (circular or redundant):
+- Sub-agent → Sub-agent (not supported)
+- Skill → Skill (use modular design instead)
+- MCP → Sub-agent (MCP shouldn't orchestrate)
+
+---
+
 ## Dependencies & Assumptions
 
 ### Cross-Feature Dependencies
@@ -483,6 +624,7 @@ As a user, I want to see book structure and navigate to specific chapters.
 - Feature 2 (Loading Status) enhances UX for Features 3, 7, 8 (all involve processing)
 - Feature 4 (Source Attribution) builds on existing RAG infrastructure
 - Feature 7 (Chat Upload) leverages Feature 8 (Book Processing) for PDF handling
+- Feature 9 (Agent Router) orchestrates Feature 5 (Agent Chat) by routing between CrewAI and Claude Code agents
 
 ### Assumptions
 
@@ -505,7 +647,7 @@ As a user, I want to see book structure and navigate to specific chapters.
 
 | Priority | Features | Rationale |
 |----------|----------|-----------|
-| P1 (Sprint 1) | 1, 2, 4 | Foundation (R&D), UX critical (Loading), Trust (Sources) |
+| P1 (Sprint 1) | 1, 2, 4, 9 | Foundation (R&D), UX critical (Loading), Trust (Sources), Orchestration (Router) |
 | P2 (Sprint 2) | 3, 7, 8 | Content expansion (URLs, Files, Books) |
 | P3 (Sprint 3) | 5, 6 | Advanced features (Agents, Courses) |
 

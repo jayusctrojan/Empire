@@ -71,20 +71,28 @@
 - [x] Long-form content handling defined
 - [x] OCR fallback requirements covered
 
+### Feature 9: Intelligent Agent Router
+- [x] Pattern selection criteria defined
+- [x] CrewAI vs Claude Code routing specified
+- [x] Composition rules documented
+- [x] Fallback mechanisms specified
+- [x] Decision matrix provided
+
 ## Priority Assessment
 
 | Priority | Features | Status |
 |----------|----------|--------|
-| P1 (Sprint 1) | 1, 2, 4 | Ready for planning |
+| P1 (Sprint 1) | 1, 2, 4, 9 | Ready for planning |
 | P2 (Sprint 2) | 3, 7, 8 | Ready for planning |
 | P3 (Sprint 3) | 5, 6 | Ready for planning |
 
 ## Notes
 
-- All 8 features have been specified with user scenarios, requirements, and success criteria
+- All 9 features have been specified with user scenarios, requirements, and success criteria
 - Spec is ready for `/speckit.plan` to generate technical implementation plan
 - Consider implementing P1 features first as they are foundational
 - Feature 2 (Loading Status) will enhance UX for all other content processing features
+- Feature 9 (Agent Router) is critical for intelligent orchestration between CrewAI and Claude Code agents
 
 ## Next Steps
 
