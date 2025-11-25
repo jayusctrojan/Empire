@@ -22,7 +22,7 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -30,6 +30,7 @@ from app.services.monitoring_service import get_monitoring_service
 from app.services.supabase_storage import get_supabase_storage
 from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
 from app.core.connections import connection_manager
+from app.core.feature_flags import get_feature_flag_manager  # Task 3.2: Feature Flags
 
 # Import security middleware (Task 41.1, 41.2, 41.4, 41.5)
 from app.middleware.security import SecurityHeadersMiddleware
@@ -92,6 +93,29 @@ async def lifespan(app: FastAPI):
         print(f"❌ Failed to initialize connections: {e}")
         # Continue anyway - some features may work without all connections
 
+    # Task 3.2: Initialize Feature Flag Manager
+    try:
+        feature_flag_manager = get_feature_flag_manager()
+        app.state.feature_flags = feature_flag_manager
+        print("🚩 Feature flag manager initialized (Database + Redis cache)")
+    except Exception as e:
+        print(f"⚠️  Failed to initialize feature flag manager: {e}")
+
+    # Task 10.3: Initialize WebSocket Manager with Redis Pub/Sub
+    try:
+        from app.services.websocket_manager import get_connection_manager
+        ws_manager = get_connection_manager()
+        await ws_manager.initialize_redis_pubsub()
+
+        if ws_manager.redis_enabled:
+            print("🔌 WebSocket manager initialized with Redis Pub/Sub (distributed broadcasting enabled)")
+        else:
+            print("🔌 WebSocket manager initialized (local-only broadcasting - Redis unavailable)")
+
+        app.state.websocket_manager = ws_manager
+    except Exception as e:
+        print(f"⚠️  Failed to initialize WebSocket manager: {e}")
+
     yield
 
     # Shutdown: Close connections
@@ -104,6 +128,24 @@ async def lifespan(app: FastAPI):
     if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
         stop_mountain_duck_monitoring()
         print("📁 Mountain Duck monitoring stopped")
+
+    # Task 10.3: Shutdown WebSocket Manager and Redis Pub/Sub
+    try:
+        if hasattr(app.state, 'websocket_manager'):
+            ws_manager = app.state.websocket_manager
+
+            # Disconnect all active WebSocket connections
+            connection_ids = list(ws_manager.active_connections.keys())
+            for connection_id in connection_ids:
+                await ws_manager.disconnect(connection_id)
+
+            # Shutdown Redis Pub/Sub
+            if ws_manager.redis_pubsub:
+                await ws_manager.redis_pubsub.disconnect()
+
+            print("✅ WebSocket manager and Redis Pub/Sub shut down gracefully")
+    except Exception as e:
+        print(f"⚠️  Error shutting down WebSocket manager: {e}")
 
     # Task 36: Close database connections gracefully
     try:
@@ -354,6 +396,12 @@ app.include_router(crewai_assets.router)  # CrewAI Assets router already has /ap
 
 # Task 41.5: Audit Logging - Query API for security audit logs
 app.include_router(audit.router)  # Audit router already has /api/audit prefix defined
+
+# Task 3.2: Feature Flags Management
+app.include_router(feature_flags.router)  # Feature flags router already has /api/feature-flags prefix defined
+
+# Task 10.2: WebSocket Real-Time Status Endpoints
+app.include_router(websocket.router)  # WebSocket router already has /ws prefix defined
 
 # TODO: Additional routers
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])

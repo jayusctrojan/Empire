@@ -99,15 +99,41 @@ PRIORITY_BACKGROUND = 1
 # Task signals for monitoring
 @task_prerun.connect
 def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
-    """Track task start"""
+    """Track task start and send WebSocket notification - Task 10.4"""
     _task_start_times[task_id] = time.time()
     print(f"📋 Task started: {task.name} [{task_id}]")
+
+    # Send WebSocket notification - Task 10.4
+    try:
+        from app.utils.websocket_notifications import send_task_notification
+
+        # Extract resource IDs from task kwargs if available
+        task_kwargs = kwargs.get('kwargs', {})
+        document_id = task_kwargs.get('document_id')
+        query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')  # Some tasks use task_id for query tracking
+        user_id = task_kwargs.get('user_id')
+        session_id = task_kwargs.get('session_id')
+
+        send_task_notification(
+            task_id=task_id,
+            task_name=task.name,
+            status="started",
+            message=f"Task {task.name} started",
+            document_id=document_id,
+            query_id=query_id,
+            user_id=user_id,
+            session_id=session_id
+        )
+    except Exception as e:
+        # Don't let WebSocket errors break task execution
+        print(f"⚠️  WebSocket notification failed for task start: {e}")
 
 
 @task_postrun.connect
 def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, **kwargs):
-    """Track task completion"""
+    """Track task completion and send WebSocket notification - Task 10.4"""
     # Calculate duration
+    duration = None
     if task_id in _task_start_times:
         duration = time.time() - _task_start_times[task_id]
         CELERY_TASK_DURATION.labels(task_name=task.name).observe(duration)
@@ -115,6 +141,41 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, **kw
 
     print(f"✅ Task completed: {task.name} [{task_id}]")
     CELERY_TASKS.labels(task_name=task.name, status='success').inc()
+
+    # Send WebSocket notification - Task 10.4
+    try:
+        from app.utils.websocket_notifications import send_task_notification
+
+        # Extract resource IDs from task kwargs if available
+        task_kwargs = kwargs.get('kwargs', {})
+        document_id = task_kwargs.get('document_id')
+        query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
+        user_id = task_kwargs.get('user_id')
+        session_id = task_kwargs.get('session_id')
+
+        # Build metadata
+        metadata = {}
+        if duration is not None:
+            metadata['duration'] = round(duration, 2)
+        if retval is not None and isinstance(retval, dict):
+            # Include relevant result data
+            metadata['result'] = retval
+
+        send_task_notification(
+            task_id=task_id,
+            task_name=task.name,
+            status="success",
+            message=f"Task {task.name} completed successfully",
+            progress=100,
+            metadata=metadata if metadata else None,
+            document_id=document_id,
+            query_id=query_id,
+            user_id=user_id,
+            session_id=session_id
+        )
+    except Exception as e:
+        # Don't let WebSocket errors break task execution
+        print(f"⚠️  WebSocket notification failed for task completion: {e}")
 
 
 @task_success.connect
@@ -127,10 +188,36 @@ def task_success_handler(sender=None, result=None, **kwargs):
 @task_failure.connect
 def task_failure_handler(sender=None, task_id=None, exception=None, args=None, kwargs=None, **kw):
     """
-    Track task failure and route to Dead Letter Queue if all retries exhausted
+    Track task failure, send WebSocket notification, and route to Dead Letter Queue if all retries exhausted - Task 10.4
     """
     print(f"❌ Task failed: {sender.name} [{task_id}]: {exception}")
     CELERY_TASKS.labels(task_name=sender.name, status='failure').inc()
+
+    # Send WebSocket notification - Task 10.4
+    try:
+        from app.utils.websocket_notifications import send_task_notification
+
+        # Extract resource IDs from task kwargs if available
+        task_kwargs = kwargs or {}
+        document_id = task_kwargs.get('document_id')
+        query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
+        user_id = task_kwargs.get('user_id')
+        session_id = task_kwargs.get('session_id')
+
+        send_task_notification(
+            task_id=task_id,
+            task_name=sender.name,
+            status="failure",
+            message=f"Task {sender.name} failed: {str(exception)}",
+            metadata={"error": str(exception), "error_type": type(exception).__name__},
+            document_id=document_id,
+            query_id=query_id,
+            user_id=user_id,
+            session_id=session_id
+        )
+    except Exception as e:
+        # Don't let WebSocket errors break task execution
+        print(f"⚠️  WebSocket notification failed for task failure: {e}")
 
     # Check if task has exhausted all retries
     from celery import current_app

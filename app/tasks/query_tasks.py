@@ -58,6 +58,19 @@ def process_adaptive_query(
             max_iterations=max_iterations
         )
 
+        # Send WebSocket notification - Task 10.4
+        from app.utils.websocket_notifications import send_query_processing_update
+        send_query_processing_update(
+            task_id=self.request.id,
+            query_id=self.request.id,  # Use task ID as query ID
+            stage="initialization",
+            status="started",
+            message="Initializing adaptive research workflow",
+            progress=10,
+            metadata={"max_iterations": max_iterations},
+            user_id=user_id
+        )
+
         # Initialize LangGraph workflow
         workflows = LangGraphWorkflows()
         graph = workflows.build_adaptive_research_graph()
@@ -75,6 +88,17 @@ def process_adaptive_query(
             "needs_external_data": False
         }
 
+        # Send progress update - Task 10.4
+        send_query_processing_update(
+            task_id=self.request.id,
+            query_id=self.request.id,
+            stage="processing",
+            status="progress",
+            message="Processing query with LangGraph workflow",
+            progress=30,
+            user_id=user_id
+        )
+
         # Run async graph in sync Celery context
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -82,6 +106,21 @@ def process_adaptive_query(
             result = loop.run_until_complete(graph.ainvoke(initial_state))
         finally:
             loop.close()
+
+        # Send completion update - Task 10.4
+        send_query_processing_update(
+            task_id=self.request.id,
+            query_id=self.request.id,
+            stage="completed",
+            status="success",
+            message="Query processing completed",
+            progress=100,
+            metadata={
+                "iterations": result["iteration_count"],
+                "tool_calls": len(result.get("tool_calls", []))
+            },
+            user_id=user_id
+        )
 
         logger.info(
             "Celery adaptive query completed",
