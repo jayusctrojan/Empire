@@ -1,4 +1,7 @@
-# Empire v7.2 - Directory Structure
+# Empire v7.3 - Directory Structure
+
+**Last Updated:** 2025-11-30
+**Version:** v7.3.0
 
 This document describes the organized directory structure for the Empire AI project.
 
@@ -7,14 +10,15 @@ This document describes the organized directory structure for the Empire AI proj
 ```
 Empire/
 ├── README.md                       # Main project documentation
-├── claude.md                       # AI assistant reference guide
+├── CLAUDE.md                       # AI assistant reference guide
 ├── empire-arch.txt                 # Core architecture specification
-└── DIRECTORY_STRUCTURE.md         # This file
+├── DIRECTORY_STRUCTURE.md          # This file
+└── notebooklm/                     # Documentation for NotebookLM presentations
 ```
 
 **Key files kept at root for easy AI/developer access:**
 - `README.md` - Primary entry point for project
-- `claude.md` - Complete guide for AI assistants and MCPs
+- `CLAUDE.md` - Complete guide for AI assistants and MCPs
 - `empire-arch.txt` - Architecture specifications
 
 ---
@@ -155,12 +159,119 @@ scripts/
 
 ## Application Code (`app/`)
 
-FastAPI application code:
+FastAPI application code with 26 API routes and 15 AI agents:
 
 ```
 app/
-└── services/
-    └── (application services)
+├── __init__.py
+├── main.py                              # FastAPI app with 26 routers
+├── celery_app.py                        # Celery configuration
+├── api/
+│   ├── __init__.py
+│   ├── notifications.py                 # Notification endpoints
+│   ├── upload.py                        # File upload endpoints
+│   └── routes/
+│       ├── __init__.py
+│       └── query.py                     # Query processing endpoints
+├── core/
+│   ├── __init__.py
+│   ├── connections.py                   # Database connection manager
+│   ├── database.py                      # Database utilities
+│   ├── database_optimized.py            # Optimized DB operations
+│   ├── feature_flags.py                 # Feature flag management
+│   ├── langfuse_config.py               # Langfuse observability
+│   ├── supabase_client.py               # Supabase client
+│   └── websockets.py                    # WebSocket utilities
+├── middleware/
+│   ├── audit.py                         # Audit logging middleware
+│   ├── auth.py                          # Authentication middleware
+│   ├── clerk_auth.py                    # Clerk authentication
+│   ├── compression.py                   # Response compression
+│   ├── input_validation.py              # Input validation
+│   ├── rate_limit.py                    # Rate limiting
+│   ├── rls_context.py                   # Row-level security context
+│   └── security.py                      # Security headers
+├── models/
+│   ├── __init__.py
+│   ├── agent_interactions.py            # Agent interaction models
+│   ├── agent_router.py                  # Agent router models
+│   ├── crewai_asset.py                  # CrewAI asset models
+│   ├── documents.py                     # Document models
+│   ├── notifications.py                 # Notification models
+│   ├── processing_logs.py               # Processing log models
+│   ├── rbac.py                          # RBAC models
+│   ├── task_status.py                   # Task status models
+│   └── users.py                         # User models
+├── routes/                              # 20 API route modules
+│   ├── agent_interactions.py            # Inter-agent messaging
+│   ├── agent_router.py                  # Intelligent query routing
+│   ├── audit.py                         # Audit log queries
+│   ├── chat_files.py                    # Chat file upload
+│   ├── content_summarizer.py            # AGENT-002 routes
+│   ├── costs.py                         # Cost tracking
+│   ├── crewai_assets.py                 # CrewAI asset storage
+│   ├── crewai.py                        # CrewAI workflows
+│   ├── department_classifier.py         # AGENT-008 routes
+│   ├── document_analysis.py             # AGENT-009/010/011 routes
+│   ├── documents.py                     # Document management
+│   ├── feature_flags.py                 # Feature flag management
+│   ├── monitoring.py                    # Analytics dashboard
+│   ├── multi_agent_orchestration.py     # AGENT-012/013/014/015 routes
+│   ├── preferences.py                   # User preferences
+│   ├── rbac.py                          # Role-based access control
+│   ├── sessions.py                      # Session management
+│   ├── status.py                        # REST status polling
+│   ├── users.py                         # User management
+│   └── websocket.py                     # WebSocket endpoints
+├── services/                            # 50+ service modules
+│   ├── agent_interaction_service.py     # Agent messaging service
+│   ├── agent_router_service.py          # Query routing service
+│   ├── content_summarizer_agent.py      # AGENT-002: Content Summarizer
+│   ├── department_classifier_agent.py   # AGENT-008: Department Classifier
+│   ├── document_analysis_agents.py      # AGENT-009/010/011: Analysis Agents
+│   ├── multi_agent_orchestration.py     # AGENT-012/013/014/015: Orchestration
+│   ├── orchestrator_agent_service.py    # LangGraph orchestrator
+│   ├── arcade_service.py                # Arcade.dev integration
+│   ├── b2_storage.py                    # Backblaze B2 storage
+│   ├── chat_service.py                  # Chat functionality
+│   ├── chunking_service.py              # Document chunking
+│   ├── citation_service.py              # Source citations
+│   ├── crewai_service.py                # CrewAI integration
+│   ├── embedding_service.py             # BGE-M3 embeddings
+│   ├── hybrid_search_service.py         # Hybrid search
+│   ├── metadata_extractor.py            # Source metadata extraction
+│   ├── neo4j_entity_service.py          # Neo4j entity operations
+│   ├── query_expansion_service.py       # Query expansion
+│   ├── reranking_service.py             # BGE-Reranker-v2
+│   ├── supabase_storage.py              # Supabase operations
+│   ├── tiered_cache_service.py          # Tiered caching
+│   ├── url_processing.py                # URL/YouTube processing
+│   ├── vision_service.py                # Claude Vision API
+│   ├── websocket_manager.py             # WebSocket management
+│   └── (40+ more services...)
+├── tasks/                               # Celery tasks
+│   ├── __init__.py
+│   ├── bulk_operations.py               # Batch processing
+│   ├── crewai_workflows.py              # CrewAI async tasks
+│   ├── document_processing.py           # Document processing
+│   ├── embedding_generation.py          # Embedding generation
+│   ├── graph_sync.py                    # Neo4j sync
+│   └── query_tasks.py                   # Query processing
+├── ui/                                  # Gradio UI components
+│   ├── chat_with_files.py               # Chat interface
+│   └── components/
+│       ├── citation_cards.py            # Citation display
+│       └── processing_status.py         # Progress indicators
+├── utils/
+│   ├── celery_retry.py                  # Retry utilities
+│   └── websocket_notifications.py       # WebSocket utilities
+├── validators/
+│   ├── __init__.py
+│   └── security.py                      # Security validators
+└── workflows/
+    ├── __init__.py
+    ├── langgraph_workflows.py           # LangGraph workflows
+    └── workflow_router.py               # Workflow routing
 ```
 
 ---
@@ -283,6 +394,37 @@ bash scripts/setup/setup_neo4j.sh
 
 ---
 
-**Last Updated:** 2025-01-02
-**Version:** v7.2
-**Status:** Reorganized and ready for development
+## Tests (`tests/`)
+
+Comprehensive test suite with 75+ test files:
+
+```
+tests/
+├── __init__.py
+├── conftest.py                          # Pytest configuration
+├── load_testing/                        # Performance tests
+│   ├── locustfile.py
+│   └── query_load_test.py
+├── test_agent_interactions.py           # Agent messaging tests
+├── test_agent_router_service.py         # Query routing tests
+├── test_content_summarizer.py           # AGENT-002 tests (15 tests)
+├── test_department_classifier.py        # AGENT-008 tests (18 tests)
+├── test_document_analysis_agents.py     # AGENT-009/010/011 tests (45 tests)
+├── test_multi_agent_orchestration.py    # AGENT-012/013/014/015 tests (62 tests)
+├── test_chat_file_upload.py             # Chat file tests
+├── test_citation_service.py             # Citation tests
+├── test_crewai_integration.py           # CrewAI tests
+├── test_embedding_service.py            # Embedding tests
+├── test_hybrid_search_service.py        # Search tests
+├── test_metadata_extraction_e2e.py      # Metadata extraction tests
+├── test_neo4j_*.py                      # Neo4j tests
+├── test_url_processing.py               # URL processing tests
+├── test_websocket_*.py                  # WebSocket tests
+└── (50+ more test files...)
+```
+
+---
+
+**Last Updated:** 2025-11-30
+**Version:** v7.3.0
+**Status:** Production-ready with 46 completed tasks

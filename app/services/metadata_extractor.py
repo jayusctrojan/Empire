@@ -433,6 +433,239 @@ class MetadataExtractor:
         else:
             return f"{minutes:02d}:{secs:02d}"
 
+    def extract_source_metadata(self, file_path: str) -> Dict[str, Any]:
+        """
+        Extract source metadata in the standardized format for storage in documents.source_metadata
+
+        Returns metadata in the format defined by the migration:
+        {
+            "title": str,
+            "author": str,
+            "publication_date": str (YYYY-MM-DD),
+            "page_count": int,
+            "document_type": str,
+            "language": str,
+            "extracted_at": str (ISO timestamp),
+            "extraction_method": str,
+            "confidence_score": float (0.0-1.0),
+            "additional_metadata": dict
+        }
+
+        Args:
+            file_path: Path to the document file
+
+        Returns:
+            Dictionary containing source metadata
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        # Get file extension
+        file_ext = Path(file_path).suffix.lower()
+
+        # Extract raw metadata using existing extractors
+        raw_metadata = self.extract_metadata(file_path)
+
+        # Initialize source metadata with defaults
+        source_metadata = {
+            "title": None,
+            "author": None,
+            "publication_date": None,
+            "page_count": None,
+            "document_type": file_ext.lstrip('.'),
+            "language": "en",  # Default to English; will enhance later
+            "extracted_at": datetime.utcnow().isoformat() + "Z",
+            "extraction_method": "native_library",
+            "confidence_score": 0.0,
+            "additional_metadata": {}
+        }
+
+        # Extract metadata based on file type
+        if file_ext == '.pdf':
+            source_metadata.update(self._format_pdf_source_metadata(raw_metadata))
+        elif file_ext == '.docx':
+            source_metadata.update(self._format_docx_source_metadata(raw_metadata))
+        elif file_ext == '.pptx':
+            source_metadata.update(self._format_pptx_source_metadata(raw_metadata))
+        else:
+            # For unsupported types, use filename as title
+            source_metadata['title'] = raw_metadata.get('filename', 'Unknown')
+            source_metadata['confidence_score'] = 0.3
+
+        # Store additional metadata that doesn't fit standard fields
+        source_metadata['additional_metadata'] = self._extract_additional_metadata(raw_metadata)
+
+        return source_metadata
+
+    def _format_pdf_source_metadata(self, raw_metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Format PDF metadata into source metadata structure"""
+        metadata = {}
+        confidence_factors = []
+
+        # Title
+        if raw_metadata.get('document_title'):
+            metadata['title'] = raw_metadata['document_title']
+            confidence_factors.append(1.0)
+        else:
+            # Use filename as fallback
+            metadata['title'] = raw_metadata.get('filename', 'Unknown').rsplit('.', 1)[0]
+            confidence_factors.append(0.5)
+
+        # Author
+        if raw_metadata.get('document_author'):
+            metadata['author'] = raw_metadata['document_author']
+            confidence_factors.append(1.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Publication date
+        if raw_metadata.get('pdf_created'):
+            try:
+                # Convert ISO timestamp to YYYY-MM-DD
+                created_date = datetime.fromisoformat(raw_metadata['pdf_created'].replace('Z', '+00:00'))
+                metadata['publication_date'] = created_date.strftime('%Y-%m-%d')
+                confidence_factors.append(0.9)  # Creation date is good proxy
+            except Exception:
+                confidence_factors.append(0.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Page count
+        if raw_metadata.get('page_count'):
+            metadata['page_count'] = raw_metadata['page_count']
+            confidence_factors.append(1.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Calculate confidence score
+        if confidence_factors:
+            metadata['confidence_score'] = sum(confidence_factors) / len(confidence_factors)
+        else:
+            metadata['confidence_score'] = 0.0
+
+        return metadata
+
+    def _format_docx_source_metadata(self, raw_metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Format DOCX metadata into source metadata structure"""
+        metadata = {}
+        confidence_factors = []
+
+        # Title
+        if raw_metadata.get('document_title'):
+            metadata['title'] = raw_metadata['document_title']
+            confidence_factors.append(1.0)
+        else:
+            metadata['title'] = raw_metadata.get('filename', 'Unknown').rsplit('.', 1)[0]
+            confidence_factors.append(0.5)
+
+        # Author
+        if raw_metadata.get('document_author'):
+            metadata['author'] = raw_metadata['document_author']
+            confidence_factors.append(1.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Publication date
+        if raw_metadata.get('document_created'):
+            try:
+                created_date = datetime.fromisoformat(raw_metadata['document_created'].replace('Z', '+00:00'))
+                metadata['publication_date'] = created_date.strftime('%Y-%m-%d')
+                confidence_factors.append(0.9)
+            except Exception:
+                confidence_factors.append(0.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Page count (DOCX doesn't have pages, use paragraph count as proxy)
+        if raw_metadata.get('paragraph_count'):
+            # Rough estimate: 10 paragraphs per page
+            metadata['page_count'] = max(1, raw_metadata['paragraph_count'] // 10)
+            confidence_factors.append(0.5)  # Low confidence for estimated pages
+        else:
+            confidence_factors.append(0.0)
+
+        # Calculate confidence score
+        if confidence_factors:
+            metadata['confidence_score'] = sum(confidence_factors) / len(confidence_factors)
+        else:
+            metadata['confidence_score'] = 0.0
+
+        return metadata
+
+    def _format_pptx_source_metadata(self, raw_metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Format PPTX metadata into source metadata structure"""
+        metadata = {}
+        confidence_factors = []
+
+        # Title
+        if raw_metadata.get('document_title'):
+            metadata['title'] = raw_metadata['document_title']
+            confidence_factors.append(1.0)
+        else:
+            metadata['title'] = raw_metadata.get('filename', 'Unknown').rsplit('.', 1)[0]
+            confidence_factors.append(0.5)
+
+        # Author
+        if raw_metadata.get('document_author'):
+            metadata['author'] = raw_metadata['document_author']
+            confidence_factors.append(1.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Publication date
+        if raw_metadata.get('document_created'):
+            try:
+                created_date = datetime.fromisoformat(raw_metadata['document_created'].replace('Z', '+00:00'))
+                metadata['publication_date'] = created_date.strftime('%Y-%m-%d')
+                confidence_factors.append(0.9)
+            except Exception:
+                confidence_factors.append(0.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Page count (use slide count)
+        if raw_metadata.get('slide_count'):
+            metadata['page_count'] = raw_metadata['slide_count']
+            confidence_factors.append(1.0)
+        else:
+            confidence_factors.append(0.0)
+
+        # Calculate confidence score
+        if confidence_factors:
+            metadata['confidence_score'] = sum(confidence_factors) / len(confidence_factors)
+        else:
+            metadata['confidence_score'] = 0.0
+
+        return metadata
+
+    def _extract_additional_metadata(self, raw_metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract additional metadata that doesn't fit standard source_metadata fields"""
+        additional = {}
+
+        # File properties
+        if raw_metadata.get('file_size_mb'):
+            additional['file_size_mb'] = raw_metadata['file_size_mb']
+        if raw_metadata.get('file_hash'):
+            additional['file_hash'] = raw_metadata['file_hash']
+
+        # Document-specific properties
+        if raw_metadata.get('document_subject'):
+            additional['subject'] = raw_metadata['document_subject']
+        if raw_metadata.get('document_keywords'):
+            additional['keywords'] = raw_metadata['document_keywords']
+        if raw_metadata.get('pdf_creator'):
+            additional['creator'] = raw_metadata['pdf_creator']
+        if raw_metadata.get('pdf_producer'):
+            additional['producer'] = raw_metadata['pdf_producer']
+
+        # DOCX-specific
+        if raw_metadata.get('paragraph_count'):
+            additional['paragraph_count'] = raw_metadata['paragraph_count']
+        if raw_metadata.get('table_count'):
+            additional['table_count'] = raw_metadata['table_count']
+
+        return additional
+
 
 # Global instance
 _metadata_extractor = None

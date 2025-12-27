@@ -37,12 +37,15 @@ langchain-ollama>=0.1.0  # Ollama integration for embeddings
 langgraph>=0.0.50  # LangGraph for adaptive workflows with state management
 arcadepy>=0.1.0  # Arcade.dev for external tool integration (Google Search, Slack, etc.)
 openai>=1.10.0  # OpenAI API for embeddings and LLMs
+mistralai>=1.0.0  # Mistral API for embeddings fallback (Task 26)
 
 # Document Processing
 pypdf>=4.0.0
 python-docx>=1.1.0
 python-pptx>=0.6.23
 pillow>=10.2.0
+reportlab>=4.0.0  # PDF generation for Content Summarizer Agent
+matplotlib>=3.8.0  # Chart and diagram generation
 opencv-python-headless>=4.9.0
 exifread>=3.0.0  # EXIF metadata extraction from images
 

@@ -22,8 +22,62 @@ from app.middleware.clerk_auth import verify_clerk_token
 # Task 43.3: Query result caching with semantic similarity
 from app.services.query_cache import cached_query
 
+# Task 15: Citation service for inline citations
+from app.services.citation_service import get_citation_service, CitationStyle
+
 router = APIRouter(prefix="/api/query", tags=["query"])
 logger = structlog.get_logger(__name__)
+
+
+def process_citations_for_response(
+    answer: str,
+    search_results: List[dict],
+    citation_style: CitationStyle = CitationStyle.NUMERIC
+) -> tuple:
+    """
+    Process search results and add inline citations to the answer.
+
+    Args:
+        answer: The AI-generated answer text
+        search_results: List of search result chunks
+        citation_style: Citation style to use
+
+    Returns:
+        Tuple of (cited_answer, citations_list, sources_footer)
+    """
+    citation_service = get_citation_service()
+
+    if not search_results:
+        return answer, [], ""
+
+    # Insert inline citations and get CitedResponse
+    cited_response = citation_service.insert_inline_citations(
+        response_text=answer,
+        chunks=search_results,
+        style=citation_style
+    )
+
+    # Convert citations to CitationInfo format
+    citations_list = [
+        {
+            "citation_number": c.citation_number,
+            "marker": c.marker,
+            "title": c.source.title,
+            "author": c.source.author,
+            "document_id": c.source.document_id,
+            "chunk_id": c.source.chunk_id,
+            "page_number": c.source.page_number,
+            "document_type": c.source.document_type,
+            "relevance_score": c.source.relevance_score,
+            "formatted_citation": c.formatted_citation
+        }
+        for c in cited_response.citations
+    ]
+
+    # Generate sources footer
+    sources_footer = citation_service.format_citations_footer(cited_response.citations)
+
+    return cited_response.response_text, citations_list, sources_footer
 
 
 class AdaptiveQueryRequest(BaseModel):
@@ -32,6 +86,20 @@ class AdaptiveQueryRequest(BaseModel):
     max_iterations: int = Field(3, ge=1, le=5, description="Max refinement iterations")
     use_external_tools: bool = Field(True, description="Allow external API calls via Arcade")
     use_graph_context: bool = Field(True, description="Include Neo4j graph context")
+
+
+class CitationInfo(BaseModel):
+    """Citation information for a source."""
+    citation_number: int
+    marker: str  # e.g., "[1]", "(Doe, 2024)"
+    title: str
+    author: Optional[str] = None
+    document_id: Optional[str] = None
+    chunk_id: Optional[str] = None
+    page_number: Optional[int] = None
+    document_type: Optional[str] = None
+    relevance_score: Optional[float] = None
+    formatted_citation: str
 
 
 class AdaptiveQueryResponse(BaseModel):
@@ -45,6 +113,10 @@ class AdaptiveQueryResponse(BaseModel):
     processing_time_ms: int
     from_cache: bool = False
     cache_namespace: Optional[str] = None
+    # Task 15: Citation fields
+    citations: List[CitationInfo] = []
+    citation_style: str = "numeric"
+    sources_footer: str = ""
 
 
 class ToolListResponse(BaseModel):
@@ -192,14 +264,27 @@ async def adaptive_query_endpoint(
             tool_calls=len(result.get("tool_calls", []))
         )
 
+        # Task 15: Process citations for the response
+        search_results = result.get("search_results", [])
+        final_answer = result.get("final_answer", "")
+
+        cited_answer, citations, sources_footer = process_citations_for_response(
+            answer=final_answer,
+            search_results=search_results,
+            citation_style=CitationStyle.NUMERIC
+        )
+
         return AdaptiveQueryResponse(
-            answer=result.get("final_answer", ""),
+            answer=cited_answer,
             refined_queries=result.get("refined_queries", []),
-            sources=result.get("search_results", []),
+            sources=search_results,
             tool_calls=result.get("tool_calls", []),
             iterations=result["iteration_count"],
             workflow_type="langgraph",
-            processing_time_ms=processing_time
+            processing_time_ms=processing_time,
+            citations=citations,
+            citation_style="numeric",
+            sources_footer=sources_footer
         )
 
     except Exception as e:
@@ -275,14 +360,27 @@ async def auto_routed_query(
 
                 processing_time = int((time.time() - start_time) * 1000)
 
+                # Task 15: Process citations for CrewAI response
+                sources = crewai_result.get("sources", [])
+                answer = crewai_result.get("answer", "")
+
+                cited_answer, citations, sources_footer = process_citations_for_response(
+                    answer=answer,
+                    search_results=sources,
+                    citation_style=CitationStyle.NUMERIC
+                )
+
                 return AdaptiveQueryResponse(
-                    answer=crewai_result.get("answer", ""),
+                    answer=cited_answer,
                     refined_queries=crewai_result.get("refined_queries", []),
-                    sources=crewai_result.get("sources", []),
+                    sources=sources,
                     tool_calls=crewai_result.get("agents_used", []),
                     iterations=len(crewai_result.get("steps", [])),
                     workflow_type="crewai",
-                    processing_time_ms=processing_time
+                    processing_time_ms=processing_time,
+                    citations=citations,
+                    citation_style="numeric",
+                    sources_footer=sources_footer
                 )
 
             except Exception as e:
@@ -296,7 +394,10 @@ async def auto_routed_query(
                     iterations=0,
                     refined_queries=[],
                     sources=[],
-                    tool_calls=[]
+                    tool_calls=[],
+                    citations=[],
+                    citation_style="numeric",
+                    sources_footer=""
                 )
 
         else:  # SIMPLE
@@ -305,14 +406,27 @@ async def auto_routed_query(
 
             logger.info("Simple RAG query", query=request.query[:50])
 
+            # Task 15: Simple RAG also includes citations (when actual RAG is implemented)
+            stub_sources = [{"type": "vector", "content": "Stub result"}]
+            stub_answer = f"Simple RAG result for: {request.query}"
+
+            cited_answer, citations, sources_footer = process_citations_for_response(
+                answer=stub_answer,
+                search_results=stub_sources,
+                citation_style=CitationStyle.NUMERIC
+            )
+
             return AdaptiveQueryResponse(
-                answer=f"Simple RAG result for: {request.query}",
-                sources=[{"type": "vector", "content": "Stub result"}],
+                answer=cited_answer,
+                sources=stub_sources,
                 workflow_type="simple",
                 processing_time_ms=processing_time,
                 iterations=0,
                 refined_queries=[],
-                tool_calls=[]
+                tool_calls=[],
+                citations=citations,
+                citation_style="numeric",
+                sources_footer=sources_footer
             )
 
     except Exception as e:

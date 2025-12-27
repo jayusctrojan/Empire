@@ -1,6 +1,11 @@
 """
 Empire v7.3 - Embedding Generation Service
-Generate and cache embeddings using BGE-M3 (Ollama) or OpenAI with Supabase pgvector caching
+Generate and cache embeddings using BGE-M3 (Ollama) or Mistral with Supabase pgvector caching
+
+Primary: BGE-M3 via Ollama (1024 dims, free, local)
+Fallback: Mistral Embed (1024 dims, $0.1/1M tokens, cloud)
+
+Both use 1024 dimensions for compatibility - no schema changes needed when switching.
 """
 
 import os
@@ -21,13 +26,13 @@ except ImportError:
     OLLAMA_AVAILABLE = False
     logging.warning("langchain-ollama not available - install with: pip install langchain-ollama")
 
-# OpenAI for production embeddings
+# Mistral AI for production embeddings (fallback)
 try:
-    from openai import AsyncOpenAI
-    OPENAI_AVAILABLE = True
+    from mistralai import Mistral
+    MISTRAL_AVAILABLE = True
 except ImportError:
-    OPENAI_AVAILABLE = False
-    logging.warning("openai not available - install with: pip install openai")
+    MISTRAL_AVAILABLE = False
+    logging.warning("mistralai not available - install with: pip install mistralai")
 
 logger = logging.getLogger(__name__)
 
@@ -38,15 +43,14 @@ logger = logging.getLogger(__name__)
 
 class EmbeddingProvider(str, Enum):
     """Available embedding providers"""
-    OLLAMA = "ollama"  # BGE-M3 via Ollama for development
-    OPENAI = "openai"  # OpenAI embeddings for production
+    OLLAMA = "ollama"  # BGE-M3 via Ollama for development (free, local)
+    MISTRAL = "mistral"  # Mistral Embed for production fallback ($0.1/1M tokens)
 
 
 class EmbeddingModel(str, Enum):
     """Available embedding models"""
     BGE_M3 = "bge-m3"  # Ollama BGE-M3 (1024 dimensions, free)
-    OPENAI_SMALL = "text-embedding-3-small"  # OpenAI (1536 dimensions)
-    OPENAI_LARGE = "text-embedding-3-large"  # OpenAI (3072 dimensions)
+    MISTRAL_EMBED = "mistral-embed"  # Mistral Embed (1024 dimensions with output_dimension param)
 
 
 @dataclass
@@ -55,9 +59,9 @@ class EmbeddingConfig:
     provider: EmbeddingProvider
     model: EmbeddingModel
     batch_size: int = 100
-    dimensions: int = 1024
+    dimensions: int = 1024  # Both BGE-M3 and Mistral use 1024 dims
     ollama_base_url: str = "http://localhost:11434"
-    openai_api_key: Optional[str] = None
+    mistral_api_key: Optional[str] = None
     cache_enabled: bool = True
     regenerate_on_update: bool = True
 
@@ -252,12 +256,14 @@ class EmbeddingService:
     Unified embedding generation service with caching and monitoring
 
     Features:
-    - BGE-M3 via Ollama for development (free, local)
-    - OpenAI embeddings for production (paid, cloud)
+    - BGE-M3 via Ollama for development (free, local, 1024 dims)
+    - Mistral Embed for production fallback ($0.1/1M tokens, 1024 dims)
     - Automatic caching in Supabase pgvector
     - Batch processing (100 chunks default)
     - Cost tracking and monitoring
     - Error handling and retries
+
+    Both providers use 1024 dimensions for seamless switching.
     """
 
     def __init__(
@@ -286,12 +292,12 @@ class EmbeddingService:
 
         # Initialize embedding providers
         self.ollama_client = None
-        self.openai_client = None
+        self.mistral_client = None
 
         if config.provider == EmbeddingProvider.OLLAMA:
             self._init_ollama()
-        elif config.provider == EmbeddingProvider.OPENAI:
-            self._init_openai()
+        elif config.provider == EmbeddingProvider.MISTRAL:
+            self._init_mistral()
 
     def _init_ollama(self):
         """Initialize Ollama embedding client"""
@@ -308,20 +314,20 @@ class EmbeddingService:
             logger.error(f"Failed to initialize Ollama client: {e}")
             raise
 
-    def _init_openai(self):
-        """Initialize OpenAI embedding client"""
-        if not OPENAI_AVAILABLE:
-            raise ImportError("openai not installed. Install with: pip install openai")
+    def _init_mistral(self):
+        """Initialize Mistral embedding client"""
+        if not MISTRAL_AVAILABLE:
+            raise ImportError("mistralai not installed. Install with: pip install mistralai")
 
-        api_key = self.config.openai_api_key or os.getenv("OPENAI_API_KEY")
+        api_key = self.config.mistral_api_key or os.getenv("MISTRAL_API_KEY")
         if not api_key:
-            raise ValueError("OpenAI API key not provided and OPENAI_API_KEY not in environment")
+            raise ValueError("Mistral API key not provided and MISTRAL_API_KEY not in environment")
 
         try:
-            self.openai_client = AsyncOpenAI(api_key=api_key)
-            logger.info(f"Initialized OpenAI embeddings with model: {self.config.model.value}")
+            self.mistral_client = Mistral(api_key=api_key)
+            logger.info(f"Initialized Mistral embeddings with model: {self.config.model.value}")
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}")
+            logger.error(f"Failed to initialize Mistral client: {e}")
             raise
 
     async def generate_embedding(
@@ -367,8 +373,8 @@ class EmbeddingService:
         if self.config.provider == EmbeddingProvider.OLLAMA:
             embedding = await self._generate_ollama_embedding(text)
             cost = 0.0  # Free
-        elif self.config.provider == EmbeddingProvider.OPENAI:
-            embedding, cost = await self._generate_openai_embedding(text)
+        elif self.config.provider == EmbeddingProvider.MISTRAL:
+            embedding, cost = await self._generate_mistral_embedding(text)
         else:
             raise ValueError(f"Unsupported provider: {self.config.provider}")
 
@@ -481,8 +487,8 @@ class EmbeddingService:
                 new_emb = await self._generate_ollama_embeddings_batch(uncached_texts)
                 new_embeddings = [(uncached_indices[i], emb) for i, emb in enumerate(new_emb)]
                 cost = 0.0
-            elif self.config.provider == EmbeddingProvider.OPENAI:
-                new_emb, cost = await self._generate_openai_embeddings_batch(uncached_texts)
+            elif self.config.provider == EmbeddingProvider.MISTRAL:
+                new_emb, cost = await self._generate_mistral_embeddings_batch(uncached_texts)
                 new_embeddings = [(uncached_indices[i], emb) for i, emb in enumerate(new_emb)]
                 total_cost = cost
 
@@ -562,61 +568,60 @@ class EmbeddingService:
             logger.error(f"Ollama batch embedding generation failed: {e}")
             raise
 
-    async def _generate_openai_embedding(self, text: str) -> Tuple[List[float], float]:
-        """Generate single embedding using OpenAI"""
-        if not self.openai_client:
-            raise ValueError("OpenAI client not initialized")
+    async def _generate_mistral_embedding(self, text: str) -> Tuple[List[float], float]:
+        """Generate single embedding using Mistral AI"""
+        if not self.mistral_client:
+            raise ValueError("Mistral client not initialized")
 
         try:
-            response = await self.openai_client.embeddings.create(
+            # Use async method with output_dimension=1024 to match BGE-M3
+            response = await self.mistral_client.embeddings.create_async(
                 model=self.config.model.value,
-                input=text
+                inputs=[text],
+                output_dimension=1024  # Match BGE-M3 dimensions
             )
 
             embedding = response.data[0].embedding
 
-            # Calculate cost (rough estimate based on tokens)
-            from app.services.monitoring_service import CostCalculator
-            tokens = len(text.split()) * 1.3  # Rough token estimate
-            cost = CostCalculator.calculate_embedding_cost(
-                self.config.model.value,
-                int(tokens)
-            )
+            # Calculate cost: $0.1 per 1M tokens
+            # Rough token estimate: ~1.3 tokens per word
+            tokens = len(text.split()) * 1.3
+            cost = (tokens / 1_000_000) * 0.1
 
             return embedding, cost
 
         except Exception as e:
-            logger.error(f"OpenAI embedding generation failed: {e}")
+            logger.error(f"Mistral embedding generation failed: {e}")
             raise
 
-    async def _generate_openai_embeddings_batch(
+    async def _generate_mistral_embeddings_batch(
         self,
         texts: List[str]
     ) -> Tuple[List[List[float]], float]:
-        """Generate batch embeddings using OpenAI"""
-        if not self.openai_client:
-            raise ValueError("OpenAI client not initialized")
+        """Generate batch embeddings using Mistral AI"""
+        if not self.mistral_client:
+            raise ValueError("Mistral client not initialized")
 
         try:
-            response = await self.openai_client.embeddings.create(
+            # Use async method with output_dimension=1024 to match BGE-M3
+            response = await self.mistral_client.embeddings.create_async(
                 model=self.config.model.value,
-                input=texts
+                inputs=texts,
+                output_dimension=1024  # Match BGE-M3 dimensions
             )
 
-            embeddings = [item.embedding for item in response.data]
+            # Extract embeddings maintaining order (sorted by index)
+            sorted_data = sorted(response.data, key=lambda x: x.index)
+            embeddings = [item.embedding for item in sorted_data]
 
-            # Calculate total cost
-            from app.services.monitoring_service import CostCalculator
+            # Calculate total cost: $0.1 per 1M tokens
             total_tokens = sum(len(text.split()) * 1.3 for text in texts)
-            cost = CostCalculator.calculate_embedding_cost(
-                self.config.model.value,
-                int(total_tokens)
-            )
+            cost = (total_tokens / 1_000_000) * 0.1
 
             return embeddings, cost
 
         except Exception as e:
-            logger.error(f"OpenAI batch embedding generation failed: {e}")
+            logger.error(f"Mistral batch embedding generation failed: {e}")
             raise
 
     async def invalidate_chunk_cache(self, chunk_id: str):
@@ -640,7 +645,7 @@ def create_embedding_service(
     Factory function to create an embedding service
 
     Args:
-        provider: "ollama" or "openai"
+        provider: "ollama" or "mistral"
         model: Model name (defaults based on provider)
         supabase_storage: Supabase storage service
         monitoring_service: Monitoring service
@@ -648,18 +653,23 @@ def create_embedding_service(
 
     Returns:
         Configured EmbeddingService instance
+
+    Note:
+        Both providers use 1024 dimensions for compatibility:
+        - ollama: BGE-M3 (free, local)
+        - mistral: mistral-embed with output_dimension=1024 ($0.1/1M tokens)
     """
-    # Determine provider
+    # Determine provider - both use 1024 dimensions
     if provider == "ollama":
         embedding_provider = EmbeddingProvider.OLLAMA
         embedding_model = EmbeddingModel.BGE_M3 if not model else EmbeddingModel(model)
         dimensions = 1024
-    elif provider == "openai":
-        embedding_provider = EmbeddingProvider.OPENAI
-        embedding_model = EmbeddingModel.OPENAI_SMALL if not model else EmbeddingModel(model)
-        dimensions = 1536 if embedding_model == EmbeddingModel.OPENAI_SMALL else 3072
+    elif provider == "mistral":
+        embedding_provider = EmbeddingProvider.MISTRAL
+        embedding_model = EmbeddingModel.MISTRAL_EMBED if not model else EmbeddingModel(model)
+        dimensions = 1024  # Set via output_dimension parameter in API call
     else:
-        raise ValueError(f"Unsupported provider: {provider}")
+        raise ValueError(f"Unsupported provider: {provider}. Use 'ollama' or 'mistral'.")
 
     # Create configuration
     config = EmbeddingConfig(
@@ -668,7 +678,7 @@ def create_embedding_service(
         dimensions=dimensions,
         batch_size=kwargs.get("batch_size", 100),
         ollama_base_url=kwargs.get("ollama_base_url", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")),
-        openai_api_key=kwargs.get("openai_api_key", os.getenv("OPENAI_API_KEY")),
+        mistral_api_key=kwargs.get("mistral_api_key", os.getenv("MISTRAL_API_KEY")),
         cache_enabled=kwargs.get("cache_enabled", True),
         regenerate_on_update=kwargs.get("regenerate_on_update", True)
     )

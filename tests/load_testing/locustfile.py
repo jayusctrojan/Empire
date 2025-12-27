@@ -313,8 +313,8 @@ class QueryProcessingTasks(TaskSet):
             "health safety compliance"
         ]
 
-        # Random filters to simulate different search patterns
-        departments = random.sample(["legal", "hr", "finance", "it"], k=random.randint(0, 2))
+        # Random filters to simulate different search patterns (v7.3 - 12 departments)
+        departments = random.sample(["legal", "hr", "finance", "it", "research-development", "consulting"], k=random.randint(0, 2))
         file_types = random.sample(["pdf", "docx", "txt"], k=random.randint(0, 2))
 
         params = {

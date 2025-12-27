@@ -204,6 +204,11 @@ class DepartmentRouter:
                 'primary': ['education', 'learning', 'course', 'training', 'skill', 'personal', 'development'],
                 'secondary': ['certification', 'online', 'tutorial', 'workshop', 'webinar'],
                 'weight': 1.0
+            },
+            'research-development': {
+                'primary': ['research', 'r&d', 'innovation', 'prototype', 'experiment', 'hypothesis', 'patent', 'invention'],
+                'secondary': ['lab', 'laboratory', 'testing', 'proof of concept', 'poc', 'mvp', 'pilot', 'beta'],
+                'weight': 1.0
             }
         }
 

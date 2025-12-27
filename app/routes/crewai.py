@@ -546,3 +546,203 @@ async def get_agent_pool_stats(crewai_service: CrewAIService = Depends(get_crewa
     except Exception as e:
         logger.error("Failed to get agent pool stats", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== AGENT-001: Orchestrator Endpoints (Task 41) ====================
+
+from app.services.orchestrator_agent_service import (
+    OrchestratorAgentService,
+    OrchestratorResult,
+    Department,
+    AssetType
+)
+
+
+class OrchestratorRequest(BaseModel):
+    """Request model for orchestrator content processing"""
+    content: str = Field(..., description="Content to analyze and process", min_length=10)
+    filename: Optional[str] = Field(default=None, description="Optional filename for context")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Optional additional metadata")
+    user_id: Optional[str] = Field(default=None, description="Optional user ID for tracking")
+
+
+class OrchestratorResponse(BaseModel):
+    """Response model for orchestrator processing"""
+    success: bool
+    department: str
+    department_confidence: float
+    primary_asset_type: str
+    all_asset_types: List[str]
+    needs_summary: bool
+    delegation_targets: List[str]
+    output_paths: Dict[str, str]
+    processing_time_seconds: float
+    classification_reasoning: str
+    asset_decision_reasoning: str
+
+
+def get_orchestrator_service(supabase: Client = Depends(get_supabase)) -> OrchestratorAgentService:
+    """Dependency to get OrchestratorAgentService instance"""
+    return OrchestratorAgentService(supabase_client=supabase)
+
+
+@router.post(
+    "/orchestrator/process",
+    summary="Process Content with AGENT-001",
+    description="Analyze content using AGENT-001 (Master Content Analyzer & Asset Orchestrator). "
+                "Classifies department (12 departments including R&D, >96% accuracy), selects asset types, "
+                "and determines delegation targets.",
+    response_model=OrchestratorResponse,
+    tags=["crewai", "agent-001"]
+)
+async def orchestrator_process_content(
+    request: OrchestratorRequest,
+    orchestrator: OrchestratorAgentService = Depends(get_orchestrator_service)
+):
+    """
+    AGENT-001: Master Content Analyzer & Asset Orchestrator
+
+    Analyzes incoming content and makes intelligent decisions about:
+    1. Department classification (12 departments including R&D)
+    2. Asset type selection (skill/command/agent/prompt/workflow)
+    3. Content summary requirements
+    4. Delegation to specialized agents
+
+    Target: >96% classification accuracy
+    LLM: Claude Sonnet 4.5
+    """
+    try:
+        logger.info(
+            "AGENT-001 request received",
+            content_length=len(request.content),
+            filename=request.filename
+        )
+
+        result: OrchestratorResult = await orchestrator.process_content(
+            content=request.content,
+            filename=request.filename,
+            metadata=request.metadata,
+            user_id=request.user_id
+        )
+
+        return OrchestratorResponse(
+            success=True,
+            department=result.classification.department.value,
+            department_confidence=result.classification.confidence,
+            primary_asset_type=result.asset_decision.primary_type.value,
+            all_asset_types=[a.value for a in result.asset_decision.asset_types],
+            needs_summary=result.asset_decision.needs_summary,
+            delegation_targets=result.delegation_targets,
+            output_paths=result.output_paths,
+            processing_time_seconds=result.processing_metadata.get("processing_time_seconds", 0),
+            classification_reasoning=result.classification.reasoning,
+            asset_decision_reasoning=result.asset_decision.reasoning
+        )
+
+    except Exception as e:
+        logger.error("AGENT-001 processing failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Orchestrator processing failed: {str(e)}"
+        )
+
+
+@router.get(
+    "/orchestrator/stats",
+    summary="AGENT-001 Statistics",
+    description="Get processing statistics for AGENT-001 orchestrator"
+)
+async def orchestrator_stats(
+    orchestrator: OrchestratorAgentService = Depends(get_orchestrator_service)
+):
+    """Get AGENT-001 processing statistics"""
+    try:
+        stats = orchestrator.get_stats()
+        return {
+            "agent_id": "AGENT-001",
+            "agent_name": "Master Content Analyzer & Asset Orchestrator",
+            "statistics": stats
+        }
+    except Exception as e:
+        logger.error("Failed to get orchestrator stats", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/orchestrator/departments",
+    summary="List Departments",
+    description="Get list of all available departments for classification"
+)
+async def list_departments():
+    """Get list of all available departments"""
+    departments = [
+        {
+            "code": d.value,
+            "name": d.name.replace("_", " ").title(),
+            "description": _get_department_description(d)
+        }
+        for d in Department
+    ]
+    return {"departments": departments, "count": len(departments)}
+
+
+@router.get(
+    "/orchestrator/asset-types",
+    summary="List Asset Types",
+    description="Get list of all available asset types for generation"
+)
+async def list_asset_types():
+    """Get list of all available asset types"""
+    asset_types = [
+        {
+            "code": a.value,
+            "name": a.name.replace("_", " ").title(),
+            "description": _get_asset_type_description(a),
+            "file_extension": _get_asset_extension(a)
+        }
+        for a in AssetType
+    ]
+    return {"asset_types": asset_types, "count": len(asset_types)}
+
+
+def _get_department_description(dept: Department) -> str:
+    """Get description for department (12 departments v7.3)"""
+    descriptions = {
+        Department.IT_ENGINEERING: "Software development, infrastructure, DevOps, technical systems",
+        Department.SALES_MARKETING: "Sales processes, marketing campaigns, lead generation, CRM",
+        Department.CUSTOMER_SUPPORT: "Customer service, helpdesk, ticketing, issue resolution",
+        Department.OPERATIONS_HR_SUPPLY: "HR, operations, supply chain, logistics, workforce management",
+        Department.FINANCE_ACCOUNTING: "Financial operations, accounting, budgeting, auditing",
+        Department.PROJECT_MANAGEMENT: "Project planning, Agile/Scrum, milestones, resource management",
+        Department.REAL_ESTATE: "Property management, leasing, real estate transactions",
+        Department.PRIVATE_EQUITY_MA: "Private equity, mergers & acquisitions, valuations, investments",
+        Department.CONSULTING: "Strategic consulting, advisory services, frameworks, recommendations",
+        Department.PERSONAL_CONTINUING_ED: "Education, training, professional development, courses",
+        Department.GLOBAL: "Cross-department or multi-department content",
+        Department.RESEARCH_DEVELOPMENT: "R&D, innovation, prototyping, experiments, patents, product development"
+    }
+    return descriptions.get(dept, "")
+
+
+def _get_asset_type_description(asset: AssetType) -> str:
+    """Get description for asset type"""
+    descriptions = {
+        AssetType.SKILL: "Complex reusable automation with parameters and logic (YAML)",
+        AssetType.COMMAND: "Quick one-liner actions and shortcuts (Markdown)",
+        AssetType.AGENT: "Multi-step role-based intelligent tasks (YAML)",
+        AssetType.PROMPT: "Reusable AI prompt templates (Markdown) - DEFAULT",
+        AssetType.WORKFLOW: "Multi-system automation sequences (JSON)"
+    }
+    return descriptions.get(asset, "")
+
+
+def _get_asset_extension(asset: AssetType) -> str:
+    """Get file extension for asset type"""
+    extensions = {
+        AssetType.SKILL: ".yaml",
+        AssetType.COMMAND: ".md",
+        AssetType.AGENT: ".yaml",
+        AssetType.PROMPT: ".md",
+        AssetType.WORKFLOW: ".json"
+    }
+    return extensions.get(asset, "")

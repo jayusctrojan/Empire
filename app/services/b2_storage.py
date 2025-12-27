@@ -342,6 +342,43 @@ class B2StorageService:
             logger.error(f"Failed to delete file {file_id}: {e}")
             raise
 
+    async def download_file(self, file_id: str, file_name: str, destination_path: str) -> bool:
+        """
+        Download a file from B2 to local filesystem
+
+        Args:
+            file_id: B2 file ID
+            file_name: Full file path in B2
+            destination_path: Local path to save the file
+
+        Returns:
+            bool: True if successful
+
+        Raises:
+            B2Error: If download fails
+            FileNotFoundError: If file doesn't exist in B2
+        """
+        try:
+            bucket = self._get_bucket()
+
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+            # Download file
+            downloaded_file = bucket.download_file_by_id(file_id)
+            downloaded_file.save_to(destination_path)
+
+            logger.info(f"Downloaded file {file_name} to {destination_path}")
+            return True
+
+        except FileNotPresent:
+            logger.error(f"File not found in B2: {file_name} (ID: {file_id})")
+            raise FileNotFoundError(f"File not found in B2: {file_name}")
+
+        except B2Error as e:
+            logger.error(f"Failed to download file {file_id}: {e}")
+            raise
+
     async def move_to_status(
         self,
         file_id: str,

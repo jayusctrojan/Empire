@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# 10 Business Departments
+# 12 Business Departments (v7.3 - includes _global and research-development)
 DEPARTMENTS = [
     "it-engineering",
     "sales-marketing",
@@ -24,7 +24,9 @@ DEPARTMENTS = [
     "real-estate",
     "private-equity-ma",
     "consulting",
-    "personal-continuing-ed"
+    "personal-continuing-ed",
+    "_global",
+    "research-development"
 ]
 
 # Asset types for suggestions (drafts + approved)

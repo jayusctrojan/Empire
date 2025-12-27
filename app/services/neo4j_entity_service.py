@@ -513,6 +513,146 @@ class Neo4jEntityService:
             logger.error(f"Failed to check relationship existence: {e}")
             return False
 
+    # =========================================================================
+    # DEPARTMENT NODE METHODS (v7.3)
+    # =========================================================================
+
+    def get_all_departments(self) -> List[Dict[str, Any]]:
+        """
+        Get all department nodes from Neo4j
+
+        Returns:
+            List of department dictionaries with all properties
+        """
+        try:
+            query = """
+            MATCH (d:Department)
+            RETURN d.slug as slug,
+                   d.display_name as display_name,
+                   d.description as description,
+                   d.icon as icon,
+                   d.sort_order as sort_order,
+                   d.is_active as is_active,
+                   d.keywords as keywords
+            ORDER BY d.sort_order
+            """
+
+            result = self.connection.execute_query(query, {})
+            logger.info(f"Retrieved {len(result)} departments from Neo4j")
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to get departments: {e}")
+            return []
+
+    def get_department_by_slug(self, slug: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific department by slug
+
+        Args:
+            slug: Department slug (e.g., 'research-development')
+
+        Returns:
+            Department dictionary or None if not found
+        """
+        try:
+            query = """
+            MATCH (d:Department {slug: $slug})
+            RETURN d.slug as slug,
+                   d.display_name as display_name,
+                   d.description as description,
+                   d.icon as icon,
+                   d.sort_order as sort_order,
+                   d.is_active as is_active,
+                   d.keywords as keywords
+            """
+
+            result = self.connection.execute_query(query, {"slug": slug})
+
+            if result:
+                return result[0]
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to get department {slug}: {e}")
+            return None
+
+    def link_document_to_department(
+        self,
+        doc_id: str,
+        department_slug: str
+    ) -> bool:
+        """
+        Create a relationship between a document and its department
+
+        Args:
+            doc_id: Document ID
+            department_slug: Department slug
+
+        Returns:
+            True if successful
+        """
+        try:
+            query = """
+            MATCH (d:Document {doc_id: $doc_id})
+            MATCH (dept:Department {slug: $department_slug})
+            MERGE (d)-[r:BELONGS_TO]->(dept)
+            SET r.created_at = datetime()
+            RETURN d.doc_id as doc_id, dept.slug as department
+            """
+
+            result = self.connection.execute_query(
+                query,
+                {"doc_id": doc_id, "department_slug": department_slug}
+            )
+
+            if result:
+                logger.info(
+                    f"Linked document {doc_id} to department {department_slug}"
+                )
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"Failed to link document to department: {e}")
+            return False
+
+    def get_documents_by_department(
+        self,
+        department_slug: str,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all documents belonging to a department
+
+        Args:
+            department_slug: Department slug
+            limit: Maximum number of documents to return
+
+        Returns:
+            List of document dictionaries
+        """
+        try:
+            query = """
+            MATCH (d:Document)-[:BELONGS_TO]->(dept:Department {slug: $slug})
+            RETURN d.doc_id as doc_id,
+                   d.title as title,
+                   d.doc_type as doc_type,
+                   d.department as department
+            ORDER BY d.created_at DESC
+            LIMIT $limit
+            """
+
+            result = self.connection.execute_query(
+                query,
+                {"slug": department_slug, "limit": limit}
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to get documents for department: {e}")
+            return []
+
 
 # Singleton instance
 _neo4j_entity_service: Optional[Neo4jEntityService] = None

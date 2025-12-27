@@ -7,10 +7,14 @@ from app.celery_app import celery_app, PRIORITY_URGENT, PRIORITY_HIGH, PRIORITY_
 from app.services.supabase_storage import get_supabase_storage
 from app.services.notification_dispatcher import get_notification_dispatcher
 from app.services.b2_workflow import get_workflow_manager
+from app.services.b2_storage import B2StorageService
+from app.services.metadata_extractor import get_metadata_extractor
 from typing import Dict, Any, Optional
 import os
 import asyncio
 import logging
+import tempfile
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +60,49 @@ def process_document(self, file_id: str, filename: str, b2_path: str) -> Dict[st
             status="processing"
         ))
 
+        # Extract source metadata
+        temp_file_path = None
+        try:
+            # Download file from B2 to temp location
+            b2_storage = B2StorageService()
+            temp_dir = tempfile.gettempdir()
+            temp_file_path = os.path.join(temp_dir, filename)
+
+            logger.info(f"📥 Downloading {filename} from B2 for metadata extraction")
+            asyncio.run(b2_storage.download_file(
+                file_id=file_id,
+                file_name=b2_path,
+                destination_path=temp_file_path
+            ))
+
+            # Extract source metadata using MetadataExtractor
+            logger.info(f"📊 Extracting source metadata from {filename}")
+            metadata_extractor = get_metadata_extractor()
+            source_metadata = metadata_extractor.extract_source_metadata(temp_file_path)
+
+            logger.info(f"✅ Extracted source metadata: {source_metadata}")
+
+            # Store source metadata in Supabase
+            asyncio.run(supabase_storage.update_source_metadata(
+                b2_file_id=file_id,
+                source_metadata=source_metadata
+            ))
+
+            logger.info(f"💾 Stored source metadata for {filename}")
+
+        except Exception as metadata_error:
+            logger.error(f"⚠️ Metadata extraction failed for {filename}: {metadata_error}")
+            # Continue processing even if metadata extraction fails
+            # This is non-critical, document can still be processed
+
+        finally:
+            # Clean up temporary file
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+                logger.info(f"🗑️ Cleaned up temporary file: {temp_file_path}")
+
         # TODO: Call LlamaIndex service for parsing
-        # TODO: Extract metadata
-        # TODO: Store results
+        # TODO: Store parsed content
 
         # Placeholder implementation
         logger.info(f"✅ Document processed successfully: {filename}")

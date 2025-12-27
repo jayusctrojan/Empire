@@ -9,7 +9,7 @@ from typing import Dict, List, Any
 import os
 from datetime import datetime
 
-# Department codes for classification
+# Department codes for classification (v7.3 - 12 departments)
 DEPARTMENTS = [
     "it-engineering",
     "sales-marketing",
@@ -21,7 +21,8 @@ DEPARTMENTS = [
     "private-equity-ma",
     "consulting",
     "personal-continuing-ed",
-    "_global"
+    "_global",
+    "research-development"
 ]
 
 # Asset type definitions
