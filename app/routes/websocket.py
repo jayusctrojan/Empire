@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 
 from app.services.websocket_manager import get_connection_manager
-from app.core.auth import get_current_user_optional
+from app.middleware.auth import get_current_user_optional
 
 logger = structlog.get_logger(__name__)
 
