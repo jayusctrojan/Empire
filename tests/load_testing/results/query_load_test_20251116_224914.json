@@ -1,0 +1,32 @@
+{
+  "timestamp": "2025-11-16T22:49:14.653247",
+  "host": "https://jb-empire-api.onrender.com",
+  "adaptive_endpoint": {
+    "avg_ms": 12028.222222222223,
+    "p50_ms": 12783,
+    "p95_ms": 18728,
+    "cache_hit_rate": 0.1111111111111111,
+    "total_requests": 9
+  },
+  "auto_endpoint": {
+    "avg_ms": 6750.888888888889,
+    "p50_ms": 7449,
+    "p95_ms": 8795,
+    "cache_hit_rate": 0.1111111111111111,
+    "total_requests": 9,
+    "workflow_routing": {
+      "simple": 9
+    }
+  },
+  "cache_effectiveness": {
+    "first_request_ms": 386,
+    "cached_avg_ms": 357.55555555555554,
+    "speedup_pct": 7.369027058146233,
+    "cache_hit_rate": 1.0
+  },
+  "semantic_similarity": {
+    "semantic_cache_hits": 3,
+    "total_similar_queries": 3,
+    "hit_rate": 1.0
+  }
+}

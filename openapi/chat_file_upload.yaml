@@ -1,0 +1,861 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - Chat File/Image Upload API
+  description: |
+    API endpoints for uploading files and images directly within chat conversations.
+    Supports multipart file uploads, image analysis using Claude Vision API, and context-aware
+    Q&A with uploaded content. Files remain in conversation context for follow-up questions.
+    Handles images (PNG, JPG, WebP), PDFs, and text documents.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: chat-upload
+    description: File and image upload in chat
+  - name: chat-context
+    description: Chat conversation context management
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/chat/upload:
+    post:
+      tags:
+        - chat-upload
+      summary: Upload file or image in chat
+      description: |
+        Upload a file or image to include in the chat conversation context.
+        Images are analyzed using Claude Vision API. Files are processed and made available
+        for question-answering. Returns upload ID for referencing in subsequent messages.
+      operationId: uploadFileInChat
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - session_id
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload (image, PDF, or text document)
+                session_id:
+                  type: string
+                  format: uuid
+                  description: Chat session ID for context association
+                message:
+                  type: string
+                  maxLength: 2000
+                  description: Optional message accompanying the upload
+                upload_options:
+                  type: object
+                  description: Upload processing options
+                  properties:
+                    analyze_image:
+                      type: boolean
+                      default: true
+                      description: Analyze image content (images only)
+                    extract_text:
+                      type: boolean
+                      default: true
+                      description: Extract text from document/image
+                    store_permanently:
+                      type: boolean
+                      default: false
+                      description: Store in permanent knowledge base (vs. session-only)
+            encoding:
+              file:
+                contentType: image/png, image/jpeg, image/webp, application/pdf, text/plain, text/markdown
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatUploadResponse'
+              examples:
+                image_upload:
+                  summary: Image upload with analysis
+                  value:
+                    upload_id: "550e8400-e29b-41d4-a716-446655440000"
+                    session_id: "660e8400-e29b-41d4-a716-446655440001"
+                    file_type: "image"
+                    file_name: "architecture_diagram.png"
+                    file_size_bytes: 524288
+                    mime_type: "image/png"
+                    analysis:
+                      type: "image"
+                      description: "Architecture diagram showing a microservices system with API gateway, multiple services, and databases"
+                      objects_detected:
+                        - "flowchart"
+                        - "boxes"
+                        - "arrows"
+                        - "text labels"
+                      text_extracted: "API Gateway\nUser Service\nOrder Service\nPostgreSQL\nRedis"
+                      confidence_score: 0.94
+                    context_added: true
+                    message: "Image analyzed and added to conversation context. You can now ask questions about it."
+                    uploaded_at: "2025-11-24T13:49:00Z"
+                pdf_upload:
+                  summary: PDF document upload
+                  value:
+                    upload_id: "770e8400-e29b-41d4-a716-446655440002"
+                    session_id: "660e8400-e29b-41d4-a716-446655440001"
+                    file_type: "document"
+                    file_name: "research_paper.pdf"
+                    file_size_bytes: 2458624
+                    mime_type: "application/pdf"
+                    analysis:
+                      type: "document"
+                      page_count: 15
+                      word_count: 5420
+                      text_preview: "Abstract: This paper presents a novel approach to..."
+                    context_added: true
+                    message: "Document processed and added to conversation. Ask me anything about it."
+                    uploaded_at: "2025-11-24T13:49:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/FileTooLargeError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaTypeError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/chat/query-with-context:
+    post:
+      tags:
+        - chat-context
+      summary: Query with uploaded file context
+      description: |
+        Execute a query using uploaded files as context. References files by upload ID.
+        Supports follow-up questions about previously uploaded content within the session.
+      operationId: queryWithFileContext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - session_id
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                  description: User query about uploaded files
+                  example: "What are the main components shown in this architecture diagram?"
+                session_id:
+                  type: string
+                  format: uuid
+                  description: Chat session ID
+                upload_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Specific upload IDs to reference (optional - uses all session uploads if omitted)
+                  maxItems: 10
+                query_options:
+                  type: object
+                  properties:
+                    include_visual_details:
+                      type: boolean
+                      default: true
+                      description: Include visual analysis in response (images only)
+                    max_length:
+                      type: integer
+                      minimum: 100
+                      maximum: 4000
+                      default: 1000
+                      description: Maximum response length in words
+            examples:
+              image_question:
+                summary: Question about uploaded image
+                value:
+                  query: "Explain the data flow in this architecture diagram"
+                  session_id: "660e8400-e29b-41d4-a716-446655440001"
+                  upload_ids: ["550e8400-e29b-41d4-a716-446655440000"]
+              document_question:
+                summary: Question about uploaded PDF
+                value:
+                  query: "Summarize the key findings from this research paper"
+                  session_id: "660e8400-e29b-41d4-a716-446655440001"
+                  upload_ids: ["770e8400-e29b-41d4-a716-446655440002"]
+      responses:
+        '200':
+          description: Query executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatQueryResponse'
+              examples:
+                image_analysis_response:
+                  summary: Response about architecture diagram
+                  value:
+                    query: "Explain the data flow in this architecture diagram"
+                    answer: |
+                      Based on the architecture diagram you uploaded, the data flow follows this pattern:
+
+                      1. **Client requests** enter through the API Gateway
+                      2. The gateway **routes requests** to either the User Service or Order Service
+                      3. Both services interact with **PostgreSQL** for persistent data storage
+                      4. **Redis** is used as a caching layer to improve response times
+                      5. Services communicate with each other for cross-domain operations
+
+                      The architecture follows a microservices pattern with clear separation of concerns.
+                    referenced_uploads:
+                      - upload_id: "550e8400-e29b-41d4-a716-446655440000"
+                        file_name: "architecture_diagram.png"
+                        relevance_score: 0.98
+                    response_metadata:
+                      model: "claude-3-5-sonnet-20241022"
+                      vision_analysis_used: true
+                      processing_time_ms: 2340
+                      tokens_used: 456
+                    timestamp: "2025-11-24T13:49:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/chat/sessions/{session_id}/uploads:
+    get:
+      tags:
+        - chat-context
+      summary: List session uploads
+      description: Get all files uploaded in a specific chat session
+      operationId: getSessionUploads
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Chat session ID
+        - name: file_type
+          in: query
+          schema:
+            type: string
+            enum: [image, document, all]
+            default: all
+          description: Filter by file type
+      responses:
+        '200':
+          description: Session uploads retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploads:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChatUpload'
+                  total:
+                    type: integer
+                  session_id:
+                    type: string
+                    format: uuid
+              examples:
+                session_files:
+                  summary: Files in session
+                  value:
+                    session_id: "660e8400-e29b-41d4-a716-446655440001"
+                    uploads:
+                      - upload_id: "550e8400-e29b-41d4-a716-446655440000"
+                        file_name: "architecture_diagram.png"
+                        file_type: "image"
+                        file_size_bytes: 524288
+                        mime_type: "image/png"
+                        uploaded_at: "2025-11-24T13:45:00Z"
+                        analysis_summary: "Architecture diagram with microservices"
+                      - upload_id: "770e8400-e29b-41d4-a716-446655440002"
+                        file_name: "research_paper.pdf"
+                        file_type: "document"
+                        file_size_bytes: 2458624
+                        mime_type: "application/pdf"
+                        uploaded_at: "2025-11-24T13:47:00Z"
+                        analysis_summary: "15-page research paper on ML algorithms"
+                    total: 2
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/chat/uploads/{upload_id}:
+    get:
+      tags:
+        - chat-upload
+      summary: Get upload details
+      description: Retrieve detailed information about a specific upload
+      operationId: getUploadById
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Upload ID
+      responses:
+        '200':
+          description: Upload details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatUploadDetails'
+              examples:
+                image_details:
+                  summary: Image upload details
+                  value:
+                    upload_id: "550e8400-e29b-41d4-a716-446655440000"
+                    session_id: "660e8400-e29b-41d4-a716-446655440001"
+                    file_name: "architecture_diagram.png"
+                    file_type: "image"
+                    file_size_bytes: 524288
+                    mime_type: "image/png"
+                    dimensions:
+                      width: 1920
+                      height: 1080
+                    analysis:
+                      type: "image"
+                      description: "Architecture diagram showing a microservices system with API gateway, multiple services, and databases"
+                      objects_detected:
+                        - "flowchart"
+                        - "boxes"
+                        - "arrows"
+                        - "text labels"
+                      text_extracted: "API Gateway\nUser Service\nOrder Service\nPostgreSQL\nRedis"
+                      colors_detected: ["#3498db", "#2ecc71", "#e74c3c"]
+                      confidence_score: 0.94
+                    url: "/api/chat/uploads/550e8400-e29b-41d4-a716-446655440000/content"
+                    thumbnail_url: "/api/chat/uploads/550e8400-e29b-41d4-a716-446655440000/thumbnail"
+                    uploaded_at: "2025-11-24T13:45:00Z"
+                    query_count: 3
+                    last_queried: "2025-11-24T13:49:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - chat-upload
+      summary: Delete upload
+      description: Remove an uploaded file from the session context
+      operationId: deleteUpload
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Upload deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/chat/uploads/{upload_id}/content:
+    get:
+      tags:
+        - chat-upload
+      summary: Download uploaded file
+      description: Retrieve the original uploaded file content
+      operationId: downloadUploadedFile
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File content
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/plain:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/chat/uploads/{upload_id}/thumbnail:
+    get:
+      tags:
+        - chat-upload
+      summary: Get image thumbnail
+      description: Retrieve thumbnail version of uploaded image (images only)
+      operationId: getUploadThumbnail
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: size
+          in: query
+          schema:
+            type: integer
+            enum: [128, 256, 512]
+            default: 256
+          description: Thumbnail size in pixels (square)
+      responses:
+        '200':
+          description: Thumbnail image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/chat/supported-file-types:
+    get:
+      tags:
+        - chat-upload
+      summary: Get supported file types
+      description: List all supported file types and size limits for chat uploads
+      operationId: getSupportedFileTypes
+      responses:
+        '200':
+          description: Supported file types retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supported_types:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SupportedFileType'
+              examples:
+                supported_list:
+                  summary: All supported file types
+                  value:
+                    supported_types:
+                      - category: "images"
+                        mime_types:
+                          - "image/png"
+                          - "image/jpeg"
+                          - "image/webp"
+                        extensions: [".png", ".jpg", ".jpeg", ".webp"]
+                        max_size_bytes: 10485760
+                        max_size_display: "10 MB"
+                        features:
+                          - "Claude Vision analysis"
+                          - "Text extraction (OCR)"
+                          - "Object detection"
+                      - category: "documents"
+                        mime_types:
+                          - "application/pdf"
+                          - "text/plain"
+                          - "text/markdown"
+                        extensions: [".pdf", ".txt", ".md"]
+                        max_size_bytes: 20971520
+                        max_size_display: "20 MB"
+                        features:
+                          - "Text extraction"
+                          - "Metadata extraction"
+                          - "Searchable content"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    ChatUploadResponse:
+      type: object
+      required:
+        - upload_id
+        - session_id
+        - file_type
+        - file_name
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+          description: Unique upload identifier
+        session_id:
+          type: string
+          format: uuid
+          description: Associated chat session
+        file_type:
+          type: string
+          enum: [image, document]
+          description: Type of uploaded file
+        file_name:
+          type: string
+          description: Original filename
+        file_size_bytes:
+          type: integer
+          description: File size in bytes
+        mime_type:
+          type: string
+          description: MIME type of file
+        analysis:
+          type: object
+          description: Automated analysis results
+          properties:
+            type:
+              type: string
+              enum: [image, document]
+            description:
+              type: string
+              description: AI-generated description
+            objects_detected:
+              type: array
+              items:
+                type: string
+              description: Objects/elements detected (images)
+            text_extracted:
+              type: string
+              description: Extracted text content
+            page_count:
+              type: integer
+              description: Number of pages (PDFs)
+            word_count:
+              type: integer
+              description: Estimated word count
+            confidence_score:
+              type: number
+              format: float
+              minimum: 0.0
+              maximum: 1.0
+              description: Analysis confidence (0-1)
+        context_added:
+          type: boolean
+          description: Whether file was added to conversation context
+        message:
+          type: string
+          description: Human-readable status message
+        uploaded_at:
+          type: string
+          format: date-time
+
+    ChatUpload:
+      type: object
+      required:
+        - upload_id
+        - file_name
+        - file_type
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        file_type:
+          type: string
+          enum: [image, document]
+        file_size_bytes:
+          type: integer
+        mime_type:
+          type: string
+        uploaded_at:
+          type: string
+          format: date-time
+        analysis_summary:
+          type: string
+          description: Brief analysis summary
+
+    ChatUploadDetails:
+      allOf:
+        - $ref: '#/components/schemas/ChatUpload'
+        - type: object
+          properties:
+            session_id:
+              type: string
+              format: uuid
+            dimensions:
+              type: object
+              description: Image dimensions (images only)
+              properties:
+                width:
+                  type: integer
+                height:
+                  type: integer
+            analysis:
+              type: object
+              description: Full analysis results
+              properties:
+                type:
+                  type: string
+                description:
+                  type: string
+                objects_detected:
+                  type: array
+                  items:
+                    type: string
+                text_extracted:
+                  type: string
+                colors_detected:
+                  type: array
+                  items:
+                    type: string
+                confidence_score:
+                  type: number
+                  format: float
+            url:
+              type: string
+              format: uri
+              description: URL to download original file
+            thumbnail_url:
+              type: string
+              format: uri
+              description: URL to thumbnail (images only)
+            query_count:
+              type: integer
+              description: Number of queries referencing this upload
+            last_queried:
+              type: string
+              format: date-time
+              description: Last time file was referenced in a query
+
+    ChatQueryResponse:
+      type: object
+      required:
+        - query
+        - answer
+      properties:
+        query:
+          type: string
+          description: Original user query
+        answer:
+          type: string
+          description: AI-generated response using uploaded file context
+        referenced_uploads:
+          type: array
+          items:
+            type: object
+            properties:
+              upload_id:
+                type: string
+                format: uuid
+              file_name:
+                type: string
+              relevance_score:
+                type: number
+                format: float
+                description: How relevant this file was to the answer (0-1)
+          description: Files referenced in generating the response
+        response_metadata:
+          type: object
+          properties:
+            model:
+              type: string
+              description: AI model used
+            vision_analysis_used:
+              type: boolean
+              description: Whether vision analysis was used
+            processing_time_ms:
+              type: integer
+            tokens_used:
+              type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    SupportedFileType:
+      type: object
+      required:
+        - category
+        - mime_types
+        - max_size_bytes
+      properties:
+        category:
+          type: string
+          description: File category (images, documents)
+        mime_types:
+          type: array
+          items:
+            type: string
+          description: Supported MIME types
+        extensions:
+          type: array
+          items:
+            type: string
+          description: File extensions
+        max_size_bytes:
+          type: integer
+          description: Maximum file size in bytes
+        max_size_display:
+          type: string
+          description: Human-readable size limit
+        features:
+          type: array
+          items:
+            type: string
+          description: Available features for this file type
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing_session:
+              summary: Missing session ID
+              value:
+                error: "MISSING_SESSION_ID"
+                message: "session_id is required for file uploads"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing_token:
+              summary: Missing authentication token
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication required. Please provide a valid JWT token."
+                timestamp: "2025-11-24T13:49:00Z"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            upload_not_found:
+              summary: Upload not found
+              value:
+                error: "UPLOAD_NOT_FOUND"
+                message: "Upload with ID '550e8400-e29b-41d4-a716-446655440000' not found"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    FileTooLargeError:
+      description: File exceeds maximum size limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            file_too_large:
+              summary: File too large
+              value:
+                error: "FILE_TOO_LARGE"
+                message: "File size exceeds maximum limit of 10 MB for images"
+                details:
+                  max_size_bytes: 10485760
+                  file_size_bytes: 15728640
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnsupportedMediaTypeError:
+      description: File type not supported
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            unsupported_type:
+              summary: Unsupported file type
+              value:
+                error: "UNSUPPORTED_FILE_TYPE"
+                message: "File type 'application/msword' is not supported"
+                details:
+                  mime_type: "application/msword"
+                  supported_types: ["image/png", "image/jpeg", "application/pdf", "text/plain"]
+                timestamp: "2025-11-24T13:49:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            generic_error:
+              summary: Internal server error
+              value:
+                error: "INTERNAL_SERVER_ERROR"
+                message: "An unexpected error occurred. Please try again later."
+                timestamp: "2025-11-24T13:49:00Z"
