@@ -22,7 +22,7 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -402,6 +402,42 @@ app.include_router(feature_flags.router)  # Feature flags router already has /ap
 
 # Task 10.2: WebSocket Real-Time Status Endpoints
 app.include_router(websocket.router)  # WebSocket router already has /ws prefix defined
+
+# Task 17: Agent Router - Intelligent query routing
+app.include_router(agent_router.router)  # Agent Router already has /api/router prefix defined
+
+# Task 11: REST Status Polling Endpoints (WebSocket fallback)
+app.include_router(status.router)  # Status router already has /api/status prefix defined
+
+# Task 21: Chat File Upload - File and Image Upload in Chat
+app.include_router(chat_files.router)  # Chat files router already has /api/chat prefix defined
+
+# Task 42: Content Summarizer Agent (AGENT-002) - PDF Summary Generation
+app.include_router(content_summarizer.router)  # Content Summarizer router already has /api/summarizer prefix defined
+
+# Task 44: Department Classifier Agent (AGENT-008) - 10-Department Classification
+app.include_router(department_classifier.router)  # Department Classifier router already has /api/classifier prefix defined
+
+# Task 45: Document Analysis Agents (AGENT-009, AGENT-010, AGENT-011) - Research/Strategy/Fact-Check
+app.include_router(document_analysis.router)  # Document Analysis router already has /api/document-analysis prefix defined
+
+# Task 46: Multi-Agent Orchestration Agents (AGENT-012, AGENT-013, AGENT-014, AGENT-015) - Research/Analysis/Writing/Review
+app.include_router(multi_agent_orchestration.router)  # Multi-Agent Orchestration router already has /api/orchestration prefix defined
+
+# Task 26: Embedding Generation Service - BGE-M3 embeddings with caching
+app.include_router(embeddings.router)  # Embeddings router already has /api/embeddings prefix defined
+
+# Task 27: Hybrid Search with BM25 and Vector Fusion
+app.include_router(hybrid_search.router)  # Hybrid Search router already has /api/search prefix defined
+
+# Task 29: Reranking with BGE-Reranker-v2 (Ollama) and Claude fallback
+app.include_router(reranking.router)  # Reranking router already has /api/rerank prefix defined
+
+# Task 28: Query Expansion with Claude Haiku (<500ms latency target)
+app.include_router(query_expansion.router)  # Query Expansion router already has /api/expand prefix defined
+
+# Task 30: Semantic Cache with Tiered Similarity Thresholds (60-80% hit rate target)
+app.include_router(semantic_cache.router)  # Semantic Cache router already has /api/cache prefix defined
 
 # TODO: Additional routers
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
