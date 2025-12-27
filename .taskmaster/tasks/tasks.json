@@ -4175,7 +4175,7 @@
         "description": "Integrate Neo4j for entity storage, relationship traversal, and graph-enhanced context retrieval. Includes Cypher generation via Claude Sonnet.",
         "details": "Implement FR-023 from PRD: Store entities and relationships in Neo4j (Community on Mac Studio Docker). Knowledge graph queries for related content, entity-centric search, relationship traversal (2-3 hops). Cypher generation via Claude Sonnet for natural language queries. Graph-enhanced context retrieval.",
         "testStrategy": "Test entity extraction and storage, verify relationship traversal, test Cypher generation accuracy, measure graph query latency.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           26
@@ -4189,7 +4189,7 @@
         "description": "Build production conversation memory using Supabase PostgreSQL graph tables (user_memory_nodes, user_memory_edges) with RLS policies per user.",
         "details": "Implement FR-037 from PRD: Store conversations in PostgreSQL graph tables. user_memory_nodes stores facts, preferences, entities with embeddings. user_memory_edges stores relationships between nodes. Row-level security (RLS) per user. Graph-based retrieval for relevant context. Long-term memory persistence.",
         "testStrategy": "Test memory node creation/retrieval, verify RLS policies isolate user data, test graph traversal for context retrieval, measure memory retrieval latency (<200ms target).",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           2,
           10
@@ -4628,7 +4628,7 @@
     ],
     "metadata": {
       "created": "2025-11-24T19:36:45.295Z",
-      "updated": "2025-12-27T22:18:42.019Z",
+      "updated": "2025-12-27T22:39:28.976Z",
       "description": "Tasks for v7_3_features context"
     }
   }
