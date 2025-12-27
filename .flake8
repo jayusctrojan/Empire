@@ -1,0 +1,43 @@
+# Empire v7.3 - Flake8 Linting Configuration
+# Task 6: CI/CD Pipeline and Test Infrastructure
+
+[flake8]
+max-line-length = 120
+extend-ignore =
+    # E203: whitespace before ':'  (conflicts with Black)
+    E203,
+    # E501: line too long (handled by max-line-length)
+    E501,
+    # W503: line break before binary operator (deprecated)
+    W503,
+    # E402: module level import not at top of file
+    E402,
+    # F401: imported but unused (handled by autoflake)
+    F401
+
+exclude =
+    .git,
+    __pycache__,
+    .pytest_cache,
+    .venv,
+    venv,
+    env,
+    build,
+    dist,
+    *.egg-info,
+    migrations,
+    .github,
+    docs,
+    htmlcov,
+    .taskmaster
+
+per-file-ignores =
+    # __init__.py can have unused imports (re-exports)
+    __init__.py:F401,F403
+    # conftest.py can have unused imports (fixtures)
+    conftest.py:F401,F811
+    # test files can have unused imports and long lines
+    test_*.py:E501,F401,F811
+
+max-complexity = 15
+docstring-convention = google
