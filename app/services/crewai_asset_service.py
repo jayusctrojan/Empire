@@ -317,6 +317,66 @@ class CrewAIAssetService:
         }
         return mime_types.get(format, "application/octet-stream")
 
+    async def get_signed_download_url(
+        self,
+        asset_id: UUID,
+        valid_duration_seconds: int = 3600
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a signed download URL for a file-based asset
+
+        For assets stored in B2 (file-based), generates a time-limited
+        signed URL for secure download. Text-based assets (stored in DB)
+        do not have signed URLs.
+
+        Args:
+            asset_id: Asset UUID
+            valid_duration_seconds: How long the URL should be valid (default: 1 hour)
+
+        Returns:
+            dict with signed_url, expires_at, and asset metadata, or None if text-based
+
+        Raises:
+            ValueError: If asset not found
+            Exception: If URL generation fails
+        """
+        try:
+            # Get asset
+            asset = await self.get_asset_by_id(asset_id)
+            if not asset:
+                raise ValueError(f"Asset not found: {asset_id}")
+
+            # Text-based assets don't have B2 paths
+            if not asset.b2_path:
+                logger.info(
+                    f"Asset {asset_id} is text-based (no B2 path), "
+                    "signed URL not applicable"
+                )
+                return None
+
+            # Generate signed URL from B2 service
+            signed_url_info = await self.b2_service.get_signed_url_for_asset(
+                b2_path=asset.b2_path,
+                valid_duration_seconds=valid_duration_seconds
+            )
+
+            if signed_url_info:
+                signed_url_info["asset_id"] = str(asset_id)
+                signed_url_info["asset_name"] = asset.asset_name
+                signed_url_info["mime_type"] = asset.mime_type
+                signed_url_info["file_size"] = asset.file_size
+
+            logger.info(
+                f"Generated signed URL for asset {asset_id}, "
+                f"expires at {signed_url_info['expires_at']}"
+            )
+
+            return signed_url_info
+
+        except Exception as e:
+            logger.error(f"Failed to get signed URL for asset {asset_id}: {e}")
+            raise
+
 
 # Singleton instance
 _asset_service = None

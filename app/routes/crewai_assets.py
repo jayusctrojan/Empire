@@ -281,3 +281,82 @@ async def get_execution_assets(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve execution assets: {str(e)}"
         )
+
+
+@router.get(
+    "/{asset_id}/download-url",
+    summary="Get Signed Download URL",
+    description="""
+    Generate a time-limited signed download URL for a file-based asset
+
+    **Only applicable for file-based assets** stored in B2 (PDF, DOCX, images, etc.)
+    Text-based assets (stored in database) will return null.
+
+    Default expiration: 1 hour (3600 seconds)
+    Maximum expiration: 1 week (604800 seconds)
+    """
+)
+async def get_asset_download_url(
+    asset_id: UUID,
+    valid_duration_seconds: int = 3600,
+    service: CrewAIAssetService = Depends(get_service)
+):
+    """
+    Get a signed download URL for a file-based asset
+
+    **Path Parameters**:
+    - `asset_id` (UUID): Asset ID
+
+    **Query Parameters**:
+    - `valid_duration_seconds` (int, optional): URL validity in seconds (default: 3600, max: 604800)
+
+    **Response**: Object with signed_url, expires_at, and asset metadata
+
+    **Errors**:
+    - 404: Asset not found
+    - 400: Invalid duration or text-based asset
+    """
+    try:
+        # Validate duration
+        if valid_duration_seconds < 60:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="valid_duration_seconds must be at least 60 seconds"
+            )
+
+        if valid_duration_seconds > 604800:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="valid_duration_seconds cannot exceed 604800 (1 week)"
+            )
+
+        signed_url_info = await service.get_signed_download_url(
+            asset_id=asset_id,
+            valid_duration_seconds=valid_duration_seconds
+        )
+
+        if signed_url_info is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Asset is text-based and does not have a downloadable file. Use GET /{asset_id} to retrieve content."
+            )
+
+        logger.info(f"Generated signed URL for asset {asset_id} via API")
+        return signed_url_info
+
+    except ValueError as e:
+        logger.error(f"Asset not found: {asset_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Failed to generate signed URL for asset {asset_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate download URL: {str(e)}"
+        )
