@@ -4391,7 +4391,7 @@
         "description": "Build 5 asset generation agents: Skill Generator (YAML), Command Generator (Markdown), Agent Generator (CrewAI YAML), Prompt Generator, and Workflow Generator (n8n JSON).",
         "details": "AGENTS 003-007 from PRD: AGENT-003=Skill Generator (YAML for Claude Code), AGENT-004=Command Generator (Markdown slash commands), AGENT-005=Agent Generator (CrewAI configs), AGENT-006=Prompt Generator (reusable templates), AGENT-007=Workflow Generator (n8n JSON). Each outputs to processed/crewai-suggestions/{asset-type}/drafts/.",
         "testStrategy": "Test each asset type generation, verify output format matches specification, test asset type decision logic from Main Orchestrator.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           40,
           41
@@ -4628,7 +4628,7 @@
     ],
     "metadata": {
       "created": "2025-11-24T19:36:45.295Z",
-      "updated": "2025-12-29T18:44:42.153Z",
+      "updated": "2025-12-29T19:56:43.664Z",
       "description": "Tasks for v7_3_features context"
     }
   }
