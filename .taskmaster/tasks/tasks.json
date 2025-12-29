@@ -4203,7 +4203,7 @@
         "description": "Build context management for retrieving relevant memory nodes, graph traversal (1-2 hops), recency/access weighting, and context window management (4K tokens).",
         "details": "Implement FR-038 from PRD: Retrieve relevant memory nodes for query context. Graph traversal for related memories (1-2 hops). Recency-weighted retrieval (recent > old). Access-count-weighted retrieval (frequent > rare). Context window: 4K tokens (last 5 messages + memory). Target: >90% context relevance.",
         "testStrategy": "Test context retrieval relevance, verify weighting algorithms work correctly, test context window limits are respected, measure context relevance score.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           32
         ],
@@ -4243,7 +4243,7 @@
         "description": "Build RBAC system with user roles (admin, editor, viewer, guest), permission-based access, API key management, and audit logging.",
         "details": "Implement FR-047 from PRD: User roles (admin, editor, viewer, guest). Permission-based access (create, read, update, delete). Resource-level permissions (own documents vs all). API key management (create, rotate, revoke). Audit logs for admin actions. Database tables: users, api_keys, audit_logs with RLS policies.",
         "testStrategy": "Test role-based access restrictions, verify permission enforcement, test API key lifecycle, verify audit logs capture all admin actions.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           6
@@ -4628,7 +4628,7 @@
     ],
     "metadata": {
       "created": "2025-11-24T19:36:45.295Z",
-      "updated": "2025-12-27T23:07:34.877Z",
+      "updated": "2025-12-29T18:44:42.153Z",
       "description": "Tasks for v7_3_features context"
     }
   }
