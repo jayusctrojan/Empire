@@ -1,11 +1,17 @@
 """
-Empire v7.3 - Hybrid Search Service
+Empire v7.3 - Hybrid Search Service (Task 27)
 
 Implements hybrid search combining multiple retrieval methods:
-- Dense vector search (pgvector similarity)
-- Sparse BM25 search (PostgreSQL full-text search)
-- Fuzzy matching (ILIKE pattern matching + rapidfuzz)
+- Dense vector search (pgvector similarity via RPC)
+- Sparse BM25 search (PostgreSQL full-text search with ts_rank_cd)
+- Fuzzy matching (PostgreSQL trigram similarity + ILIKE)
 - Reciprocal Rank Fusion (RRF) for result combination
+
+Features:
+- Server-side PostgreSQL RPC functions for optimal performance
+- Python fallback for development/testing
+- Configurable weights and thresholds
+- Target: +40-60% improvement vs vector-only search
 
 Author: Empire AI Team
 Date: January 2025
@@ -13,10 +19,12 @@ Date: January 2025
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
 import math
+import json
 
 from rapidfuzz import fuzz, process
 
@@ -25,10 +33,12 @@ logger = logging.getLogger(__name__)
 
 class SearchMethod(Enum):
     """Available search methods"""
-    DENSE = "dense"  # Vector similarity
-    SPARSE = "sparse"  # BM25 full-text search
-    FUZZY = "fuzzy"  # Pattern matching + fuzzy string matching
+    DENSE = "dense"  # Vector similarity (pgvector)
+    SPARSE = "sparse"  # BM25 full-text search (ts_rank_cd)
+    FUZZY = "fuzzy"  # Trigram similarity + ILIKE pattern matching
+    ILIKE = "ilike"  # Simple pattern matching only
     HYBRID = "hybrid"  # All methods combined with RRF
+    HYBRID_RPC = "hybrid_rpc"  # Server-side hybrid search (recommended)
 
 
 @dataclass
@@ -42,12 +52,29 @@ class SearchResult:
     rank: int
     method: str  # Which search method found this result
     metadata: Dict[str, Any] = field(default_factory=dict)
+    file_id: Optional[str] = None
 
     # Additional fields for hybrid search
     dense_score: Optional[float] = None
     sparse_score: Optional[float] = None
     fuzzy_score: Optional[float] = None
     rrf_score: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for API response"""
+        return {
+            "chunk_id": self.chunk_id,
+            "content": self.content,
+            "score": self.score,
+            "rank": self.rank,
+            "method": self.method,
+            "metadata": self.metadata,
+            "file_id": self.file_id,
+            "dense_score": self.dense_score,
+            "sparse_score": self.sparse_score,
+            "fuzzy_score": self.fuzzy_score,
+            "rrf_score": self.rrf_score
+        }
 
 
 @dataclass
@@ -71,13 +98,16 @@ class HybridSearchConfig:
 
     # Minimum scores to include results
     min_dense_score: float = 0.5  # Cosine similarity threshold
-    min_sparse_score: float = 0.1  # BM25 relevance threshold
-    min_fuzzy_score: float = 60.0  # Fuzzy match percentage
+    min_sparse_score: float = 0.0  # BM25 relevance threshold (ts_rank_cd)
+    min_fuzzy_score: float = 0.3  # Trigram similarity threshold (0-1)
 
     # Search behavior
     enable_dense: bool = True
     enable_sparse: bool = True
     enable_fuzzy: bool = True
+
+    # Use server-side RPC functions (recommended for production)
+    use_rpc: bool = True
 
     def validate(self):
         """Validate configuration"""
@@ -155,15 +185,35 @@ class HybridSearchService:
             List of SearchResult objects ranked by relevance
         """
         config = custom_config or self.config
+        start_time = time.time()
 
-        if method == SearchMethod.DENSE:
-            return await self._dense_search(query, config, namespace, metadata_filter)
-        elif method == SearchMethod.SPARSE:
-            return await self._sparse_search(query, config, namespace, metadata_filter)
-        elif method == SearchMethod.FUZZY:
-            return await self._fuzzy_search(query, config, namespace, metadata_filter)
-        else:  # HYBRID
-            return await self._hybrid_search(query, config, namespace, metadata_filter)
+        try:
+            if method == SearchMethod.DENSE:
+                results = await self._dense_search(query, config, namespace, metadata_filter)
+            elif method == SearchMethod.SPARSE:
+                results = await self._sparse_search_rpc(query, config, namespace, metadata_filter) \
+                    if config.use_rpc else await self._sparse_search(query, config, namespace, metadata_filter)
+            elif method == SearchMethod.FUZZY:
+                results = await self._fuzzy_search_rpc(query, config, namespace, metadata_filter) \
+                    if config.use_rpc else await self._fuzzy_search(query, config, namespace, metadata_filter)
+            elif method == SearchMethod.ILIKE:
+                results = await self._ilike_search(query, config, namespace, metadata_filter)
+            elif method == SearchMethod.HYBRID_RPC:
+                results = await self._hybrid_search_rpc(query, config, namespace, metadata_filter)
+            else:  # HYBRID (default)
+                results = await self._hybrid_search(query, config, namespace, metadata_filter)
+
+            duration = time.time() - start_time
+            logger.info(
+                f"Search completed: method={method.value}, query='{query[:50]}...', "
+                f"results={len(results)}, duration={duration:.3f}s"
+            )
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Search failed: method={method.value}, error={e}")
+            raise
 
     async def _hybrid_search(
         self,
@@ -561,6 +611,402 @@ class HybridSearchService:
         except Exception as e:
             logger.error(f"Failed to get chunk content: {e}")
             return ""
+
+    # =========================================================================
+    # PostgreSQL RPC-based search methods (Task 27 - recommended for production)
+    # =========================================================================
+
+    async def _hybrid_search_rpc(
+        self,
+        query: str,
+        config: HybridSearchConfig,
+        namespace: Optional[str],
+        metadata_filter: Optional[Dict[str, Any]]
+    ) -> List[SearchResult]:
+        """
+        Server-side hybrid search using PostgreSQL RPC function
+
+        This is the recommended approach for production as it:
+        - Performs all computation on the database server
+        - Leverages database indexes (HNSW, GIN, trigram)
+        - Returns fused results in a single query
+        - Significantly reduces latency
+
+        Args:
+            query: Search query
+            config: Search configuration
+            namespace: Filter by namespace
+            metadata_filter: Filter by metadata
+
+        Returns:
+            Fused and ranked search results
+        """
+        try:
+            # Generate query embedding for dense search component
+            embedding_result = await self.embedding_service.generate_embedding(query)
+            query_embedding = embedding_result.embedding
+
+            # Call the hybrid_search RPC function
+            result = await self.storage.supabase.rpc(
+                "hybrid_search",
+                {
+                    "search_query": query,
+                    "query_embedding": query_embedding,
+                    "match_limit": config.top_k,
+                    "dense_weight": config.dense_weight,
+                    "dense_threshold": config.min_dense_score,
+                    "dense_count": config.dense_top_k,
+                    "sparse_weight": config.sparse_weight,
+                    "sparse_threshold": config.min_sparse_score,
+                    "sparse_count": config.sparse_top_k,
+                    "fuzzy_weight": config.fuzzy_weight,
+                    "fuzzy_threshold": config.min_fuzzy_score,
+                    "fuzzy_count": config.fuzzy_top_k,
+                    "rrf_k": config.rrf_k,
+                    "filter_namespace": namespace,
+                    "filter_metadata": json.dumps(metadata_filter) if metadata_filter else None
+                }
+            ).execute()
+
+            if not result.data:
+                return []
+
+            # Convert to SearchResult objects
+            search_results = []
+            for rank, row in enumerate(result.data, 1):
+                search_results.append(SearchResult(
+                    chunk_id=str(row["chunk_id"]),
+                    content=row.get("content", ""),
+                    score=row.get("rrf_score", 0.0),
+                    rank=rank,
+                    method="hybrid_rpc",
+                    metadata=row.get("metadata", {}),
+                    file_id=str(row["file_id"]) if row.get("file_id") else None,
+                    dense_score=row.get("dense_score"),
+                    sparse_score=row.get("sparse_score"),
+                    fuzzy_score=row.get("fuzzy_score"),
+                    rrf_score=row.get("rrf_score")
+                ))
+
+            return search_results
+
+        except Exception as e:
+            logger.warning(f"RPC hybrid search failed, falling back to Python: {e}")
+            # Fallback to Python-based hybrid search
+            return await self._hybrid_search(query, config, namespace, metadata_filter)
+
+    async def _sparse_search_rpc(
+        self,
+        query: str,
+        config: HybridSearchConfig,
+        namespace: Optional[str],
+        metadata_filter: Optional[Dict[str, Any]]
+    ) -> List[SearchResult]:
+        """
+        BM25 full-text search using PostgreSQL RPC function
+
+        Uses ts_rank_cd for BM25-like scoring with proper document length normalization.
+
+        Args:
+            query: Search query
+            config: Search configuration
+            namespace: Filter by namespace
+            metadata_filter: Filter by metadata
+
+        Returns:
+            List of results from BM25 search
+        """
+        try:
+            result = await self.storage.supabase.rpc(
+                "search_chunks_bm25",
+                {
+                    "search_query": query,
+                    "match_limit": config.sparse_top_k,
+                    "min_rank": config.min_sparse_score,
+                    "filter_namespace": namespace,
+                    "filter_metadata": json.dumps(metadata_filter) if metadata_filter else None
+                }
+            ).execute()
+
+            if not result.data:
+                return []
+
+            # Convert to SearchResult objects
+            search_results = []
+            for rank, row in enumerate(result.data, 1):
+                search_results.append(SearchResult(
+                    chunk_id=str(row["chunk_id"]),
+                    content=row.get("content", ""),
+                    score=row.get("rank", 0.0),
+                    rank=rank,
+                    method="sparse",
+                    metadata=row.get("metadata", {}),
+                    file_id=str(row["file_id"]) if row.get("file_id") else None,
+                    sparse_score=row.get("rank")
+                ))
+
+            return search_results
+
+        except Exception as e:
+            logger.warning(f"RPC sparse search failed, falling back to Python: {e}")
+            return await self._sparse_search(query, config, namespace, metadata_filter)
+
+    async def _fuzzy_search_rpc(
+        self,
+        query: str,
+        config: HybridSearchConfig,
+        namespace: Optional[str],
+        metadata_filter: Optional[Dict[str, Any]]
+    ) -> List[SearchResult]:
+        """
+        Fuzzy search using PostgreSQL trigram similarity
+
+        Uses pg_trgm extension for efficient fuzzy matching.
+
+        Args:
+            query: Search query
+            config: Search configuration
+            namespace: Filter by namespace
+            metadata_filter: Filter by metadata
+
+        Returns:
+            List of results from fuzzy search
+        """
+        try:
+            result = await self.storage.supabase.rpc(
+                "search_chunks_fuzzy",
+                {
+                    "search_query": query,
+                    "match_limit": config.fuzzy_top_k,
+                    "min_similarity": config.min_fuzzy_score,
+                    "filter_namespace": namespace,
+                    "filter_metadata": json.dumps(metadata_filter) if metadata_filter else None
+                }
+            ).execute()
+
+            if not result.data:
+                return []
+
+            # Convert to SearchResult objects
+            search_results = []
+            for rank, row in enumerate(result.data, 1):
+                search_results.append(SearchResult(
+                    chunk_id=str(row["chunk_id"]),
+                    content=row.get("content", ""),
+                    score=row.get("similarity", 0.0),
+                    rank=rank,
+                    method="fuzzy",
+                    metadata=row.get("metadata", {}),
+                    file_id=str(row["file_id"]) if row.get("file_id") else None,
+                    fuzzy_score=row.get("similarity")
+                ))
+
+            return search_results
+
+        except Exception as e:
+            logger.warning(f"RPC fuzzy search failed, falling back to Python: {e}")
+            return await self._fuzzy_search(query, config, namespace, metadata_filter)
+
+    async def _ilike_search(
+        self,
+        query: str,
+        config: HybridSearchConfig,
+        namespace: Optional[str],
+        metadata_filter: Optional[Dict[str, Any]]
+    ) -> List[SearchResult]:
+        """
+        Simple ILIKE pattern search
+
+        Fast case-insensitive pattern matching without fuzzy scoring.
+
+        Args:
+            query: Search pattern
+            config: Search configuration
+            namespace: Filter by namespace
+            metadata_filter: Filter by metadata
+
+        Returns:
+            List of matching results
+        """
+        try:
+            result = await self.storage.supabase.rpc(
+                "search_chunks_ilike",
+                {
+                    "search_pattern": query,
+                    "match_limit": config.top_k,
+                    "filter_namespace": namespace,
+                    "filter_metadata": json.dumps(metadata_filter) if metadata_filter else None
+                }
+            ).execute()
+
+            if not result.data:
+                return []
+
+            # Convert to SearchResult objects
+            search_results = []
+            for rank, row in enumerate(result.data, 1):
+                search_results.append(SearchResult(
+                    chunk_id=str(row["chunk_id"]),
+                    content=row.get("content", ""),
+                    score=1.0,  # ILIKE doesn't provide a score
+                    rank=rank,
+                    method="ilike",
+                    metadata=row.get("metadata", {}),
+                    file_id=str(row["file_id"]) if row.get("file_id") else None
+                ))
+
+            return search_results
+
+        except Exception as e:
+            logger.error(f"ILIKE search failed: {e}")
+            return []
+
+    async def get_search_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about searchable content
+
+        Returns:
+            Dictionary with search statistics
+        """
+        try:
+            result = await self.storage.supabase.rpc(
+                "get_search_stats"
+            ).execute()
+
+            if result.data and len(result.data) > 0:
+                return result.data[0]
+            return {}
+
+        except Exception as e:
+            logger.error(f"Failed to get search stats: {e}")
+            return {
+                "error": str(e),
+                "total_chunks": 0,
+                "chunks_with_tsv": 0,
+                "total_embeddings": 0
+            }
+
+    async def search_with_reranking(
+        self,
+        query: str,
+        method: SearchMethod = SearchMethod.HYBRID,
+        namespace: Optional[str] = None,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+        custom_config: Optional[HybridSearchConfig] = None,
+        reranking_config: Optional[Any] = None
+    ) -> Tuple[List[SearchResult], Dict[str, Any]]:
+        """
+        Perform hybrid search with optional reranking for improved precision
+
+        This method combines hybrid search with BGE-Reranker-v2 or Cohere
+        for +15-25% precision improvement.
+
+        Args:
+            query: Search query
+            method: Search method to use
+            namespace: Filter by namespace
+            metadata_filter: Filter by metadata
+            custom_config: Override default configuration
+            reranking_config: Optional reranking configuration
+
+        Returns:
+            Tuple of (reranked results, metrics dict with reranking stats)
+        """
+        from app.services.reranking_service import (
+            RerankingService, RerankingConfig, RerankingProvider
+        )
+
+        config = custom_config or self.config
+        start_time = time.time()
+        metrics = {
+            "search_method": method.value,
+            "search_time_ms": 0,
+            "reranking_time_ms": 0,
+            "total_time_ms": 0,
+            "initial_results": 0,
+            "reranked_results": 0,
+            "reranking_provider": None,
+            "ndcg": None
+        }
+
+        # Step 1: Perform initial search (get more results for reranking)
+        search_config = custom_config or HybridSearchConfig(
+            top_k=config.top_k * 3,  # Get 3x results for reranking
+            dense_top_k=config.dense_top_k,
+            sparse_top_k=config.sparse_top_k,
+            fuzzy_top_k=config.fuzzy_top_k,
+            dense_weight=config.dense_weight,
+            sparse_weight=config.sparse_weight,
+            fuzzy_weight=config.fuzzy_weight,
+            rrf_k=config.rrf_k,
+            min_dense_score=config.min_dense_score,
+            min_sparse_score=config.min_sparse_score,
+            min_fuzzy_score=config.min_fuzzy_score,
+            use_rpc=config.use_rpc
+        )
+
+        initial_results = await self.search(
+            query=query,
+            method=method,
+            namespace=namespace,
+            metadata_filter=metadata_filter,
+            custom_config=search_config
+        )
+
+        search_time = time.time()
+        metrics["search_time_ms"] = (search_time - start_time) * 1000
+        metrics["initial_results"] = len(initial_results)
+
+        # Step 2: Rerank if we have results
+        if not initial_results:
+            metrics["total_time_ms"] = metrics["search_time_ms"]
+            return [], metrics
+
+        # Create reranking service with config
+        rerank_config = reranking_config or RerankingConfig(
+            provider=RerankingProvider.OLLAMA,
+            top_k=config.top_k,
+            max_input_results=len(initial_results),
+            score_threshold=0.3,
+            enable_metrics=True
+        )
+
+        reranking_service = RerankingService(config=rerank_config)
+
+        try:
+            reranking_result = await reranking_service.rerank(
+                query=query,
+                results=initial_results
+            )
+
+            # Update metrics
+            if reranking_result.metrics:
+                metrics["reranking_time_ms"] = reranking_result.metrics.reranking_time_ms
+                metrics["reranking_provider"] = reranking_result.metrics.provider.value if reranking_result.metrics.provider else None
+                metrics["ndcg"] = reranking_result.metrics.ndcg
+
+            metrics["reranked_results"] = len(reranking_result.reranked_results)
+            metrics["total_time_ms"] = (time.time() - start_time) * 1000
+
+            # Update ranks based on new order
+            final_results = []
+            for i, result in enumerate(reranking_result.reranked_results, 1):
+                result.rank = i
+                final_results.append(result)
+
+            return final_results, metrics
+
+        except Exception as e:
+            logger.error(f"Reranking failed, returning initial results: {e}")
+            metrics["error"] = str(e)
+            metrics["total_time_ms"] = (time.time() - start_time) * 1000
+            metrics["reranked_results"] = len(initial_results)
+
+            # Return top_k of initial results
+            return initial_results[:config.top_k], metrics
+
+        finally:
+            await reranking_service.close()
 
 
 # Singleton instance

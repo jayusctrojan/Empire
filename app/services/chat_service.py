@@ -379,7 +379,7 @@ class ChatService:
                 )
                 raise
 
-            # Extract answer
+            # Extract answer (already includes inline citations from Task 15)
             answer = result.get("answer", "No answer provided")
 
             # Format response with metadata
@@ -394,11 +394,17 @@ class ChatService:
                 time_s = result['processing_time_ms'] / 1000
                 formatted += f"**Processing Time**: {time_s:.2f}s\n"
 
+            # Task 15: Add sources footer with citations
+            sources_footer = result.get("sources_footer", "")
+            if sources_footer:
+                formatted += f"\n---\n{sources_footer}\n"
+
             logger.info(
                 "API request successful",
                 endpoint=endpoint,
                 workflow_type=result.get("workflow_type"),
-                iterations=result.get("iterations", 0)
+                iterations=result.get("iterations", 0),
+                citations_count=len(result.get("citations", []))
             )
 
             return formatted

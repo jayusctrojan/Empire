@@ -86,8 +86,9 @@ class UserPreference:
             value=node.metadata.get("value"),
             source=node.metadata.get("source", "explicit"),
             confidence=node.confidence_score or 1.0,
-            created_at=node.created_at,
-            updated_at=node.updated_at,
+            # MemoryNode uses first_mentioned_at/last_mentioned_at, not created_at/updated_at
+            created_at=node.first_mentioned_at,
+            updated_at=node.last_mentioned_at,
             metadata=node.metadata
         )
 

@@ -1,4 +1,8 @@
-# Claude Code Development Guide for Empire v7.2
+# Claude Code Development Guide for Empire v7.3
+
+**Last Updated:** 2025-11-30
+**Version:** v7.3.0
+**Status:** Production-ready with 46 completed tasks, 15 AI agents, 26 API routes
 
 ## ⚠️ CRITICAL SECURITY POLICY - READ FIRST ⚠️
 
@@ -60,9 +64,9 @@
 ---
 
 ## Overview
-This document outlines all tools, MCPs, and development environments available for building Empire v7.2 with production-grade FastAPI + Celery architecture. Read this file at the start of each development session to understand your capabilities.
+This document outlines all tools, MCPs, and development environments available for building Empire v7.3 with production-grade FastAPI + Celery architecture. Read this file at the start of each development session to understand your capabilities.
 
-**Architecture Note**: Empire v7.2 uses a hybrid database production architecture:
+**Architecture Note**: Empire v7.3 uses a hybrid database production architecture:
 - **Production Databases**:
   - PostgreSQL (Supabase) - Vector search, user data, sessions
   - Neo4j (Mac Studio Docker) - Knowledge graphs, entity relationships
@@ -845,7 +849,7 @@ Let me handle the deployment..."
 ## 5. Monitoring and Observability Stack (Milestone 6)
 
 ### Overview
-Empire v7.2 includes comprehensive monitoring using Prometheus, Grafana, and supporting services for metrics, alerting, and visualization.
+Empire v7.3 includes comprehensive monitoring using Prometheus, Grafana, and supporting services for metrics, alerting, and visualization.
 
 ### Monitoring Services Available
 
@@ -922,7 +926,96 @@ FLOWER_PORT=5555
 
 ---
 
-## 6.5. Security Hardening (Task 41 - Completed)
+## 6.5. Monitoring & Observability Stack (Milestone 6 - Task 44 - DEPLOYED ✅)
+
+### Overview
+Empire v7.3 includes a comprehensive monitoring stack with **EMAIL ALERTING** for production-grade observability.
+
+### Deployed Services (All ACTIVE)
+- **Prometheus** (Port 9090) - Metrics collection and storage
+- **Grafana** (Port 3001) - Visualization dashboards (admin/empiregrafana123)
+- **Alertmanager** (Port 9093) - Alert routing and **EMAIL NOTIFICATIONS**
+- **Node Exporter** (Port 9100) - System-level metrics
+- **Redis** (Upstash) - Celery task broker and cache
+- **Flower** (Port 5555) - Celery task monitoring (admin/empireflower123)
+
+### Email Alerting System (PRODUCTION ✅)
+**Configuration**: `monitoring/alertmanager.yml`
+**SMTP Provider**: Gmail (smtp.gmail.com:587 with TLS)
+**Authentication**: Gmail App Password (stored in alertmanager.yml)
+**Recipient**: jbajaj08@gmail.com
+
+**Alert Severity Levels:**
+- **Critical (🚨)**: 10-second delay, 1-hour repeat interval
+- **Warning (⚠️)**: 2-minute delay, 12-hour repeat interval
+- **Info (ℹ️)**: 5-minute delay, 24-hour repeat interval
+
+**Email Templates**:
+- HTML formatted with severity-based styling (red, orange, blue)
+- Includes alert name, severity, component, summary, description
+- Runbook instructions for remediation
+- Links to Prometheus (http://localhost:9090) and Grafana (http://localhost:3000)
+- Timestamps for alert start and end
+
+### Alert Rules (39 Total Across All Severity Levels)
+**Critical Alerts (Immediate Email):**
+- `APIDown` - Service unavailable for >5 minutes
+- `HighErrorRate` - >5 errors/second for 2 minutes
+- `VerySlowProcessing` - P95 latency >60 seconds
+- `HighCPUUsage` - CPU >95% for 5 minutes
+- `HighMemoryUsage` - Memory >95% for 5 minutes
+- `HighQueueBacklog` - >500 tasks waiting
+
+**Warning Alerts (Proactive Email):**
+- `ElevatedErrorRate` - >1 error/second for 5 minutes
+- `SlowProcessing` - P95 latency >30 seconds
+- `ModerateResourceUsage` - CPU/Memory >80%
+- `QueueBacklog` - >100 tasks waiting
+- `LowCacheHitRate` - Cache efficiency <40%
+
+**Info Alerts (Daily Digest Email):**
+- System health summaries
+- Usage statistics and trends
+- Performance benchmarks
+
+### Quick Start
+```bash
+# Start monitoring stack
+./start-monitoring.sh
+
+# Verify services
+curl http://localhost:9090/-/healthy  # Prometheus
+curl http://localhost:9093/-/healthy  # Alertmanager
+curl http://localhost:3001/api/health # Grafana
+
+# Send test email alert
+./test-alert.sh
+```
+
+### Files and Documentation
+- `docker-compose.monitoring.yml` - Service orchestration
+- `monitoring/prometheus.yml` - Prometheus configuration
+- `monitoring/alert_rules.yml` - 39 alert rule definitions
+- `monitoring/alertmanager.yml` - Email notification config
+- `monitoring/INTEGRATION_GUIDE.md` - Integration guide
+- `start-monitoring.sh` - One-command startup
+- `test-alert.sh` - Email alert testing
+
+### Access URLs
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3001 (admin/empiregrafana123)
+- **Alertmanager**: http://localhost:9093
+- **Alerts UI**: http://localhost:9093/#/alerts
+
+### Deployment Status
+✅ **Milestone 6 Complete** - Full observability deployed
+✅ **Email Alerts Working** - Tested and verified
+✅ **39 Alert Rules Active** - Comprehensive coverage
+✅ **Production Ready** - Automated email notifications
+
+---
+
+## 6.6. Security Hardening (Task 41 - Completed)
 
 ### Task 41.1: HTTP Security Headers + Rate Limiting
 **Status**: ✅ Deployed to Production
@@ -1008,7 +1101,111 @@ FLOWER_PORT=5555
 
 ---
 
-## 7. Empire v7.2 Specific Tools
+## 6.7. AI Agent System (Tasks 42-46 - COMPLETED ✅)
+
+Empire v7.3 includes a comprehensive **15-agent AI system** for document analysis, content summarization, department classification, and multi-agent orchestration.
+
+### Agent Registry
+
+| Agent ID | Name | Purpose | Model | Task |
+|----------|------|---------|-------|------|
+| **AGENT-002** | Content Summarizer | PDF summary generation with key points extraction | Claude Sonnet 4.5 | Task 42 |
+| **AGENT-008** | Department Classifier | 10-department content classification | Claude Sonnet 4.5 | Task 44 |
+| **AGENT-009** | Senior Research Analyst | Extract topics, entities, facts, quality assessment | Claude Sonnet 4.5 | Task 45 |
+| **AGENT-010** | Content Strategist | Generate executive summaries, findings, recommendations | Claude Sonnet 4.5 | Task 45 |
+| **AGENT-011** | Fact Checker | Verify claims, assign confidence scores, provide citations | Claude Sonnet 4.5 | Task 45 |
+| **AGENT-012** | Research Agent | Web/academic search, query expansion, source credibility | Claude Sonnet 4.5 | Task 46 |
+| **AGENT-013** | Analysis Agent | Pattern detection, statistical analysis, correlations | Claude Sonnet 4.5 | Task 46 |
+| **AGENT-014** | Writing Agent | Report generation, multi-format output, citations | Claude Sonnet 4.5 | Task 46 |
+| **AGENT-015** | Review Agent | Quality assurance, fact verification, revision loop | Claude Sonnet 4.5 | Task 46 |
+
+### API Endpoints (26 Total Routes)
+
+**Content Summarizer (Task 42)** - `/api/summarizer`:
+- `POST /api/summarizer/summarize` - Generate document summary
+- `GET /api/summarizer/health` - Service health check
+- `GET /api/summarizer/stats` - Usage statistics
+
+**Department Classifier (Task 44)** - `/api/classifier`:
+- `POST /api/classifier/classify` - Classify content into 10 departments
+- `POST /api/classifier/batch` - Batch classification
+- `GET /api/classifier/departments` - List all departments
+- `GET /api/classifier/health` - Service health check
+
+**Document Analysis (Task 45)** - `/api/document-analysis`:
+- `POST /api/document-analysis/analyze` - Full document analysis (3 agents)
+- `POST /api/document-analysis/research` - AGENT-009 only
+- `POST /api/document-analysis/strategy` - AGENT-010 only
+- `POST /api/document-analysis/fact-check` - AGENT-011 only
+- `GET /api/document-analysis/agents` - List analysis agents
+- `GET /api/document-analysis/stats` - Usage statistics
+- `GET /api/document-analysis/health` - Service health check
+
+**Multi-Agent Orchestration (Task 46)** - `/api/orchestration`:
+- `POST /api/orchestration/workflow` - Full 4-agent workflow
+- `POST /api/orchestration/research` - AGENT-012 only
+- `POST /api/orchestration/analyze` - AGENT-013 only
+- `POST /api/orchestration/write` - AGENT-014 only
+- `POST /api/orchestration/review` - AGENT-015 only
+- `GET /api/orchestration/agents` - List orchestration agents
+- `GET /api/orchestration/stats` - Workflow statistics
+- `GET /api/orchestration/health` - Service health check
+
+### Department Classification (AGENT-008)
+
+10 business departments for content classification:
+1. **IT & Engineering** - Technical, software, infrastructure
+2. **Sales & Marketing** - Revenue, campaigns, customer acquisition
+3. **Customer Support** - Service, tickets, satisfaction
+4. **Operations & HR & Supply Chain** - Logistics, workforce, processes
+5. **Finance & Accounting** - Budget, reporting, compliance
+6. **Project Management** - Planning, tracking, delivery
+7. **Real Estate** - Property, leases, facilities
+8. **Private Equity & M&A** - Investments, acquisitions, deals
+9. **Consulting** - Advisory, strategy, transformation
+10. **Personal & Continuing Education** - Training, development, learning
+
+### Multi-Agent Workflows
+
+**Document Analysis Pipeline (Task 45)**:
+```
+Document → AGENT-009 (Research) → AGENT-010 (Strategy) → AGENT-011 (Fact-Check) → Combined Result
+```
+
+**Multi-Agent Orchestration Pipeline (Task 46)**:
+```
+Task → AGENT-012 (Research) → AGENT-013 (Analysis) → AGENT-014 (Writing) → AGENT-015 (Review)
+                                                                              ↓
+                                                                     [Revision Loop if needed]
+                                                                              ↓
+                                                                    Back to AGENT-014 (Writing)
+```
+
+### Service Files
+
+| File | Purpose |
+|------|---------|
+| `app/services/content_summarizer_agent.py` | AGENT-002 implementation |
+| `app/services/department_classifier_agent.py` | AGENT-008 implementation |
+| `app/services/document_analysis_agents.py` | AGENT-009, 010, 011 implementations |
+| `app/services/multi_agent_orchestration.py` | AGENT-012, 013, 014, 015 implementations |
+| `app/routes/content_summarizer.py` | Summarizer API routes |
+| `app/routes/department_classifier.py` | Classifier API routes |
+| `app/routes/document_analysis.py` | Document analysis API routes |
+| `app/routes/multi_agent_orchestration.py` | Orchestration API routes |
+
+### Test Coverage
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `tests/test_content_summarizer.py` | 15 tests | 62% |
+| `tests/test_department_classifier.py` | 18 tests | 65% |
+| `tests/test_document_analysis_agents.py` | 45 tests | 58% |
+| `tests/test_multi_agent_orchestration.py` | 62 tests | 60% |
+
+---
+
+## 7. Empire v7.3 Specific Tools
 
 ### Local Services (Running on Mac Studio via Tailscale)
 

@@ -6,6 +6,7 @@ Handles file uploads to B2 with folder structure management
 import os
 from typing import Optional, BinaryIO, List, Dict, Any
 from enum import Enum
+from datetime import datetime, timedelta
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
 from b2sdk.v2.exception import B2Error, FileNotPresent
 import logging
@@ -342,6 +343,43 @@ class B2StorageService:
             logger.error(f"Failed to delete file {file_id}: {e}")
             raise
 
+    async def download_file(self, file_id: str, file_name: str, destination_path: str) -> bool:
+        """
+        Download a file from B2 to local filesystem
+
+        Args:
+            file_id: B2 file ID
+            file_name: Full file path in B2
+            destination_path: Local path to save the file
+
+        Returns:
+            bool: True if successful
+
+        Raises:
+            B2Error: If download fails
+            FileNotFoundError: If file doesn't exist in B2
+        """
+        try:
+            bucket = self._get_bucket()
+
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+
+            # Download file
+            downloaded_file = bucket.download_file_by_id(file_id)
+            downloaded_file.save_to(destination_path)
+
+            logger.info(f"Downloaded file {file_name} to {destination_path}")
+            return True
+
+        except FileNotPresent:
+            logger.error(f"File not found in B2: {file_name} (ID: {file_id})")
+            raise FileNotFoundError(f"File not found in B2: {file_name}")
+
+        except B2Error as e:
+            logger.error(f"Failed to download file {file_id}: {e}")
+            raise
+
     async def move_to_status(
         self,
         file_id: str,
@@ -444,6 +482,100 @@ class B2StorageService:
         )
 
         return results
+
+    def get_signed_download_url(
+        self,
+        file_path: str,
+        valid_duration_seconds: int = 3600
+    ) -> Dict[str, Any]:
+        """
+        Generate a signed (time-limited) download URL for a file
+
+        Uses B2's download authorization feature to create URLs that expire
+        after a specified duration. This is useful for sharing files securely
+        without exposing permanent URLs.
+
+        Args:
+            file_path: Full path to file in B2 (e.g., crewai/assets/marketing/summary/uuid/file.pdf)
+            valid_duration_seconds: How long the URL should be valid (default: 1 hour, max: 1 week)
+
+        Returns:
+            dict: Contains signed_url, expires_at timestamp, and file_path
+
+        Raises:
+            B2Error: If authorization fails
+            ValueError: If duration exceeds maximum (604800 seconds / 1 week)
+        """
+        try:
+            # B2 limits authorization to max 7 days (604800 seconds)
+            max_duration = 604800
+            if valid_duration_seconds > max_duration:
+                raise ValueError(
+                    f"valid_duration_seconds cannot exceed {max_duration} (1 week)"
+                )
+
+            bucket = self._get_bucket()
+
+            # Generate download authorization token
+            # The token is valid for downloading any file that starts with the prefix
+            auth_token = bucket.get_download_authorization(
+                file_name_prefix=file_path,
+                valid_duration_in_seconds=valid_duration_seconds
+            )
+
+            # Construct the signed URL
+            base_url = self.b2_api.get_download_url_for_file_name(
+                self.bucket_name,
+                file_path
+            )
+
+            # Append authorization token to URL
+            signed_url = f"{base_url}?Authorization={auth_token}"
+
+            # Calculate expiration time
+            expires_at = datetime.utcnow() + timedelta(seconds=valid_duration_seconds)
+
+            logger.info(
+                f"Generated signed URL for {file_path}, "
+                f"expires at {expires_at.isoformat()}"
+            )
+
+            return {
+                "signed_url": signed_url,
+                "expires_at": expires_at.isoformat(),
+                "valid_duration_seconds": valid_duration_seconds,
+                "file_path": file_path
+            }
+
+        except B2Error as e:
+            logger.error(f"Failed to generate signed URL for {file_path}: {e}")
+            raise
+
+    async def get_signed_url_for_asset(
+        self,
+        b2_path: str,
+        valid_duration_seconds: int = 3600
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Convenience method to get signed URL for a CrewAI asset
+
+        Args:
+            b2_path: B2 path from crewai_generated_assets table
+            valid_duration_seconds: How long the URL should be valid
+
+        Returns:
+            dict with signed_url and expires_at, or None if b2_path is None
+
+        Raises:
+            B2Error: If URL generation fails
+        """
+        if not b2_path:
+            return None
+
+        return self.get_signed_download_url(
+            file_path=b2_path,
+            valid_duration_seconds=valid_duration_seconds
+        )
 
 
 # Singleton instance

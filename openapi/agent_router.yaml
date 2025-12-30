@@ -1,0 +1,918 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - Intelligent Agent Router API
+  description: |
+    API endpoints for automatic workflow routing to optimal execution paths.
+    Intelligently routes queries to LangGraph (adaptive workflows), CrewAI (multi-agent),
+    or Simple RAG based on query complexity, type, and historical performance data.
+    Achieves >90% routing accuracy with <100ms decision time. Supports manual overrides,
+    routing history analytics, and continuous learning from feedback.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: routing
+    description: Query routing operations
+  - name: analytics
+    description: Routing analytics and performance
+  - name: configuration
+    description: Router configuration management
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/router/route:
+    post:
+      tags:
+        - routing
+      summary: Route query to optimal workflow
+      description: |
+        Analyze query and automatically route to the most appropriate workflow:
+        - **LangGraph**: Complex queries needing iterative refinement, external data, or research
+        - **CrewAI**: Multi-document analysis, coordinated multi-agent workflows
+        - **Simple RAG**: Direct knowledge base lookups, straightforward queries
+
+        Returns routing decision with confidence score and reasoning.
+      operationId: routeQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                  description: User query to route
+                  example: "Compare the market strategies of Apple and Microsoft based on recent documents"
+                context:
+                  type: object
+                  description: Additional context for routing decision
+                  properties:
+                    document_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: Available document context
+                    session_id:
+                      type: string
+                      format: uuid
+                      description: Session ID for context continuity
+                    user_preferences:
+                      type: object
+                      description: User workflow preferences
+                      properties:
+                        preferred_workflow:
+                          type: string
+                          enum: [langgraph, crewai, simple_rag, auto]
+                          description: User's preferred workflow (auto for automatic)
+                routing_options:
+                  type: object
+                  description: Routing configuration options
+                  properties:
+                    enable_caching:
+                      type: boolean
+                      default: true
+                      description: Use cached routing decisions for similar queries
+                    min_confidence:
+                      type: number
+                      format: float
+                      minimum: 0.0
+                      maximum: 1.0
+                      default: 0.7
+                      description: Minimum confidence for automatic routing
+                    fallback_workflow:
+                      type: string
+                      enum: [langgraph, crewai, simple_rag]
+                      default: simple_rag
+                      description: Fallback if confidence below threshold
+            examples:
+              complex_query:
+                summary: Complex multi-document query
+                value:
+                  query: "Compare the market strategies of Apple and Microsoft based on recent documents"
+                  context:
+                    document_ids:
+                      - "550e8400-e29b-41d4-a716-446655440000"
+                      - "660e8400-e29b-41d4-a716-446655440001"
+              simple_query:
+                summary: Simple lookup query
+                value:
+                  query: "What is the company's revenue?"
+                  routing_options:
+                    enable_caching: true
+                    min_confidence: 0.8
+      responses:
+        '200':
+          description: Routing decision made successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingDecision'
+              examples:
+                crewai_routing:
+                  summary: Routed to CrewAI for multi-document analysis
+                  value:
+                    query: "Compare the market strategies of Apple and Microsoft"
+                    selected_workflow: "crewai"
+                    confidence_score: 0.94
+                    reasoning: "Query requires multi-document comparative analysis across different companies, best suited for coordinated multi-agent workflow"
+                    query_characteristics:
+                      complexity: "high"
+                      query_type: "comparative_analysis"
+                      requires_multiple_documents: true
+                      requires_external_data: false
+                      estimated_tokens: 1500
+                    alternative_workflows:
+                      - workflow: "langgraph"
+                        confidence_score: 0.78
+                        reason: "Could use adaptive workflow but multi-agent coordination is more efficient"
+                    execution_endpoint: "/api/crewai/query"
+                    estimated_response_time_ms: 8500
+                    cached: false
+                    routing_time_ms: 45
+                    timestamp: "2025-11-24T13:49:00Z"
+                simple_rag_routing:
+                  summary: Routed to Simple RAG for direct lookup
+                  value:
+                    query: "What is the company's revenue?"
+                    selected_workflow: "simple_rag"
+                    confidence_score: 0.97
+                    reasoning: "Straightforward factual query that can be answered with direct knowledge base lookup"
+                    query_characteristics:
+                      complexity: "low"
+                      query_type: "factual_lookup"
+                      requires_multiple_documents: false
+                      requires_external_data: false
+                      estimated_tokens: 250
+                    execution_endpoint: "/api/query/simple"
+                    estimated_response_time_ms: 1200
+                    cached: true
+                    routing_time_ms: 12
+                    timestamp: "2025-11-24T13:49:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/router/execute:
+    post:
+      tags:
+        - routing
+      summary: Route and execute query
+      description: |
+        Convenience endpoint that routes query and immediately executes it on the selected workflow.
+        Combines routing decision and execution in a single request.
+      operationId: routeAndExecute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                context:
+                  type: object
+                routing_options:
+                  type: object
+                execution_options:
+                  type: object
+                  description: Workflow-specific execution options
+                  properties:
+                    max_iterations:
+                      type: integer
+                      minimum: 1
+                      maximum: 10
+                      description: Max iterations for LangGraph
+                    timeout_seconds:
+                      type: integer
+                      minimum: 10
+                      maximum: 300
+                      description: Execution timeout
+            examples:
+              auto_execute:
+                summary: Auto-route and execute
+                value:
+                  query: "Analyze the latest financial report and identify key trends"
+                  execution_options:
+                    max_iterations: 3
+                    timeout_seconds: 120
+      responses:
+        '200':
+          description: Query routed and executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingExecutionResponse'
+              examples:
+                langgraph_execution:
+                  summary: LangGraph execution result
+                  value:
+                    routing_decision:
+                      selected_workflow: "langgraph"
+                      confidence_score: 0.91
+                      reasoning: "Complex analytical query requiring iterative refinement"
+                      routing_time_ms: 38
+                    execution_result:
+                      answer: "Based on the latest financial report, three key trends emerge: 1) Revenue growth of 15% YoY, 2) Expanding profit margins..."
+                      iterations_used: 2
+                      sources_used: 5
+                      execution_time_ms: 6420
+                    total_time_ms: 6458
+                    timestamp: "2025-11-24T13:49:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/router/history:
+    get:
+      tags:
+        - analytics
+      summary: Get routing history
+      description: Retrieve historical routing decisions with filtering and pagination
+      operationId: getRoutingHistory
+      parameters:
+        - name: workflow
+          in: query
+          schema:
+            type: string
+            enum: [langgraph, crewai, simple_rag, all]
+            default: all
+          description: Filter by workflow
+        - name: time_range
+          in: query
+          schema:
+            type: string
+            enum: [1h, 24h, 7d, 30d]
+            default: 24h
+          description: Time range for history
+        - name: min_confidence
+          in: query
+          schema:
+            type: number
+            format: float
+            minimum: 0.0
+            maximum: 1.0
+          description: Filter by minimum confidence score
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum results
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Results offset
+      responses:
+        '200':
+          description: Routing history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  decisions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RoutingHistoryEntry'
+                  total:
+                    type: integer
+                  time_range:
+                    type: string
+                  summary_stats:
+                    type: object
+                    properties:
+                      total_routings:
+                        type: integer
+                      by_workflow:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      avg_confidence:
+                        type: number
+                        format: float
+                      avg_routing_time_ms:
+                        type: number
+                        format: float
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/router/analytics:
+    get:
+      tags:
+        - analytics
+      summary: Get routing analytics
+      description: Retrieve comprehensive routing analytics and performance metrics
+      operationId: getRoutingAnalytics
+      parameters:
+        - name: time_range
+          in: query
+          schema:
+            type: string
+            enum: [24h, 7d, 30d, 90d]
+            default: 7d
+          description: Analytics time range
+      responses:
+        '200':
+          description: Analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutingAnalytics'
+              examples:
+                analytics_summary:
+                  summary: 7-day routing analytics
+                  value:
+                    time_range: "7d"
+                    total_routings: 5420
+                    workflow_distribution:
+                      simple_rag: 3254
+                      langgraph: 1523
+                      crewai: 643
+                    workflow_percentages:
+                      simple_rag: 60.0
+                      langgraph: 28.1
+                      crewai: 11.9
+                    accuracy_metrics:
+                      overall_accuracy: 0.92
+                      by_workflow:
+                        simple_rag: 0.97
+                        langgraph: 0.89
+                        crewai: 0.86
+                      confidence_calibration: 0.94
+                    performance_metrics:
+                      avg_routing_time_ms: 42
+                      p50_routing_time_ms: 35
+                      p95_routing_time_ms: 78
+                      p99_routing_time_ms: 145
+                      cache_hit_rate: 0.34
+                    query_characteristics:
+                      avg_complexity: "medium"
+                      most_common_types:
+                        - type: "factual_lookup"
+                          count: 2847
+                        - type: "analytical"
+                          count: 1523
+                        - type: "comparative_analysis"
+                          count: 643
+                    user_overrides:
+                      total: 127
+                      percentage: 2.3
+                      by_workflow:
+                        langgraph: 73
+                        crewai: 42
+                        simple_rag: 12
+                    trends:
+                      - metric: "accuracy"
+                        change: "+0.04"
+                        direction: "improving"
+                      - metric: "avg_routing_time"
+                        change: "-8ms"
+                        direction: "improving"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/router/feedback:
+    post:
+      tags:
+        - analytics
+      summary: Submit routing feedback
+      description: |
+        Provide feedback on routing decision accuracy to improve future routing.
+        Used for continuous learning and router optimization.
+      operationId: submitRoutingFeedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - routing_id
+                - correct_routing
+              properties:
+                routing_id:
+                  type: string
+                  format: uuid
+                  description: ID of the routing decision
+                correct_routing:
+                  type: boolean
+                  description: Whether the routing was correct
+                preferred_workflow:
+                  type: string
+                  enum: [langgraph, crewai, simple_rag]
+                  description: User's preferred workflow (if incorrect)
+                feedback_comment:
+                  type: string
+                  maxLength: 500
+                  description: Optional feedback comment
+                execution_success:
+                  type: boolean
+                  description: Whether query execution succeeded
+                execution_time_ms:
+                  type: integer
+                  description: Actual execution time
+            examples:
+              positive_feedback:
+                summary: Correct routing
+                value:
+                  routing_id: "550e8400-e29b-41d4-a716-446655440000"
+                  correct_routing: true
+                  execution_success: true
+                  execution_time_ms: 2340
+              negative_feedback:
+                summary: Incorrect routing
+                value:
+                  routing_id: "660e8400-e29b-41d4-a716-446655440001"
+                  correct_routing: false
+                  preferred_workflow: "crewai"
+                  feedback_comment: "Query needed multi-agent coordination"
+                  execution_success: false
+      responses:
+        '201':
+          description: Feedback recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feedback_id:
+                    type: string
+                    format: uuid
+                  routing_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [recorded, processing]
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/router/config:
+    get:
+      tags:
+        - configuration
+      summary: Get router configuration
+      description: Retrieve current router configuration and thresholds
+      operationId: getRouterConfig
+      responses:
+        '200':
+          description: Configuration retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouterConfiguration'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - configuration
+      summary: Update router configuration
+      description: Update routing thresholds and configuration (admin only)
+      operationId: updateRouterConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouterConfigUpdate'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouterConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/router/cache/clear:
+    post:
+      tags:
+        - configuration
+      summary: Clear routing cache
+      description: Clear cached routing decisions (admin only)
+      operationId: clearRoutingCache
+      responses:
+        '200':
+          description: Cache cleared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  entries_cleared:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    RoutingDecision:
+      type: object
+      required:
+        - query
+        - selected_workflow
+        - confidence_score
+        - reasoning
+      properties:
+        query:
+          type: string
+          description: Original query
+        selected_workflow:
+          type: string
+          enum: [langgraph, crewai, simple_rag]
+          description: Selected workflow
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Routing confidence (0-1)
+        reasoning:
+          type: string
+          description: Human-readable explanation for routing decision
+        query_characteristics:
+          type: object
+          properties:
+            complexity:
+              type: string
+              enum: [low, medium, high]
+            query_type:
+              type: string
+              description: Detected query type
+            requires_multiple_documents:
+              type: boolean
+            requires_external_data:
+              type: boolean
+            estimated_tokens:
+              type: integer
+        alternative_workflows:
+          type: array
+          items:
+            type: object
+            properties:
+              workflow:
+                type: string
+              confidence_score:
+                type: number
+                format: float
+              reason:
+                type: string
+        execution_endpoint:
+          type: string
+          format: uri
+          description: Endpoint to execute query
+        estimated_response_time_ms:
+          type: integer
+          description: Estimated execution time
+        cached:
+          type: boolean
+          description: Whether decision was from cache
+        routing_time_ms:
+          type: integer
+          description: Time taken to make routing decision
+        timestamp:
+          type: string
+          format: date-time
+
+    RoutingExecutionResponse:
+      type: object
+      required:
+        - routing_decision
+        - execution_result
+      properties:
+        routing_decision:
+          type: object
+          properties:
+            selected_workflow:
+              type: string
+            confidence_score:
+              type: number
+              format: float
+            reasoning:
+              type: string
+            routing_time_ms:
+              type: integer
+        execution_result:
+          type: object
+          description: Workflow execution result
+          properties:
+            answer:
+              type: string
+            iterations_used:
+              type: integer
+            sources_used:
+              type: integer
+            execution_time_ms:
+              type: integer
+        total_time_ms:
+          type: integer
+          description: Total time (routing + execution)
+        timestamp:
+          type: string
+          format: date-time
+
+    RoutingHistoryEntry:
+      type: object
+      required:
+        - routing_id
+        - query
+        - selected_workflow
+        - confidence_score
+      properties:
+        routing_id:
+          type: string
+          format: uuid
+        query:
+          type: string
+        selected_workflow:
+          type: string
+        confidence_score:
+          type: number
+          format: float
+        query_characteristics:
+          type: object
+        execution_success:
+          type: boolean
+        execution_time_ms:
+          type: integer
+        user_override:
+          type: boolean
+          description: Whether user manually overrode routing
+        feedback_received:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    RoutingAnalytics:
+      type: object
+      required:
+        - time_range
+        - total_routings
+        - workflow_distribution
+      properties:
+        time_range:
+          type: string
+        total_routings:
+          type: integer
+        workflow_distribution:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Count by workflow
+        workflow_percentages:
+          type: object
+          additionalProperties:
+            type: number
+          description: Percentage by workflow
+        accuracy_metrics:
+          type: object
+          properties:
+            overall_accuracy:
+              type: number
+              format: float
+            by_workflow:
+              type: object
+              additionalProperties:
+                type: number
+            confidence_calibration:
+              type: number
+              format: float
+              description: How well confidence scores match actual accuracy
+        performance_metrics:
+          type: object
+          properties:
+            avg_routing_time_ms:
+              type: number
+              format: float
+            p50_routing_time_ms:
+              type: number
+            p95_routing_time_ms:
+              type: number
+            p99_routing_time_ms:
+              type: number
+            cache_hit_rate:
+              type: number
+              format: float
+        query_characteristics:
+          type: object
+          properties:
+            avg_complexity:
+              type: string
+            most_common_types:
+              type: array
+              items:
+                type: object
+        user_overrides:
+          type: object
+          properties:
+            total:
+              type: integer
+            percentage:
+              type: number
+              format: float
+            by_workflow:
+              type: object
+              additionalProperties:
+                type: integer
+        trends:
+          type: array
+          items:
+            type: object
+            properties:
+              metric:
+                type: string
+              change:
+                type: string
+              direction:
+                type: string
+                enum: [improving, stable, declining]
+
+    RouterConfiguration:
+      type: object
+      required:
+        - enabled
+        - default_workflow
+      properties:
+        enabled:
+          type: boolean
+          description: Whether automatic routing is enabled
+        default_workflow:
+          type: string
+          enum: [langgraph, crewai, simple_rag]
+          description: Default workflow when confidence low
+        routing_thresholds:
+          type: object
+          description: Confidence thresholds for each workflow
+          properties:
+            simple_rag_min:
+              type: number
+              format: float
+              default: 0.8
+            langgraph_min:
+              type: number
+              format: float
+              default: 0.7
+            crewai_min:
+              type: number
+              format: float
+              default: 0.7
+        caching_config:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            ttl_seconds:
+              type: integer
+            similarity_threshold:
+              type: number
+              format: float
+        feature_flags:
+          type: object
+          properties:
+            enable_ml_routing:
+              type: boolean
+            enable_feedback_learning:
+              type: boolean
+            enable_user_overrides:
+              type: boolean
+        updated_at:
+          type: string
+          format: date-time
+
+    RouterConfigUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        default_workflow:
+          type: string
+          enum: [langgraph, crewai, simple_rag]
+        routing_thresholds:
+          type: object
+        caching_config:
+          type: object
+        feature_flags:
+          type: object
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ForbiddenError:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

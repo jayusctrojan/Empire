@@ -204,6 +204,41 @@ class SupabaseStorage:
             logger.error(f"Error updating document status: {e}")
             return False
 
+    async def update_source_metadata(
+        self,
+        b2_file_id: str,
+        source_metadata: Dict[str, Any]
+    ) -> bool:
+        """
+        Update source metadata for a document
+
+        Args:
+            b2_file_id: B2 file ID (stored in b2_file_id column)
+            source_metadata: Source metadata dict (title, author, publication_date, etc.)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            update_data = {
+                "source_metadata": source_metadata,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+
+            result = self.client.table("documents").update(update_data).eq("b2_file_id", b2_file_id).execute()
+
+            if result.data:
+                logger.info(f"Updated source metadata for document {b2_file_id}")
+                return True
+            return False
+
+        except Exception as e:
+            logger.error(f"Error updating source metadata: {e}")
+            return False
+
     async def list_documents(
         self,
         status: Optional[str] = None,

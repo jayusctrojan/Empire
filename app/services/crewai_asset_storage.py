@@ -42,7 +42,7 @@ class CrewAIAssetStorage:
         """Initialize with B2 storage service"""
         self.b2_service = b2_service or B2StorageService()
 
-        # 10-department taxonomy from PRD
+        # 12-department taxonomy (v7.3 - includes _global and research-development)
         self.departments = [
             "it-engineering",
             "sales-marketing",
@@ -53,7 +53,9 @@ class CrewAIAssetStorage:
             "real-estate",
             "private-equity-ma",
             "consulting",
-            "personal-continuing-ed"
+            "personal-continuing-ed",
+            "_global",
+            "research-development"
         ]
 
     def get_asset_folder(self, asset_type: str, department: str) -> str:

@@ -7,13 +7,36 @@ Tests for preference management, learning, privacy controls, and import/export.
 import pytest
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from app.services.user_preference_service import (
     UserPreferenceService,
     UserPreference
 )
 from app.services.conversation_memory_service import MemoryNode
+
+
+# ==================== Helper Functions ====================
+
+def create_test_memory_node(
+    user_id: str,
+    content: str = "",
+    node_type: str = "preference",
+    confidence_score: float = 1.0,
+    metadata: dict = None
+) -> MemoryNode:
+    """Helper to create MemoryNode with proper UUID and timestamps for tests"""
+    now = datetime.utcnow()
+    return MemoryNode(
+        id=uuid4(),
+        user_id=user_id,
+        content=content,
+        node_type=node_type,
+        confidence_score=confidence_score,
+        first_mentioned_at=now,
+        last_mentioned_at=now,
+        metadata=metadata or {}
+    )
 
 
 # ==================== Fixtures ====================
@@ -91,12 +114,16 @@ class TestUserPreference:
 
     def test_preference_from_memory_node(self, user_id):
         """Test UserPreference.from_memory_node() class method"""
+        test_uuid = uuid4()
+        now = datetime.utcnow()
         node = MemoryNode(
-            id="node_123",
+            id=test_uuid,
             user_id=user_id,
             content="Preference: privacy.opt_out = True",
             node_type="preference",
             confidence_score=1.0,
+            first_mentioned_at=now,
+            last_mentioned_at=now,
             metadata={
                 "category": "privacy",
                 "key": "opt_out",
@@ -107,7 +134,7 @@ class TestUserPreference:
 
         pref = UserPreference.from_memory_node(node)
 
-        assert pref.preference_id == "node_123"
+        assert pref.preference_id == str(test_uuid)
         assert pref.user_id == user_id
         assert pref.category == "privacy"
         assert pref.key == "opt_out"
@@ -143,8 +170,7 @@ class TestPreferenceCRUD:
         mock_memory_service.get_nodes_by_type.return_value = []
 
         # Mock: create new node
-        mock_memory_service.create_memory_node.return_value = MemoryNode(
-            id="node_123",
+        mock_memory_service.create_memory_node.return_value = create_test_memory_node(
             user_id=user_id,
             content="Preference: communication.style = formal",
             node_type="preference",
@@ -176,8 +202,7 @@ class TestPreferenceCRUD:
     async def test_set_preference_update_existing(self, service, mock_memory_service, user_id):
         """Test updating an existing preference"""
         # Mock: preference already exists
-        existing_node = MemoryNode(
-            id="node_123",
+        existing_node = create_test_memory_node(
             user_id=user_id,
             content="Preference: communication.style = casual",
             node_type="preference",
@@ -193,8 +218,7 @@ class TestPreferenceCRUD:
         mock_memory_service.get_nodes_by_type.return_value = [existing_node]
 
         # Mock: update node
-        mock_memory_service.update_memory_node.return_value = MemoryNode(
-            id="node_123",
+        mock_memory_service.update_memory_node.return_value = create_test_memory_node(
             user_id=user_id,
             content="Preference: communication.style = formal",
             node_type="preference",
@@ -223,8 +247,7 @@ class TestPreferenceCRUD:
     async def test_get_preference(self, service, mock_memory_service, user_id):
         """Test getting a specific preference"""
         mock_memory_service.get_nodes_by_type.return_value = [
-            MemoryNode(
-                id="node_123",
+            create_test_memory_node(
                 user_id=user_id,
                 content="Preference: content.format = markdown",
                 node_type="preference",
@@ -264,8 +287,7 @@ class TestPreferenceCRUD:
     async def test_delete_preference(self, service, mock_memory_service, user_id):
         """Test deleting a preference"""
         # Mock: preference exists
-        existing_node = MemoryNode(
-            id="node_123",
+        existing_node = create_test_memory_node(
             user_id=user_id,
             content="Preference: test.key = value",
             node_type="preference",

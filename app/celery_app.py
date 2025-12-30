@@ -1,12 +1,18 @@
 """
 Empire v7.3 - Celery Configuration
 Background task processing for document parsing, embedding generation, and graph synchronization
+
+Task 12: Enhanced with unified StatusBroadcaster for:
+- Redis Pub/Sub broadcasting
+- Database status persistence
+- Standardized TaskStatusMessage schema
 """
 
 import os
 import time
+import traceback
 from celery import Celery
-from celery.signals import task_prerun, task_postrun, task_failure, task_success
+from celery.signals import task_prerun, task_postrun, task_failure, task_success, task_retry
 from prometheus_client import Counter, Histogram
 from dotenv import load_dotenv
 
@@ -21,12 +27,29 @@ CELERY_TASK_DURATION = Histogram('empire_celery_task_duration_seconds', 'Celery 
 from app.services.monitoring_service import get_monitoring_service
 from app.services.supabase_storage import get_supabase_storage
 
+# Task 12: Import StatusBroadcaster for unified status broadcasting
+from app.services.status_broadcaster import (
+    get_sync_status_broadcaster,
+    get_task_type_from_name
+)
+from app.models.task_status import TaskType
+
 # Initialize monitoring service
 _supabase_storage = get_supabase_storage()
 _monitoring_service = get_monitoring_service(_supabase_storage)
 
 # Task timing storage (to calculate duration)
 _task_start_times = {}
+
+# Task 12: Get sync broadcaster for signal handlers
+_status_broadcaster = None
+
+def _get_status_broadcaster():
+    """Lazy load the status broadcaster"""
+    global _status_broadcaster
+    if _status_broadcaster is None:
+        _status_broadcaster = get_sync_status_broadcaster()
+    return _status_broadcaster
 
 # Redis broker URL
 # Clean URL to remove invalid SSL parameters
@@ -99,15 +122,58 @@ PRIORITY_BACKGROUND = 1
 # Task signals for monitoring
 @task_prerun.connect
 def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
-    """Track task start"""
+    """
+    Track task start and broadcast status - Task 12 Enhanced
+    Uses unified StatusBroadcaster for Redis Pub/Sub and database persistence.
+    """
     _task_start_times[task_id] = time.time()
     print(f"📋 Task started: {task.name} [{task_id}]")
 
+    # Task 12: Use unified StatusBroadcaster
+    try:
+        broadcaster = _get_status_broadcaster()
+
+        # Extract resource IDs from task kwargs if available
+        task_kwargs = kwargs.get('kwargs', {})
+        document_id = task_kwargs.get('document_id')
+        query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
+        user_id = task_kwargs.get('user_id')
+        session_id = task_kwargs.get('session_id')
+
+        # Determine task type from task name
+        task_type = get_task_type_from_name(task.name)
+
+        # Build metadata
+        metadata = {}
+        if task_kwargs.get('filename'):
+            metadata['filename'] = task_kwargs.get('filename')
+        if task_kwargs.get('file_size'):
+            metadata['file_size'] = task_kwargs.get('file_size')
+
+        # Broadcast started status via Redis Pub/Sub + database
+        broadcaster.broadcast_started(
+            task_id=task_id,
+            task_name=task.name,
+            task_type=task_type,
+            document_id=document_id,
+            query_id=query_id,
+            user_id=user_id,
+            session_id=session_id,
+            metadata=metadata if metadata else None
+        )
+    except Exception as e:
+        # Don't let broadcast errors break task execution
+        print(f"⚠️  Status broadcast failed for task start: {e}")
+
 
 @task_postrun.connect
-def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, **kwargs):
-    """Track task completion"""
+def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, state=None, **kwargs):
+    """
+    Track task completion and broadcast status - Task 12 Enhanced
+    Uses unified StatusBroadcaster for Redis Pub/Sub and database persistence.
+    """
     # Calculate duration
+    duration = None
     if task_id in _task_start_times:
         duration = time.time() - _task_start_times[task_id]
         CELERY_TASK_DURATION.labels(task_name=task.name).observe(duration)
@@ -115,6 +181,46 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, **kw
 
     print(f"✅ Task completed: {task.name} [{task_id}]")
     CELERY_TASKS.labels(task_name=task.name, status='success').inc()
+
+    # Task 12: Use unified StatusBroadcaster
+    try:
+        broadcaster = _get_status_broadcaster()
+
+        # Extract resource IDs from task kwargs if available
+        task_kwargs = kwargs.get('kwargs', {})
+        document_id = task_kwargs.get('document_id')
+        query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
+        user_id = task_kwargs.get('user_id')
+        session_id = task_kwargs.get('session_id')
+
+        # Determine task type from task name
+        task_type = get_task_type_from_name(task.name)
+
+        # Build metadata
+        metadata = {}
+        if duration is not None:
+            metadata['duration_seconds'] = round(duration, 2)
+
+        # Prepare result (sanitize for JSON serialization)
+        result_data = None
+        if retval is not None and isinstance(retval, dict):
+            result_data = retval
+
+        # Broadcast success status via Redis Pub/Sub + database
+        broadcaster.broadcast_success(
+            task_id=task_id,
+            task_name=task.name,
+            result=result_data,
+            runtime_seconds=duration,
+            task_type=task_type,
+            document_id=document_id,
+            query_id=query_id,
+            user_id=user_id,
+            metadata=metadata if metadata else None
+        )
+    except Exception as e:
+        # Don't let broadcast errors break task execution
+        print(f"⚠️  Status broadcast failed for task completion: {e}")
 
 
 @task_success.connect
@@ -125,36 +231,131 @@ def task_success_handler(sender=None, result=None, **kwargs):
 
 
 @task_failure.connect
-def task_failure_handler(sender=None, task_id=None, exception=None, args=None, kwargs=None, **kw):
+def task_failure_handler(sender=None, task_id=None, exception=None, args=None, kwargs=None, einfo=None, **kw):
     """
-    Track task failure and route to Dead Letter Queue if all retries exhausted
+    Track task failure and broadcast status - Task 12 Enhanced
+    Uses unified StatusBroadcaster for Redis Pub/Sub and database persistence.
+    Also routes to Dead Letter Queue if all retries exhausted.
     """
     print(f"❌ Task failed: {sender.name} [{task_id}]: {exception}")
     CELERY_TASKS.labels(task_name=sender.name, status='failure').inc()
 
-    # Check if task has exhausted all retries
+    # Calculate duration if available
+    duration = None
+    if task_id in _task_start_times:
+        duration = time.time() - _task_start_times[task_id]
+        del _task_start_times[task_id]
+
+    # Get retry info
     from celery import current_app
     task_state = current_app.backend.get_task_meta(task_id)
+    retry_count = task_state.get('retries', 0) if task_state else 0
+    max_retries = sender.max_retries if hasattr(sender, 'max_retries') else 3
+
+    # Task 12: Use unified StatusBroadcaster
+    try:
+        broadcaster = _get_status_broadcaster()
+
+        # Extract resource IDs from task kwargs if available
+        task_kwargs = kwargs or {}
+        document_id = task_kwargs.get('document_id')
+        query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
+        user_id = task_kwargs.get('user_id')
+        session_id = task_kwargs.get('session_id')
+
+        # Determine task type from task name
+        task_type = get_task_type_from_name(sender.name)
+
+        # Get stack trace if available
+        stack_trace = None
+        if einfo:
+            stack_trace = str(einfo.traceback) if hasattr(einfo, 'traceback') else str(einfo)
+
+        # Broadcast failure status via Redis Pub/Sub + database
+        broadcaster.broadcast_failure(
+            task_id=task_id,
+            task_name=sender.name,
+            error_type=type(exception).__name__,
+            error_message=str(exception),
+            retry_count=retry_count,
+            max_retries=max_retries,
+            stack_trace=stack_trace,
+            runtime_seconds=duration,
+            task_type=task_type,
+            document_id=document_id,
+            query_id=query_id,
+            user_id=user_id,
+            metadata={"args": str(args)[:500] if args else None}
+        )
+    except Exception as e:
+        # Don't let broadcast errors break task execution
+        print(f"⚠️  Status broadcast failed for task failure: {e}")
 
     # If task has no more retries, send to Dead Letter Queue
-    if task_state and 'retries' in task_state:
-        max_retries = sender.max_retries if hasattr(sender, 'max_retries') else 3
-        if task_state.get('retries', 0) >= max_retries:
-            print(f"💀 Task {task_id} exhausted all retries - routing to Dead Letter Queue")
+    if task_state and retry_count >= max_retries:
+        print(f"💀 Task {task_id} exhausted all retries - routing to Dead Letter Queue")
 
-            # Route to DLQ by applying to dead_letter queue
-            send_to_dead_letter_queue.apply_async(
-                args=[{
-                    'task_id': task_id,
-                    'task_name': sender.name,
-                    'exception': str(exception),
-                    'args': args,
-                    'kwargs': kwargs,
-                    'retries': task_state.get('retries', 0),
-                    'max_retries': max_retries
-                }],
-                queue='dead_letter'
-            )
+        # Route to DLQ by applying to dead_letter queue
+        send_to_dead_letter_queue.apply_async(
+            args=[{
+                'task_id': task_id,
+                'task_name': sender.name,
+                'exception': str(exception),
+                'args': args,
+                'kwargs': kwargs,
+                'retries': retry_count,
+                'max_retries': max_retries
+            }],
+            queue='dead_letter'
+        )
+
+
+@task_retry.connect
+def task_retry_handler(sender=None, request=None, reason=None, einfo=None, **kwargs):
+    """
+    Track task retry and broadcast status - Task 12
+    Uses unified StatusBroadcaster for Redis Pub/Sub and database persistence.
+    """
+    task_id = request.id if request else None
+    print(f"🔄 Task retrying: {sender.name} [{task_id}]: {reason}")
+    CELERY_TASKS.labels(task_name=sender.name, status='retry').inc()
+
+    # Task 12: Use unified StatusBroadcaster
+    try:
+        broadcaster = _get_status_broadcaster()
+
+        # Extract resource IDs from task kwargs if available
+        task_kwargs = request.kwargs if request else {}
+        document_id = task_kwargs.get('document_id')
+        query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
+        user_id = task_kwargs.get('user_id')
+        session_id = task_kwargs.get('session_id')
+
+        # Determine task type from task name
+        task_type = get_task_type_from_name(sender.name)
+
+        # Get retry count and countdown
+        retry_count = request.retries if request else 0
+        max_retries = sender.max_retries if hasattr(sender, 'max_retries') else 3
+        countdown = getattr(request, 'countdown', 60) or 60
+
+        # Broadcast retry status via Redis Pub/Sub + database
+        broadcaster.broadcast_retry(
+            task_id=task_id,
+            task_name=sender.name,
+            retry_count=retry_count,
+            max_retries=max_retries,
+            error_message=str(reason),
+            countdown_seconds=int(countdown),
+            task_type=task_type,
+            document_id=document_id,
+            query_id=query_id,
+            user_id=user_id,
+            metadata=None
+        )
+    except Exception as e:
+        # Don't let broadcast errors break task execution
+        print(f"⚠️  Status broadcast failed for task retry: {e}")
 
 
 # Health check task

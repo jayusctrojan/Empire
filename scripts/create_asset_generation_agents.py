@@ -13,8 +13,8 @@ ASSET_GENERATION_AGENTS = [
     {
         "agent_name": "main_orchestrator",
         "role": "Master Content Analyzer & Asset Orchestrator",
-        "goal": "Analyze incoming content and make intelligent decisions about: 1) Department classification (10 departments), 2) Asset type selection (skill vs command vs agent vs prompt vs workflow), 3) Content summary requirements, 4) Delegation to appropriate specialized agents",
-        "backstory": "Expert orchestrator with deep knowledge of asset type decision logic, department taxonomy (10 departments), and output guidelines. Skilled at analyzing content patterns and delegating to specialized agents.",
+        "goal": "Analyze incoming content and make intelligent decisions about: 1) Department classification (12 departments including R&D), 2) Asset type selection (skill vs command vs agent vs prompt vs workflow), 3) Content summary requirements, 4) Delegation to appropriate specialized agents",
+        "backstory": "Expert orchestrator with deep knowledge of asset type decision logic, department taxonomy (12 departments including research-development), and output guidelines. Skilled at analyzing content patterns and delegating to specialized agents.",
         "tools": ["document_search", "pattern_analyzer", "department_classifier"],
         "llm_config": {
             "model": "claude-sonnet-4-20250514",

@@ -57,7 +57,7 @@ class CourseClassifier:
         }
 
     async def _classify_department(self, filename: str, content_preview: str) -> Dict:
-        """Classify into one of 10 departments"""
+        """Classify into one of 12 departments (v7.3)"""
 
         prompt = f"""Analyze this course material and classify it into the appropriate department.
 
@@ -67,7 +67,7 @@ Content Preview: {content_preview[:3000]}
 DEPARTMENTS (use slug format in response):
 
 1. it-engineering - Technology, software, DevOps, data, security, cloud
-2. sales-marketing - Sales techniques, marketing, product strategy, R&D, customer success
+2. sales-marketing - Sales techniques, marketing, product strategy, customer success
 3. customer-support - Technical support, help desk, SLA management, customer service
 4. operations-hr-supply - HR, operations, supply chain, procurement, legal compliance
 5. finance-accounting - FP&A, accounting, tax, audits, financial risk
@@ -76,6 +76,8 @@ DEPARTMENTS (use slug format in response):
 8. private-equity-ma - M&A, due diligence, PE fundamentals, valuation, exit strategies
 9. consulting - Management consulting, strategy frameworks, client engagement, case interviews
 10. personal-continuing-ed - Psychology, NLP, life coaching, mindfulness, personal growth
+11. _global - Cross-department content applicable to multiple areas
+12. research-development - R&D, innovation, prototyping, experiments, patents, product development
 
 Respond in JSON format:
 {{

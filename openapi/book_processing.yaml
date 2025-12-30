@@ -1,0 +1,966 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - Book Processing API
+  description: |
+    API endpoints for intelligent book processing with automatic chapter detection and
+    per-chapter knowledge base indexing. Supports automatic table of contents extraction,
+    chapter boundary detection (>90% accuracy), and chapter-aware querying. Creates separate
+    knowledge base entries for each chapter with page ranges and hierarchical structure.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: book-upload
+    description: Book upload and processing
+  - name: chapters
+    description: Chapter management and queries
+  - name: book-metadata
+    description: Book metadata and structure
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/books/upload:
+    post:
+      tags:
+        - book-upload
+      summary: Upload and process book
+      description: |
+        Upload a book (PDF, EPUB, MOBI) for automatic chapter detection and processing.
+        System automatically detects chapters using regex patterns and ML algorithms,
+        creates separate knowledge base entries per chapter, and indexes with embeddings.
+        Returns task ID for tracking processing status.
+      operationId: uploadBook
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Book file (PDF, EPUB, MOBI)
+                metadata:
+                  type: object
+                  description: Optional book metadata
+                  properties:
+                    title:
+                      type: string
+                      maxLength: 500
+                      description: Book title (auto-extracted if not provided)
+                    author:
+                      type: string
+                      maxLength: 200
+                      description: Book author
+                    isbn:
+                      type: string
+                      pattern: '^(?:\d{10}|\d{13})$'
+                      description: ISBN-10 or ISBN-13
+                    publication_year:
+                      type: integer
+                      minimum: 1000
+                      maximum: 9999
+                      description: Year of publication
+                    genre:
+                      type: string
+                      description: Book genre/category
+                    language:
+                      type: string
+                      description: Book language (ISO 639-1 code)
+                      example: "en"
+                processing_options:
+                  type: object
+                  description: Processing configuration
+                  properties:
+                    detect_chapters:
+                      type: boolean
+                      default: true
+                      description: Automatically detect chapter boundaries
+                    extract_toc:
+                      type: boolean
+                      default: true
+                      description: Extract table of contents if available
+                    chapter_detection_mode:
+                      type: string
+                      enum: [auto, strict, relaxed]
+                      default: auto
+                      description: Chapter detection sensitivity
+                    create_full_book_index:
+                      type: boolean
+                      default: true
+                      description: Also create book-wide searchable index
+                    department_id:
+                      type: integer
+                      minimum: 1
+                      maximum: 11
+                      description: Department classification
+            encoding:
+              file:
+                contentType: application/pdf, application/epub+zip, application/x-mobipocket-ebook
+      responses:
+        '202':
+          description: Book upload accepted and processing started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookUploadResponse'
+              examples:
+                book_processing:
+                  summary: Book processing started
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    book_id: "660e8400-e29b-41d4-a716-446655440001"
+                    file_name: "machine_learning_textbook.pdf"
+                    file_size_bytes: 15728640
+                    estimated_processing_time_seconds: 180
+                    status_url: "/api/status/550e8400-e29b-41d4-a716-446655440000"
+                    message: "Book uploaded successfully. Processing chapters..."
+                    uploaded_at: "2025-11-24T13:49:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '413':
+          $ref: '#/components/responses/FileTooLargeError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaTypeError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/books/{book_id}:
+    get:
+      tags:
+        - book-metadata
+      summary: Get book details
+      description: Retrieve complete book metadata including chapter structure
+      operationId: getBookById
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Book UUID
+      responses:
+        '200':
+          description: Book details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookDetails'
+              examples:
+                ml_textbook:
+                  summary: Machine Learning textbook
+                  value:
+                    book_id: "660e8400-e29b-41d4-a716-446655440001"
+                    title: "Machine Learning: A Comprehensive Guide"
+                    author: "John Smith"
+                    isbn: "9781234567890"
+                    publication_year: 2024
+                    genre: "Computer Science"
+                    language: "en"
+                    department_id: 11
+                    department_name: "Research & Development"
+                    file_type: "pdf"
+                    file_size_bytes: 15728640
+                    page_count: 523
+                    word_count: 187420
+                    chapter_count: 18
+                    chapters:
+                      - chapter_id: "770e8400-e29b-41d4-a716-446655440002"
+                        chapter_number: 1
+                        title: "Introduction to Machine Learning"
+                        page_range: [1, 28]
+                        word_count: 8420
+                        has_embeddings: true
+                      - chapter_id: "880e8400-e29b-41d4-a716-446655440003"
+                        chapter_number: 2
+                        title: "Supervised Learning Fundamentals"
+                        page_range: [29, 67]
+                        word_count: 11250
+                        has_embeddings: true
+                    table_of_contents:
+                      - chapter: 1
+                        title: "Introduction to Machine Learning"
+                        page: 1
+                        subsections:
+                          - title: "What is Machine Learning?"
+                            page: 3
+                          - title: "Types of Learning"
+                            page: 8
+                      - chapter: 2
+                        title: "Supervised Learning Fundamentals"
+                        page: 29
+                    processing_status: "complete"
+                    uploaded_at: "2025-11-24T13:49:00Z"
+                    processed_at: "2025-11-24T13:52:30Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - book-metadata
+      summary: Delete book
+      description: Delete book and all associated chapter data (soft delete)
+      operationId: deleteBook
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Book deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/books:
+    get:
+      tags:
+        - book-metadata
+      summary: List books
+      description: Retrieve list of all processed books with filtering options
+      operationId: listBooks
+      parameters:
+        - name: department_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 11
+          description: Filter by department
+        - name: author
+          in: query
+          schema:
+            type: string
+          description: Filter by author name (partial match)
+        - name: genre
+          in: query
+          schema:
+            type: string
+          description: Filter by genre
+        - name: processing_status
+          in: query
+          schema:
+            type: string
+            enum: [processing, complete, failed]
+          description: Filter by processing status
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum number of results
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Results offset for pagination
+      responses:
+        '200':
+          description: Books list retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  books:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/books/{book_id}/chapters/{chapter_id}:
+    get:
+      tags:
+        - chapters
+      summary: Get chapter details
+      description: Retrieve detailed information about a specific chapter including content
+      operationId: getChapterById
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: chapter_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Chapter details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChapterDetails'
+              examples:
+                intro_chapter:
+                  summary: Introduction chapter
+                  value:
+                    chapter_id: "770e8400-e29b-41d4-a716-446655440002"
+                    book_id: "660e8400-e29b-41d4-a716-446655440001"
+                    book_title: "Machine Learning: A Comprehensive Guide"
+                    chapter_number: 1
+                    title: "Introduction to Machine Learning"
+                    page_range: [1, 28]
+                    word_count: 8420
+                    summary: "This chapter introduces the fundamental concepts of machine learning, covering supervised, unsupervised, and reinforcement learning paradigms..."
+                    key_topics:
+                      - "Supervised Learning"
+                      - "Unsupervised Learning"
+                      - "Reinforcement Learning"
+                      - "Model Training"
+                      - "Evaluation Metrics"
+                    subsections:
+                      - title: "What is Machine Learning?"
+                        page_range: [3, 7]
+                      - title: "Types of Learning"
+                        page_range: [8, 15]
+                      - title: "Applications"
+                        page_range: [16, 28]
+                    embeddings_count: 42
+                    has_embeddings: true
+                    indexed_at: "2025-11-24T13:51:15Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/books/{book_id}/query:
+    post:
+      tags:
+        - chapters
+      summary: Query book content
+      description: |
+        Execute a query against book content. Can query specific chapters, all chapters,
+        or book-wide. Returns results with chapter attribution and page numbers.
+      operationId: queryBook
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                  description: User query
+                  example: "Explain supervised learning algorithms"
+                scope:
+                  type: string
+                  enum: [book, chapter, chapters]
+                  default: book
+                  description: Query scope (entire book or specific chapters)
+                chapter_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  maxItems: 20
+                  description: Specific chapters to query (if scope=chapters)
+                max_results:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                  description: Maximum number of results
+            examples:
+              book_wide_query:
+                summary: Query entire book
+                value:
+                  query: "What are the main types of machine learning?"
+                  scope: "book"
+                  max_results: 10
+              chapter_specific_query:
+                summary: Query specific chapters
+                value:
+                  query: "Explain gradient descent optimization"
+                  scope: "chapters"
+                  chapter_ids:
+                    - "770e8400-e29b-41d4-a716-446655440002"
+                    - "880e8400-e29b-41d4-a716-446655440003"
+      responses:
+        '200':
+          description: Query executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookQueryResponse'
+              examples:
+                query_results:
+                  summary: Book query results
+                  value:
+                    query: "What are the main types of machine learning?"
+                    answer: |
+                      The three main types of machine learning are:
+
+                      1. **Supervised Learning** [Ch. 2, p. 29-67]: Learning from labeled data to make predictions
+                      2. **Unsupervised Learning** [Ch. 3, p. 68-102]: Finding patterns in unlabeled data
+                      3. **Reinforcement Learning** [Ch. 4, p. 103-145]: Learning through trial and error with rewards
+
+                      Each type has distinct characteristics and use cases as detailed in the respective chapters.
+                    results:
+                      - chapter_id: "770e8400-e29b-41d4-a716-446655440002"
+                        chapter_number: 1
+                        chapter_title: "Introduction to Machine Learning"
+                        page_range: [8, 15]
+                        excerpt: "The three primary paradigms of machine learning are supervised learning, unsupervised learning, and reinforcement learning..."
+                        relevance_score: 0.94
+                      - chapter_id: "880e8400-e29b-41d4-a716-446655440003"
+                        chapter_number: 2
+                        chapter_title: "Supervised Learning Fundamentals"
+                        page_range: [29, 32]
+                        excerpt: "Supervised learning involves training models on labeled datasets..."
+                        relevance_score: 0.89
+                    chapters_searched: 18
+                    results_count: 2
+                    processing_time_ms: 1847
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/books/{book_id}/chapters/{chapter_id}/content:
+    get:
+      tags:
+        - chapters
+      summary: Get chapter content
+      description: Retrieve full text content of a specific chapter
+      operationId: getChapterContent
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: chapter_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [text, markdown, json]
+            default: text
+          description: Content format
+      responses:
+        '200':
+          description: Chapter content retrieved
+          content:
+            text/plain:
+              schema:
+                type: string
+            text/markdown:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chapter_id:
+                    type: string
+                    format: uuid
+                  chapter_number:
+                    type: integer
+                  title:
+                    type: string
+                  content:
+                    type: string
+                  page_range:
+                    type: array
+                    items:
+                      type: integer
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/books/{book_id}/toc:
+    get:
+      tags:
+        - book-metadata
+      summary: Get table of contents
+      description: Retrieve book's table of contents with chapter hierarchy
+      operationId: getTableOfContents
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Table of contents retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableOfContents'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/books/{book_id}/chapters/{chapter_id}/summary:
+    post:
+      tags:
+        - chapters
+      summary: Generate chapter summary
+      description: Generate AI-powered summary of a chapter's content
+      operationId: generateChapterSummary
+      parameters:
+        - name: book_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: chapter_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                length:
+                  type: string
+                  enum: [brief, standard, detailed]
+                  default: standard
+                  description: Summary length
+                include_key_points:
+                  type: boolean
+                  default: true
+                  description: Include bullet points of key concepts
+      responses:
+        '200':
+          description: Summary generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chapter_id:
+                    type: string
+                    format: uuid
+                  chapter_title:
+                    type: string
+                  summary:
+                    type: string
+                  key_points:
+                    type: array
+                    items:
+                      type: string
+                  generated_at:
+                    type: string
+                    format: date-time
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    BookUploadResponse:
+      type: object
+      required:
+        - task_id
+        - book_id
+        - file_name
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          description: Celery task ID for tracking processing
+        book_id:
+          type: string
+          format: uuid
+          description: Unique book identifier
+        file_name:
+          type: string
+          description: Original filename
+        file_size_bytes:
+          type: integer
+        estimated_processing_time_seconds:
+          type: integer
+          description: Estimated time to complete processing
+        status_url:
+          type: string
+          format: uri
+          description: URL to poll for processing status
+        message:
+          type: string
+        uploaded_at:
+          type: string
+          format: date-time
+
+    Book:
+      type: object
+      required:
+        - book_id
+        - title
+      properties:
+        book_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        author:
+          type: string
+        isbn:
+          type: string
+        publication_year:
+          type: integer
+        genre:
+          type: string
+        language:
+          type: string
+        department_id:
+          type: integer
+        department_name:
+          type: string
+        file_type:
+          type: string
+          enum: [pdf, epub, mobi]
+        file_size_bytes:
+          type: integer
+        page_count:
+          type: integer
+        word_count:
+          type: integer
+        chapter_count:
+          type: integer
+        processing_status:
+          type: string
+          enum: [processing, complete, failed]
+        uploaded_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+
+    BookDetails:
+      allOf:
+        - $ref: '#/components/schemas/Book'
+        - type: object
+          properties:
+            chapters:
+              type: array
+              items:
+                $ref: '#/components/schemas/Chapter'
+            table_of_contents:
+              type: array
+              items:
+                $ref: '#/components/schemas/TocEntry'
+
+    Chapter:
+      type: object
+      required:
+        - chapter_id
+        - chapter_number
+        - title
+      properties:
+        chapter_id:
+          type: string
+          format: uuid
+        chapter_number:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        page_range:
+          type: array
+          items:
+            type: integer
+          minItems: 2
+          maxItems: 2
+          description: Start and end page numbers
+        word_count:
+          type: integer
+        has_embeddings:
+          type: boolean
+          description: Whether chapter has been indexed with embeddings
+
+    ChapterDetails:
+      allOf:
+        - $ref: '#/components/schemas/Chapter'
+        - type: object
+          properties:
+            book_id:
+              type: string
+              format: uuid
+            book_title:
+              type: string
+            summary:
+              type: string
+              description: AI-generated chapter summary
+            key_topics:
+              type: array
+              items:
+                type: string
+              description: Main topics covered
+            subsections:
+              type: array
+              items:
+                type: object
+                properties:
+                  title:
+                    type: string
+                  page_range:
+                    type: array
+                    items:
+                      type: integer
+            embeddings_count:
+              type: integer
+              description: Number of embedding chunks for this chapter
+            indexed_at:
+              type: string
+              format: date-time
+
+    BookQueryResponse:
+      type: object
+      required:
+        - query
+        - answer
+        - results
+      properties:
+        query:
+          type: string
+        answer:
+          type: string
+          description: AI-generated answer with chapter references
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              chapter_id:
+                type: string
+                format: uuid
+              chapter_number:
+                type: integer
+              chapter_title:
+                type: string
+              page_range:
+                type: array
+                items:
+                  type: integer
+              excerpt:
+                type: string
+              relevance_score:
+                type: number
+                format: float
+        chapters_searched:
+          type: integer
+        results_count:
+          type: integer
+        processing_time_ms:
+          type: integer
+
+    TocEntry:
+      type: object
+      required:
+        - chapter
+        - title
+        - page
+      properties:
+        chapter:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        page:
+          type: integer
+          minimum: 1
+        subsections:
+          type: array
+          items:
+            type: object
+            properties:
+              title:
+                type: string
+              page:
+                type: integer
+
+    TableOfContents:
+      type: object
+      required:
+        - book_id
+        - entries
+      properties:
+        book_id:
+          type: string
+          format: uuid
+        book_title:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/TocEntry'
+        total_chapters:
+          type: integer
+        extracted_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    FileTooLargeError:
+      description: File exceeds maximum size limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            file_too_large:
+              summary: File too large
+              value:
+                error: "FILE_TOO_LARGE"
+                message: "Book file exceeds maximum size limit of 100 MB"
+                details:
+                  max_size_bytes: 104857600
+                  file_size_bytes: 157286400
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnsupportedMediaTypeError:
+      description: File type not supported
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            unsupported_type:
+              summary: Unsupported file type
+              value:
+                error: "UNSUPPORTED_FILE_TYPE"
+                message: "File type 'application/msword' is not supported for book processing"
+                details:
+                  mime_type: "application/msword"
+                  supported_types: ["application/pdf", "application/epub+zip", "application/x-mobipocket-ebook"]
+                timestamp: "2025-11-24T13:49:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

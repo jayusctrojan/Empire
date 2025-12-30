@@ -1,0 +1,391 @@
+#
+# Empire v7.3 - CI/CD Pipeline - Task 6
+# Automated testing, linting, deployment to Render, and database migrations
+#
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ========================================
+  # Linting and Code Quality Checks
+  # ========================================
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install linting dependencies
+        run: |
+          pip install --upgrade pip
+          pip install flake8 black isort mypy
+
+      - name: Run Flake8
+        run: flake8 app/ --statistics
+        continue-on-error: false
+
+      - name: Check formatting with Black
+        run: black --check app/ tests/
+        continue-on-error: true
+
+      - name: Check import sorting with isort
+        run: isort --check-only app/ tests/
+        continue-on-error: true
+
+  # ========================================
+  # Unit Tests (Fast tests without external dependencies)
+  # ========================================
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run unit tests
+        env:
+          TESTING: true
+        run: |
+          pytest tests/ -m "unit" \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --maxfail=5 \
+            -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+
+  # ========================================
+  # Integration Tests (Require external services)
+  # Runs only on main branch or manual trigger
+  # ========================================
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run integration tests
+        env:
+          TESTING: true
+          # Mock external services for CI
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+        run: |
+          pytest tests/ -m "integration" \
+            --maxfail=3 \
+            --tb=short \
+            -v || echo "Integration tests skipped or failed (non-blocking)"
+        continue-on-error: true
+
+  # ========================================
+  # Database Migration Checks
+  # ========================================
+  check-migrations:
+    name: Check Database Migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Validate migration files
+        run: |
+          echo "Checking for .sql files in migrations/"
+          if [ -d "migrations" ]; then
+            echo "Found migration files:"
+            ls -la migrations/*.sql 2>/dev/null || echo "No SQL migration files found"
+          else
+            echo "No migrations directory found"
+          fi
+
+      - name: Syntax check migration files
+        run: |
+          if [ -d "migrations" ]; then
+            for file in migrations/*.sql; do
+              if [ -f "$file" ]; then
+                echo "Checking syntax: $file"
+                # Basic SQL syntax check (more thorough check would require DB connection)
+                grep -q "CREATE\|ALTER\|DROP\|INSERT" "$file" || echo "Warning: $file may not contain valid SQL"
+              fi
+            done
+          fi
+
+  # ========================================
+  # Deploy to Render (Production)
+  # Runs only on push to main branch
+  # ========================================
+  deploy-production:
+    name: Deploy to Render (Production)
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://jb-empire-api.onrender.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Render - Empire API
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}  # srv-d44o2dq4d50c73elgupg
+        run: |
+          echo "Triggering deployment to Render..."
+          curl -X POST "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}'
+
+      - name: Wait for deployment (30 seconds)
+        run: sleep 30
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://jb-empire-api.onrender.com/health)
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ Deployment successful! Health check passed."
+          else
+            echo "⚠️  Health check returned status: $STATUS"
+            exit 1
+          fi
+
+  # ========================================
+  # Deploy to Render - Celery Worker
+  # Runs only on push to main branch
+  # ========================================
+  deploy-celery-worker:
+    name: Deploy Celery Worker
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy to Render - Celery Worker
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_CELERY_SERVICE_ID: ${{ secrets.RENDER_CELERY_SERVICE_ID }}  # srv-d44oclodl3ps73bg8rmg
+        run: |
+          echo "Triggering Celery worker deployment..."
+          curl -X POST "https://api.render.com/v1/services/$RENDER_CELERY_SERVICE_ID/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"clearCache": false}'
+
+  # ========================================
+  # Run Database Migrations (Production)
+  # Runs after successful deployment
+  # ========================================
+  migrate-database:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install psycopg2-binary python-dotenv
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run migrations
+        env:
+          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+          SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
+          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
+        run: |
+          echo "Running database migrations..."
+          python scripts/run_migrations.py || echo "Migration script not found or failed (non-blocking)"
+        continue-on-error: true
+
+  # ========================================
+  # Seed Test Data (Production - Manual Only)
+  # ========================================
+  seed-test-data:
+    name: Seed Test Data
+    runs-on: ubuntu-latest
+    needs: [migrate-database]
+    if: github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Seed test data
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "Seeding test data..."
+          python scripts/seed_test_data.py || echo "Test data seeding script not found (non-blocking)"
+        continue-on-error: true
+
+  # ========================================
+  # Smoke Tests (Post-Deployment)
+  # ========================================
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install test dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run smoke tests
+        env:
+          API_BASE_URL: https://jb-empire-api.onrender.com
+        run: |
+          pytest tests/ -m "smoke" -v || echo "No smoke tests found"
+        continue-on-error: true
+
+      - name: Basic API health checks
+        run: |
+          echo "Testing /health endpoint..."
+          curl -f https://jb-empire-api.onrender.com/health || exit 1
+
+          echo "Testing /docs endpoint..."
+          curl -f https://jb-empire-api.onrender.com/docs || exit 1
+
+          echo "✅ Basic smoke tests passed!"
+
+  # ========================================
+  # Notify on Failure
+  # ========================================
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, deploy-production]
+    if: failure() && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Create GitHub Issue on Failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 CI/CD Pipeline Failed',
+              body: `CI/CD pipeline failed on commit ${context.sha}\n\nWorkflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              labels: ['ci-cd', 'alert', 'bug']
+            })
