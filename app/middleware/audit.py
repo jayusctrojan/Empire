@@ -256,7 +256,9 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                 "resource_id": self._extract_resource_id(request.url.path),
                 "action": f"{request.method} {request.url.path}",
                 "metadata": json.dumps(metadata),
-                "severity": self._determine_severity(response.status_code, event_type)
+                "severity": self._determine_severity(response.status_code, event_type),
+                "category": self._determine_category(request.url.path, event_type),
+                "status": "success" if response.status_code < 400 else "failure"
             }).execute()
 
             logger.debug(
@@ -309,6 +311,36 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
             return id_match.group(1)
 
         return None
+
+    def _determine_category(self, path: str, event_type: str) -> str:
+        """Determine audit log category based on path and event type"""
+
+        # Authentication/Authorization
+        if event_type in ["user_login", "user_logout", "auth_failure", "authz_failure"]:
+            return "authentication"
+
+        # Security violations
+        if event_type == "policy_violation":
+            return "security"
+
+        # Data operations
+        if event_type in ["data_access", "data_modification", "data_deletion", "data_export"]:
+            return "data"
+
+        # System events
+        if event_type == "system_error":
+            return "system"
+
+        # Administrative actions
+        if event_type in ["rbac_change", "config_change", "user_deletion"]:
+            return "admin"
+
+        # Document operations
+        if event_type in ["document_upload", "document_delete"]:
+            return "document"
+
+        # API operations (default)
+        return "api"
 
     def _determine_severity(self, status_code: int, event_type: str) -> str:
         """Determine log severity level"""
