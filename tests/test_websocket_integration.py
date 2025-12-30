@@ -47,7 +47,12 @@ class TestWebSocketEndpoints:
         document_id = "doc_test_123"
 
         with client.websocket_connect(f"/ws/document/{document_id}?user_id=user123") as websocket:
-            # Should receive subscription confirmation
+            # First message is the connection confirmation
+            connection_data = websocket.receive_json()
+            assert connection_data["type"] == "connection"
+            assert connection_data["status"] == "connected"
+
+            # Second message is subscription confirmation
             data = websocket.receive_json()
             assert data["type"] == "subscription_confirmed"
             assert data["resource_type"] == "document"
@@ -60,7 +65,12 @@ class TestWebSocketEndpoints:
         query_id = "query_test_456"
 
         with client.websocket_connect(f"/ws/query/{query_id}?session_id=session123") as websocket:
-            # Should receive subscription confirmation
+            # First message is the connection confirmation
+            connection_data = websocket.receive_json()
+            assert connection_data["type"] == "connection"
+            assert connection_data["status"] == "connected"
+
+            # Second message is subscription confirmation
             data = websocket.receive_json()
             assert data["type"] == "subscription_confirmed"
             assert data["resource_type"] == "query"
@@ -72,6 +82,10 @@ class TestWebSocketEndpoints:
         client = TestClient(app)
 
         with client.websocket_connect("/ws/notifications") as websocket:
+            # First message is the connection confirmation
+            connection_data = websocket.receive_json()
+            assert connection_data["type"] == "connection"
+
             # Send ping
             websocket.send_json({"type": "ping"})
 
@@ -150,6 +164,9 @@ class TestConnectionManager:
             connection_type="document"
         )
 
+        # Reset mock to clear the initial connection message call
+        mock_ws.send_json.reset_mock()
+
         message = {"type": "test", "data": "hello"}
         await manager.send_to_document(message, document_id)
 
@@ -165,6 +182,10 @@ class TestConnectionManager:
 
         await manager.connect(mock_ws1, "conn1", connection_type="general")
         await manager.connect(mock_ws2, "conn2", connection_type="general")
+
+        # Reset mocks to clear the initial connection message calls
+        mock_ws1.send_json.reset_mock()
+        mock_ws2.send_json.reset_mock()
 
         message = {"type": "broadcast", "data": "announcement"}
         await manager.broadcast(message, publish_to_redis=False)
@@ -276,7 +297,8 @@ class TestCeleryWebSocketIntegration:
 
     def test_send_task_notification(self):
         """Test sending task notification"""
-        with patch('app.utils.websocket_notifications.get_connection_manager') as mock_manager:
+        # Patch where get_connection_manager is imported from
+        with patch('app.services.websocket_manager.get_connection_manager') as mock_manager:
             mock_conn_manager = AsyncMock()
             mock_manager.return_value = mock_conn_manager
 
@@ -343,8 +365,9 @@ class TestWebSocketStats:
 
         stats = response.json()
         assert "active_connections" in stats
-        assert "session_count" in stats
-        assert "user_count" in stats
+        # Stats structure changed: session_count -> active_sessions, user_count -> connected_users
+        assert "active_sessions" in stats
+        assert "connected_users" in stats
 
 
 class TestMessageRouting:
@@ -369,6 +392,10 @@ class TestMessageRouting:
             connection_id="conn_other",
             connection_type="general"
         )
+
+        # Reset mocks to clear the initial connection message calls
+        mock_ws_doc.send_json.reset_mock()
+        mock_ws_other.send_json.reset_mock()
 
         # Send to document subscribers
         message = {"type": "document_update", "doc_id": "doc123"}
@@ -397,6 +424,10 @@ class TestMessageRouting:
             connection_id="conn_other",
             connection_type="general"
         )
+
+        # Reset mocks to clear the initial connection message calls
+        mock_ws_user.send_json.reset_mock()
+        mock_ws_other.send_json.reset_mock()
 
         # Send to specific user
         message = {"type": "user_notification", "user_id": "user123"}

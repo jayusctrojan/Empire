@@ -201,16 +201,18 @@ class TestSessionCreation:
 
     @pytest.mark.asyncio
     async def test_create_session_max_limit_cleanup(self, service, mock_supabase, user_id):
-        """Test that oldest session is deleted when max limit is reached"""
+        """Test that oldest session is deactivated when max limit is reached"""
         # Mock 10 existing active sessions
         existing_sessions = [
-            {"id": f"session_{i}", "created_at": datetime.utcnow().isoformat()}
+            {"id": f"session_{i}", "user_id": user_id, "is_active": True,
+             "created_at": datetime.utcnow().isoformat(), "updated_at": datetime.utcnow().isoformat(),
+             "message_count": 0, "total_tokens": 0}
             for i in range(10)
         ]
 
         mock_supabase.execute.side_effect = [
             Mock(data=existing_sessions),  # get_active_sessions
-            Mock(data=[]),  # delete oldest
+            Mock(data=None),  # deactivate oldest (update call)
             Mock(data=[{  # create new session
                 "id": "new_session",
                 "user_id": user_id,
@@ -225,8 +227,8 @@ class TestSessionCreation:
         session = await service.create_session(user_id=user_id)
 
         assert session is not None
-        # Verify delete was called for oldest session
-        assert mock_supabase.delete.called
+        # Verify update was called for deactivating oldest session (not delete - it's a soft delete)
+        assert mock_supabase.update.called
 
 
 # ==================== Session Activity Tracking Tests ====================
@@ -237,9 +239,9 @@ class TestSessionActivity:
     @pytest.mark.asyncio
     async def test_update_session_activity(self, service, mock_supabase, mock_redis, user_id, session_id):
         """Test updating session activity"""
-        # Mock Supabase response
+        # Mock Supabase response - single() returns a single dict, not a list
         mock_supabase.execute.return_value = Mock(
-            data=[{
+            data={
                 "id": session_id,
                 "user_id": user_id,
                 "message_count": 5,
@@ -248,7 +250,7 @@ class TestSessionActivity:
                 "is_active": True,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
-            }]
+            }
         )
 
         session = await service.update_session_activity(
@@ -266,8 +268,9 @@ class TestSessionActivity:
     async def test_update_activity_refreshes_redis_ttl(self, service, mock_redis, user_id, session_id):
         """Test that activity updates refresh Redis TTL"""
         mock_supabase = service.supabase
+        # single() returns a single dict, not a list
         mock_supabase.execute.return_value = Mock(
-            data=[{
+            data={
                 "id": session_id,
                 "user_id": user_id,
                 "is_active": True,
@@ -275,7 +278,7 @@ class TestSessionActivity:
                 "total_tokens": 10,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
-            }]
+            }
         )
 
         await service.update_session_activity(
@@ -323,9 +326,9 @@ class TestSessionRetrieval:
         # Cache miss
         mock_redis.get.return_value = None
 
-        # Database hit
+        # Database hit - single() returns a single dict, not a list
         mock_supabase.execute.return_value = Mock(
-            data=[{
+            data={
                 "id": session_id,
                 "user_id": user_id,
                 "title": "DB Session",
@@ -334,7 +337,7 @@ class TestSessionRetrieval:
                 "total_tokens": 200,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat()
-            }]
+            }
         )
 
         session = await service.get_session(session_id, user_id)
@@ -426,8 +429,9 @@ class TestSessionExport:
     @pytest.mark.asyncio
     async def test_export_session_basic(self, service, mock_supabase, session_id, user_id):
         """Test exporting session without messages"""
+        # single() returns a single dict, not a list
         mock_supabase.execute.return_value = Mock(
-            data=[{
+            data={
                 "id": session_id,
                 "user_id": user_id,
                 "title": "Export Test",
@@ -438,7 +442,7 @@ class TestSessionExport:
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat(),
                 "session_metadata": {"test": "data"}
-            }]
+            }
         )
 
         export = await service.export_session(
@@ -448,7 +452,8 @@ class TestSessionExport:
         )
 
         assert export is not None
-        assert export["session_id"] == session_id
+        # export_session returns session.to_dict() which has "id", not "session_id"
+        assert export["id"] == session_id
         assert export["user_id"] == user_id
         assert "messages" not in export
 
