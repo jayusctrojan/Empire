@@ -29,7 +29,9 @@ class AuditLogEntry(BaseModel):
     action: str
     metadata: dict = Field(default_factory=dict)
     severity: str
-    created_at: datetime
+    timestamp: datetime
+    category: Optional[str] = None
+    status: Optional[str] = None
 
 
 class AuditLogListResponse(BaseModel):
@@ -99,14 +101,14 @@ async def get_audit_logs(
             query = query.eq("resource_type", resource_type)
 
         if start_date:
-            query = query.gte("created_at", start_date.isoformat())
+            query = query.gte("timestamp", start_date.isoformat())
 
         if end_date:
-            query = query.lte("created_at", end_date.isoformat())
+            query = query.lte("timestamp", end_date.isoformat())
 
         # Apply pagination
         offset = (page - 1) * page_size
-        query = query.order("created_at", desc=True).range(offset, offset + page_size - 1)
+        query = query.order("timestamp", desc=True).range(offset, offset + page_size - 1)
 
         # Execute query
         result = query.execute()
@@ -197,9 +199,9 @@ async def get_user_audit_trail(
         query = supabase.table("audit_logs")\
             .select("*", count="exact")\
             .eq("user_id", user_id)\
-            .gte("created_at", start_date.isoformat())\
-            .lte("created_at", end_date.isoformat())\
-            .order("created_at", desc=True)\
+            .gte("timestamp", start_date.isoformat())\
+            .lte("timestamp", end_date.isoformat())\
+            .order("timestamp", desc=True)\
             .range(offset, offset + page_size - 1)
 
         result = query.execute()
@@ -252,8 +254,8 @@ async def get_audit_stats(
         # Get all logs in date range
         result = supabase.table("audit_logs")\
             .select("event_type, severity, user_id")\
-            .gte("created_at", start_date.isoformat())\
-            .lte("created_at", end_date.isoformat())\
+            .gte("timestamp", start_date.isoformat())\
+            .lte("timestamp", end_date.isoformat())\
             .execute()
 
         logs = result.data
@@ -285,7 +287,7 @@ async def get_audit_stats(
         recent_errors_result = supabase.table("audit_logs")\
             .select("id", count="exact")\
             .eq("severity", "error")\
-            .gte("created_at", recent_errors_start.isoformat())\
+            .gte("timestamp", recent_errors_start.isoformat())\
             .execute()
 
         recent_errors = recent_errors_result.count if recent_errors_result.count else 0
@@ -335,7 +337,7 @@ async def get_recent_events(
             query = query.eq("severity", severity)
 
         # Get recent events
-        query = query.order("created_at", desc=True).limit(limit)
+        query = query.order("timestamp", desc=True).limit(limit)
 
         result = query.execute()
 
