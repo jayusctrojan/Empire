@@ -4,10 +4,11 @@ Admin-only endpoints for querying security audit logs
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from typing import Optional, List, Any
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime, timedelta
 import structlog
+import json
 
 from app.core.supabase_client import get_supabase_client
 from app.middleware.auth import require_admin
@@ -32,6 +33,19 @@ class AuditLogEntry(BaseModel):
     timestamp: datetime
     category: Optional[str] = None
     status: Optional[str] = None
+
+    @field_validator('metadata', mode='before')
+    @classmethod
+    def parse_metadata(cls, v: Any) -> dict:
+        """Parse metadata from JSON string if needed"""
+        if v is None:
+            return {}
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return {"raw": v}
+        return v
 
 
 class AuditLogListResponse(BaseModel):
