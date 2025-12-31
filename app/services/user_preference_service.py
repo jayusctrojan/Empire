@@ -1,21 +1,28 @@
 """
-User Preference Service - Task 28
+User Preference Service - Task 28 & 34
 
 Manages user preferences using the ConversationMemoryService as the storage layer.
 Preferences are stored as memory nodes with node_type="preference".
 
 Features:
 - Preference storage and retrieval
-- Preference learning from user interactions
+- Preference learning from user interactions (Task 34.2 - Claude-enhanced)
 - Preference inference and recommendations
 - Privacy controls and opt-out mechanisms
 - Preference categories: communication, content, privacy, notifications
 """
 
 import logging
+import os
+import json
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from uuid import uuid4
+
+try:
+    from anthropic import AsyncAnthropic
+except ImportError:
+    AsyncAnthropic = None
 
 try:
     from app.services.conversation_memory_service import (
@@ -28,6 +35,35 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+
+
+# Claude-based preference extraction prompt
+PREFERENCE_EXTRACTION_PROMPT = """Analyze the following conversation and extract user preferences.
+
+Conversation:
+{conversation}
+
+Based on this conversation, identify any preferences the user has expressed or implied. Focus on:
+1. Topic interests (what subjects they're interested in)
+2. Communication style (formal/casual, detailed/concise)
+3. Content preferences (document types, formats, domains)
+4. Response preferences (length, level of detail, examples)
+
+Return a JSON object with extracted preferences. Each preference should have:
+- category: one of "content", "communication", "display"
+- key: a descriptive key (e.g., "interested_in_finance", "prefers_concise_responses")
+- value: the preference value (string, boolean, or number)
+- confidence: 0.0 to 1.0 (how confident you are about this preference)
+- reason: brief explanation of why this was inferred
+
+Only include preferences you're confident about (confidence >= 0.5).
+If no clear preferences can be extracted, return an empty list.
+
+Respond ONLY with valid JSON in this format:
+{{"preferences": [
+  {{"category": "content", "key": "interested_in_topic", "value": true, "confidence": 0.8, "reason": "User asked about..."}},
+  ...
+]}}"""
 
 
 class UserPreference:
@@ -493,6 +529,209 @@ class UserPreferenceService:
             )
 
         return None
+
+    async def extract_preferences_from_conversation(
+        self,
+        user_id: str,
+        messages: List[Dict[str, str]],
+        min_confidence: float = 0.5
+    ) -> List[UserPreference]:
+        """
+        Extract user preferences from conversation using Claude (Task 34.2).
+
+        Uses Claude Haiku to analyze conversation patterns and extract:
+        - Topic interests
+        - Communication style preferences
+        - Content preferences
+        - Response preferences
+
+        Args:
+            user_id: User identifier
+            messages: List of conversation messages [{"role": "user/assistant", "content": "..."}]
+            min_confidence: Minimum confidence threshold for storing preferences
+
+        Returns:
+            List of extracted and stored UserPreference objects
+        """
+        # Check if user has opted out
+        opt_out = await self.get_preference(
+            user_id,
+            self.CATEGORY_PRIVACY,
+            self.PRIVACY_OPT_OUT_LEARNING
+        )
+        if opt_out and opt_out.value is True:
+            logger.info(f"User {user_id} has opted out of preference learning")
+            return []
+
+        # Check if Claude is available
+        if not AsyncAnthropic:
+            logger.warning("Anthropic SDK not available for preference extraction")
+            return []
+
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            logger.warning("ANTHROPIC_API_KEY not set")
+            return []
+
+        # Format conversation for Claude
+        conversation_text = "\n".join([
+            f"{msg.get('role', 'user').upper()}: {msg.get('content', '')}"
+            for msg in messages[-10:]  # Last 10 messages to keep context manageable
+        ])
+
+        if len(conversation_text) < 50:
+            # Not enough content to extract preferences
+            return []
+
+        try:
+            client = AsyncAnthropic(api_key=api_key)
+
+            response = await client.messages.create(
+                model="claude-3-5-haiku-20241022",
+                max_tokens=500,
+                temperature=0.3,
+                messages=[{
+                    "role": "user",
+                    "content": PREFERENCE_EXTRACTION_PROMPT.format(conversation=conversation_text)
+                }]
+            )
+
+            # Parse response
+            response_text = response.content[0].text.strip()
+
+            # Try to extract JSON
+            try:
+                # Handle potential markdown code blocks
+                if "```json" in response_text:
+                    response_text = response_text.split("```json")[1].split("```")[0]
+                elif "```" in response_text:
+                    response_text = response_text.split("```")[1].split("```")[0]
+
+                extracted = json.loads(response_text)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse preference extraction response: {response_text[:200]}")
+                return []
+
+            preferences = extracted.get("preferences", [])
+            stored_preferences = []
+
+            for pref_data in preferences:
+                confidence = pref_data.get("confidence", 0.5)
+
+                # Only store if above minimum confidence
+                if confidence < min_confidence:
+                    continue
+
+                category = pref_data.get("category", self.CATEGORY_CONTENT)
+                key = pref_data.get("key", "")
+                value = pref_data.get("value")
+
+                if not key or value is None:
+                    continue
+
+                # Validate category
+                valid_categories = [
+                    self.CATEGORY_COMMUNICATION,
+                    self.CATEGORY_CONTENT,
+                    self.CATEGORY_DISPLAY
+                ]
+                if category not in valid_categories:
+                    category = self.CATEGORY_CONTENT
+
+                # Store the preference
+                pref = await self.set_preference(
+                    user_id=user_id,
+                    category=category,
+                    key=key,
+                    value=value,
+                    source="learned",
+                    confidence=confidence,
+                    metadata={
+                        "extraction_method": "claude_nlp",
+                        "reason": pref_data.get("reason", ""),
+                        "extracted_at": datetime.utcnow().isoformat()
+                    }
+                )
+
+                if pref:
+                    stored_preferences.append(pref)
+                    logger.info(f"Extracted preference for {user_id}: {category}.{key} = {value}")
+
+            return stored_preferences
+
+        except Exception as e:
+            logger.error(f"Error extracting preferences from conversation: {e}")
+            return []
+
+    async def get_content_preferences(
+        self,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Get user's content preferences for search boosting (Task 34.4).
+
+        Returns a structured dict of preferences that can be used to boost search results.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Dict with preference data for boosting:
+            - topics: List of interested topics with weights
+            - domains: Preferred content domains
+            - document_types: Preferred document types
+            - recency_preference: How much to weight recent content
+        """
+        content_prefs = await self.get_preferences_by_category(
+            user_id,
+            self.CATEGORY_CONTENT
+        )
+
+        # Structure preferences for search boosting
+        boost_data = {
+            "topics": [],
+            "domains": [],
+            "document_types": [],
+            "recency_preference": "balanced"  # default
+        }
+
+        for pref in content_prefs:
+            key = pref.key
+            value = pref.value
+            confidence = pref.confidence
+
+            # Topic interests
+            if key.startswith("interested_in_"):
+                topic = key.replace("interested_in_", "")
+                if value is True:
+                    boost_data["topics"].append({
+                        "topic": topic,
+                        "weight": confidence
+                    })
+
+            # Domain preferences
+            elif key.startswith("prefers_domain_"):
+                domain = key.replace("prefers_domain_", "")
+                if value is True:
+                    boost_data["domains"].append({
+                        "domain": domain,
+                        "weight": confidence
+                    })
+
+            # Document type preferences
+            elif key.startswith("prefers_doc_type_"):
+                doc_type = key.replace("prefers_doc_type_", "")
+                if value is True:
+                    boost_data["document_types"].append({
+                        "type": doc_type,
+                        "weight": confidence
+                    })
+
+            # Recency preference
+            elif key == "prefers_recent_content":
+                boost_data["recency_preference"] = "recent" if value else "balanced"
+
+        return boost_data
 
     async def _update_existing_preference(
         self,

@@ -1,5 +1,5 @@
 """
-Empire v7.3 - Hybrid Search API Routes (Task 27)
+Empire v7.3 - Hybrid Search API Routes (Task 27 & 34)
 
 Provides REST API endpoints for hybrid search combining:
 - Dense vector search (pgvector similarity)
@@ -7,6 +7,7 @@ Provides REST API endpoints for hybrid search combining:
 - Fuzzy search (trigram similarity)
 - ILIKE pattern matching
 - Reciprocal Rank Fusion (RRF) for result combination
+- User preference-based result boosting (Task 34.4)
 
 Author: Empire AI Team
 Date: January 2025
@@ -19,6 +20,97 @@ from pydantic import BaseModel, Field
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Preference Boosting Helper (Task 34.4)
+# ============================================================================
+
+async def apply_preference_boost(
+    results: List[Any],
+    user_id: Optional[str],
+    boost_factor: float = 0.2
+) -> List[Any]:
+    """
+    Apply user preference-based boosting to search results (Task 34.4).
+
+    Boosts results that match user's content preferences:
+    - Topics of interest
+    - Preferred document types
+    - Domain preferences
+
+    Args:
+        results: Search results to boost
+        user_id: User ID to get preferences for (None = no boosting)
+        boost_factor: Maximum boost factor (0.0-1.0)
+
+    Returns:
+        Results with adjusted scores based on preferences
+    """
+    if not user_id or not results:
+        return results
+
+    try:
+        from app.services.user_preference_service import UserPreferenceService
+        from app.services.conversation_memory_service import ConversationMemoryService
+        from app.core.database import get_supabase
+
+        supabase = get_supabase()
+        memory_service = ConversationMemoryService(supabase_client=supabase)
+        pref_service = UserPreferenceService(memory_service=memory_service)
+
+        # Get user's content preferences
+        boost_data = await pref_service.get_content_preferences(user_id)
+
+        if not boost_data.get("topics") and not boost_data.get("domains"):
+            # No preferences to apply
+            return results
+
+        # Build lookup for topic/domain matching
+        topic_weights = {t["topic"].lower(): t["weight"] for t in boost_data.get("topics", [])}
+        domain_weights = {d["domain"].lower(): d["weight"] for d in boost_data.get("domains", [])}
+        doc_type_weights = {dt["type"].lower(): dt["weight"] for dt in boost_data.get("document_types", [])}
+
+        # Apply boosts to results
+        boosted_results = []
+        for result in results:
+            content = result.content.lower() if hasattr(result, 'content') else ""
+            metadata = result.metadata if hasattr(result, 'metadata') else {}
+
+            boost = 0.0
+
+            # Check topic matches
+            for topic, weight in topic_weights.items():
+                if topic in content:
+                    boost += weight * boost_factor
+                    break  # Only one topic boost per result
+
+            # Check domain matches
+            doc_domain = metadata.get("domain", "").lower()
+            if doc_domain in domain_weights:
+                boost += domain_weights[doc_domain] * boost_factor
+
+            # Check document type matches
+            doc_type = metadata.get("document_type", "").lower()
+            if doc_type in doc_type_weights:
+                boost += doc_type_weights[doc_type] * boost_factor
+
+            # Apply boost (cap at boost_factor * 2)
+            if boost > 0:
+                result.score = min(1.0, result.score + min(boost, boost_factor * 2))
+
+            boosted_results.append(result)
+
+        # Re-sort by score and re-rank
+        boosted_results.sort(key=lambda r: r.score, reverse=True)
+        for i, r in enumerate(boosted_results):
+            r.rank = i + 1
+
+        return boosted_results
+
+    except Exception as e:
+        logger.warning(f"Preference boosting failed for user {user_id}: {e}")
+        return results  # Return original results on error
 
 router = APIRouter(prefix="/api/search", tags=["Hybrid Search"])
 
@@ -64,6 +156,22 @@ class HybridSearchRequest(BaseModel):
     # RRF configuration
     rrf_k: int = Field(default=60, ge=1, le=1000, description="RRF k parameter")
 
+    # Preference boosting configuration (Task 34.4)
+    user_id: Optional[str] = Field(
+        default=None,
+        description="User ID for preference-based result boosting"
+    )
+    apply_preference_boost: bool = Field(
+        default=True,
+        description="Whether to apply user preference boosting (requires user_id)"
+    )
+    preference_boost_factor: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=0.5,
+        description="Maximum preference boost factor (0.0-0.5)"
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -72,7 +180,9 @@ class HybridSearchRequest(BaseModel):
                 "top_k": 10,
                 "dense_weight": 0.5,
                 "sparse_weight": 0.3,
-                "fuzzy_weight": 0.2
+                "fuzzy_weight": 0.2,
+                "user_id": "user-123",
+                "apply_preference_boost": True
             }
         }
 
@@ -203,6 +313,18 @@ async def hybrid_search(request: HybridSearchRequest):
             custom_config=config
         )
 
+        # Apply preference-based boosting if user_id provided (Task 34.4)
+        preference_boosted = False
+        if request.user_id and request.apply_preference_boost:
+            original_order = [r.chunk_id for r in results]
+            results = await apply_preference_boost(
+                results,
+                request.user_id,
+                request.preference_boost_factor
+            )
+            new_order = [r.chunk_id for r in results]
+            preference_boosted = original_order != new_order
+
         search_time_ms = (time.time() - start_time) * 1000
 
         return HybridSearchResponse(
@@ -232,7 +354,13 @@ async def hybrid_search(request: HybridSearchRequest):
                 "sparse_weight": request.sparse_weight,
                 "fuzzy_weight": request.fuzzy_weight,
                 "top_k": request.top_k,
-                "rrf_k": request.rrf_k
+                "rrf_k": request.rrf_k,
+                "preference_boosting": {
+                    "enabled": request.apply_preference_boost and request.user_id is not None,
+                    "user_id": request.user_id,
+                    "boost_factor": request.preference_boost_factor,
+                    "results_reordered": preference_boosted
+                }
             }
         )
 

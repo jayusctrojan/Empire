@@ -2716,7 +2716,7 @@
   "v7_3_features": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Establish OpenAPI Contracts for All Features",
         "description": "Create OpenAPI 3.0 YAML specifications for each of the 9 features, defining endpoints, request/response schemas, error codes, and examples.",
         "details": "Use Swagger Editor or Stoplight Studio to author OpenAPI 3.0 YAML files for each feature. Ensure all endpoints, parameters, authentication (JWT/OAuth2), and error responses are specified. Include example payloads and document all enums and JSONB fields. Store contracts in a /openapi directory and validate with openapi-cli.",
@@ -2732,7 +2732,8 @@
             "dependencies": [],
             "details": "Use Swagger Editor or Stoplight Studio to author the YAML file. Define endpoints for R&D department management, specify JWT/OAuth2 authentication, enumerate all parameters, and document enums and JSONB fields. Include example payloads and error responses. Store the file in /openapi/rd_department.yaml.",
             "status": "done",
-            "testStrategy": "Validate YAML with openapi-cli and review with backend lead for completeness."
+            "testStrategy": "Validate YAML with openapi-cli and review with backend lead for completeness.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2741,7 +2742,8 @@
             "dependencies": [],
             "details": "Author the YAML file using Swagger Editor. Define endpoints for querying and updating loading status, specify required parameters, authentication, and error responses. Document enums and JSONB fields. Include example payloads. Store in /openapi/loading_status.yaml.",
             "status": "done",
-            "testStrategy": "Lint YAML with openapi-cli and verify endpoint coverage with frontend lead."
+            "testStrategy": "Lint YAML with openapi-cli and verify endpoint coverage with frontend lead.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2750,7 +2752,8 @@
             "dependencies": [],
             "details": "Use Stoplight Studio to define endpoints for uploading URLs, specify input validation, authentication, and error handling. Document all enums and JSONB fields. Provide example payloads. Save as /openapi/url_upload.yaml.",
             "status": "done",
-            "testStrategy": "Validate with openapi-cli and confirm with backend team."
+            "testStrategy": "Validate with openapi-cli and confirm with backend team.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -2759,7 +2762,8 @@
             "dependencies": [],
             "details": "Author YAML using Swagger Editor. Define endpoints for source attribution, document parameters, authentication, enums, and JSONB fields. Include example requests and responses. Store in /openapi/source_attribution.yaml.",
             "status": "done",
-            "testStrategy": "Lint YAML and review with product owner for requirements coverage."
+            "testStrategy": "Lint YAML and review with product owner for requirements coverage.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -2768,7 +2772,8 @@
             "dependencies": [],
             "details": "Use Stoplight Studio to define chat endpoints, specify JWT/OAuth2 authentication, document all parameters, enums, and JSONB fields. Include example payloads and error responses. Save as /openapi/agent_chat.yaml.",
             "status": "done",
-            "testStrategy": "Validate YAML with openapi-cli and confirm with chat service team."
+            "testStrategy": "Validate YAML with openapi-cli and confirm with chat service team.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -2777,7 +2782,8 @@
             "dependencies": [],
             "details": "Author YAML using Swagger Editor. Define endpoints for adding courses, specify required parameters, authentication, enums, and JSONB fields. Include example payloads and error responses. Store in /openapi/course_addition.yaml.",
             "status": "done",
-            "testStrategy": "Lint YAML and review with education product manager."
+            "testStrategy": "Lint YAML and review with education product manager.",
+            "parentId": "undefined"
           },
           {
             "id": 7,
@@ -2786,7 +2792,8 @@
             "dependencies": [],
             "details": "Use Stoplight Studio to define endpoints for file upload in chat, specify multipart/form-data handling, authentication, enums, and JSONB fields. Include example payloads and error responses. Save as /openapi/chat_file_upload.yaml.",
             "status": "done",
-            "testStrategy": "Validate YAML with openapi-cli and test multipart payloads."
+            "testStrategy": "Validate YAML with openapi-cli and test multipart payloads.",
+            "parentId": "undefined"
           },
           {
             "id": 8,
@@ -2795,7 +2802,8 @@
             "dependencies": [],
             "details": "Author YAML using Swagger Editor. Define endpoints for book processing, specify required parameters, authentication, enums, and JSONB fields. Include example payloads and error responses. Store in /openapi/book_processing.yaml.",
             "status": "done",
-            "testStrategy": "Lint YAML and review with backend and QA teams."
+            "testStrategy": "Lint YAML and review with backend and QA teams.",
+            "parentId": "undefined"
           },
           {
             "id": 9,
@@ -2804,19 +2812,20 @@
             "dependencies": [],
             "details": "Use Stoplight Studio to define endpoints for agent routing, specify authentication, document all parameters, enums, and JSONB fields. Include example payloads and error responses. Save as /openapi/agent_router.yaml.",
             "status": "done",
-            "testStrategy": "Validate YAML with openapi-cli and confirm with integration team."
+            "testStrategy": "Validate YAML with openapi-cli and confirm with integration team.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "Design and Implement Database Migrations",
         "description": "Create SQL migration files for all schema changes required by v7.3 features.",
         "details": "Use Alembic (Python) or Prisma (TypeScript) for migration management. Write migrations to: (1) add 'R&D' to department enum, (2) add processing_status and source_metadata JSONB columns, (3) create agent_router_cache and agent_feedback tables, (4) create book metadata and course tables. Ensure migrations are idempotent and reversible.",
         "testStrategy": "Run migrations on a test database, verify schema changes, and perform rollback tests. Use dbmate or Alembic test commands.",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "done",
         "subtasks": [
@@ -2827,7 +2836,8 @@
             "dependencies": [],
             "details": "Use Alembic/Prisma to create a migration that alters the department enum type to include 'R&D' as a valid option. Ensure backward compatibility with existing code. Include proper up and down migration functions for reversibility.",
             "status": "done",
-            "testStrategy": "Verify the enum contains the new value after migration. Test that existing records with other department values remain unchanged. Test rollback removes the new enum value."
+            "testStrategy": "Verify the enum contains the new value after migration. Test that existing records with other department values remain unchanged. Test rollback removes the new enum value.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2838,7 +2848,8 @@
             ],
             "details": "Identify tables that need processing status tracking (likely documents, uploads, or processing_jobs tables). Add JSONB column 'processing_status' with appropriate default value (empty JSON object). Include proper indexing for query performance.",
             "status": "done",
-            "testStrategy": "Verify column exists with correct data type after migration. Test inserting and querying various processing status values. Confirm rollback removes the column."
+            "testStrategy": "Verify column exists with correct data type after migration. Test inserting and querying various processing status values. Confirm rollback removes the column.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2849,7 +2860,8 @@
             ],
             "details": "Add 'source_metadata' JSONB column to the documents or content table. This will store extracted metadata like title, author, publication date, and page count. Set appropriate default value (empty JSON) and add GIN index for efficient querying of JSON properties.",
             "status": "done",
-            "testStrategy": "Verify column exists with correct data type. Test storing and retrieving complex JSON metadata. Test querying by specific JSON fields. Confirm rollback removes the column."
+            "testStrategy": "Verify column exists with correct data type. Test storing and retrieving complex JSON metadata. Test querying by specific JSON fields. Confirm rollback removes the column.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -2860,7 +2872,8 @@
             ],
             "details": "Create new table 'agent_router_cache' with columns for query_hash, agent_id, confidence_score, timestamp, and any other required fields. Add appropriate indexes for query performance. Set up foreign key relationships to agents table if applicable. Include TTL mechanism for cache expiration.",
             "status": "done",
-            "testStrategy": "Verify table creation with all columns and constraints. Test inserting, updating and querying cache entries. Confirm foreign key constraints work as expected. Test rollback drops the table."
+            "testStrategy": "Verify table creation with all columns and constraints. Test inserting, updating and querying cache entries. Confirm foreign key constraints work as expected. Test rollback drops the table.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -2871,7 +2884,8 @@
             ],
             "details": "Create new table 'agent_feedback' with columns for feedback_id, agent_id, user_id, query_id, rating, feedback_text, timestamp, and any other required fields. Add appropriate indexes and foreign key constraints. Include audit columns for tracking feedback modifications.",
             "status": "done",
-            "testStrategy": "Verify table creation with all columns and constraints. Test inserting and querying feedback entries. Confirm foreign key constraints work as expected. Test rollback drops the table."
+            "testStrategy": "Verify table creation with all columns and constraints. Test inserting and querying feedback entries. Confirm foreign key constraints work as expected. Test rollback drops the table.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -2882,7 +2896,8 @@
             ],
             "details": "Create tables for 'books', 'book_authors', 'publishers', and join tables as needed. Include columns for ISBN, title, publication_date, edition, page_count, etc. Set up proper relationships between tables with foreign keys. Add appropriate indexes for common query patterns.",
             "status": "done",
-            "testStrategy": "Verify all tables are created with correct columns and relationships. Test inserting and querying book metadata across related tables. Confirm cascading operations work as expected. Test rollback removes all tables."
+            "testStrategy": "Verify all tables are created with correct columns and relationships. Test inserting and querying book metadata across related tables. Confirm cascading operations work as expected. Test rollback removes all tables.",
+            "parentId": "undefined"
           },
           {
             "id": 7,
@@ -2893,7 +2908,8 @@
             ],
             "details": "Create tables for 'courses', 'modules', 'lessons', and any necessary join tables. Include columns for title, description, sequence, status, and metadata. Implement hierarchical relationships between courses, modules, and lessons. Add constraints to maintain data integrity across the course structure.",
             "status": "done",
-            "testStrategy": "Verify all tables are created with correct columns and relationships. Test inserting and querying course structures. Test hierarchical queries across the course structure. Confirm rollback removes all tables."
+            "testStrategy": "Verify all tables are created with correct columns and relationships. Test inserting and querying course structures. Test hierarchical queries across the course structure. Confirm rollback removes all tables.",
+            "parentId": "undefined"
           },
           {
             "id": 8,
@@ -2909,19 +2925,20 @@
             ],
             "details": "Create a test script that applies all migrations in sequence to a test database. Verify each schema change is applied correctly. Test data insertion and querying for each new table and column. Test rollback of each migration individually and in sequence. Document any issues or edge cases discovered.",
             "status": "done",
-            "testStrategy": "Run full migration sequence on clean test database. Verify schema matches expected state. Run rollback sequence and verify original schema is restored. Test with sample data to ensure functionality works as expected."
+            "testStrategy": "Run full migration sequence on clean test database. Verify schema matches expected state. Run rollback sequence and verify original schema is restored. Test with sample data to ensure functionality works as expected.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "Set Up Feature Flags and Configuration Management",
         "description": "Implement feature flag system and update environment configuration for all new features.",
         "details": "Integrate a feature flag library such as Unleash or LaunchDarkly (open-source version if cost is a concern). Store flags in a centralized config file or service. Update .env files and Render.com environment variables for new settings. Document flag usage for each feature.",
         "testStrategy": "Toggle flags in staging and verify feature enable/disable behavior. Write unit tests for flag checks in code.",
         "priority": "high",
         "dependencies": [
-          2
+          "2"
         ],
         "status": "done",
         "subtasks": [
@@ -2932,7 +2949,8 @@
             "dependencies": [],
             "details": "Compare at least 3 feature flag libraries (Unleash, LaunchDarkly open-source, and a simple file-based system). Evaluate based on: ease of integration with FastAPI, performance impact, self-hosting options, and developer experience. Create a comparison document with recommendations and prepare installation instructions for the selected library.",
             "status": "done",
-            "testStrategy": "Create a simple test FastAPI app to verify the selected library can toggle features correctly and has minimal performance impact."
+            "testStrategy": "Create a simple test FastAPI app to verify the selected library can toggle features correctly and has minimal performance impact.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2943,7 +2961,8 @@
             ],
             "details": "Install the selected feature flag library. Create a centralized configuration module for managing flags. Implement helper functions for checking flag status. Set up initialization in the FastAPI app startup. Create a configuration file or database schema for storing flag states. Ensure the system works in both development and production environments.",
             "status": "done",
-            "testStrategy": "Write unit tests to verify flag checking functions work correctly. Test initialization during app startup and proper loading of flag configurations."
+            "testStrategy": "Write unit tests to verify flag checking functions work correctly. Test initialization during app startup and proper loading of flag configurations.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2954,7 +2973,8 @@
             ],
             "details": "Define feature flags for each of the 9 new features with appropriate naming conventions. Set default values for each environment (dev, staging, prod). Create feature flag definitions for: R&D Department, Loading Status UI, Source Attribution, Course Addition, Book Processing, and Intelligent Agent Router. Implement flag checking in relevant API endpoints and services. Ensure flags can be toggled without code changes or redeployment.",
             "status": "done",
-            "testStrategy": "Test each feature with flags turned on and off to verify proper enabling/disabling behavior. Verify that toggling flags doesn't require application restart."
+            "testStrategy": "Test each feature with flags turned on and off to verify proper enabling/disabling behavior. Verify that toggling flags doesn't require application restart.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -2966,7 +2986,8 @@
             ],
             "details": "Update local .env files with feature flag configuration variables. Configure Render.com environment variables for all environments (dev, staging, production). Create documentation for required environment variables. Implement validation to ensure all required configuration is present at startup. Update CI/CD pipeline to handle feature flag configuration during deployment.",
             "status": "done",
-            "testStrategy": "Test application startup with various environment configurations to ensure proper validation and error handling. Verify Render.com deployments correctly apply feature flag settings."
+            "testStrategy": "Test application startup with various environment configurations to ensure proper validation and error handling. Verify Render.com deployments correctly apply feature flag settings.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -2979,7 +3000,8 @@
             ],
             "details": "Create a protected admin endpoint in FastAPI for viewing and updating feature flag states. Implement authentication and authorization for the admin interface. Develop a simple UI for toggling flags or a CLI tool for administrators. Add audit logging for flag changes. Ensure the interface works across all environments. Add ability to schedule flag activation/deactivation for controlled rollouts.",
             "status": "done",
-            "testStrategy": "Test admin interface with different user roles to verify proper access controls. Verify flag changes take effect immediately. Test scheduled flag changes to ensure they activate at the correct time."
+            "testStrategy": "Test admin interface with different user roles to verify proper access controls. Verify flag changes take effect immediately. Test scheduled flag changes to ensure they activate at the correct time.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -2994,33 +3016,34 @@
             ],
             "details": "Create developer documentation explaining how to use feature flags in code. Document the admin interface or CLI usage. Provide examples for common use cases like A/B testing, gradual rollouts, and emergency disabling. Create a troubleshooting guide. Add documentation for how to add new feature flags. Include architecture diagrams showing how the feature flag system integrates with the application. Update project README with feature flag information.",
             "status": "done",
-            "testStrategy": "Have developers review documentation and attempt to implement a new feature flag following the guidelines to verify clarity and completeness."
+            "testStrategy": "Have developers review documentation and attempt to implement a new feature flag following the guidelines to verify clarity and completeness.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Configure Monitoring: Prometheus, Grafana, and Alertmanager",
         "description": "Set up monitoring and alerting for all new features using Prometheus, Grafana, and Alertmanager.",
         "details": "Add Prometheus exporters to FastAPI and Celery services (use prometheus_fastapi_instrumentator and celery-prometheus-exporter). Create Grafana dashboards for processing status, agent routing, and upload metrics. Define alert rules for error rates, latency, and processing failures. Integrate email alerts for critical issues.",
         "testStrategy": "Trigger test alerts and verify dashboard metrics update in real time. Simulate failures to ensure alerts fire.",
         "priority": "high",
         "dependencies": [
-          3
+          "3"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Develop Data Model and API Documentation",
         "description": "Document all data models, API endpoints, and implementation guides for development teams.",
         "details": "Use tools like Sphinx (Python) or Docusaurus (JS) to generate developer documentation. Include ER diagrams, endpoint descriptions, request/response examples, and migration guides. Link OpenAPI YAML files and provide usage examples for each API.",
         "testStrategy": "Review documentation for completeness and accuracy. Have developers follow guides to implement a sample feature.",
         "priority": "medium",
         "dependencies": [
-          1,
-          2
+          "1",
+          "2"
         ],
         "status": "done",
         "subtasks": [
@@ -3031,7 +3054,8 @@
             "dependencies": [],
             "details": "Choose between Sphinx or Docusaurus based on the project's primary language. Install dependencies, initialize the documentation project, configure theme and plugins, and set up CI/CD for automatic documentation builds. Create a basic structure with sections for data models, API endpoints, migration guides, and developer onboarding.",
             "status": "done",
-            "testStrategy": "Verify documentation builds successfully without errors. Test navigation between sections and ensure proper rendering of code blocks and diagrams."
+            "testStrategy": "Verify documentation builds successfully without errors. Test navigation between sections and ensure proper rendering of code blocks and diagrams.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3042,7 +3066,8 @@
             ],
             "details": "Use tools like dbdiagram.io, ERDPlus, or PlantUML to create visual representations of the database schema. Include all tables from Task 2 (agent_router_cache, agent_feedback, book metadata, course tables). Document primary keys, foreign keys, indexes, and constraints. Provide detailed descriptions for each field including data types, validation rules, and business purpose.",
             "status": "done",
-            "testStrategy": "Review diagrams with database administrators and developers to ensure accuracy. Verify all tables from Task 2 migrations are properly represented."
+            "testStrategy": "Review diagrams with database administrators and developers to ensure accuracy. Verify all tables from Task 2 migrations are properly represented.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3053,7 +3078,8 @@
             ],
             "details": "Document each API endpoint with its HTTP method, URL path, query parameters, request body schema, response schema, status codes, and error handling. Include curl examples and code snippets in multiple languages (Python, JavaScript, etc.). Group endpoints by functionality and provide use cases for each. Link to relevant data models and include authentication requirements.",
             "status": "done",
-            "testStrategy": "Test documentation by following examples to make actual API calls. Verify all endpoints are documented and examples work as described."
+            "testStrategy": "Test documentation by following examples to make actual API calls. Verify all endpoints are documented and examples work as described.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3064,7 +3090,8 @@
             ],
             "details": "Document the migration process for all schema changes in Task 2, including adding 'R&D' to department enum, adding processing_status and source_metadata columns, and creating new tables. Provide step-by-step instructions for applying migrations in different environments. Include rollback procedures and troubleshooting tips. Document any data transformation or backfill requirements.",
             "status": "done",
-            "testStrategy": "Have a developer follow the migration guide on a test environment to verify completeness and accuracy of instructions."
+            "testStrategy": "Have a developer follow the migration guide on a test environment to verify completeness and accuracy of instructions.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3076,33 +3103,34 @@
             ],
             "details": "Import and render OpenAPI specifications within the documentation. Create interactive API explorers using Swagger UI or ReDoc. Develop a developer onboarding guide that includes environment setup, architecture overview, coding standards, testing procedures, and common workflows. Include a quickstart tutorial that walks through implementing a simple feature using the documented APIs and data models.",
             "status": "done",
-            "testStrategy": "Have a new or junior developer follow the onboarding guide and provide feedback. Verify OpenAPI specifications match the actual API implementation."
+            "testStrategy": "Have a new or junior developer follow the onboarding guide and provide feedback. Verify OpenAPI specifications match the actual API implementation.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "Set Up CI/CD Pipeline and Test Infrastructure",
         "description": "Configure GitHub Actions for CI/CD, run migrations on staging, and set up integration test data.",
         "details": "Update GitHub Actions workflows to run tests, lint code, and deploy to Render.com. Use pytest for backend and Playwright for frontend tests. Automate database migrations on staging. Seed test data for all new features.",
         "testStrategy": "Verify CI/CD runs on PRs and pushes. Confirm deployments and migrations succeed without manual intervention.",
         "priority": "high",
         "dependencies": [
-          2,
-          3
+          "2",
+          "3"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 7,
+        "id": "7",
         "title": "Implement Rollback Plan and Performance Baselines",
         "description": "Prepare rollback scripts and establish performance baselines for new features.",
         "details": "Write SQL and infrastructure scripts to revert migrations and deployments. Use Locust or k6 to benchmark API endpoints and document baseline metrics for processing time, latency, and error rates.",
         "testStrategy": "Perform rollback drills on staging. Run load tests and compare results to success metrics.",
         "priority": "medium",
         "dependencies": [
-          6
+          "6"
         ],
         "status": "done",
         "subtasks": [
@@ -3113,7 +3141,8 @@
             "dependencies": [],
             "details": "Identify all migration files in the project. For each migration, create a corresponding rollback script that reverts the changes. Test each rollback script in a development environment to ensure it correctly restores the database to its previous state. Document each script with comments explaining what it reverts and any dependencies.",
             "status": "done",
-            "testStrategy": "Execute each rollback script in a test database after running the forward migration to verify the database returns to its previous state. Validate data integrity after rollback."
+            "testStrategy": "Execute each rollback script in a test database after running the forward migration to verify the database returns to its previous state. Validate data integrity after rollback.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3124,7 +3153,8 @@
             ],
             "details": "Document current Render configuration settings. Create shell scripts or Render API calls that can revert to previous deployment versions. Implement configuration rollback procedures for environment variables, service settings, and networking configurations. Include procedures for reverting to previous Docker images if applicable.",
             "status": "done",
-            "testStrategy": "Perform a mock deployment followed by rollback in the staging environment. Verify all services return to their previous state and function correctly."
+            "testStrategy": "Perform a mock deployment followed by rollback in the staging environment. Verify all services return to their previous state and function correctly.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3133,7 +3163,8 @@
             "dependencies": [],
             "details": "Choose between Locust and k6 based on project requirements. Set up the testing environment with appropriate configuration files. Create test scenarios that simulate realistic user behavior for all critical API endpoints. Configure test parameters including concurrent users, ramp-up time, and test duration. Implement custom metrics collection for detailed performance analysis.",
             "status": "done",
-            "testStrategy": "Run initial tests with minimal load to verify test setup. Gradually increase load to identify performance boundaries. Verify metrics collection is working correctly."
+            "testStrategy": "Run initial tests with minimal load to verify test setup. Gradually increase load to identify performance boundaries. Verify metrics collection is working correctly.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3144,7 +3175,8 @@
             ],
             "details": "Execute load tests on all critical endpoints using the configured testing framework. Collect and analyze metrics for response time (average, p95, p99), requests per second, error rates, and resource utilization (CPU, memory, database connections). Create visualizations of performance data. Document acceptable thresholds for each metric that will trigger alerts or rollback procedures if exceeded in production.",
             "status": "done",
-            "testStrategy": "Compare metrics across multiple test runs to ensure consistency. Validate that metrics collection captures all required data points for future comparison."
+            "testStrategy": "Compare metrics across multiple test runs to ensure consistency. Validate that metrics collection captures all required data points for future comparison.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3157,19 +3189,20 @@
             ],
             "details": "Compile all rollback scripts and procedures into a comprehensive runbook. Include decision criteria for when to initiate rollback. Document step-by-step procedures for database rollback, infrastructure rollback, and application rollback. Include verification steps after each stage of rollback. Add troubleshooting guidance for common rollback issues. Document communication templates for stakeholder notification during rollback events. Schedule and document a rollback drill on the staging environment.",
             "status": "done",
-            "testStrategy": "Conduct a full rollback drill in staging following the runbook exactly as written. Identify and address any gaps or unclear instructions. Have a team member unfamiliar with the rollback process attempt to follow the runbook to verify clarity."
+            "testStrategy": "Conduct a full rollback drill in staging following the runbook exactly as written. Identify and address any gaps or unclear instructions. Have a team member unfamiliar with the rollback process attempt to follow the runbook to verify clarity.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 8,
+        "id": "8",
         "title": "Prepare for Security Audit and Stakeholder Sign-off",
         "description": "Conduct security review and obtain sign-off from stakeholders before feature rollout.",
         "details": "Use Bandit (Python) and OWASP ZAP for static and dynamic security scans. Review authentication, authorization, and data validation. Schedule stakeholder demo and collect sign-off.",
         "testStrategy": "Address all critical/high findings from security tools. Document sign-off in project tracker.",
         "priority": "high",
         "dependencies": [
-          7
+          "7"
         ],
         "status": "done",
         "subtasks": [
@@ -3180,7 +3213,8 @@
             "dependencies": [],
             "details": "Configure and run Bandit with appropriate security plugins. Focus on identifying common vulnerabilities like SQL injection, XSS, insecure file operations, and use of deprecated/insecure functions. Generate a comprehensive report of findings categorized by severity.",
             "status": "done",
-            "testStrategy": "Verify all critical and high severity issues are addressed. Document false positives with justification."
+            "testStrategy": "Verify all critical and high severity issues are addressed. Document false positives with justification.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3189,7 +3223,8 @@
             "dependencies": [],
             "details": "Configure OWASP ZAP to scan all API endpoints in the staging environment. Test for OWASP Top 10 vulnerabilities including injection flaws, broken authentication, sensitive data exposure, and CSRF. Generate a detailed report with screenshots and reproduction steps for each finding.",
             "status": "done",
-            "testStrategy": "Validate findings with manual testing. Ensure all critical and high vulnerabilities are remediated before proceeding to stakeholder sign-off."
+            "testStrategy": "Validate findings with manual testing. Ensure all critical and high vulnerabilities are remediated before proceeding to stakeholder sign-off.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3201,7 +3236,8 @@
             ],
             "details": "Examine JWT implementation, session management, password policies, and role-based access controls. Verify proper implementation of authentication flows including login, logout, password reset, and account recovery. Check for secure token handling and proper authorization checks across all protected resources.",
             "status": "done",
-            "testStrategy": "Create test cases for authentication bypass attempts and unauthorized access scenarios. Verify all security controls are functioning as expected."
+            "testStrategy": "Create test cases for authentication bypass attempts and unauthorized access scenarios. Verify all security controls are functioning as expected.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3213,7 +3249,8 @@
             ],
             "details": "Review all form inputs, API parameters, file uploads, and database queries for proper validation and sanitization. Check for implementation of parameterized queries, input encoding, and content security policies. Identify any instances where user input is processed without proper validation.",
             "status": "done",
-            "testStrategy": "Test with malicious payloads to verify sanitization effectiveness. Ensure all input validation controls properly reject malformed data."
+            "testStrategy": "Test with malicious payloads to verify sanitization effectiveness. Ensure all input validation controls properly reject malformed data.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3225,20 +3262,21 @@
             ],
             "details": "Create a comprehensive security report documenting all findings from previous subtasks, including severity ratings and recommended fixes. Prepare a remediation plan with timelines. Schedule and conduct a stakeholder demo to present findings, demonstrate security measures, and obtain formal sign-off for feature rollout.",
             "status": "done",
-            "testStrategy": "Collect stakeholder feedback during demo and address any concerns. Document sign-off in project tracker with approver names and dates."
+            "testStrategy": "Collect stakeholder feedback during demo and address any concerns. Document sign-off in project tracker with approver names and dates.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 9,
+        "id": "9",
         "title": "Add R&D Department to Department Enum and Services",
         "description": "Update backend and storage logic to support 'Research & Development' as a department.",
         "details": "Update department enum in PostgreSQL and service layer constants. Update B2 storage logic to include 'rnd/' folder. Update Neo4j department nodes. Ensure all APIs and UIs reflect the new department.",
         "testStrategy": "Verify R&D appears in all selection UIs and documents are correctly classified and stored. Write integration tests for classification.",
         "priority": "high",
         "dependencies": [
-          2,
-          5
+          "2",
+          "5"
         ],
         "status": "done",
         "subtasks": [
@@ -3249,7 +3287,8 @@
             "dependencies": [],
             "details": "Create an Alembic migration script to alter the department enum type in PostgreSQL. Add 'rnd' or 'research_development' (based on existing naming conventions) to the enum. Update any relevant ORM models to include the new enum value. Test the migration in development environment before applying to production.",
             "status": "done",
-            "testStrategy": "Write unit tests to verify the enum contains the new value. Test database queries filtering by the new department value."
+            "testStrategy": "Write unit tests to verify the enum contains the new value. Test database queries filtering by the new department value.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3260,7 +3299,8 @@
             ],
             "details": "Modify the storage service to recognize the R&D department and route files to the appropriate 'rnd/' folder in B2 storage. Update path generation logic in file upload services. Ensure proper permissions are set on the new folder. Create the folder structure if it doesn't exist automatically.",
             "status": "done",
-            "testStrategy": "Test file uploads with R&D department classification to verify they're stored in the correct location. Verify folder permissions match other department folders."
+            "testStrategy": "Test file uploads with R&D department classification to verify they're stored in the correct location. Verify folder permissions match other department folders.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3271,7 +3311,8 @@
             ],
             "details": "Create Cypher query to add the R&D department node to Neo4j. Establish appropriate relationships between the new department node and existing nodes (e.g., connect to relevant topics, documents, or other organizational units). Update any graph traversal queries that rely on department information.",
             "status": "done",
-            "testStrategy": "Execute graph queries to verify the R&D node exists and has correct relationships. Test knowledge graph traversals that should include R&D department data."
+            "testStrategy": "Execute graph queries to verify the R&D node exists and has correct relationships. Test knowledge graph traversals that should include R&D department data.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3283,7 +3324,8 @@
             ],
             "details": "Update classification algorithms and rules to identify R&D content based on keywords, topics, and document metadata. Modify service layer constants and enums to include R&D department. Update any caching mechanisms that store department information. Ensure classification accuracy for R&D content through testing with sample documents.",
             "status": "done",
-            "testStrategy": "Run classification tests with known R&D content to verify correct department assignment. Compare classification results before and after changes to ensure existing content classification remains accurate."
+            "testStrategy": "Run classification tests with known R&D content to verify correct department assignment. Compare classification results before and after changes to ensure existing content classification remains accurate.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3295,19 +3337,20 @@
             ],
             "details": "Identify all UI components that display or filter by department (dropdowns, filter panels, department badges, etc.). Update these components to include the R&D option. Ensure proper labeling and consistent terminology across the UI. Update any client-side validation or department-specific business logic. Verify UI changes in all affected pages and components.",
             "status": "done",
-            "testStrategy": "Perform UI testing to verify R&D appears in all relevant dropdowns and filters. Test document upload and classification flows to ensure R&D appears as an option and works correctly."
+            "testStrategy": "Perform UI testing to verify R&D appears in all relevant dropdowns and filters. Test document upload and classification flows to ensure R&D appears as an option and works correctly.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 10,
+        "id": "10",
         "title": "Implement Real-Time Processing Status with WebSockets",
         "description": "Create WebSocket manager and endpoints for real-time document and query status updates.",
         "details": "Use FastAPI's WebSocket support (starlette.websockets) to implement a manager for broadcasting status. Create endpoints for bidirectional communication. Use Redis pub/sub for scaling across workers. Integrate with Celery task events.",
         "testStrategy": "Simulate concurrent uploads and queries, verify status updates within 500ms. Use WebSocket test clients.",
         "priority": "high",
         "dependencies": [
-          6
+          "6"
         ],
         "status": "done",
         "subtasks": [
@@ -3318,7 +3361,8 @@
             "dependencies": [],
             "details": "Create a ConnectionManager class using starlette.websockets that maintains active connections, handles new connections, disconnections, and provides methods for broadcasting messages to all or specific clients. Implement proper error handling and connection lifecycle management.",
             "status": "done",
-            "testStrategy": "Write unit tests for connection handling, message broadcasting, and error scenarios. Test with multiple simultaneous connections."
+            "testStrategy": "Write unit tests for connection handling, message broadcasting, and error scenarios. Test with multiple simultaneous connections.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3329,7 +3373,8 @@
             ],
             "details": "Implement /ws/document/{document_id} and /ws/query/{query_id} endpoints that allow clients to subscribe to status updates for specific documents or queries. Include authentication and validation. Handle connection establishment, message parsing, and proper error responses.",
             "status": "done",
-            "testStrategy": "Test endpoint connectivity, authentication, and message handling with WebSocket test clients. Verify proper status code responses."
+            "testStrategy": "Test endpoint connectivity, authentication, and message handling with WebSocket test clients. Verify proper status code responses.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3341,7 +3386,8 @@
             ],
             "details": "Configure Redis pub/sub channels for document and query status updates. Implement publisher components that send messages to Redis channels. Create subscriber components that listen to Redis channels and forward messages to the WebSocket manager for broadcasting to clients. Ensure proper serialization/deserialization of messages.",
             "status": "done",
-            "testStrategy": "Test message publishing and subscription across multiple worker instances. Verify messages are correctly distributed and received by all relevant clients."
+            "testStrategy": "Test message publishing and subscription across multiple worker instances. Verify messages are correctly distributed and received by all relevant clients.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3353,7 +3399,8 @@
             ],
             "details": "Create Celery task event listeners that capture task state changes (pending, started, success, failure) for document processing and query tasks. Map task IDs to document/query IDs. Publish status updates to Redis channels when task states change. Include progress information when available.",
             "status": "done",
-            "testStrategy": "Test with various Celery task scenarios (success, failure, retry). Verify WebSocket clients receive timely and accurate status updates."
+            "testStrategy": "Test with various Celery task scenarios (success, failure, retry). Verify WebSocket clients receive timely and accurate status updates.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3364,7 +3411,8 @@
             ],
             "details": "Develop JavaScript components that establish WebSocket connections, handle reconnection logic, parse incoming messages, and update UI elements with status information. Create progress indicators, status badges, and notification components. Implement error handling for connection issues.",
             "status": "done",
-            "testStrategy": "Test components with mocked WebSocket servers. Verify UI updates correctly with different status messages. Test reconnection behavior and error handling."
+            "testStrategy": "Test components with mocked WebSocket servers. Verify UI updates correctly with different status messages. Test reconnection behavior and error handling.",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -3378,19 +3426,20 @@
             ],
             "details": "Implement metrics collection for WebSocket connections (count, message rate, latency). Configure logging for connection events. Create load testing scripts using WebSocket test clients to simulate high connection counts and message volumes. Document performance characteristics and bottlenecks.",
             "status": "done",
-            "testStrategy": "Run load tests with increasing numbers of concurrent connections. Verify system maintains <500ms latency for status updates under expected load. Test recovery from connection spikes."
+            "testStrategy": "Run load tests with increasing numbers of concurrent connections. Verify system maintains <500ms latency for status updates under expected load. Test recovery from connection spikes.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 11,
+        "id": "11",
         "title": "Create REST Status Endpoint and Polling Logic",
         "description": "Implement REST endpoint for polling processing/query status as a fallback to WebSockets.",
         "details": "Add /status endpoint to FastAPI, returning current processing state from database. Ensure endpoint is rate-limited and returns consistent schema.",
         "testStrategy": "Test polling from frontend, verify correct status at each stage. Write unit and integration tests.",
         "priority": "medium",
         "dependencies": [
-          10
+          "10"
         ],
         "status": "done",
         "subtasks": [
@@ -3401,7 +3450,8 @@
             "dependencies": [],
             "details": "Create a new FastAPI route handler for GET /status that queries the database for current processing state. Include query parameter support for specific job IDs. Ensure proper error handling for non-existent jobs and database connection issues.",
             "status": "done",
-            "testStrategy": "Write unit tests to verify endpoint returns correct status codes and data. Test with various job states (pending, processing, complete, error)."
+            "testStrategy": "Write unit tests to verify endpoint returns correct status codes and data. Test with various job states (pending, processing, complete, error).",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3412,7 +3462,8 @@
             ],
             "details": "Define Pydantic models for status responses that include fields for job_id, status, progress_percentage, created_at, updated_at, and error_message if applicable. Ensure schema is consistent with existing WebSocket status messages to simplify frontend integration.",
             "status": "done",
-            "testStrategy": "Validate response schema against OpenAPI specification. Test serialization/deserialization with various status states."
+            "testStrategy": "Validate response schema against OpenAPI specification. Test serialization/deserialization with various status states.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3423,7 +3474,8 @@
             ],
             "details": "Integrate a rate limiting middleware (such as slowapi) to restrict requests per client IP or API key. Configure appropriate limits (e.g., 60 requests per minute) and ensure proper response headers (X-RateLimit-*) are included. Implement graceful handling of rate limit exceeded scenarios.",
             "status": "done",
-            "testStrategy": "Test rate limiting by sending requests at various frequencies. Verify correct 429 responses when limits are exceeded and headers indicate remaining quota."
+            "testStrategy": "Test rate limiting by sending requests at various frequencies. Verify correct 429 responses when limits are exceeded and headers indicate remaining quota.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3434,7 +3486,8 @@
             ],
             "details": "Create a polling utility in JavaScript that implements exponential backoff strategy. Include functions for starting/stopping polling, handling connection errors, and transitioning between WebSocket and REST polling when needed. Ensure proper cleanup of polling intervals to prevent memory leaks.",
             "status": "done",
-            "testStrategy": "Write Jest tests to verify polling behavior, backoff strategy, and proper state transitions. Mock API responses to test various scenarios including network failures."
+            "testStrategy": "Write Jest tests to verify polling behavior, backoff strategy, and proper state transitions. Mock API responses to test various scenarios including network failures.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3447,20 +3500,21 @@
             ],
             "details": "Add comprehensive OpenAPI documentation to the status endpoint including parameter descriptions, response schemas, and status codes. Create a documentation page with example requests/responses and polling implementation patterns. Include guidance on rate limits and best practices for efficient polling.",
             "status": "done",
-            "testStrategy": "Review documentation for completeness. Have another developer attempt to implement polling using only the documentation to verify clarity and accuracy."
+            "testStrategy": "Review documentation for completeness. Have another developer attempt to implement polling using only the documentation to verify clarity and accuracy.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 12,
+        "id": "12",
         "title": "Update Celery Tasks to Broadcast Status Changes",
         "description": "Modify Celery tasks to emit status updates to WebSocket manager and REST endpoint.",
         "details": "Use celery-signals to hook into task state changes. Publish updates to Redis channel for WebSocket manager. Update processing_status JSONB column in database.",
         "testStrategy": "Run end-to-end upload and query flows, verify all status transitions are broadcast and persisted.",
         "priority": "high",
         "dependencies": [
-          10,
-          11
+          "10",
+          "11"
         ],
         "status": "done",
         "subtasks": [
@@ -3471,7 +3525,8 @@
             "dependencies": [],
             "details": "Define signal handlers using @task_prerun, @task_postrun, @task_success, and @task_failure decorators from celery.signals. Create a common status update function that will be called by all signal handlers. Ensure handlers capture task_id, state, runtime, and any error information.",
             "status": "done",
-            "testStrategy": "Write unit tests for each signal handler to verify they correctly capture state changes and call the status update function with proper parameters."
+            "testStrategy": "Write unit tests for each signal handler to verify they correctly capture state changes and call the status update function with proper parameters.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3482,7 +3537,8 @@
             ],
             "details": "Create a Pydantic model for status messages with fields for task_id, status, timestamp, progress percentage, error details (if applicable), and metadata. Include validation for required fields and data types. Document the schema for frontend developers who will consume these messages.",
             "status": "done",
-            "testStrategy": "Write unit tests to validate message serialization/deserialization and schema validation for both valid and invalid message formats."
+            "testStrategy": "Write unit tests to validate message serialization/deserialization and schema validation for both valid and invalid message formats.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3493,7 +3549,8 @@
             ],
             "details": "Implement a StatusPublisher class that connects to Redis and publishes status messages to appropriate channels. Create channel naming convention based on task type and ID. Add configuration for Redis connection parameters. Ensure messages follow the defined schema from subtask 2.",
             "status": "done",
-            "testStrategy": "Create integration tests that verify messages are correctly published to Redis channels and can be received by subscribers. Mock Redis for unit tests."
+            "testStrategy": "Create integration tests that verify messages are correctly published to Redis channels and can be received by subscribers. Mock Redis for unit tests.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3504,7 +3561,8 @@
             ],
             "details": "Create a database service method to update the processing_status column with the latest status information. Implement transaction handling to ensure data consistency. Store the complete status history in the JSONB column, not just the current status. Add indexes if needed for query performance.",
             "status": "done",
-            "testStrategy": "Write integration tests with a test database to verify status updates are correctly persisted. Test edge cases like concurrent updates and error recovery."
+            "testStrategy": "Write integration tests with a test database to verify status updates are correctly persisted. Test edge cases like concurrent updates and error recovery.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3518,21 +3576,22 @@
             ],
             "details": "Create end-to-end tests that trigger Celery tasks and verify: 1) Signal handlers are called, 2) Status messages are published to Redis, 3) Database is updated with status changes, 4) WebSocket clients receive updates. Test all state transitions including error states and retries. Create a test harness that can monitor all components simultaneously.",
             "status": "done",
-            "testStrategy": "Use pytest fixtures to set up test environment with Redis, database, and mock WebSocket clients. Verify message delivery and content at each stage of the pipeline."
+            "testStrategy": "Use pytest fixtures to set up test environment with Redis, database, and mock WebSocket clients. Verify message delivery and content at each stage of the pipeline.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 13,
+        "id": "13",
         "title": "Integrate Gradio Processing Status Component",
         "description": "Add progress bars and status indicators to Gradio upload and query UI.",
         "details": "Use Gradio's custom components (Blocks API) to display real-time progress. Connect to WebSocket and REST endpoints for updates. Ensure accessibility and responsive design.",
         "testStrategy": "Upload documents and run queries in UI, verify progress bars update in real time. Test on multiple browsers.",
         "priority": "medium",
         "dependencies": [
-          10,
-          11,
-          12
+          "10",
+          "11",
+          "12"
         ],
         "status": "done",
         "subtasks": [
@@ -3543,7 +3602,8 @@
             "dependencies": [],
             "details": "Use Gradio's Blocks API to create a custom component with progress bars, status text, and animated indicators. Implement CSS styling for different states (pending, processing, complete, error). Create a Python class that encapsulates the component for easy reuse across different parts of the UI.",
             "status": "done",
-            "testStrategy": "Test component rendering with different progress values and states. Verify proper display on different screen sizes and browsers."
+            "testStrategy": "Test component rendering with different progress values and states. Verify proper display on different screen sizes and browsers.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3554,7 +3614,8 @@
             ],
             "details": "Extend the base progress component to handle multiple stages of processing (upload, parsing, indexing, querying). Implement percentage-based progress bars with appropriate labels for each stage. Add animations for indeterminate progress states when exact progress cannot be calculated. Ensure smooth transitions between stages.",
             "status": "done",
-            "testStrategy": "Upload documents of various sizes and verify progress bars accurately reflect upload and processing progress. Test with both fast and slow network connections."
+            "testStrategy": "Upload documents of various sizes and verify progress bars accurately reflect upload and processing progress. Test with both fast and slow network connections.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3565,7 +3626,8 @@
             ],
             "details": "Create a WebSocket client that connects to the backend progress update endpoint. Implement message handlers for different update types (progress, status change, completion, error). Add reconnection logic with exponential backoff for connection failures. Update the progress component UI in response to received messages.",
             "status": "done",
-            "testStrategy": "Test WebSocket connection establishment, message handling, and reconnection behavior. Verify UI updates correctly in response to different message types."
+            "testStrategy": "Test WebSocket connection establishment, message handling, and reconnection behavior. Verify UI updates correctly in response to different message types.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3576,7 +3638,8 @@
             ],
             "details": "Create a polling service that fetches progress updates via REST API at regular intervals. Implement detection logic to determine when to fall back to polling (WebSocket connection failures, browser limitations). Ensure smooth transition between WebSocket and polling modes. Optimize polling frequency to balance responsiveness and server load.",
             "status": "done",
-            "testStrategy": "Test fallback behavior by simulating WebSocket failures. Verify polling correctly retrieves and displays progress updates. Measure performance impact of polling vs WebSocket updates."
+            "testStrategy": "Test fallback behavior by simulating WebSocket failures. Verify polling correctly retrieves and displays progress updates. Measure performance impact of polling vs WebSocket updates.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3587,20 +3650,21 @@
             ],
             "details": "Add ARIA attributes to progress elements for screen reader support. Implement keyboard navigation for interactive elements. Test and adjust component layout for mobile devices, ensuring proper scaling and touch interactions. Add high-contrast mode support and ensure color choices meet WCAG 2.1 AA standards. Document accessibility features for future maintenance.",
             "status": "done",
-            "testStrategy": "Test with screen readers (NVDA, VoiceOver) to verify accessibility. Verify responsive behavior on various device sizes. Use Lighthouse or similar tools to audit accessibility compliance."
+            "testStrategy": "Test with screen readers (NVDA, VoiceOver) to verify accessibility. Verify responsive behavior on various device sizes. Use Lighthouse or similar tools to audit accessibility compliance.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 14,
+        "id": "14",
         "title": "Implement Source Metadata Extraction and Storage",
         "description": "Extract and store source metadata (title, author, date, page) for all uploaded documents.",
         "details": "Integrate LangExtract (latest version) for metadata extraction. Update upload pipeline to extract and store metadata in source_metadata JSONB column. Ensure support for PDFs, DOCX, and web articles.",
         "testStrategy": "Upload sample documents, verify metadata extraction accuracy (>95%). Write unit tests for extraction logic.",
         "priority": "high",
         "dependencies": [
-          2,
-          6
+          "2",
+          "6"
         ],
         "status": "done",
         "subtasks": [
@@ -3611,7 +3675,8 @@
             "dependencies": [],
             "details": "Add LangExtract as a dependency in the project requirements. Set up API keys or credentials if required. Verify installation by running a simple extraction example using LangExtract to ensure it is operational.\n<info added on 2025-11-25T17:41:00.894Z>\nSKIPPED - Used native Python libraries (pypdf, python-docx, python-pptx) instead of LangExtract for better accuracy and simpler integration. The native library approach provides direct access to document metadata without additional API dependencies, offers reliable extraction for title, author, publication_date, and page_count, and includes built-in confidence scoring based on metadata availability. This decision was made during 14.2 implementation and validated during 14.5 testing with 100% pass rate (14/14 tests).\n</info added on 2025-11-25T17:41:00.894Z>",
             "status": "done",
-            "testStrategy": "Run a basic LangExtract extraction on a sample text and confirm output structure matches expectations."
+            "testStrategy": "Run a basic LangExtract extraction on a sample text and confirm output structure matches expectations.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3622,7 +3687,8 @@
             ],
             "details": "Create format-specific handlers that preprocess documents and invoke LangExtract with tailored prompts and examples. Ensure extraction covers all required metadata fields and handles format-specific quirks (e.g., PDF metadata tags, DOCX properties, web article HTML parsing).\n<info added on 2025-11-25T04:40:27.029Z>\nImplementation completed for metadata extraction logic across PDF, DOCX, and PPTX formats. The solution uses native libraries instead of LangExtract for improved accuracy. The `extract_source_metadata()` method in `app/services/metadata_extractor.py` now extracts standard fields (title, author, publication_date, page_count) for all supported formats and returns data in standardized JSONB format matching the database schema. Format-specific extractors were implemented for each document type with tailored approaches: PDFs leverage document properties with creation date as publication proxy, DOCX extracts core properties with paragraph-based page estimation, and PPTX uses slide count for page metrics. A confidence scoring system (0.0-1.0) evaluates metadata quality based on field availability. Additional non-standard metadata (file_hash, creator, producer, keywords) is stored separately in the `additional_metadata` field for future use.\n</info added on 2025-11-25T04:40:27.029Z>",
             "status": "done",
-            "testStrategy": "Unit test extraction logic with diverse sample documents for each format, verifying all required metadata fields are extracted."
+            "testStrategy": "Unit test extraction logic with diverse sample documents for each format, verifying all required metadata fields are extracted.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3633,7 +3699,8 @@
             ],
             "details": "Integrate the extraction logic into the upload workflow. Ensure that, upon upload, the document is processed and metadata is extracted before storage. Handle errors gracefully and log extraction failures for review.\n<info added on 2025-11-25T04:40:51.608Z>\nImplementation completed for integrating metadata extraction into the document upload pipeline. The workflow now includes downloading files from B2 storage, extracting metadata using the MetadataExtractor, and storing it in the documents.source_metadata JSONB column. The process follows a clear pipeline: document upload to B2, Celery task triggering, file movement to processing directory, temporary download, metadata extraction, storage in Supabase, cleanup, and continuation of processing. Error handling ensures metadata extraction failures don't halt document processing, temporary files are always removed, and the existing retry logic with exponential backoff applies to the entire task. Key files modified include document_processing.py, b2_storage.py (with new download_file method), and supabase_storage.py (with new update_source_metadata method).\n</info added on 2025-11-25T04:40:51.608Z>",
             "status": "done",
-            "testStrategy": "Upload documents via the pipeline and verify that metadata extraction is triggered and results are available for subsequent storage."
+            "testStrategy": "Upload documents via the pipeline and verify that metadata extraction is triggered and results are available for subsequent storage.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3644,7 +3711,8 @@
             ],
             "details": "Update the database interaction layer to accept and store the extracted metadata as a JSONB object. Ensure schema compatibility and handle updates or overwrites of metadata for re-uploaded documents.",
             "status": "done",
-            "testStrategy": "Verify that uploaded documents have their metadata correctly stored in the JSONB column by querying the database and inspecting the stored values."
+            "testStrategy": "Verify that uploaded documents have their metadata correctly stored in the JSONB column by querying the database and inspecting the stored values.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3655,19 +3723,20 @@
             ],
             "details": "Prepare a diverse set of sample PDFs, DOCX files, and web articles. Upload them through the system, then retrieve and inspect the stored metadata. Confirm extraction accuracy (>95%) and completeness for all required fields.\n<info added on 2025-11-25T17:40:39.006Z>\nEnd-to-End Validation Testing Results:\n\n**Test Results (14 tests, all passing):**\n\n1. PDF Metadata Extraction:\n   - Full metadata extraction: PASSED (title, author, publication date, page count)\n   - Minimal metadata extraction: PASSED (filename fallback, page count)\n   - Timestamp validation: PASSED (ISO 8601 format)\n\n2. DOCX Metadata Extraction:\n   - Full metadata extraction: PASSED (core properties)\n   - Minimal metadata extraction: PASSED (handles auto-populated fields)\n\n3. PPTX Metadata Extraction:\n   - Full metadata extraction: PASSED (slide count as page count)\n   - Minimal metadata extraction: PASSED\n\n4. Edge Cases:\n   - File not found: PASSED (raises FileNotFoundError)\n   - Unsupported file type: PASSED (uses filename, 0.3 confidence)\n   - Corrupted PDF: PASSED (handles gracefully)\n\n5. Confidence Scoring:\n   - All fields present: PASSED (0.975 confidence)\n   - Missing author: PASSED (0.725 confidence)\n   - Filename only: PASSED (<0.5 confidence)\n\n6. Output Schema Validation:\n   - All required fields present: PASSED\n   - Type validation: PASSED\n\n**Database Verification:**\n- `source_metadata` JSONB column exists in `documents` table\n- `source_metadata` JSONB column exists in `document_chunks` table\n- `source_attribution` JSONB column exists in `chat_messages` table\n- GIN indexes created for efficient JSONB querying\n- Pipeline integration verified in document_processing.py\n\n**Test File:** tests/test_metadata_extraction_e2e.py (14 tests)\n</info added on 2025-11-25T17:40:39.006Z>",
             "status": "done",
-            "testStrategy": "Automated and manual tests: Upload test documents, query stored metadata, and compare against expected values. Write assertions for extraction accuracy and field presence."
+            "testStrategy": "Automated and manual tests: Upload test documents, query stored metadata, and compare against expected values. Write assertions for extraction accuracy and field presence.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 15,
+        "id": "15",
         "title": "Update Chat Endpoint to Include Inline Citations",
         "description": "Modify chat API to return inline citations and source metadata for each AI response.",
         "details": "Update FastAPI chat endpoint to include citations in response payload. Format citations with page numbers and metadata. Ensure compatibility with Gradio citation component.",
         "testStrategy": "Send chat queries, verify citations are present and accurate. Write tests for citation formatting.",
         "priority": "high",
         "dependencies": [
-          14
+          "14"
         ],
         "status": "done",
         "subtasks": [
@@ -3678,7 +3747,8 @@
             "dependencies": [],
             "details": "Update the retrieval augmented generation (RAG) component to extract source_metadata from document chunks. Ensure the metadata includes title, author, publication_date, page_count, document_type, and confidence_score. Create a function to collect and deduplicate metadata from multiple chunks used in a single response.",
             "status": "done",
-            "testStrategy": "Write unit tests to verify metadata extraction from document chunks. Test with various document types to ensure all metadata fields are properly retrieved."
+            "testStrategy": "Write unit tests to verify metadata extraction from document chunks. Test with various document types to ensure all metadata fields are properly retrieved.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3689,7 +3759,8 @@
             ],
             "details": "Create a CitationFormatter class that takes source_metadata and generates properly formatted citations. Implement methods for different citation styles (e.g., APA, MLA). Include functionality to generate inline citation markers (e.g., [1], [2]) and map them to the full citation data. Handle edge cases like missing metadata fields.",
             "status": "done",
-            "testStrategy": "Unit test the CitationFormatter with various metadata inputs, including incomplete metadata. Verify correct formatting of citations according to specified styles."
+            "testStrategy": "Unit test the CitationFormatter with various metadata inputs, including incomplete metadata. Verify correct formatting of citations according to specified styles.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3700,7 +3771,8 @@
             ],
             "details": "Update the response generation process to insert citation markers (e.g., [1], [2]) at appropriate points in the AI-generated text. Implement logic to determine where citations should be placed based on the chunks used for each part of the response. Ensure citations are properly numbered and correspond to the correct source metadata.",
             "status": "done",
-            "testStrategy": "Test with various queries to ensure citations are placed appropriately in the text. Verify that citation numbers match the correct sources in the citations array."
+            "testStrategy": "Test with various queries to ensure citations are placed appropriately in the text. Verify that citation numbers match the correct sources in the citations array.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3711,7 +3783,8 @@
             ],
             "details": "Update the FastAPI chat endpoint to return a new response structure that includes both the AI response text (with inline citations) and a citations array containing full metadata for each source. Define a Pydantic model for the citation structure. Ensure the response format is consistent and well-documented. Update API documentation to reflect the new response structure.",
             "status": "done",
-            "testStrategy": "Write API tests to verify the endpoint returns the expected structure. Test with various queries to ensure citations array contains all referenced sources with complete metadata."
+            "testStrategy": "Write API tests to verify the endpoint returns the expected structure. Test with various queries to ensure citations array contains all referenced sources with complete metadata.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3722,33 +3795,34 @@
             ],
             "details": "Review the Gradio citation component requirements and ensure the API response structure is compatible. Update the response format if necessary to match Gradio's expected input structure. Test the integration between the API and the Gradio UI to ensure citations are properly displayed. Document the integration requirements for frontend developers.",
             "status": "done",
-            "testStrategy": "Perform end-to-end testing with the Gradio UI to verify citations are correctly displayed. Test various response scenarios including multiple citations, missing metadata fields, and different citation formats."
+            "testStrategy": "Perform end-to-end testing with the Gradio UI to verify citations are correctly displayed. Test various response scenarios including multiple citations, missing metadata fields, and different citation formats.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 16,
+        "id": "16",
         "title": "Create Gradio Citation Component with Expandable Cards",
         "description": "Develop a Gradio UI component to display inline citations and allow users to expand for full source context.",
         "details": "Use Gradio's Blocks API to create clickable citation cards. On click, show full metadata and excerpt. Ensure mobile responsiveness and accessibility.",
         "testStrategy": "Test citation display and expansion in chat UI. Verify usability and correct linkage to sources.",
         "priority": "medium",
         "dependencies": [
-          15
+          "15"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 17,
+        "id": "17",
         "title": "Implement Agent Router Data Models and Service",
         "description": "Create data models and service logic for intelligent agent routing (LangGraph, CrewAI, Simple RAG).",
         "details": "Define SQLAlchemy models for agent_router_cache and decision history. Implement routing logic in a dedicated FastAPI service. Use ML-based or rule-based approach for workflow selection. Cache recent decisions for performance.",
         "testStrategy": "Unit test routing logic with diverse queries. Verify cache hits and correct workflow selection.",
         "priority": "high",
         "dependencies": [
-          2,
-          6
+          "2",
+          "6"
         ],
         "status": "done",
         "subtasks": [
@@ -3759,7 +3833,8 @@
             "dependencies": [],
             "details": "Create AgentRouterRequest model with fields for query text, user context, and optional parameters. Create AgentRouterResponse model with fields for selected agent type, confidence score, and routing metadata. Include validation logic for required fields and proper typing.",
             "status": "done",
-            "testStrategy": "Write unit tests to verify model validation, serialization/deserialization, and edge cases like empty queries or missing context."
+            "testStrategy": "Write unit tests to verify model validation, serialization/deserialization, and edge cases like empty queries or missing context.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3770,7 +3845,8 @@
             ],
             "details": "Define AgentRouterCache model with fields for query hash, selected agent, timestamp, and expiration. Create DecisionHistory model to track all routing decisions with query text, selected agent, timestamp, and outcome metrics. Add indexes for efficient querying and implement TTL logic for cache entries.",
             "status": "done",
-            "testStrategy": "Test database operations including insertion, retrieval, and cache expiration. Verify query hashing consistency and proper indexing performance."
+            "testStrategy": "Test database operations including insertion, retrieval, and cache expiration. Verify query hashing consistency and proper indexing performance.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3782,7 +3858,8 @@
             ],
             "details": "Develop a classifier using rule-based patterns and ML techniques to distinguish between document-focused queries (e.g., 'summarize this document') and conversational queries (e.g., 'what is machine learning?'). Implement feature extraction from queries, classification logic, and confidence scoring. Support both rule-based fallbacks and ML-based primary classification.",
             "status": "done",
-            "testStrategy": "Create a test suite with diverse query examples for each category. Measure classification accuracy against a labeled dataset. Test edge cases and ambiguous queries."
+            "testStrategy": "Create a test suite with diverse query examples for each category. Measure classification accuracy against a labeled dataset. Test edge cases and ambiguous queries.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3793,7 +3870,8 @@
             ],
             "details": "Implement the core routing algorithm that maps query classifications to specific agent types. Create decision trees or scoring mechanisms to select between LangGraph (for complex multi-step reasoning), CrewAI (for collaborative tasks), and Simple RAG (for direct document retrieval). Include logic to consider user context, query history, and performance metrics in the decision process.",
             "status": "done",
-            "testStrategy": "Test routing decisions against predefined scenarios. Verify that similar queries consistently route to the same agent type. Simulate various user contexts to test contextual routing."
+            "testStrategy": "Test routing decisions against predefined scenarios. Verify that similar queries consistently route to the same agent type. Simulate various user contexts to test contextual routing.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3807,47 +3885,48 @@
             ],
             "details": "Develop a FastAPI endpoint at /api/v1/agent-router that accepts POST requests with AgentRouterRequest payloads. Implement request validation, error handling, and response formatting. Add detailed logging for each routing decision, including query, selected agent, confidence score, and processing time. Implement metrics collection for routing performance, cache hit rates, and agent success rates.",
             "status": "done",
-            "testStrategy": "Perform integration testing with the full API stack. Test error handling, rate limiting, and concurrent requests. Verify metrics collection and log output format."
+            "testStrategy": "Perform integration testing with the full API stack. Test error handling, rate limiting, and concurrent requests. Verify metrics collection and log output format.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 18,
+        "id": "18",
         "title": "Create Agent Router API Endpoint",
         "description": "Expose agent router logic via a REST endpoint for frontend and service integration.",
         "details": "Add /agent-router endpoint to FastAPI. Accept query payload, return selected workflow and decision metadata. Enforce authentication and rate limiting.",
         "testStrategy": "Send test queries, verify correct workflow is selected and response is within 100ms.",
         "priority": "high",
         "dependencies": [
-          17
+          "17"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 19,
+        "id": "19",
         "title": "Integrate and Monitor Agent Routing Decisions",
         "description": "Log and monitor agent routing decisions for accuracy and performance.",
         "details": "Log all routing decisions to agent_router_cache. Add Prometheus metrics for routing accuracy and latency. Create Grafana dashboard for monitoring.",
         "testStrategy": "Review logs and metrics, verify >90% accuracy and <100ms latency under load.",
         "priority": "medium",
         "dependencies": [
-          18,
-          4
+          "18",
+          "4"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 20,
+        "id": "20",
         "title": "Implement URL/Link Upload and Processing",
         "description": "Enable upload and processing of YouTube videos and web articles via URLs.",
         "details": "Integrate yt-dlp (latest) for YouTube transcription. Use BeautifulSoup4 for article scraping. Implement URL validator to detect content type. Add URL upload endpoint and Celery tasks for processing. Store extracted text and metadata.",
         "testStrategy": "Upload various URLs, verify transcript or article extraction. Test invalid/unsupported URLs are rejected.",
         "priority": "high",
         "dependencies": [
-          6,
-          14
+          "6",
+          "14"
         ],
         "status": "done",
         "subtasks": [
@@ -3858,7 +3937,8 @@
             "dependencies": [],
             "details": "Develop a URL validator service that checks for valid URL formats, sanitizes inputs to prevent injection attacks, and performs preliminary content-type detection (YouTube, article, PDF, etc.). Implement regex patterns for common URL formats and use Python's urllib.parse for validation. Add unit tests for various URL formats and edge cases.",
             "status": "done",
-            "testStrategy": "Test with valid and invalid URLs across different formats (YouTube, news sites, PDFs, etc.). Verify sanitization prevents XSS and injection attacks. Ensure proper error handling for malformed URLs."
+            "testStrategy": "Test with valid and invalid URLs across different formats (YouTube, news sites, PDFs, etc.). Verify sanitization prevents XSS and injection attacks. Ensure proper error handling for malformed URLs.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3869,7 +3949,8 @@
             ],
             "details": "Implement a web scraper service using BeautifulSoup4 that extracts main content from articles while filtering out navigation, ads, and irrelevant content. Create content extraction strategies for common website patterns. Handle pagination if needed. Implement timeout and retry logic for reliability. Add logging for debugging extraction issues.",
             "status": "done",
-            "testStrategy": "Test against various news sites, blogs, and article formats. Verify content extraction accuracy by comparing with manual extractions. Test handling of different HTML structures and error cases."
+            "testStrategy": "Test against various news sites, blogs, and article formats. Verify content extraction accuracy by comparing with manual extractions. Test handling of different HTML structures and error cases.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3880,7 +3961,8 @@
             ],
             "details": "Integrate the latest version of yt-dlp to download and process YouTube videos. Extract video transcripts, titles, descriptions, and other metadata. Handle different transcript formats and languages. Implement caching to avoid re-downloading videos. Add error handling for region-restricted or private videos. Create Celery tasks for asynchronous processing.",
             "status": "done",
-            "testStrategy": "Test with various YouTube videos including different lengths, languages, and caption availability. Verify transcript extraction accuracy and metadata completeness. Test error handling for unavailable videos."
+            "testStrategy": "Test with various YouTube videos including different lengths, languages, and caption availability. Verify transcript extraction accuracy and metadata completeness. Test error handling for unavailable videos.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3893,7 +3975,8 @@
             ],
             "details": "Implement a metadata extraction service that retrieves title, description, author information, publication date, and favicon from URLs. Use Open Graph tags, Twitter cards, and HTML meta tags for extraction. Create fallback strategies when primary metadata sources are unavailable. Store extracted metadata in the database with proper schema mapping to existing metadata tables.",
             "status": "done",
-            "testStrategy": "Test metadata extraction across various websites with different metadata implementations. Verify extraction of titles, descriptions, authors, dates, and favicons. Test fallback strategies when primary metadata is missing."
+            "testStrategy": "Test metadata extraction across various websites with different metadata implementations. Verify extraction of titles, descriptions, authors, dates, and favicons. Test fallback strategies when primary metadata is missing.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3906,20 +3989,21 @@
             ],
             "details": "Create REST API endpoints for URL submission. Implement rate limiting to prevent abuse and ensure compliance with robots.txt rules for web scraping. Connect extracted content to the existing document processing pipeline for indexing and storage. Add monitoring and logging for URL processing jobs. Implement retry logic for failed processing attempts. Create admin dashboard components for URL processing status and configuration.",
             "status": "done",
-            "testStrategy": "Test end-to-end URL processing flow with various content types. Verify rate limiting prevents abuse. Test robots.txt compliance with mock websites. Verify processed URL content appears correctly in search results and knowledge base."
+            "testStrategy": "Test end-to-end URL processing flow with various content types. Verify rate limiting prevents abuse. Test robots.txt compliance with mock websites. Verify processed URL content appears correctly in search results and knowledge base.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 21,
+        "id": "21",
         "title": "Enable File and Image Upload in Chat",
         "description": "Allow users to upload files and images directly in chat for context-aware Q&A.",
         "details": "Implement file handler utility for multipart uploads. Integrate Claude Vision API for image analysis (latest version). Add chat file upload endpoint and Gradio component. Ensure file context is linked to chat session.",
         "testStrategy": "Upload images and PDFs in chat, verify analysis and context retention. Test with various file types.",
         "priority": "high",
         "dependencies": [
-          6,
-          13
+          "6",
+          "13"
         ],
         "status": "done",
         "subtasks": [
@@ -3930,7 +4014,8 @@
             "dependencies": [],
             "details": "Develop a file handler utility that supports multipart uploads, validates file types (images, PDFs, docs), implements size limits, generates unique filenames, and extracts basic metadata. Store files in a configurable location with proper error handling and logging.",
             "status": "done",
-            "testStrategy": "Unit test with various file types and sizes. Test validation logic, error handling, and metadata extraction."
+            "testStrategy": "Unit test with various file types and sizes. Test validation logic, error handling, and metadata extraction.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -3941,7 +4026,8 @@
             ],
             "details": "Implement a service that takes uploaded image files, prepares them for Claude Vision API, handles the API requests with proper error handling, and formats the response for use in the chat context. Include rate limiting, retries, and caching mechanisms. Update environment variables for API keys.",
             "status": "done",
-            "testStrategy": "Test with various image types and sizes. Mock API responses for unit tests. Integration tests with actual API calls using test images."
+            "testStrategy": "Test with various image types and sizes. Mock API responses for unit tests. Integration tests with actual API calls using test images.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -3953,7 +4039,8 @@
             ],
             "details": "Create a new FastAPI endpoint at /api/chat/upload that accepts multipart form data, processes files using the file handler utility, links uploads to the current chat session ID in the database, and returns file metadata. Implement authentication checks, rate limiting, and proper error responses. Update OpenAPI documentation.",
             "status": "done",
-            "testStrategy": "Unit tests for endpoint logic. Integration tests with authenticated requests. Test error cases like invalid files, authentication failures, and rate limiting."
+            "testStrategy": "Unit tests for endpoint logic. Integration tests with authenticated requests. Test error cases like invalid files, authentication failures, and rate limiting.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -3964,7 +4051,8 @@
             ],
             "details": "Extend the existing Gradio chat interface to include a file upload button that supports drag-and-drop. Style the component to match the UI design. Implement client-side validation for file types and sizes. Show upload progress and handle errors gracefully. Update the chat display to show uploaded files with thumbnails for images.",
             "status": "done",
-            "testStrategy": "Manual testing of the UI component. Test with various file types. Verify error messages display correctly. Test accessibility compliance."
+            "testStrategy": "Manual testing of the UI component. Test with various file types. Verify error messages display correctly. Test accessibility compliance.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -3976,21 +4064,22 @@
             ],
             "details": "Modify the chat session database schema to track uploaded files. Implement a mechanism to include file content in the conversation context sent to the LLM. For images, include Claude Vision analysis. For text documents, include extracted text. Ensure file context persists across page refreshes and session resumption. Add cleanup job for temporary files.",
             "status": "done",
-            "testStrategy": "Test chat continuity with uploaded files. Verify context is maintained after refresh. Test with multiple files in a single chat. Verify file cleanup works correctly."
+            "testStrategy": "Test chat continuity with uploaded files. Verify context is maintained after refresh. Test with multiple files in a single chat. Verify file cleanup works correctly.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 22,
+        "id": "22",
         "title": "Implement Book Processing and Chapter Detection",
         "description": "Automatically detect chapters and create per-chapter knowledge base entries for uploaded books.",
         "details": "Develop chapter detector using regex and ML (e.g., spaCy or transformers). Create book service for chapter-aware processing. Add Celery task for chapter processing. Update book metadata tables. Add Gradio book upload component.",
         "testStrategy": "Upload books in various formats, verify chapters detected with >90% accuracy. Query by chapter and book-wide.",
         "priority": "high",
         "dependencies": [
-          2,
-          6,
-          14
+          "2",
+          "6",
+          "14"
         ],
         "status": "done",
         "subtasks": [
@@ -4001,7 +4090,8 @@
             "dependencies": [],
             "details": "Develop a BookFormatDetector class that identifies file types based on headers and extensions. Implement format-specific parsers for EPUB (using ebooklib) and PDF (using PyPDF2 or pdfplumber). Create a unified interface that returns extracted text and basic metadata regardless of the input format. Include error handling for corrupted or unsupported files.",
             "status": "done",
-            "testStrategy": "Test with various book formats including EPUB, PDF, and malformed files. Verify correct format detection and text extraction with >95% accuracy."
+            "testStrategy": "Test with various book formats including EPUB, PDF, and malformed files. Verify correct format detection and text extraction with >95% accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -4012,7 +4102,8 @@
             ],
             "details": "Create a TOCParser class that extracts structured chapter information from EPUB navigation and NCX files. For PDFs, implement bookmark extraction and analysis. Map extracted TOC entries to text positions in the document. Handle nested chapter structures and maintain hierarchy information. Store chapter titles, start/end positions, and parent-child relationships.",
             "status": "done",
-            "testStrategy": "Test with books containing various TOC structures (flat, nested, missing). Verify chapter boundaries match actual content positions. Compare extracted TOC with manual analysis for accuracy."
+            "testStrategy": "Test with books containing various TOC structures (flat, nested, missing). Verify chapter boundaries match actual content positions. Compare extracted TOC with manual analysis for accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -4023,7 +4114,8 @@
             ],
             "details": "Implement regex patterns to identify common chapter headings (e.g., 'Chapter X', 'Section Y'). Use spaCy or transformers to detect semantic section breaks based on content shifts. Analyze page breaks, font changes, and whitespace patterns in PDFs. Combine heuristic and ML approaches with a confidence score. Fall back to fixed-size chunking when confidence is low. Create a ChapterDetector class that integrates with the book processing pipeline.",
             "status": "done",
-            "testStrategy": "Test with books lacking TOC. Compare detected chapters with human-annotated boundaries. Measure precision/recall with target of >90% accuracy."
+            "testStrategy": "Test with books lacking TOC. Compare detected chapters with human-annotated boundaries. Measure precision/recall with target of >90% accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -4035,7 +4127,8 @@
             ],
             "details": "Create a ChapterChunker class that processes each detected chapter separately. Implement semantic chunking within chapters using sentence and paragraph boundaries. Ensure chunks maintain context and don't split mid-sentence. Add overlap between chunks to improve retrieval quality. Implement metadata tagging to associate chunks with their source chapters. Update the Celery task for document processing to use chapter-aware chunking.",
             "status": "done",
-            "testStrategy": "Test chunking with various book types and chapter structures. Verify chunks respect chapter boundaries and maintain semantic coherence. Measure retrieval quality with chunked vs. non-chunked approaches."
+            "testStrategy": "Test chunking with various book types and chapter structures. Verify chunks respect chapter boundaries and maintain semantic coherence. Measure retrieval quality with chunked vs. non-chunked approaches.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -4048,26 +4141,27 @@
             ],
             "details": "Extend the database schema to store book metadata (ISBN, publisher, edition, author, publication date). Create tables for chapter structure with parent-child relationships. Implement BookMetadataService for CRUD operations on book and chapter metadata. Update the Gradio interface with a dedicated book upload component that displays chapter structure. Integrate with existing knowledge base retrieval to support chapter-specific queries.",
             "status": "done",
-            "testStrategy": "Test database operations with various book metadata scenarios. Verify chapter hierarchy is correctly stored and retrieved. Test queries that target specific chapters vs. whole-book searches."
+            "testStrategy": "Test database operations with various book metadata scenarios. Verify chapter hierarchy is correctly stored and retrieved. Test queries that target specific chapters vs. whole-book searches.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 23,
+        "id": "23",
         "title": "Conduct End-to-End Integration and Load Testing",
         "description": "Test all new features together under realistic load and edge cases.",
         "status": "done",
         "dependencies": [
-          9,
-          10,
-          13,
-          15,
-          16,
-          18,
-          19,
-          20,
-          21,
-          22
+          "9",
+          "10",
+          "13",
+          "15",
+          "16",
+          "18",
+          "19",
+          "20",
+          "21",
+          "22"
         ],
         "priority": "high",
         "details": "Comprehensive test suite created with pytest, Playwright, and Locust for integration and load testing. Tests cover all major workflows including Content Summarizer, Department Classifier, Agent Router, CrewAI Asset Storage, Document Analysis, Multi-Agent Orchestration, Asset Generator, B2 Storage, API Routes, Concurrent Operations, and Error Recovery scenarios. Existing infrastructure leverages pytest with async support, Locust load testing configurations, and coverage reporting.",
@@ -4080,7 +4174,8 @@
             "dependencies": [],
             "details": "Created tests/test_e2e_integration.py with 17 E2E integration tests covering Content Summarizer flow, Department Classifier flow, Agent Router flow, CrewAI Asset Storage flow, Document Analysis workflow, Multi-Agent Orchestration workflow, Asset Generator flow, B2 Storage and Signed URL flow, API Route Integration tests, Concurrent Operations tests, Error Recovery tests, and Smoke Tests for imports, models, and routes.",
             "status": "done",
-            "testStrategy": "Use pytest with async support to test all major workflows. Ensure tests are isolated and can run in CI/CD pipeline."
+            "testStrategy": "Use pytest with async support to test all major workflows. Ensure tests are isolated and can run in CI/CD pipeline.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -4089,7 +4184,8 @@
             "dependencies": [],
             "details": "Utilized existing load testing infrastructure in tests/load_testing/ with Locust configurations for different load profiles (light, moderate, heavy). Simulated concurrent uploads, queries, and agent routing to validate system performance under load.",
             "status": "done",
-            "testStrategy": "Run Locust tests with multiple user profiles and validate against success metrics for latency, accuracy, and error rate."
+            "testStrategy": "Run Locust tests with multiple user profiles and validate against success metrics for latency, accuracy, and error rate.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -4100,7 +4196,8 @@
             ],
             "details": "Fixed import names to match actual service classes, updated method signatures to match actual implementations, and fixed AgentRouterRequest usage for route_query method. Addressed integration points between components to ensure proper communication.",
             "status": "done",
-            "testStrategy": "Iteratively fix issues and rerun tests to verify resolution. Document fixes for future reference."
+            "testStrategy": "Iteratively fix issues and rerun tests to verify resolution. Document fixes for future reference.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -4113,7 +4210,8 @@
             ],
             "details": "Documented test suite status showing 76 core tests passing (from Task 47 and Task 23). Full test suite shows 1,344 passed, 22 failed (mostly HTTP integration requiring live services), and 28 errors. Configured and utilized coverage reporting to identify areas needing additional testing.",
             "status": "done",
-            "testStrategy": "Generate comprehensive test reports including coverage metrics, pass/fail statistics, and detailed failure analysis."
+            "testStrategy": "Generate comprehensive test reports including coverage metrics, pass/fail statistics, and detailed failure analysis.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -4124,262 +4222,466 @@
             ],
             "details": "Analyzed the 22 failed tests (mostly HTTP integration requiring live services) and 28 errors to determine root causes. Created documentation on how to resolve these issues, including which ones require live service mocking versus actual code fixes.",
             "status": "done",
-            "testStrategy": "Categorize failures by type (HTTP integration, configuration, code bugs) and document recommended fixes for each category."
+            "testStrategy": "Categorize failures by type (HTTP integration, configuration, code bugs) and document recommended fixes for each category.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 24,
+        "id": "24",
         "title": "Prepare Production Deployment and Release Notes",
         "description": "Finalize deployment scripts, update release notes, and prepare for production rollout.",
         "details": "Update Render.com deployment configuration. Write release notes summarizing new features, migrations, and breaking changes. Schedule deployment window and notify stakeholders.",
         "testStrategy": "Perform blue/green deployment on production. Monitor for errors and rollback if needed.",
         "priority": "high",
         "dependencies": [
-          23
+          "23"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 25,
+        "id": "25",
         "title": "Post-Deployment Monitoring and Success Metrics Validation",
         "description": "Monitor system post-deployment and validate against defined success metrics.",
         "details": "Use Prometheus and Grafana to monitor uptime, error rate, processing time, and feature-specific metrics. Collect user feedback and bug reports. Prepare post-mortem if metrics are not met.",
         "testStrategy": "Review dashboards and logs for 48 hours post-launch. Confirm all metrics meet targets. Address any incidents immediately.",
         "priority": "high",
         "dependencies": [
-          24
+          "24"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure System Health and Uptime Monitoring",
+            "description": "Set up Prometheus and Grafana dashboards to monitor system health and uptime metrics post-deployment.",
+            "dependencies": [],
+            "details": "Configure Prometheus to collect system health metrics including CPU usage, memory consumption, and service availability. Create dedicated Grafana dashboard panels for uptime tracking with appropriate thresholds. Set up alerting for any downtime exceeding 1 minute. Include historical uptime graphs for the first 48 hours post-deployment.",
+            "status": "done",
+            "testStrategy": "Verify dashboard displays accurate uptime data. Simulate a brief service interruption to confirm alerting works properly.",
+            "updatedAt": "2025-12-31T01:33:34.633Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement API Performance Monitoring",
+            "description": "Monitor API response times and error rates across all endpoints to ensure they meet performance targets.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use prometheus_fastapi_instrumentator to track response times, status codes, and error rates for all API endpoints. Create Grafana visualizations showing p50, p95, and p99 latency metrics. Set up alerts for endpoints exceeding 500ms response time or error rates above 1%. Generate hourly reports for the first 48 hours post-deployment.",
+            "status": "done",
+            "testStrategy": "Generate test load against API endpoints and verify metrics are captured correctly. Confirm alerts trigger when thresholds are exceeded.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T01:33:34.673Z"
+          },
+          {
+            "id": 3,
+            "title": "Set Up Database Health Monitoring",
+            "description": "Configure monitoring for Supabase database performance, connection pool status, and query execution times.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement database health checks using Prometheus exporters for PostgreSQL. Monitor connection pool utilization, query execution times, transaction rates, and database size growth. Create Grafana panels showing database performance metrics with appropriate thresholds. Set up alerts for slow queries (>200ms) and connection pool saturation (>80%).",
+            "status": "done",
+            "testStrategy": "Run database load tests and verify metrics are captured accurately. Confirm slow query detection works by executing intentionally inefficient queries.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T01:33:34.721Z"
+          },
+          {
+            "id": 4,
+            "title": "Document Success Metrics Baseline",
+            "description": "Establish and document baseline success metrics for all monitored components and create comparison reports.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Define baseline success metrics for system uptime (99.9%), API response times (<200ms avg), error rates (<0.5%), database performance, and feature-specific metrics. Create a comprehensive document with all baseline values and acceptable ranges. Implement automated comparison reports showing actual vs. expected metrics. Store baseline documentation in the project wiki.",
+            "status": "done",
+            "testStrategy": "Review baseline documentation with stakeholders to confirm metrics are appropriate. Verify automated comparison reports accurately flag metrics outside acceptable ranges.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T01:33:34.773Z"
+          },
+          {
+            "id": 5,
+            "title": "Create Ongoing Monitoring Checklist and Validation Process",
+            "description": "Develop a standardized monitoring checklist and validation process for ongoing system health verification.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create a detailed monitoring checklist covering all critical metrics including system health, API performance, database status, and feature-specific indicators. Develop procedures for daily, weekly, and monthly validation checks. Implement a process for documenting and addressing any metrics that fall outside acceptable ranges. Create templates for post-mortem analysis if critical metrics are not met.",
+            "status": "done",
+            "testStrategy": "Conduct a trial run of the monitoring checklist to verify completeness. Have team members follow the process independently to confirm clarity and effectiveness.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T01:33:34.834Z"
+          }
+        ],
+        "updatedAt": "2025-12-31T01:33:34.834Z"
       },
       {
-        "id": 26,
+        "id": "26",
         "title": "Implement Embedding Generation Service",
         "description": "Create embedding generation service using BGE-M3 (development via Ollama, production via API). Includes batch processing, caching, and regeneration on content updates.",
         "details": "Implement FR-017 from PRD: Development embeddings via BGE-M3 on Ollama (Mac Studio), production via Claude API or hosted endpoint. Batch processing (100 chunks per batch), embedding caching in Supabase, regenerate on content updates. Target latency: <100ms per chunk locally.",
         "testStrategy": "Measure embedding generation latency, verify batch processing works correctly, test cache hit rates, verify embeddings regenerate on content updates.",
         "status": "done",
         "dependencies": [
-          2,
-          6
+          "2",
+          "6"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 27,
+        "id": "27",
         "title": "Implement Hybrid Search with BM25 and Vector Fusion",
         "description": "Build hybrid search combining dense vector search (BGE-M3), sparse BM25 keyword matching, ILIKE pattern matching, and fuzzy search with Reciprocal Rank Fusion.",
         "details": "Implement FR-019 from PRD: Dense search (vector similarity), sparse search (BM25), ILIKE pattern matching, fuzzy search (Levenshtein). Combine results using Reciprocal Rank Fusion (RRF). Configurable weights per search type. Target: +40-60% improvement vs vector-only.",
         "testStrategy": "Compare search quality metrics (NDCG, MRR) between hybrid and single-method approaches. Verify RRF fusion produces better results than individual methods.",
         "status": "done",
         "dependencies": [
-          2,
-          6
+          "2",
+          "6"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 28,
+        "id": "28",
         "title": "Implement Query Expansion with Claude Haiku",
         "description": "Use Claude Haiku to generate 4-5 query variations for improved retrieval. Execute parallel searches and combine results with RRF.",
         "details": "Implement FR-020 from PRD: Claude Haiku generates query variations with different keywords but same intent. Parallel search with all variations, combine with RRF. Improves recall for ambiguous queries. Target latency: <500ms total.",
         "testStrategy": "Test query expansion with ambiguous queries, measure recall improvement, verify latency target is met, test parallel search execution.",
         "status": "done",
         "dependencies": [
-          2,
-          6
+          "2",
+          "6"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 29,
+        "id": "29",
         "title": "Implement Reranking with BGE-Reranker-v2",
         "description": "Add reranking layer using BGE-Reranker-v2 (development via Ollama, production via API) to rerank top 20-30 results and return top 10.",
         "details": "Implement FR-021 from PRD: Development reranking via BGE-Reranker-v2 on Ollama, production via Claude API or hosted reranker. Rerank top 20-30 results, score each (0-1 relevance), return top 10. Target latency: <200ms locally. Expected improvement: +15-25% precision.",
         "testStrategy": "Measure precision improvement with vs without reranking, verify latency targets, test with various query types.",
         "status": "done",
         "dependencies": [
-          27
+          "27"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 30,
+        "id": "30",
         "title": "Implement Semantic Caching with Redis",
         "description": "Build tiered semantic caching using Redis with similarity thresholds for cache hits. Target 60-80% cache hit rate.",
         "details": "Implement FR-025 from PRD: Redis cache for frequent queries, cache embeddings to avoid recomputation, cache search results (5-minute TTL). Semantic cache thresholds: Exact match >0.98, High similarity 0.93-0.97, Medium 0.88-0.92 (fresh search), Low <0.88. Target: 60-80% cache hit rate.",
         "testStrategy": "Measure cache hit rates under various query loads, verify semantic similarity thresholds work correctly, test cache invalidation.",
         "status": "done",
         "dependencies": [
-          26,
-          27
+          "26",
+          "27"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 31,
+        "id": "31",
         "title": "Implement Neo4j Knowledge Graph Integration",
         "description": "Integrate Neo4j for entity storage, relationship traversal, and graph-enhanced context retrieval. Includes Cypher generation via Claude Sonnet.",
         "details": "Implement FR-023 from PRD: Store entities and relationships in Neo4j (Community on Mac Studio Docker). Knowledge graph queries for related content, entity-centric search, relationship traversal (2-3 hops). Cypher generation via Claude Sonnet for natural language queries. Graph-enhanced context retrieval.",
         "testStrategy": "Test entity extraction and storage, verify relationship traversal, test Cypher generation accuracy, measure graph query latency.",
         "status": "done",
         "dependencies": [
-          2,
-          26
+          "2",
+          "26"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 32,
+        "id": "32",
         "title": "Implement Conversation Memory with Graph Tables",
         "description": "Build production conversation memory using Supabase PostgreSQL graph tables (user_memory_nodes, user_memory_edges) with RLS policies per user.",
         "details": "Implement FR-037 from PRD: Store conversations in PostgreSQL graph tables. user_memory_nodes stores facts, preferences, entities with embeddings. user_memory_edges stores relationships between nodes. Row-level security (RLS) per user. Graph-based retrieval for relevant context. Long-term memory persistence.",
         "testStrategy": "Test memory node creation/retrieval, verify RLS policies isolate user data, test graph traversal for context retrieval, measure memory retrieval latency (<200ms target).",
         "status": "done",
         "dependencies": [
-          2,
-          10
+          "2",
+          "10"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 33,
+        "id": "33",
         "title": "Implement Context Management Service",
         "description": "Build context management for retrieving relevant memory nodes, graph traversal (1-2 hops), recency/access weighting, and context window management (4K tokens).",
         "details": "Implement FR-038 from PRD: Retrieve relevant memory nodes for query context. Graph traversal for related memories (1-2 hops). Recency-weighted retrieval (recent > old). Access-count-weighted retrieval (frequent > rare). Context window: 4K tokens (last 5 messages + memory). Target: >90% context relevance.",
         "testStrategy": "Test context retrieval relevance, verify weighting algorithms work correctly, test context window limits are respected, measure context relevance score.",
         "status": "done",
         "dependencies": [
-          32
+          "32"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 34,
+        "id": "34",
         "title": "Implement User Preferences Learning and Storage",
         "description": "Build system to learn user preferences from interactions, store as high-confidence memory nodes, and apply to search result boosting/filtering.",
         "details": "Implement FR-039 from PRD: Learn user preferences from interactions. Store as memory nodes with high confidence scores. Apply preferences to search results (boost/filter). Explicit preference setting via UI controls. Privacy controls (opt-out of memory).",
         "testStrategy": "Test preference extraction from conversations, verify preferences affect search results, test explicit preference setting, verify opt-out functionality.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          32
+          "32"
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create user preferences database schema and model",
+            "description": "Design and implement the database schema to store user preferences with appropriate relationships and fields",
+            "dependencies": [],
+            "details": "Create a database schema for user preferences that includes: preference type (explicit/learned), confidence score, timestamp, preference category, preference value, user ID reference. Implement the corresponding data model with methods for CRUD operations. Include fields for opt-out status and last updated timestamp.",
+            "status": "done",
+            "testStrategy": "Unit tests for model validation, database migration tests, verify relationships with user model, test CRUD operations",
+            "updatedAt": "2025-12-31T02:16:30.272Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Build preference extraction service from conversations",
+            "description": "Implement a service that analyzes user interactions to identify and extract preferences with confidence scores",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a service that processes conversation history to extract user preferences. Implement NLP techniques to identify preference statements, categorize them, and assign confidence scores. Include rules for detecting explicit vs. implicit preferences. Handle preference conflicts and updates to existing preferences with higher confidence scores.",
+            "status": "done",
+            "testStrategy": "Test with sample conversations containing various preference types, verify extraction accuracy, test confidence scoring, verify conflict resolution",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:26:01.879Z"
+          },
+          {
+            "id": 3,
+            "title": "Implement preference storage as memory nodes",
+            "description": "Store extracted preferences as high-confidence memory nodes in the memory graph with appropriate metadata",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Extend the memory node system to support preference nodes. Implement storage of preferences as memory nodes with high confidence scores. Include metadata such as source (conversation ID), extraction method, and timestamp. Create indexing for efficient preference retrieval. Implement privacy controls to respect user opt-out settings.",
+            "status": "done",
+            "testStrategy": "Verify preferences are correctly stored as memory nodes, test retrieval performance, verify opt-out functionality prevents storage",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:16:30.310Z"
+          },
+          {
+            "id": 4,
+            "title": "Add search result boosting based on preferences",
+            "description": "Implement a system to boost or filter search results based on stored user preferences",
+            "dependencies": [
+              3
+            ],
+            "details": "Create a search modifier that applies user preferences to search results. Implement boosting algorithms that adjust relevance scores based on preference matching. Add filtering capabilities to exclude results that contradict strong preferences. Implement preference weighting based on confidence scores. Ensure performance impact is minimal (<50ms overhead).",
+            "status": "done",
+            "testStrategy": "A/B test search results with and without preference boosting, measure relevance improvements, verify performance overhead, test with various preference combinations",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:26:01.921Z"
+          },
+          {
+            "id": 5,
+            "title": "Create user preferences API and opt-out controls",
+            "description": "Implement API endpoints for managing preferences and add /memory chat command for opt-out control",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Create RESTful API endpoints for viewing and managing user preferences. Implement explicit preference setting via API. Add a /memory chat command to control opt-out settings. Implement user interface components for preference management. Ensure all endpoints are properly authenticated and authorized. Add documentation for the API endpoints.",
+            "status": "done",
+            "testStrategy": "API integration tests, verify authentication requirements, test opt-out functionality via chat command, verify UI components correctly display and modify preferences",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:26:02.032Z"
+          }
+        ],
+        "updatedAt": "2025-12-31T02:26:02.032Z"
       },
       {
-        "id": 35,
+        "id": "35",
         "title": "Implement Session Management for Chat",
         "description": "Build session management supporting multiple concurrent sessions, persistence, timeout (30 min idle), clear, and export functionality.",
         "details": "Implement FR-040 from PRD: Multiple concurrent sessions per user. Session persistence (reload conversation). Session timeout (30 minutes idle). Clear session (delete history). Export conversation history (JSON, Markdown formats).",
         "testStrategy": "Test multiple concurrent sessions, verify session persistence across page reloads, test timeout behavior, verify export generates valid JSON/Markdown.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          10,
-          32
+          "10",
+          "32"
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2025-12-31T02:37:03.435Z"
       },
       {
-        "id": 36,
+        "id": "36",
         "title": "Implement Role-Based Access Control (RBAC)",
         "description": "Build RBAC system with user roles (admin, editor, viewer, guest), permission-based access, API key management, and audit logging.",
         "details": "Implement FR-047 from PRD: User roles (admin, editor, viewer, guest). Permission-based access (create, read, update, delete). Resource-level permissions (own documents vs all). API key management (create, rotate, revoke). Audit logs for admin actions. Database tables: users, api_keys, audit_logs with RLS policies.",
         "testStrategy": "Test role-based access restrictions, verify permission enforcement, test API key lifecycle, verify audit logs capture all admin actions.",
         "status": "done",
         "dependencies": [
-          2,
-          6
+          "2",
+          "6"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 37,
+        "id": "37",
         "title": "Implement Document Management Admin Tools",
         "description": "Build admin tools for bulk document operations: upload (100 files), delete, reprocess embeddings, metadata update, versioning, and approval workflow.",
         "details": "Implement FR-048 from PRD: Bulk document upload (up to 100 files). Bulk delete with confirmation. Bulk reprocessing (regenerate embeddings). Bulk metadata update. Document versioning (track changes). Document approval workflow (draft → review → published).",
         "testStrategy": "Test bulk operations with large file sets, verify versioning tracks changes, test approval workflow transitions, measure bulk operation throughput (>100 docs/minute target).",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          36
+          "36"
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Bulk Document Upload Functionality",
+            "description": "Develop the bulk document upload feature allowing users to upload up to 100 files simultaneously with progress tracking and validation.",
+            "dependencies": [],
+            "details": "Create a drag-and-drop interface with multi-file selection. Implement client-side validation for file types and sizes. Add server-side processing queue with progress indicators. Include batch metadata assignment during upload. Handle upload failures gracefully with retry options. Target upload throughput of >100 docs/minute.",
+            "status": "done",
+            "testStrategy": "Test with various file types and sizes. Verify upload of exactly 100 files works correctly. Test partial upload recovery. Measure upload throughput against target metrics.",
+            "updatedAt": "2025-12-31T02:34:54.077Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement Bulk Document Operations (Delete and Reprocess)",
+            "description": "Create functionality for bulk document deletion with confirmation workflow and bulk reprocessing to regenerate embeddings.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement multi-select interface for documents. Add confirmation modal for bulk deletion with count and document list. Create background job system for embedding regeneration. Add progress tracking for long-running operations. Implement job cancellation. Connect to existing embedding generation service for reprocessing.",
+            "status": "done",
+            "testStrategy": "Test deletion confirmation works properly. Verify large batch deletions complete successfully. Test embedding regeneration produces correct vectors. Measure reprocessing throughput.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:34:54.201Z"
+          },
+          {
+            "id": 3,
+            "title": "Implement Bulk Metadata Update System",
+            "description": "Build functionality to update metadata across multiple documents simultaneously with validation and change preview.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create batch metadata editor interface. Implement field validation for different metadata types. Add preview of changes before submission. Create undo/rollback capability for metadata updates. Support conditional updates based on existing metadata values. Implement batch tagging and categorization.",
+            "status": "done",
+            "testStrategy": "Test metadata updates across different field types. Verify validation prevents invalid updates. Test rollback functionality works correctly. Verify conditional updates apply only to matching documents.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:34:54.346Z"
+          },
+          {
+            "id": 4,
+            "title": "Implement Document Versioning System",
+            "description": "Create a document versioning system that tracks changes, allows version comparison, and supports reverting to previous versions.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Implement version history storage in database. Create diff visualization between versions. Add version metadata (timestamp, user, change description). Support reverting to previous versions. Implement version pruning for storage optimization. Add version comparison interface. Ensure embedding updates when versions change.",
+            "status": "done",
+            "testStrategy": "Test version creation on document updates. Verify diff visualization correctly shows changes. Test reversion to previous versions works correctly. Verify embeddings update when document versions change.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:34:54.484Z"
+          },
+          {
+            "id": 5,
+            "title": "Implement Document Approval Workflow",
+            "description": "Build a configurable approval workflow system supporting draft, review, and published states with role-based permissions.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement workflow state machine (draft → review → published). Create role-based permissions for state transitions. Add comment/feedback system for reviewers. Implement notification system for workflow state changes. Create dashboard for pending approvals. Support bulk state transitions for approved documents. Add audit logging for all workflow actions.",
+            "status": "done",
+            "testStrategy": "Test all workflow state transitions. Verify permissions correctly restrict unauthorized transitions. Test notification delivery on state changes. Verify audit logs capture all workflow actions correctly.",
+            "parentId": "undefined",
+            "updatedAt": "2025-12-31T02:34:54.623Z"
+          }
+        ],
+        "updatedAt": "2025-12-31T02:34:54.623Z"
       },
       {
-        "id": 38,
+        "id": "38",
         "title": "Implement User Management Admin Interface",
         "description": "Build admin interface for user CRUD operations, role assignment, password reset, account suspension, activity logs, and GDPR data export.",
         "details": "Implement FR-049 from PRD: Create/edit/delete users (admin only). Assign roles and permissions. Reset passwords. Suspend/activate accounts. View user activity logs. Export user data (GDPR compliance).",
         "testStrategy": "Test all user CRUD operations, verify role assignment affects permissions, test GDPR export contains all user data, verify activity logs are comprehensive.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          36
+          "36"
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2025-12-31T02:36:26.022Z"
       },
       {
-        "id": 39,
+        "id": "39",
         "title": "Implement Analytics Dashboard for Admin",
         "description": "Build admin analytics dashboard showing document stats, processing rates, top queries, active users, storage usage, and API usage metrics.",
         "details": "Implement FR-052 from PRD: Total documents by type. Documents by department. Processing success/failure rates. Top queries (last 7 days). Active users (last 30 days). Storage usage (PostgreSQL, B2). API usage by endpoint.",
         "testStrategy": "Verify dashboard metrics match database queries, test real-time updates, verify data accuracy across all metrics.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          4,
-          36
+          "4",
+          "36"
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2025-12-31T02:37:54.361Z"
       },
       {
-        "id": 40,
+        "id": "40",
         "title": "Implement CrewAI Multi-Agent Foundation Infrastructure",
         "description": "Set up core CrewAI infrastructure including agent base class, inter-agent communication, state management, database schema, and Render service integration.",
         "details": "Implement FR-053 from PRD: CrewAI framework on Render (already deployed at jb-crewai.onrender.com). Multi-agent orchestration for complex workflows. Task delegation and result aggregation. Agent collaboration. Long-running async tasks via Celery. Database tables: crewai_agents, crewai_crews, crewai_executions, crewai_task_executions.",
         "testStrategy": "Test agent registration and lifecycle, verify inter-agent communication, test async task execution, verify database schema supports all agent operations.",
         "status": "done",
         "dependencies": [
-          17
+          "17"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 41,
+        "id": "41",
         "title": "Implement Main Orchestrator Agent (AGENT-001)",
         "description": "Build Master Content Analyzer & Asset Orchestrator that analyzes content, classifies departments, selects asset types, and delegates to specialized agents.",
         "details": "AGENT-001 from PRD: Role=Master Content Analyzer & Asset Orchestrator. Goal=Analyze content for department classification (10 depts), asset type selection (skill/command/agent/prompt/workflow), summary requirements. Tools: document_search, pattern_analyzer, department_classifier. LLM: Claude Sonnet 4.5. Allow Delegation: Yes.",
         "testStrategy": "Test department classification accuracy (>96% target), verify asset type decision logic, test delegation to appropriate agents.",
         "status": "done",
         "dependencies": [
-          40
+          "40"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 42,
+        "id": "42",
         "title": "Implement Content Summarizer Agent (AGENT-002)",
         "description": "Build PDF summary generator with visual diagrams, flowcharts, key concepts, implementation guides, and quick reference sections.",
         "details": "AGENT-002 from PRD: Role=Content Summary & Visualization Expert. Goal=Generate comprehensive PDF summaries with visuals. Output to processed/crewai-summaries/{department}/. Tools: pdf_generator, diagram_creator, chart_builder. LLM: Claude Sonnet 4.5.",
         "testStrategy": "Verify PDF generation with proper formatting, test visual diagram creation, verify output file naming follows pattern.",
         "status": "done",
         "dependencies": [
-          40
+          "40"
         ],
         "priority": "high",
         "subtasks": [
@@ -4390,7 +4692,8 @@
             "dependencies": [],
             "details": "Implement PDF parsing using appropriate libraries to extract text, images, and metadata. Clean and segment the extracted content into manageable chunks suitable for input to the LLM and visualization tools.",
             "status": "done",
-            "testStrategy": "Test extraction accuracy on various PDF formats and verify preprocessing outputs correct text chunks and metadata."
+            "testStrategy": "Test extraction accuracy on various PDF formats and verify preprocessing outputs correct text chunks and metadata.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -4401,7 +4704,8 @@
             ],
             "details": "Design prompts and workflows to feed preprocessed text chunks into Claude Sonnet 4.5, ensuring summaries cover key concepts and implementation details as specified in the PRD.",
             "status": "done",
-            "testStrategy": "Validate summary completeness and relevance by comparing generated summaries against source documents and PRD requirements."
+            "testStrategy": "Validate summary completeness and relevance by comparing generated summaries against source documents and PRD requirements.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -4412,7 +4716,8 @@
             ],
             "details": "Analyze summarized content to identify sections suitable for visualization. Programmatically generate diagrams and charts that illustrate workflows, concepts, or data referenced in the summary.",
             "status": "done",
-            "testStrategy": "Verify visual outputs are accurate, clear, and correspond correctly to the summarized content sections."
+            "testStrategy": "Verify visual outputs are accurate, clear, and correspond correctly to the summarized content sections.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -4424,7 +4729,8 @@
             ],
             "details": "Design PDF layout templates to include sections for key concepts, implementation guides, quick references, and visuals. Implement generation logic to produce final PDF files saved to processed/crewai-summaries/{department}/.",
             "status": "done",
-            "testStrategy": "Check PDF formatting, section ordering, and file naming conventions. Confirm all content and visuals are correctly embedded."
+            "testStrategy": "Check PDF formatting, section ordering, and file naming conventions. Confirm all content and visuals are correctly embedded.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -4435,33 +4741,34 @@
             ],
             "details": "Create automated and manual test cases to validate formatting, content accuracy, visual correctness, and output path compliance. Include edge cases and performance benchmarks.",
             "status": "done",
-            "testStrategy": "Run comprehensive tests covering PDF content integrity, visual element accuracy, and adherence to naming and storage conventions."
+            "testStrategy": "Run comprehensive tests covering PDF content integrity, visual element accuracy, and adherence to naming and storage conventions.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 43,
+        "id": "43",
         "title": "Implement Asset Generator Agents (AGENT-003 to AGENT-007)",
         "description": "Build 5 asset generation agents: Skill Generator (YAML), Command Generator (Markdown), Agent Generator (CrewAI YAML), Prompt Generator, and Workflow Generator (n8n JSON).",
         "details": "AGENTS 003-007 from PRD: AGENT-003=Skill Generator (YAML for Claude Code), AGENT-004=Command Generator (Markdown slash commands), AGENT-005=Agent Generator (CrewAI configs), AGENT-006=Prompt Generator (reusable templates), AGENT-007=Workflow Generator (n8n JSON). Each outputs to processed/crewai-suggestions/{asset-type}/drafts/.",
         "testStrategy": "Test each asset type generation, verify output format matches specification, test asset type decision logic from Main Orchestrator.",
         "status": "done",
         "dependencies": [
-          40,
-          41
+          "40",
+          "41"
         ],
         "priority": "high",
         "subtasks": []
       },
       {
-        "id": 44,
+        "id": "44",
         "title": "Implement Department Classifier Agent (AGENT-008)",
         "description": "Build specialized agent for accurate 10-department classification with confidence scores using keyword extraction and content analysis.",
         "details": "AGENT-008 from PRD: Role=Department Classification Specialist. Departments: it-engineering, sales-marketing, customer-support, operations-hr-supply, finance-accounting, project-management, real-estate, private-equity-ma, consulting, personal-continuing-ed. Tools: file_reader, department_classifier, keyword_extractor. LLM: Claude Haiku (fast). Output: Department + confidence score (0-1).",
         "testStrategy": "Test classification accuracy across all 10 departments (>96% target), verify confidence scores correlate with actual accuracy.",
         "status": "done",
         "dependencies": [
-          40
+          "40"
         ],
         "priority": "high",
         "subtasks": [
@@ -4472,7 +4779,8 @@
             "dependencies": [],
             "details": "Gather representative documents and content samples for each department: it-engineering, sales-marketing, customer-support, operations-hr-supply, finance-accounting, project-management, real-estate, private-equity-ma, consulting, personal-continuing-ed. Clean and preprocess data for keyword extraction and content analysis. Define expected output format including department labels and confidence score range (0-1).",
             "status": "done",
-            "testStrategy": "Verify dataset completeness and balance across departments; validate data preprocessing correctness."
+            "testStrategy": "Verify dataset completeness and balance across departments; validate data preprocessing correctness.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -4483,7 +4791,8 @@
             ],
             "details": "Use or adapt the existing keyword_extractor tool to extract meaningful keywords from document content. Tune extraction parameters to maximize relevance for department-specific terms. Ensure output is compatible with downstream classification module.",
             "status": "done",
-            "testStrategy": "Test keyword extraction accuracy and relevance on sample documents; compare extracted keywords against expected department-specific terms."
+            "testStrategy": "Test keyword extraction accuracy and relevance on sample documents; compare extracted keywords against expected department-specific terms.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -4495,7 +4804,8 @@
             ],
             "details": "Integrate file_reader, keyword_extractor, and department_classifier tools. Use extracted keywords and content features as input to Claude Haiku LLM for classification. Implement logic to generate confidence scores between 0 and 1 reflecting classification certainty. Ensure the agent outputs department label plus confidence score.",
             "status": "done",
-            "testStrategy": "Evaluate classification accuracy on validation set aiming for >96% accuracy; verify confidence scores correlate with actual correctness."
+            "testStrategy": "Evaluate classification accuracy on validation set aiming for >96% accuracy; verify confidence scores correlate with actual correctness.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -4506,7 +4816,8 @@
             ],
             "details": "Develop orchestration code to read input files, extract keywords, classify department, and output results. Handle error cases and edge inputs gracefully. Validate that the agent meets performance and latency requirements. Prepare for deployment environment integration.",
             "status": "done",
-            "testStrategy": "Conduct integration testing with diverse document inputs; verify output format and confidence scores; measure response times and error handling."
+            "testStrategy": "Conduct integration testing with diverse document inputs; verify output format and confidence scores; measure response times and error handling.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -4517,19 +4828,20 @@
             ],
             "details": "Run extensive tests across all 10 departments using test datasets. Analyze misclassifications and adjust model or thresholds as needed. Calibrate confidence scores to reflect true probabilities. Document test results and prepare for production deployment.",
             "status": "done",
-            "testStrategy": "Use confusion matrices and ROC curves to assess accuracy; perform reliability diagrams for confidence calibration; confirm target metrics are met before release."
+            "testStrategy": "Use confusion matrices and ROC curves to assess accuracy; perform reliability diagrams for confidence calibration; confirm target metrics are met before release.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 45,
+        "id": "45",
         "title": "Implement Document Analysis Agents (AGENT-009 to AGENT-011)",
         "description": "Build 3 document analysis agents: Research Analyst, Content Strategist, and Fact Checker for comprehensive document analysis workflows.",
         "details": "AGENTS 009-011 from PRD: AGENT-009=Senior Research Analyst (extract topics, entities, facts, quality assessment), AGENT-010=Content Strategist (executive summary, findings, recommendations), AGENT-011=Fact Checker (verify claims, confidence scores, citations). All use Claude Sonnet 4.5 with varying temperatures.",
         "testStrategy": "Test sequential workflow between agents, verify output quality, test fact verification accuracy.",
         "status": "done",
         "dependencies": [
-          40
+          "40"
         ],
         "priority": "high",
         "subtasks": [
@@ -4540,7 +4852,8 @@
             "dependencies": [],
             "details": "Review PRD for AGENTS 009-011 to specify exact extraction tasks for Research Analyst (topics, entities, facts, quality assessment), summary and recommendations for Content Strategist, and claim verification with confidence scoring for Fact Checker. Define input document formats, expected outputs, and temperature settings for Claude Sonnet 4.5.",
             "status": "done",
-            "testStrategy": "Validate specifications with stakeholders and ensure clarity for implementation."
+            "testStrategy": "Validate specifications with stakeholders and ensure clarity for implementation.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -4551,7 +4864,8 @@
             ],
             "details": "Build the agent logic to process input documents, extract relevant information (topics, entities, facts), and assess document quality. Integrate Claude Sonnet 4.5 API with appropriate temperature settings. Ensure output format matches specification.",
             "status": "done",
-            "testStrategy": "Test extraction accuracy on diverse document samples and verify quality assessment outputs."
+            "testStrategy": "Test extraction accuracy on diverse document samples and verify quality assessment outputs.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -4562,7 +4876,8 @@
             ],
             "details": "Use Claude Sonnet 4.5 with configured temperature to generate concise executive summaries, highlight key findings, and formulate actionable recommendations based on input from Research Analyst outputs or raw documents.",
             "status": "done",
-            "testStrategy": "Evaluate summary coherence, relevance of findings, and appropriateness of recommendations against benchmark documents."
+            "testStrategy": "Evaluate summary coherence, relevance of findings, and appropriateness of recommendations against benchmark documents.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -4573,7 +4888,8 @@
             ],
             "details": "Integrate Claude Sonnet 4.5 to cross-check extracted claims against trusted sources or internal knowledge bases. Implement confidence scoring mechanism and citation generation. Ensure output includes verification status and references.",
             "status": "done",
-            "testStrategy": "Validate fact verification accuracy, confidence scoring consistency, and citation correctness on test datasets."
+            "testStrategy": "Validate fact verification accuracy, confidence scoring consistency, and citation correctness on test datasets.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -4586,19 +4902,20 @@
             ],
             "details": "Develop orchestration logic to pass outputs sequentially between agents: Research Analyst output feeds Content Strategist and Fact Checker. Test data flow, error handling, and output aggregation. Measure overall system performance and accuracy.",
             "status": "done",
-            "testStrategy": "Conduct sequential workflow tests, verify output quality at each stage, and assess fact verification accuracy in integrated environment."
+            "testStrategy": "Conduct sequential workflow tests, verify output quality at each stage, and assess fact verification accuracy in integrated environment.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 46,
+        "id": "46",
         "title": "Implement Multi-Agent Orchestration Agents (AGENT-012 to AGENT-015)",
         "description": "Build 4 orchestration agents: Research Agent, Analysis Agent, Writing Agent, and Review Agent for complex multi-agent workflows.",
         "details": "AGENTS 012-015 from PRD (FR-012): AGENT-012=Research Agent (web/academic search), AGENT-013=Analysis Agent (pattern detection, statistics), AGENT-014=Writing Agent (reports, documentation), AGENT-015=Review Agent (quality assurance, consistency). Sequential execution for complex analysis tasks.",
         "testStrategy": "Test multi-agent workflow execution, verify agent collaboration, test result aggregation and quality review.",
         "status": "done",
         "dependencies": [
-          40
+          "40"
         ],
         "priority": "high",
         "subtasks": [
@@ -4611,7 +4928,8 @@
             ],
             "details": "Implement AGENT-012 from PRD (FR-012) with the following features: web search integration (Google/Bing APIs), academic database access (arXiv, PubMed), query formulation, source credibility assessment, information extraction, and structured data storage. Integrate with CrewAI foundation infrastructure for agent communication.",
             "status": "done",
-            "testStrategy": "Test web search accuracy, academic database retrieval, query reformulation capabilities, and integration with other agents. Verify information extraction quality and structured output format."
+            "testStrategy": "Test web search accuracy, academic database retrieval, query reformulation capabilities, and integration with other agents. Verify information extraction quality and structured output format.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -4623,7 +4941,8 @@
             ],
             "details": "Implement AGENT-013 from PRD (FR-012) with capabilities for: pattern recognition in textual/numerical data, statistical analysis (descriptive stats, correlation, regression), data visualization preparation, anomaly detection, and insight generation. Must accept structured data from Research Agent and prepare outputs for Writing Agent.",
             "status": "done",
-            "testStrategy": "Test pattern detection accuracy, statistical analysis correctness, data transformation capabilities, and integration with Research and Writing agents. Verify performance with various data types and volumes."
+            "testStrategy": "Test pattern detection accuracy, statistical analysis correctness, data transformation capabilities, and integration with Research and Writing agents. Verify performance with various data types and volumes.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -4635,7 +4954,8 @@
             ],
             "details": "Implement AGENT-014 from PRD (FR-012) with capabilities for: report generation in multiple formats (text, markdown, HTML), section structuring, data visualization integration, citation management, terminology consistency, and style adaptation. Must consume Analysis Agent outputs and produce draft documents for Review Agent.",
             "status": "done",
-            "testStrategy": "Test document generation quality, format consistency, citation accuracy, and integration with Analysis and Review agents. Verify adaptation to different writing styles and document types."
+            "testStrategy": "Test document generation quality, format consistency, citation accuracy, and integration with Analysis and Review agents. Verify adaptation to different writing styles and document types.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -4647,7 +4967,8 @@
             ],
             "details": "Implement AGENT-015 from PRD (FR-012) with capabilities for: grammar/spelling verification, fact-checking against Research Agent data, consistency validation, citation verification, readability assessment, and improvement suggestions. Must provide feedback loop to Writing Agent and final approval mechanism.",
             "status": "done",
-            "testStrategy": "Test error detection accuracy, fact-checking reliability, consistency validation, and integration with Writing Agent. Verify feedback loop functionality and document improvement metrics."
+            "testStrategy": "Test error detection accuracy, fact-checking reliability, consistency validation, and integration with Writing Agent. Verify feedback loop functionality and document improvement metrics.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -4661,29 +4982,34 @@
             ],
             "details": "Develop workflow orchestration system to coordinate the sequential execution of Research → Analysis → Writing → Review agents. Implement data transformation between agent outputs/inputs, progress tracking, error handling/recovery, parallel execution where possible, and workflow status reporting. Create unified API endpoint for initiating multi-agent workflows.",
             "status": "done",
-            "testStrategy": "Test end-to-end workflow execution, agent transition handling, error recovery mechanisms, and overall system performance. Verify data integrity throughout the pipeline and measure total execution time for complex analysis tasks."
+            "testStrategy": "Test end-to-end workflow execution, agent transition handling, error recovery mechanisms, and overall system performance. Verify data integrity throughout the pipeline and measure total execution time for complex analysis tasks.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 47,
+        "id": "47",
         "title": "Implement CrewAI Asset Storage and B2 Integration",
         "description": "Build asset storage system for CrewAI outputs to B2 with department-based organization, metadata tracking, and URL signing.",
         "details": "B2 folder structure from PRD: processed/crewai-summaries/{10-departments}/, processed/crewai-suggestions/{asset-type}/drafts/ (claude-skills, claude-commands, agents, prompts, workflows). Database table: crewai_generated_assets with asset_type, department, b2_path, confidence_score.",
         "testStrategy": "Test asset storage to correct B2 paths, verify metadata tracking, test URL signing for asset retrieval.",
         "status": "done",
         "dependencies": [
-          40,
-          43
+          "40",
+          "43"
         ],
         "priority": "medium",
         "subtasks": []
       }
     ],
     "metadata": {
-      "created": "2025-11-24T19:36:45.295Z",
-      "updated": "2025-12-30T19:11:04.283Z",
-      "description": "Tasks for v7_3_features context"
+      "version": "1.0.0",
+      "lastModified": "2025-12-31T02:37:54.362Z",
+      "taskCount": 47,
+      "completedCount": 47,
+      "tags": [
+        "v7_3_features"
+      ]
     }
   }
 }
