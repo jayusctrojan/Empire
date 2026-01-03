@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Empire Desktop default permissions",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "http:default",
+    "shell:default",
+    "store:default",
+    "os:default",
+    "sql:default",
+    "log:default"
+  ]
+}
