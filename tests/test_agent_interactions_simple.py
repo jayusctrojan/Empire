@@ -1,13 +1,19 @@
 """
 Simplified Test Suite for Task 39: Agent Interaction API
 Tests core inter-agent messaging, events, state sync, and conflict resolution functionality
+
+NOTE: These are INTEGRATION tests - they require a running server at localhost:8000
 """
 
+import pytest
 import requests
 import json
 from typing import Dict, Any
 from datetime import datetime, timedelta
 from uuid import uuid4
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 
 BASE_URL = "http://localhost:8000"
 
