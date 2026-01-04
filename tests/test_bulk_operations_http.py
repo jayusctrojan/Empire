@@ -7,9 +7,10 @@ Prerequisites:
 2. Supabase environment variables set in .env
 3. Celery worker running (for async task processing)
 
-Run with: python tests/test_bulk_operations_http.py
+NOTE: These are INTEGRATION tests - run with: python tests/test_bulk_operations_http.py
 """
 
+import pytest
 import requests
 import json
 import asyncio
@@ -17,6 +18,9 @@ import time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 
 # Load environment
 load_dotenv()
