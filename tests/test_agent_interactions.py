@@ -1,14 +1,20 @@
 """
 Test suite for Task 39: Agent Interaction API - Inter-Agent Messaging & Collaboration
 Tests all agent interaction endpoints including messaging, events, state sync, and conflict resolution
+
+NOTE: These are INTEGRATION tests - they require a running server at localhost:8000
 """
 
+import pytest
 import requests
 import json
 import time
 from typing import Dict, Any
 from datetime import datetime, timedelta
 from uuid import uuid4
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 
 BASE_URL = "http://localhost:8000"
 

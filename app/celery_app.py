@@ -160,7 +160,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
             document_id=document_id,
             query_id=query_id,
             user_id=user_id,
-            session_id=session_id,
+            session_id=_session_id,
             metadata=metadata if metadata else None
         )
     except Exception as e:
