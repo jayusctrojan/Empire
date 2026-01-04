@@ -6,6 +6,8 @@ Tests Supabase integration for storing and retrieving RAGAS evaluation results:
 - Storing evaluation results
 - Retrieving evaluation results
 - Querying by date range and metrics
+
+NOTE: These tests require the datasets package to be installed
 """
 
 import pytest
@@ -13,6 +15,19 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from unittest.mock import Mock, patch, MagicMock
+
+# Skip all tests if datasets is not installed (required by ragas_storage)
+datasets_available = False
+try:
+    import datasets
+    datasets_available = True
+except ImportError:
+    pass
+
+pytestmark = pytest.mark.skipif(
+    not datasets_available,
+    reason="datasets package not installed - skipping RAGAS storage tests"
+)
 
 
 class TestRAGASEvaluationsTableSchema:
