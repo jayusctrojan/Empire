@@ -251,7 +251,6 @@ with gr.Blocks(
         chatbot=gr.Chatbot(
             elem_id="chatbot",
             height=600,
-            show_copy_button=True,
             render_markdown=True,
             avatar_images=(None, "🤖"),
             show_label=False,
