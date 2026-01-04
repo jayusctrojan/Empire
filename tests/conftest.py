@@ -7,9 +7,57 @@ from io import BytesIO
 from unittest.mock import Mock, AsyncMock, MagicMock
 from datetime import datetime, timedelta
 
-from app.services.encryption import EncryptionService
-from app.services.b2_storage import ProcessingStatus, B2Folder
-from app.services.b2_workflow import B2WorkflowManager
+
+# =============================================================================
+# PYTEST HOOKS - Auto-apply markers
+# =============================================================================
+
+def pytest_collection_modifyitems(config, items):
+    """
+    Auto-apply 'unit' marker to tests without integration/slow markers.
+    This ensures all tests are categorized for CI filtering.
+    """
+    for item in items:
+        # Get existing markers
+        markers = {mark.name for mark in item.iter_markers()}
+
+        # If no category marker exists, apply 'unit' by default
+        if not markers.intersection({'integration', 'slow', 'smoke', 'e2e'}):
+            item.add_marker(pytest.mark.unit)
+
+
+# =============================================================================
+# SERVICE IMPORTS (with lazy loading for CI)
+# =============================================================================
+
+# Only import services that don't require external connections at import time
+try:
+    from app.services.encryption import EncryptionService
+    from app.services.b2_storage import ProcessingStatus, B2Folder
+    from app.services.b2_workflow import B2WorkflowManager
+except (ImportError, ValueError) as e:
+    # In CI, these may fail due to missing credentials
+    # Create mock classes for fixtures to work
+    import os
+    if os.getenv('TESTING') == 'true':
+        class EncryptionService:
+            def __init__(self, enabled=True): pass
+        class ProcessingStatus:
+            PENDING = 'pending'
+            PROCESSING = 'processing'
+            PROCESSED = 'processed'
+            FAILED = 'failed'
+            ARCHIVED = 'archived'
+        class B2Folder:
+            PENDING = 'pending'
+            PROCESSING = 'processing'
+            PROCESSED = 'processed'
+            FAILED = 'failed'
+            ARCHIVE = 'archive'
+        class B2WorkflowManager:
+            pass
+    else:
+        raise
 
 
 @pytest.fixture
