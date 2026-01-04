@@ -14,6 +14,16 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Skip module entirely if SUPABASE_URL not set (prevents import-time errors)
+if not os.getenv("SUPABASE_URL"):
+    pytest.skip(
+        "SUPABASE_URL not set - skipping RBAC integration tests",
+        allow_module_level=True
+    )
+
+# Mark as integration test - requires real database connection
+pytestmark = pytest.mark.integration
+
 from app.services.rbac_service import RBACService
 from app.core.supabase_client import get_supabase_client
 
