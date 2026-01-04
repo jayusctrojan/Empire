@@ -6,6 +6,8 @@ Tests the core evaluation engine:
 - Processing evaluation results
 - Calculating aggregate scores
 - Error handling and validation
+
+NOTE: These tests require the ragas and datasets packages to be installed
 """
 
 import pytest
@@ -13,6 +15,19 @@ import json
 from pathlib import Path
 from typing import Dict, List, Any
 from unittest.mock import Mock, patch, MagicMock
+
+# Skip all tests if datasets module is not installed
+datasets_available = False
+try:
+    import datasets
+    datasets_available = True
+except ImportError:
+    pass
+
+pytestmark = pytest.mark.skipif(
+    not datasets_available,
+    reason="datasets package not installed - skipping RAGAS evaluation tests"
+)
 
 
 class TestRAGASEvaluationEngine:
