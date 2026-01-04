@@ -909,8 +909,7 @@ class TestURLProcessingService:
     @pytest.mark.asyncio
     async def test_close_service(self, service):
         """Test closing the service."""
-        with patch.object(service.web_scraper, 'close') as mock_close:
-            mock_close.return_value = asyncio.coroutine(lambda: None)()
+        with patch.object(service.web_scraper, 'close', new_callable=AsyncMock) as mock_close:
             await service.close()
             mock_close.assert_called_once()
 
