@@ -2,6 +2,11 @@
 Quick test suite for Task 35: CrewAI Integration (skips hanging health check)
 Tests core CRUD operations for agents and crews
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import requests
 import json

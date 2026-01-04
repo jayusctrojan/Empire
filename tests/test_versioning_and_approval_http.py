@@ -16,6 +16,11 @@ Prerequisites:
 
 Run with: python tests/test_versioning_and_approval_http.py
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import requests
 import json

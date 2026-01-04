@@ -2,6 +2,11 @@
 Test suite for WebSocket real-time streaming (Priority 4)
 Tests WebSocket endpoint with Redis pub/sub integration
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import sys
 import os

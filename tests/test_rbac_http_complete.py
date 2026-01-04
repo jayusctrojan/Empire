@@ -8,6 +8,11 @@ Prerequisites:
 
 Run with: python tests/test_rbac_http_complete.py
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import requests
 import json

@@ -2,6 +2,11 @@
 Test Document Analysis Workflow for Task 37.3
 Verifies that the 3-agent document analysis crew executes correctly
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import requests
 import json

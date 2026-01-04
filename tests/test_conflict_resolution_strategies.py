@@ -17,6 +17,9 @@ env_path = project_root / ".env"
 load_dotenv(dotenv_path=env_path)
 
 import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 import asyncio
 from uuid import UUID, uuid4
 import requests

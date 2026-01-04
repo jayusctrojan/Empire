@@ -2,6 +2,11 @@
 Test suite for CrewAI Asset Storage & Retrieval (Task 40)
 Tests asset storage in database and B2, retrieval with filters, and confidence updates
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import sys
 import os

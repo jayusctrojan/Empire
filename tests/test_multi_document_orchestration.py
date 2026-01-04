@@ -9,6 +9,11 @@ Tests for the 4-agent orchestration system:
 
 Covers sequential and parallel execution, validation, and error handling.
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import requests
 import json

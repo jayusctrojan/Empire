@@ -2,6 +2,11 @@
 Test Document Analysis Setup for Task 37.3
 Verifies that the 3 document analysis agents and crew are properly configured
 """
+import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 
 import requests
 
