@@ -1,15 +1,24 @@
 """
 Empire v7.3 - CrewAI Asset Routes Tests (Task 47)
 Tests for API endpoints in /api/crewai/assets
+
+NOTE: These tests require SUPABASE_URL to be set (app imports it at startup)
 """
 
 import pytest
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 from datetime import datetime
 from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
 import base64
+
+# Skip tests if Supabase credentials are not available
+pytestmark = pytest.mark.skipif(
+    not os.getenv("SUPABASE_URL"),
+    reason="SUPABASE_URL not set - skipping tests that require Supabase"
+)
 
 
 # =============================================================================

@@ -2,11 +2,17 @@
 Test script for LangGraph + Arcade.dev endpoints (Task 46)
 
 Tests both synchronous and asynchronous query processing endpoints.
+
+NOTE: These are INTEGRATION tests - require production API
 """
+import pytest
 import requests
 import time
 import json
 from typing import Dict, Any
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 
 # Render API URL
 BASE_URL = "https://jb-empire-api.onrender.com"

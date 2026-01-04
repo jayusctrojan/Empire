@@ -6,12 +6,27 @@ Tests the command-line interface for RAGAS evaluation:
 - Integration with RAGASEvaluator and RAGASStorageService
 - Batch evaluation workflow
 - Result output and storage
+
+NOTE: These tests require the ragas package to be installed
 """
 
 import pytest
 import sys
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
+
+# Skip all tests if ragas is not installed
+ragas_available = False
+try:
+    import ragas
+    ragas_available = True
+except ImportError:
+    pass
+
+pytestmark = pytest.mark.skipif(
+    not ragas_available,
+    reason="ragas package not installed - skipping RAGAS CLI tests"
+)
 
 
 class TestRAGASCLIArgumentParsing:

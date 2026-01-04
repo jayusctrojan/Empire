@@ -1,10 +1,16 @@
 """
 Test CrewAI Asset Storage for Task 36.3
 Verifies that generated assets can be stored to B2 processed/ folders
+
+NOTE: These are INTEGRATION tests - require B2 credentials
 """
 
+import pytest
 import asyncio
 from app.services.crewai_asset_storage import CrewAIAssetStorage, AssetType
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 
 
 async def test_asset_storage():
