@@ -441,7 +441,7 @@ async def adaptive_query_async(
 ):
     """
     Submit adaptive query for async processing via Celery.
-    
+
     **Authentication Required**: Must provide valid Clerk JWT token.
 
     Use this for:
@@ -513,7 +513,7 @@ async def auto_routed_query_async(
 ):
     """
     Submit auto-routed query for async processing via Celery.
-    
+
     **Authentication Required**: Must provide valid Clerk JWT token.
 
     Automatically routes to LangGraph, CrewAI, or Simple RAG based on query analysis.
@@ -794,7 +794,7 @@ async def faceted_search(
 
         # Get services
         faceted_service = get_faceted_search_service()
-        search_service = get_hybrid_search_service()
+        _search_service = get_hybrid_search_service()  # Reserved for future integration
 
         # Perform hybrid search with filters
         # TODO: Integrate filters with actual search service
