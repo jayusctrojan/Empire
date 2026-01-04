@@ -1,9 +1,12 @@
 """
 Empire v7.3 - Audio/Video Processor Tests
 Tests for audio/video processing with ffmpeg, Soniox, and Claude Vision
+
+NOTE: These are INTEGRATION tests - they require ffmpeg to be installed
 """
 
 import pytest
+import shutil
 from unittest.mock import Mock, AsyncMock, patch, MagicMock, mock_open
 from pathlib import Path
 import base64
@@ -13,6 +16,15 @@ from app.services.audio_video_processor import (
     AudioVideoProcessor,
     get_audio_video_processor
 )
+
+# Skip all tests if ffmpeg is not installed
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        shutil.which("ffmpeg") is None,
+        reason="ffmpeg not installed - skipping audio/video tests"
+    )
+]
 
 
 class TestAudioExtraction:
