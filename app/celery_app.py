@@ -44,6 +44,7 @@ _task_start_times = {}
 # Task 12: Get sync broadcaster for signal handlers
 _status_broadcaster = None
 
+
 def _get_status_broadcaster():
     """Lazy load the status broadcaster"""
     global _status_broadcaster

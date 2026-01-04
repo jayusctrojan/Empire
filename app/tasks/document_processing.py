@@ -18,9 +18,19 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Get notification dispatcher and workflow manager
+# Get notification dispatcher (lightweight, safe at import)
 dispatcher = get_notification_dispatcher()
-workflow_manager = get_workflow_manager()
+
+# Lazy workflow manager initialization (requires B2 credentials)
+_workflow_manager = None
+
+
+def _get_workflow_manager():
+    """Lazy initialize workflow manager to avoid B2 import errors in tests"""
+    global _workflow_manager
+    if _workflow_manager is None:
+        _workflow_manager = get_workflow_manager()
+    return _workflow_manager
 
 
 @celery_app.task(name='app.tasks.document_processing.process_document', bind=True)
@@ -49,7 +59,7 @@ def process_document(self, file_id: str, filename: str, b2_path: str) -> Dict[st
         )
 
         # Move file from PENDING → PROCESSING in B2
-        asyncio.run(workflow_manager.start_processing(
+        asyncio.run(_get_workflow_manager().start_processing(
             file_id=file_id,
             processor_id=self.request.id
         ))
@@ -108,7 +118,7 @@ def process_document(self, file_id: str, filename: str, b2_path: str) -> Dict[st
         logger.info(f"✅ Document processed successfully: {filename}")
 
         # Move file from PROCESSING → PROCESSED in B2
-        asyncio.run(workflow_manager.complete_processing(
+        asyncio.run(_get_workflow_manager().complete_processing(
             file_id=file_id,
             result_data={
                 "task_id": self.request.id,
@@ -166,7 +176,7 @@ def process_document(self, file_id: str, filename: str, b2_path: str) -> Dict[st
             logger.error(f"All retry attempts exhausted for {filename}")
 
             # Move file from PROCESSING → FAILED in B2
-            asyncio.run(workflow_manager.fail_processing(
+            asyncio.run(_get_workflow_manager().fail_processing(
                 file_id=file_id,
                 error=str(e),
                 retry_count=retry_count
@@ -189,7 +199,7 @@ def process_document(self, file_id: str, filename: str, b2_path: str) -> Dict[st
         else:
             # Move file from FAILED → PROCESSING for retry (if this is a retry attempt)
             if retry_count > 0:
-                asyncio.run(workflow_manager.retry_processing(
+                asyncio.run(_get_workflow_manager().retry_processing(
                     file_id=file_id,
                     retry_count=retry_count + 1
                 ))

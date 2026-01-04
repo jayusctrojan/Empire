@@ -373,10 +373,11 @@ async def get_upload_status(file_id: str):
         File status information
     """
     try:
-        b2_service = get_b2_service()
+        # TODO: Use b2_service to verify file exists
+        # b2_service = get_b2_service()
 
         # TODO: Check processing status from database
-        # For now, just verify file exists in B2
+        # For now, just return a status placeholder
 
         return {
             "file_id": file_id,

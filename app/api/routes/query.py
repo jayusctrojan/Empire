@@ -794,7 +794,8 @@ async def faceted_search(
 
         # Get services
         faceted_service = get_faceted_search_service()
-        _search_service = get_hybrid_search_service()  # Reserved for future integration
+        # TODO: Integrate hybrid_search_service when filter implementation is ready
+        # search_service = get_hybrid_search_service()
 
         # Perform hybrid search with filters
         # TODO: Integrate filters with actual search service
