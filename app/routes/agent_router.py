@@ -356,8 +356,6 @@ async def route_batch(
     Returns:
         BatchRouterResponse with results for all queries
     """
-    start_time = time.time()
-
     try:
         # Record batch size
         BATCH_ROUTING_SIZE.observe(len(request.queries))
@@ -700,11 +698,11 @@ async def clear_cache(
 
         if expired_only:
             # Call cleanup function
-            result = service.supabase.rpc("cleanup_expired_router_cache").execute()
+            service.supabase.rpc("cleanup_expired_router_cache").execute()
             message = "Expired cache entries cleared"
         else:
             # Delete all cache entries
-            result = service.supabase.table("agent_router_cache").delete().neq(
+            service.supabase.table("agent_router_cache").delete().neq(
                 "id", "00000000-0000-0000-0000-000000000000"  # Delete all
             ).execute()
             message = "All cache entries cleared"

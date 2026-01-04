@@ -69,7 +69,7 @@ class ConnectionManager:
             self.supabase = create_client(supabase_url, supabase_key)
 
             # Test connection with a simple query
-            result = self.supabase.table("documents").select("id").limit(1).execute()
+            _result = self.supabase.table("documents").select("id").limit(1).execute()
 
             logger.info("Supabase connection established", url=supabase_url)
 
@@ -163,7 +163,7 @@ class ConnectionManager:
         # Check Supabase
         try:
             if self.supabase:
-                result = self.supabase.table("documents").select("id").limit(1).execute()
+                _result = self.supabase.table("documents").select("id").limit(1).execute()
                 health_status["supabase"] = "healthy"
             else:
                 health_status["supabase"] = "not_configured"

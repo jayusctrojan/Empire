@@ -19,18 +19,18 @@ async def get_current_user(
 ) -> str:
     """
     Extract and validate user from JWT or API key.
-    
+
     Supports two authentication methods:
     1. API Key: Authorization header with emp_xxx format
     2. JWT Token: Authorization header with Bearer <token> format
-    
+
     Args:
         authorization: Authorization header value
         rbac_service: RBAC service instance
-        
+
     Returns:
         user_id: Validated user ID
-        
+
     Raises:
         HTTPException: 401 if authentication fails
     """
@@ -114,14 +114,14 @@ async def require_admin(
 ) -> bool:
     """
     Check if current user has admin role.
-    
+
     Args:
         current_user: User ID from get_current_user dependency
         rbac_service: RBAC service instance
-        
+
     Returns:
         True if user is admin
-        
+
     Raises:
         HTTPException: 403 if user does not have admin role
     """
@@ -131,8 +131,8 @@ async def require_admin(
 
         # Check if user has admin role
         is_admin = any(
-            r.get("role", {}).get("role_name") == "admin" 
-            for r in roles 
+            r.get("role", {}).get("role_name") == "admin"
+            for r in roles
             if r.get("role")
         )
 
@@ -166,22 +166,22 @@ async def get_current_user_optional(
 ) -> Optional[str]:
     """
     Optional authentication - returns None if no auth provided.
-    
+
     Useful for endpoints that support both authenticated and anonymous access.
-    
+
     Args:
         authorization: Authorization header value
         rbac_service: RBAC service instance
-        
+
     Returns:
         user_id if authenticated, None if no auth provided
-        
+
     Raises:
         HTTPException: 401 if auth provided but invalid
     """
     if not authorization:
         return None
-    
+
     return await get_current_user(authorization=authorization, rbac_service=rbac_service)
 
 
@@ -192,15 +192,15 @@ async def require_role(
 ) -> bool:
     """
     Check if current user has a specific role.
-    
+
     Args:
         required_role: Role name required (admin, editor, viewer, guest)
         current_user: User ID from get_current_user dependency
         rbac_service: RBAC service instance
-        
+
     Returns:
         True if user has the required role
-        
+
     Raises:
         HTTPException: 403 if user does not have required role
     """
@@ -210,8 +210,8 @@ async def require_role(
 
         # Check if user has required role
         has_role = any(
-            r.get("role", {}).get("role_name") == required_role 
-            for r in roles 
+            r.get("role", {}).get("role_name") == required_role
+            for r in roles
             if r.get("role")
         )
 

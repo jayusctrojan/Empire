@@ -214,7 +214,6 @@ class FeatureFlagManager:
         - Uncached: <50ms
         """
         start_time = time.time()
-        cache_hit = False
 
         try:
             # Try cache first if enabled
@@ -223,7 +222,6 @@ class FeatureFlagManager:
                 cached = self.redis_cache.get(cache_key)
 
                 if cached is not None:
-                    cache_hit = True
                     is_enabled = cached.get("enabled", False)
                     logger.debug(f"Feature flag cache hit: {flag_name}")
 
@@ -402,12 +400,12 @@ class FeatureFlagManager:
                 update_data["metadata"] = json.dumps(metadata)
 
             # Update in database
-            result = self.supabase.table("feature_flags")\
+            _result = self.supabase.table("feature_flags")\
                 .update(update_data)\
                 .eq("flag_name", flag_name)\
                 .execute()
 
-            if not result.data:
+            if not _result.data:
                 logger.error(f"Failed to update feature flag: {flag_name}")
                 return False
 

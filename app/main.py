@@ -5,7 +5,8 @@ Production-grade API server with monitoring, error handling, and authentication
 
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi import status as http_status  # Renamed to avoid conflict with app.routes.status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles

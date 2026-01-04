@@ -36,7 +36,6 @@ class CrewAIOutputValidator:
     def __init__(self):
         self.min_quality_threshold = 0.6  # Minimum acceptable quality score
 
-
     def validate_execution_output(
         self,
         execution_result: Dict[str, Any],
@@ -129,7 +128,6 @@ class CrewAIOutputValidator:
                 errors=[f"Validation error: {str(e)}"]
             )
 
-
     def validate_research_output(self, output: str) -> ValidationResult:
         """
         Validate research agent output.
@@ -210,7 +208,6 @@ class CrewAIOutputValidator:
             recommendations=recommendations,
             metrics=metrics
         )
-
 
     def validate_analysis_output(self, output: str) -> ValidationResult:
         """

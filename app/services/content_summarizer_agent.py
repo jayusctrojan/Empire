@@ -385,7 +385,7 @@ class PDFGeneratorTool:
         """Build a styled table from data"""
         headers = table_data.get("headers", [])
         rows = table_data.get("rows", [])
-        title = table_data.get("title", "")
+        _title = table_data.get("title", "")  # Reserved for future table styling
 
         # Build data with headers
         data = []
@@ -717,7 +717,7 @@ class DiagramCreatorTool:
 
         # Grid layout
         cols = min(3, n)
-        rows = (n + cols - 1) // cols
+        _rows = (n + cols - 1) // cols  # Used for layout calculation
 
         for i, elem in enumerate(elements):
             row = i // cols
@@ -1360,7 +1360,7 @@ def get_content_summarizer_service() -> ContentSummarizerAgentService:
 # =============================================================================
 
 if __name__ == "__main__":
-    import asyncio
+    # asyncio already imported at module level
 
     async def test():
         """Test the Content Summarizer Agent"""
@@ -1443,7 +1443,7 @@ if __name__ == "__main__":
             print(f"Error: {result.error}")
 
         # Print stats
-        print(f"\n=== Statistics ===")
+        print("\n=== Statistics ===")
         import json
         print(json.dumps(agent.get_stats(), indent=2))
 

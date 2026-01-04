@@ -484,8 +484,8 @@ async def memory_command(
 
         return MemoryCommandResponse(
             success=success,
-            message="Memory learning disabled. I will no longer learn from your interactions." if success
-                   else "Failed to disable memory learning.",
+            message=("Memory learning disabled. I will no longer learn from your interactions."
+                    if success else "Failed to disable memory learning."),
             memory_enabled=False,
             action_taken="disabled_learning",
             details={"opt_out_learning": True}
@@ -501,8 +501,8 @@ async def memory_command(
 
         return MemoryCommandResponse(
             success=success,
-            message="Memory learning enabled. I will learn from your interactions to personalize responses." if success
-                   else "Failed to enable memory learning.",
+            message=("Memory learning enabled. I will learn from your interactions to personalize responses."
+                    if success else "Failed to enable memory learning."),
             memory_enabled=True,
             action_taken="enabled_learning",
             details={"opt_out_learning": False}

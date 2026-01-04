@@ -291,7 +291,7 @@ class OptimizedDatabaseManager:
             # Try a simple query - use table that exists in current schema
             # Try documents table first, fallback to health check if not found
             try:
-                result = client.table("documents").select("id").limit(1).execute()
+                _result = client.table("documents").select("id").limit(1).execute()
             except Exception:
                 # Table might not exist, just verify client works
                 pass
@@ -333,7 +333,7 @@ class OptimizedDatabaseManager:
                     "configured_size": self.neo4j_pool_size,
                     "pool_hits": self.connection_stats["neo4j_pool_hits"]
                 }
-            except:
+            except Exception:
                 pass
 
             logger.info(

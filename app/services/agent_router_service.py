@@ -200,8 +200,6 @@ class AgentRouterService:
 
     def _classify_category(self, query: str, features: List[str]) -> QueryCategory:
         """Classify query into a category based on features."""
-        query_lower = query.lower()
-
         # Conversational detection (highest priority for short greetings)
         if "conversational" in features and len(query.split()) < 10:
             return QueryCategory.CONVERSATIONAL

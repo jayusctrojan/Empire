@@ -377,7 +377,6 @@ async def get_budget_status(
     current_spending = sum(float(e.get("amount", 0)) for e in entries)
 
     # Get budget config
-    budget_totals = await cost_service.get_total_costs_by_service(start_date=start_date)
     budget_status = await cost_service._get_budget_status({service.value: current_spending})
 
     status = budget_status.get(service.value, {

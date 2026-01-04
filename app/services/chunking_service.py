@@ -762,6 +762,7 @@ class ChunkingService:
 # Singleton instance
 _chunking_service_instance = None
 
+
 def get_chunking_service() -> ChunkingService:
     """Get singleton instance of ChunkingService"""
     global _chunking_service_instance

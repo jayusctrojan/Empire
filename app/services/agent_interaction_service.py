@@ -1097,7 +1097,6 @@ class AgentInteractionService:
             logger.error("Failed to get pending responses", error=str(e), exc_info=True)
             raise
 
-
     # ==================== Analytics Methods ====================
 
     async def get_interaction_history(

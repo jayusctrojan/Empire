@@ -52,6 +52,7 @@ def _get_status_broadcaster():
         _status_broadcaster = get_sync_status_broadcaster()
     return _status_broadcaster
 
+
 # Redis broker URL
 # Clean URL to remove invalid SSL parameters
 _raw_redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -139,7 +140,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        session_id = task_kwargs.get('session_id')
+        _session_id = task_kwargs.get('session_id')  # Reserved for future use
 
         # Determine task type from task name
         task_type = get_task_type_from_name(task.name)
@@ -192,7 +193,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, stat
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        session_id = task_kwargs.get('session_id')
+        _session_id = task_kwargs.get('session_id')  # Reserved for future use
 
         # Determine task type from task name
         task_type = get_task_type_from_name(task.name)
@@ -262,7 +263,7 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        session_id = task_kwargs.get('session_id')
+        _session_id = task_kwargs.get('session_id')  # Reserved for future use
 
         # Determine task type from task name
         task_type = get_task_type_from_name(sender.name)
@@ -330,7 +331,7 @@ def task_retry_handler(sender=None, request=None, reason=None, einfo=None, **kwa
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        session_id = task_kwargs.get('session_id')
+        _session_id = task_kwargs.get('session_id')  # Reserved for future use
 
         # Determine task type from task name
         task_type = get_task_type_from_name(sender.name)

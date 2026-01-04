@@ -191,7 +191,6 @@ class AudioVideoProcessor:
 
             # Get video duration and frame rate
             probe = ffmpeg.probe(video_path)
-            video_info = next(s for s in probe['streams'] if s['codec_type'] == 'video')
             duration = float(probe['format']['duration'])
 
             result["video_duration"] = duration
@@ -632,6 +631,7 @@ class AudioVideoProcessor:
 
 # Singleton instance
 _processor_instance = None
+
 
 def get_audio_video_processor() -> AudioVideoProcessor:
     """Get singleton instance of AudioVideoProcessor"""

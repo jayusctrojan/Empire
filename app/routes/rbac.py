@@ -45,7 +45,7 @@ async def create_api_key(
     Create a new API key with bcrypt hashing.
 
     **SECURITY**: Full key is shown ONLY in this response. Save it securely.
-    
+
     Returns:
         APIKeyCreateResponse with full API key (emp_xxx...)
     """
@@ -92,10 +92,10 @@ async def list_api_keys(
 ):
     """
     List API keys. Regular users see only their keys, admins can filter by user_id.
-    
+
     Args:
         user_id: Optional user ID to filter by (admin only)
-        
+
     Returns:
         APIKeyListResponse with list of keys (prefix only, no full keys)
     """
@@ -105,7 +105,7 @@ async def list_api_keys(
             # Verify user is admin
             try:
                 await require_admin(current_user=current_user, rbac_service=rbac_service)
-            except HTTPException as e:
+            except HTTPException:
                 logger.warning(
                     "non_admin_attempted_list_other_keys",
                     user_id=current_user,
@@ -157,7 +157,7 @@ async def rotate_api_key(
 ):
     """
     Rotate an API key by generating a new key and revoking the old one.
-    
+
     Returns:
         APIKeyCreateResponse with new full API key (shown ONCE)
     """
@@ -442,7 +442,7 @@ async def get_audit_logs(
 ):
     """
     Get audit logs for RBAC operations. Only admins can view audit logs.
-    
+
     Args:
         event_type: Filter by event type (api_key_created, role_assigned, etc.)
         user_id: Filter by actor or target user ID

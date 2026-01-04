@@ -205,7 +205,7 @@ async def generate_summary_from_file(
             # Try latin-1 for binary-ish text files
             try:
                 text_content = content.decode('latin-1')
-            except:
+            except Exception:
                 raise HTTPException(
                     status_code=400,
                     detail="Could not decode file content. Please upload a text file."

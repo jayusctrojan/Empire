@@ -242,7 +242,7 @@ class CostTrackingService:
             )
 
             # Store in Supabase
-            result = self.supabase.table("cost_entries").insert(entry.to_dict()).execute()
+            self.supabase.table("cost_entries").insert(entry.to_dict()).execute()
 
             # Update Prometheus metrics
             SERVICE_COST_TOTAL.labels(

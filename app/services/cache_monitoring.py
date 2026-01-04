@@ -343,7 +343,7 @@ class CacheMonitoringService:
             else:
                 # Assume bytes
                 return float(memory_str) / (1024 * 1024)
-        except:
+        except Exception:
             return 0.0
 
     async def trigger_l2_cleanup(self) -> int:

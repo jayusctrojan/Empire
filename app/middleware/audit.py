@@ -248,7 +248,7 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
                 metadata["content_length"] = int(content_length)
 
             # Insert audit log
-            result = supabase.table("audit_logs").insert({
+            supabase.table("audit_logs").insert({
                 "user_id": user_id,
                 "event_type": event_type,
                 "ip_address": ip_address,

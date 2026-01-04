@@ -75,14 +75,14 @@ class ChatService:
                     max_retries=self.max_retries
                 )
                 result = await operation(*args, **kwargs)
-                
+
                 if attempt > 1:
                     logger.info(
                         "Operation succeeded after retry",
                         operation=operation_name,
                         attempt=attempt
                     )
-                
+
                 return result
 
             except httpx.TimeoutException as e:
@@ -94,7 +94,7 @@ class ChatService:
                     max_retries=self.max_retries,
                     error=str(e)
                 )
-                
+
                 if attempt < self.max_retries:
                     delay = self.base_backoff_delay * (2 ** (attempt - 1))
                     logger.info(
@@ -119,7 +119,7 @@ class ChatService:
                     max_retries=self.max_retries,
                     error=str(e)
                 )
-                
+
                 if attempt < self.max_retries:
                     delay = self.base_backoff_delay * (2 ** (attempt - 1))
                     logger.info(
@@ -144,7 +144,7 @@ class ChatService:
                     attempt=attempt,
                     error=str(e)
                 )
-                
+
                 # Don't retry on client errors (4xx), only server errors (5xx)
                 if e.response.status_code >= 500 and attempt < self.max_retries:
                     delay = self.base_backoff_delay * (2 ** (attempt - 1))
@@ -171,7 +171,7 @@ class ChatService:
                     error=str(e),
                     error_type=type(e).__name__
                 )
-                
+
                 # Don't retry on unexpected errors
                 raise
 
@@ -256,7 +256,7 @@ class ChatService:
 
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
-            
+
             if status_code == 400:
                 error_msg = (
                     f"⚠️ **Invalid request (Error {status_code})**\n\n"
@@ -288,7 +288,7 @@ class ChatService:
                     f"❌ **API error (Error {status_code})**\n\n"
                     "An unexpected error occurred. Please try again."
                 )
-            
+
             logger.error(
                 "HTTP status error",
                 status_code=status_code,
@@ -364,7 +364,7 @@ class ChatService:
                 },
                 headers=headers
             )
-            
+
             # Raise exception for bad status codes
             response.raise_for_status()
 

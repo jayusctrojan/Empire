@@ -85,7 +85,7 @@ async def websocket_notifications(
                     await manager.send_personal_message(
                         {
                             "type": "subscription_info",
-                            "message": f"Use /ws/document/{{id}} or /ws/query/{{id}} for resource subscriptions"
+                            "message": "Use /ws/document/{id} or /ws/query/{id} for resource subscriptions"
                         },
                         connection_id
                     )

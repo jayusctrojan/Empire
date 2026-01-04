@@ -212,7 +212,7 @@ class B2StorageService:
                 # Update filename to indicate encryption
                 file_path = f"{folder_path}/{filename}.encrypted"
 
-                logger.info(f"File encrypted successfully")
+                logger.info("File encrypted successfully")
 
             # Prepare metadata
             file_info = metadata or {}

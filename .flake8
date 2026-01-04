@@ -13,7 +13,13 @@ extend-ignore =
     # E402: module level import not at top of file
     E402,
     # F401: imported but unused (handled by autoflake)
-    F401
+    F401,
+    # E128: continuation line under-indented (style preference)
+    E128,
+    # E131: continuation line unaligned (style preference)
+    E131,
+    # C901: function too complex (informational, addressed over time)
+    C901
 
 exclude =
     .git,

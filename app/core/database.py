@@ -96,7 +96,7 @@ class DatabaseManager:
         try:
             client = self.get_supabase()
             # Try a simple query
-            result = client.table("documents").select("id").limit(1).execute()
+            _result = client.table("documents").select("id").limit(1).execute()
             return True
         except Exception as e:
             print(f"❌ Supabase health check failed: {e}")
