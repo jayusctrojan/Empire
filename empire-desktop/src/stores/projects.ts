@@ -64,8 +64,9 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       set({ projects, isLoading: false })
     } catch (err) {
       console.error('Failed to load projects:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load projects'
       set({
-        error: 'Failed to load projects',
+        error: errorMessage,
         isLoading: false,
       })
     }
@@ -84,7 +85,8 @@ export const useProjectsStore = create<ProjectsState>((set, get) => ({
       return project
     } catch (err) {
       console.error('Failed to create project:', err)
-      set({ error: 'Failed to create project' })
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create project'
+      set({ error: errorMessage })
       throw err
     }
   },

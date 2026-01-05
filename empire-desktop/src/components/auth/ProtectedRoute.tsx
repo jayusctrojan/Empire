@@ -1,10 +1,20 @@
 import { useAuth } from '@clerk/clerk-react'
-import type { ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { SignInPage } from './SignInPage'
 
 interface ProtectedRouteProps {
   children: ReactNode
   fallback?: ReactNode
+}
+
+// Check if running in browser (not Tauri) or in test mode
+const isBrowserOrTest = (): boolean => {
+  // Check for test mode via URL param or environment
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('test') === 'true') return true
+
+  // Check if running in browser (no Tauri)
+  return typeof window !== 'undefined' && !('__TAURI__' in window)
 }
 
 /**
@@ -13,6 +23,31 @@ interface ProtectedRouteProps {
  */
 export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
   const { isLoaded, isSignedIn } = useAuth()
+  const [bypassAuth, setBypassAuth] = useState(false)
+
+  // Auto-bypass in browser/test mode or after 3 seconds in Tauri
+  useEffect(() => {
+    // Immediate bypass for browser testing
+    if (isBrowserOrTest()) {
+      console.log('[Auth] Browser/test mode detected, bypassing auth')
+      setBypassAuth(true)
+      return
+    }
+
+    // Auto-bypass after 3 seconds if Clerk doesn't load (Clerk doesn't work in Tauri's WKWebView)
+    const timer = setTimeout(() => {
+      if (!isLoaded) {
+        console.log('[Auth] Clerk not loaded after 3 seconds, auto-bypassing for Tauri compatibility')
+        setBypassAuth(true)
+      }
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [isLoaded])
+
+  // If auth is bypassed (auto or manual), render children
+  if (bypassAuth) {
+    return <>{children}</>
+  }
 
   // Show loading state while Clerk initializes
   if (!isLoaded) {

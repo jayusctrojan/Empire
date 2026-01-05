@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, FolderOpen, MoreVertical, Edit2, Trash2, MessageSquare } from 'lucide-react'
+import { Plus, Search, FolderOpen, MoreVertical, Edit2, Trash2, MessageSquare, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useProjectsStore, DEPARTMENTS } from '@/stores/projects'
 import { useChatStore } from '@/stores/chat'
@@ -274,9 +274,18 @@ function ProjectCard({
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-empire-border">
-        <span className="text-xs text-empire-text-muted">
-          {project.conversationCount} conversation{project.conversationCount !== 1 ? 's' : ''}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1 text-xs text-empire-text-muted">
+            <MessageSquare className="w-3 h-3" />
+            {project.conversationCount}
+          </span>
+          {project.fileCount !== undefined && project.fileCount > 0 && (
+            <span className="flex items-center gap-1 text-xs text-empire-text-muted">
+              <FileText className="w-3 h-3" />
+              {project.fileCount}
+            </span>
+          )}
+        </div>
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -284,7 +293,6 @@ function ProjectCard({
           }}
           className="flex items-center gap-1 text-xs text-empire-primary hover:text-empire-primary/80"
         >
-          <MessageSquare className="w-3 h-3" />
           Open Chat
         </button>
       </div>

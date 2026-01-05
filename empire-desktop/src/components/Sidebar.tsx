@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   Trash2,
+  Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/app'
@@ -70,6 +71,7 @@ export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
   const navItems = [
     { id: 'chats' as const, icon: MessageSquare, label: 'Chats' },
     { id: 'projects' as const, icon: FolderOpen, label: 'Projects' },
+    { id: 'uploads' as const, icon: Upload, label: 'File Uploads' },
     { id: 'settings' as const, icon: Settings, label: 'Settings' },
   ]
 

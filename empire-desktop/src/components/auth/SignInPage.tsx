@@ -33,8 +33,16 @@ export function SignInPage() {
               formFieldInputShowPasswordButton: 'text-gray-400',
               dividerLine: 'bg-white/10',
               dividerText: 'text-gray-500',
-              socialButtonsBlockButton: 'border-white/10 bg-empire-bg text-white hover:bg-white/5',
-              socialButtonsBlockButtonText: 'text-white',
+              socialButtonsBlockButton: 'border-white/20 bg-empire-sidebar hover:bg-white/10',
+              socialButtonsBlockButtonText: 'text-white font-medium',
+              socialButtonsBlockButtonArrow: 'text-white',
+              socialButtonsProviderIcon: 'brightness-0 invert',
+            },
+            variables: {
+              colorText: '#ffffff',
+              colorTextOnPrimaryBackground: '#ffffff',
+              colorTextSecondary: '#9ca3af',
+              colorInputText: '#ffffff',
             },
           }}
           routing="hash"

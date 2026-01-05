@@ -1,13 +1,58 @@
 import Database from '@tauri-apps/plugin-sql'
 import type { Conversation, Message, Project, Settings, Source } from '@/types'
+import { isTauri, MockDatabase } from './tauri-mocks'
 
 let db: Database | null = null
+let isInitializing = false
+let initPromise: Promise<Database> | null = null
 
 export async function getDatabase(): Promise<Database> {
-  if (!db) {
-    db = await Database.load('sqlite:empire.db')
+  if (db) {
+    return db
   }
-  return db
+
+  // Prevent multiple simultaneous initialization attempts
+  if (isInitializing && initPromise) {
+    return initPromise
+  }
+
+  isInitializing = true
+  initPromise = (async () => {
+    try {
+      if (isTauri()) {
+        // Running in Tauri desktop app - use real SQL plugin
+        console.log('[Database] Loading SQLite database (Tauri)...')
+        db = await Database.load('sqlite:empire.db')
+        console.log('[Database] Tauri database loaded successfully')
+      } else {
+        // Running in browser - use mock database (cast to Database type for compatibility)
+        console.log('[Database] Loading mock database (Browser)...')
+        db = await MockDatabase.load('empire.db') as unknown as Database
+        console.log('[Database] Mock database loaded successfully')
+      }
+      return db!
+    } catch (error) {
+      console.error('[Database] Failed to load database:', error)
+      throw new Error(`Database initialization failed: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      isInitializing = false
+    }
+  })()
+
+  return initPromise
+}
+
+// Initialize database early - call this on app startup
+export async function initializeDatabase(): Promise<boolean> {
+  try {
+    console.log('[Database] Initializing database on startup...')
+    await getDatabase()
+    console.log('[Database] Database initialization complete')
+    return true
+  } catch (error) {
+    console.error('[Database] Database initialization failed:', error)
+    return false
+  }
 }
 
 // Helper to generate UUIDs
@@ -169,36 +214,44 @@ export async function updateMessage(
 // ============ Projects ============
 
 export async function getProjects(): Promise<Project[]> {
-  const database = await getDatabase()
+  console.log('[Database] Loading projects...')
 
-  const rows = await database.select<{
-    id: string
-    name: string
-    description: string | null
-    department: string | null
-    instructions: string | null
-    memory_context: string | null
-    created_at: string
-    updated_at: string
-  }[]>('SELECT * FROM projects ORDER BY updated_at DESC')
+  try {
+    const database = await getDatabase()
 
-  // Get conversation counts
-  const counts = await database.select<{ project_id: string; count: number }[]>(
-    'SELECT project_id, COUNT(*) as count FROM conversations WHERE project_id IS NOT NULL GROUP BY project_id'
-  )
-  const countMap = new Map(counts.map(c => [c.project_id, c.count]))
+    const rows = await database.select<{
+      id: string
+      name: string
+      description: string | null
+      department: string | null
+      instructions: string | null
+      memory_context: string | null
+      created_at: string
+      updated_at: string
+    }[]>('SELECT * FROM projects ORDER BY updated_at DESC')
 
-  return rows.map(row => ({
-    id: row.id,
-    name: row.name,
-    description: row.description ?? undefined,
-    department: row.department as Project['department'],
-    instructions: row.instructions ?? undefined,
-    memoryContext: row.memory_context ?? undefined,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-    conversationCount: countMap.get(row.id) ?? 0,
-  }))
+    // Get conversation counts
+    const counts = await database.select<{ project_id: string; count: number }[]>(
+      'SELECT project_id, COUNT(*) as count FROM conversations WHERE project_id IS NOT NULL GROUP BY project_id'
+    )
+    const countMap = new Map(counts.map(c => [c.project_id, c.count]))
+
+    console.log('[Database] Loaded', rows.length, 'projects')
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      description: row.description ?? undefined,
+      department: row.department as Project['department'],
+      instructions: row.instructions ?? undefined,
+      memoryContext: row.memory_context ?? undefined,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      conversationCount: countMap.get(row.id) ?? 0,
+    }))
+  } catch (error) {
+    console.error('[Database] Failed to load projects:', error)
+    throw new Error(`Failed to load projects: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 export async function createProject(
@@ -206,22 +259,31 @@ export async function createProject(
   department?: Project['department'],
   description?: string
 ): Promise<Project> {
-  const database = await getDatabase()
-  const id = generateId()
+  console.log('[Database] Creating project:', { name, department, description })
 
-  await database.execute(
-    'INSERT INTO projects (id, name, department, description) VALUES (?, ?, ?, ?)',
-    [id, name, department ?? null, description ?? null]
-  )
+  try {
+    const database = await getDatabase()
+    const id = generateId()
 
-  return {
-    id,
-    name,
-    description,
-    department: department ?? 'IT & Engineering',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    conversationCount: 0,
+    console.log('[Database] Executing INSERT for project:', id)
+    await database.execute(
+      'INSERT INTO projects (id, name, department, description) VALUES (?, ?, ?, ?)',
+      [id, name, department ?? null, description ?? null]
+    )
+
+    console.log('[Database] Project created successfully:', id)
+    return {
+      id,
+      name,
+      description,
+      department: department ?? 'IT & Engineering',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      conversationCount: 0,
+    }
+  } catch (error) {
+    console.error('[Database] Failed to create project:', error)
+    throw new Error(`Failed to create project: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

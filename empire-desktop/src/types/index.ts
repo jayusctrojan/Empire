@@ -54,7 +54,17 @@ export interface Project {
   createdAt: Date
   updatedAt: Date
   conversationCount: number
+  fileCount?: number
   memoryContext?: string
+}
+
+// Project Files
+export interface ProjectFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  uploadedAt: Date
 }
 
 export type Department =

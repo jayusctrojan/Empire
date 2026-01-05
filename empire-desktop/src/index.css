@@ -92,3 +92,27 @@ body {
 .no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* Clerk Social Button Overrides */
+.cl-socialButtonsBlockButton {
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background-color: var(--color-empire-sidebar) !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.cl-socialButtonsBlockButtonText {
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+.cl-socialButtonsBlockButtonArrow {
+  color: #ffffff !important;
+}
+
+/* Fix for "Last used" badge text */
+.cl-badge {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
