@@ -70,7 +70,8 @@ celery_app = Celery(
         'app.tasks.document_processing',
         'app.tasks.embedding_generation',
         'app.tasks.graph_sync',
-        'app.tasks.crewai_workflows'
+        'app.tasks.crewai_workflows',
+        'app.tasks.source_processing'  # Task 61: Project source processing
     ]
 )
 
@@ -97,11 +98,13 @@ celery_app.conf.update(
     },
 
     # Task routing - default queues by task type
+    # Task 69: Added project sources queue with priority support
     task_routes={
         'app.tasks.document_processing.*': {'queue': 'documents'},
         'app.tasks.embedding_generation.*': {'queue': 'embeddings'},
         'app.tasks.graph_sync.*': {'queue': 'graph'},
         'app.tasks.crewai_workflows.*': {'queue': 'crewai'},
+        'app.tasks.source_processing.*': {'queue': 'project_sources'},  # Task 69: Dedicated queue
         'app.tasks.send_to_dead_letter_queue': {'queue': 'dead_letter'},
         'app.tasks.inspect_dead_letter_queue': {'queue': 'dead_letter'},
         'app.tasks.retry_from_dead_letter_queue': {'queue': 'dead_letter'}
@@ -119,6 +122,79 @@ PRIORITY_HIGH = 7
 PRIORITY_NORMAL = 5
 PRIORITY_LOW = 3
 PRIORITY_BACKGROUND = 1
+
+# Task 69: Project source processing priorities
+# Higher priority for smaller/faster processing tasks
+SOURCE_PRIORITY = {
+    # Fast processing - high priority (don't block queue)
+    "youtube": PRIORITY_HIGH,     # YouTube = fast metadata extraction
+    "website": PRIORITY_HIGH,     # Website = fast scraping
+    "txt": PRIORITY_HIGH,         # Text files = fast processing
+    "md": PRIORITY_HIGH,          # Markdown = fast processing
+    "csv": PRIORITY_HIGH,         # CSV = fast processing
+    "json": PRIORITY_HIGH,        # JSON = fast processing
+    "rtf": PRIORITY_HIGH,         # RTF = fast processing
+
+    # Moderate processing - normal priority
+    "docx": PRIORITY_NORMAL,      # Word docs = moderate processing
+    "doc": PRIORITY_NORMAL,       # Legacy Word = moderate processing
+    "xlsx": PRIORITY_NORMAL,      # Excel = moderate processing
+    "xls": PRIORITY_NORMAL,       # Legacy Excel = moderate processing
+    "pptx": PRIORITY_NORMAL,      # PowerPoint = moderate processing
+    "ppt": PRIORITY_NORMAL,       # Legacy PowerPoint = moderate processing
+    "image": PRIORITY_NORMAL,     # Images = Claude Vision (moderate)
+    "png": PRIORITY_NORMAL,       # PNG images
+    "jpg": PRIORITY_NORMAL,       # JPG images
+    "jpeg": PRIORITY_NORMAL,      # JPEG images
+
+    # Slow processing - low priority (avoid blocking queue)
+    "pdf": PRIORITY_LOW,          # PDF = slower processing (OCR, parsing)
+    "epub": PRIORITY_LOW,         # EPUB = slower processing
+
+    # Very slow processing - background priority (transcription required)
+    "audio": PRIORITY_BACKGROUND, # Audio = Soniox transcription (very slow)
+    "video": PRIORITY_BACKGROUND, # Video = transcription (very slow)
+    "mp3": PRIORITY_BACKGROUND,   # MP3 audio files
+    "wav": PRIORITY_BACKGROUND,   # WAV audio files
+    "m4a": PRIORITY_BACKGROUND,   # M4A audio files
+    "ogg": PRIORITY_BACKGROUND,   # OGG audio files
+    "flac": PRIORITY_BACKGROUND,  # FLAC audio files
+    "mp4": PRIORITY_BACKGROUND,   # MP4 video files
+    "mov": PRIORITY_BACKGROUND,   # MOV video files
+    "avi": PRIORITY_BACKGROUND,   # AVI video files
+    "mkv": PRIORITY_BACKGROUND,   # MKV video files
+    "webm": PRIORITY_BACKGROUND,  # WebM video files
+
+    # Archive files - low priority (need extraction first)
+    "zip": PRIORITY_LOW,          # ZIP archives
+    "tar": PRIORITY_LOW,          # TAR archives
+    "gz": PRIORITY_LOW,           # GZ archives
+    "archive": PRIORITY_LOW,      # Generic archive
+
+    "default": PRIORITY_NORMAL,   # Default priority
+}
+
+
+def get_source_priority(source_type: str, file_type: str = None) -> int:
+    """
+    Get processing priority for a source based on type.
+
+    Task 69: Prioritizes faster-processing sources to prevent queue blocking.
+
+    Args:
+        source_type: Type of source (file, url, youtube)
+        file_type: File extension (pdf, docx, etc.)
+
+    Returns:
+        Priority level (0-9, higher = more urgent)
+    """
+    if source_type == "youtube":
+        return SOURCE_PRIORITY["youtube"]
+    elif source_type == "url":
+        return SOURCE_PRIORITY["website"]
+    elif file_type:
+        return SOURCE_PRIORITY.get(file_type.lower().lstrip('.'), SOURCE_PRIORITY["default"])
+    return SOURCE_PRIORITY["default"]
 
 
 # Task signals for monitoring
