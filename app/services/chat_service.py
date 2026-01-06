@@ -1,19 +1,35 @@
 """
 Empire v7.3 - Chat Service
 Integrates Gradio chat UI with Task 46 LangGraph + Arcade.dev endpoints
+
+Task 65: Project-scoped RAG integration
+- Project-scoped chat using hybrid RAG endpoint
+- Source count display
+- Fallback to global-only when no project sources
 """
 
 import os
 import httpx
 import asyncio
 import json
-from typing import AsyncIterator, Dict, Any, Optional
+from typing import AsyncIterator, Dict, Any, Optional, Tuple
 from anthropic import Anthropic, AsyncAnthropic
+from dataclasses import dataclass
 import structlog
 
 from app.core.langfuse_config import observe
 
 logger = structlog.get_logger(__name__)
+
+
+@dataclass
+class ProjectChatContext:
+    """Context for project-scoped chat"""
+    project_id: str
+    source_count: int = 0
+    ready_source_count: int = 0
+    has_sources: bool = False
+    project_name: Optional[str] = None
 
 
 class ChatService:
@@ -497,6 +513,339 @@ class ChatService:
         else:
             async for chunk in self.direct_claude_stream(message, history):
                 response_parts.append(chunk)
+
+        return "".join(response_parts)
+
+    # =========================================================================
+    # Task 65: Project-Scoped Chat Methods
+    # =========================================================================
+
+    async def get_project_context(
+        self,
+        project_id: str,
+        user_id: str,
+        auth_token: Optional[str] = None
+    ) -> ProjectChatContext:
+        """
+        Get project context including source counts for display.
+
+        Args:
+            project_id: Project ID
+            user_id: User ID
+            auth_token: Authentication token
+
+        Returns:
+            ProjectChatContext with source information
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                headers = {"Content-Type": "application/json"}
+                if auth_token:
+                    headers["Authorization"] = f"Bearer {auth_token}"
+
+                # Get project stats
+                response = await client.get(
+                    f"{self.api_base_url}/api/projects/{project_id}/sources/stats",
+                    headers=headers
+                )
+
+                if response.status_code == 200:
+                    stats = response.json()
+                    ready_count = stats.get("ready_count", 0)
+                    total_count = stats.get("total_sources", 0)
+
+                    return ProjectChatContext(
+                        project_id=project_id,
+                        source_count=total_count,
+                        ready_source_count=ready_count,
+                        has_sources=ready_count > 0,
+                        project_name=stats.get("project_name")
+                    )
+                else:
+                    logger.warning(
+                        "Failed to get project stats",
+                        project_id=project_id,
+                        status_code=response.status_code
+                    )
+
+        except Exception as e:
+            logger.error(
+                "Error getting project context",
+                project_id=project_id,
+                error=str(e)
+            )
+
+        # Return default context on error
+        return ProjectChatContext(
+            project_id=project_id,
+            source_count=0,
+            ready_source_count=0,
+            has_sources=False
+        )
+
+    @observe(name="stream_project_chat_response")
+    async def stream_project_chat_response(
+        self,
+        message: str,
+        project_id: str,
+        history: list[list[str]],
+        auth_token: Optional[str] = None,
+        include_global_kb: bool = True,
+        enable_query_expansion: bool = True,
+    ) -> AsyncIterator[str]:
+        """
+        Stream project-scoped chat response using hybrid RAG.
+
+        Uses the project RAG endpoint which searches:
+        1. Project sources (files, URLs, YouTube) with weight 1.0
+        2. Global knowledge base with weight 0.7 (if enabled)
+
+        Args:
+            message: User's query
+            project_id: Project ID for scoping
+            history: Chat history
+            auth_token: Authentication token
+            include_global_kb: Include global knowledge base (default: True)
+            enable_query_expansion: Use query expansion (default: True)
+
+        Yields:
+            Response tokens with project-scoped citations
+        """
+        # Get project context first
+        context = await self.get_project_context(
+            project_id=project_id,
+            user_id="",  # Will be extracted from token
+            auth_token=auth_token
+        )
+
+        # Show appropriate loading message
+        if context.has_sources:
+            yield f"🔍 Searching {context.ready_source_count} project source(s) + global knowledge...\n\n"
+        else:
+            yield "🔍 No project sources available, searching global knowledge base...\n\n"
+
+        try:
+            # Use project RAG endpoint if sources available, otherwise fallback
+            if context.has_sources:
+                result = await self._retry_with_backoff(
+                    self._make_project_rag_request,
+                    "project_rag_query",
+                    project_id,
+                    message,
+                    auth_token,
+                    include_global_kb,
+                    enable_query_expansion
+                )
+            else:
+                # Fallback to global-only query
+                logger.info(
+                    "No project sources, falling back to global query",
+                    project_id=project_id
+                )
+                result = await self._retry_with_backoff(
+                    self._make_api_request,
+                    "global_fallback_query",
+                    "/api/query/auto",
+                    message,
+                    3,  # max_iterations
+                    auth_token
+                )
+
+            yield result
+
+        except httpx.TimeoutException as e:
+            error_msg = (
+                "⏱️ **Query took too long. Try a simpler question.**\n\n"
+                "The request exceeded the time limit. Consider asking about "
+                "specific topics from your project sources."
+            )
+            logger.error("Project chat timeout", project_id=project_id, error=str(e))
+            yield error_msg
+
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            if status_code == 404:
+                error_msg = (
+                    "🔍 **Project not found**\n\n"
+                    "The project may have been deleted or you don't have access."
+                )
+            elif status_code == 403:
+                error_msg = (
+                    "🔐 **Access denied**\n\n"
+                    "You don't have permission to query this project."
+                )
+            else:
+                error_msg = f"❌ **Error ({status_code})**\n\nFailed to query project sources."
+
+            logger.error("Project chat HTTP error", project_id=project_id, status_code=status_code)
+            yield error_msg
+
+        except Exception as e:
+            error_msg = (
+                f"❌ **Error: {type(e).__name__}**\n\n"
+                f"Failed to query project sources. Please try again.\n\n"
+                f"*Technical details: {str(e)}*"
+            )
+            logger.error("Project chat error", project_id=project_id, error=str(e))
+            yield error_msg
+
+    async def _make_project_rag_request(
+        self,
+        project_id: str,
+        message: str,
+        auth_token: Optional[str],
+        include_global_kb: bool,
+        enable_query_expansion: bool
+    ) -> str:
+        """
+        Make request to project RAG endpoint.
+
+        Args:
+            project_id: Project ID
+            message: User query
+            auth_token: Auth token
+            include_global_kb: Include global KB
+            enable_query_expansion: Use query expansion
+
+        Returns:
+            Formatted response string
+        """
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            headers = {"Content-Type": "application/json"}
+            if auth_token:
+                headers["Authorization"] = f"Bearer {auth_token}"
+
+            response = await client.post(
+                f"{self.api_base_url}/api/projects/{project_id}/rag/query",
+                json={
+                    "query": message,
+                    "include_global_kb": include_global_kb,
+                    "enable_query_expansion": enable_query_expansion,
+                    "project_source_limit": 8,
+                    "global_kb_limit": 5,
+                },
+                headers=headers
+            )
+
+            response.raise_for_status()
+
+            try:
+                result = response.json()
+            except json.JSONDecodeError as e:
+                logger.error("Failed to parse project RAG response", error=str(e))
+                raise
+
+            # Extract answer with citations
+            answer = result.get("answer", "No answer provided")
+
+            # Format response
+            formatted = f"{answer}\n\n"
+
+            # Task 66: Add formatted citation display section
+            citations = result.get("citations", [])
+            if citations:
+                formatted += "---\n"
+                formatted += "**📚 Sources:**\n"
+                for citation in citations:
+                    marker = citation.get("citation_marker", "")
+                    title = citation.get("title", "Unknown")
+                    file_type = citation.get("file_type", "").upper() if citation.get("file_type") else ""
+                    page_num = citation.get("page_number")
+                    timestamp = citation.get("youtube_timestamp")
+                    link_url = citation.get("link_url")
+
+                    # Build source line with type icon
+                    type_icon = self._get_source_type_icon(file_type.lower() if file_type else "")
+                    source_line = f"  {marker} {type_icon} **{title}**"
+
+                    # Add page or timestamp info
+                    if file_type == "PDF" and page_num:
+                        source_line += f" (p.{page_num})"
+                    elif file_type == "YOUTUBE" and timestamp:
+                        source_line += f" ({self._format_timestamp(timestamp)})"
+
+                    # Add link if available
+                    if link_url and file_type in ["YOUTUBE", "WEBSITE"]:
+                        source_line += f" — [Open]({link_url})"
+
+                    formatted += source_line + "\n"
+
+                formatted += "\n"
+
+            # Add source metadata summary
+            project_count = result.get("project_sources_count", 0)
+            global_count = result.get("global_sources_count", 0)
+
+            if project_count > 0 or global_count > 0:
+                formatted += f"*{project_count} project source(s), {global_count} global source(s) used*\n"
+
+            # Add processing time
+            if "query_time_ms" in result:
+                time_s = result["query_time_ms"] / 1000
+                formatted += f"*Query time: {time_s:.2f}s*\n"
+
+            logger.info(
+                "Project RAG request successful",
+                project_id=project_id,
+                project_sources=project_count,
+                global_sources=global_count,
+                citations=len(citations)
+            )
+
+            return formatted
+
+    def _get_source_type_icon(self, file_type: str) -> str:
+        """Get icon for source type (Task 66)"""
+        icons = {
+            "pdf": "📄",
+            "docx": "📝",
+            "doc": "📝",
+            "xlsx": "📊",
+            "xls": "📊",
+            "pptx": "📽️",
+            "ppt": "📽️",
+            "youtube": "🎥",
+            "website": "🌐",
+            "txt": "📃",
+            "md": "📋",
+            "csv": "📈",
+        }
+        return icons.get(file_type.lower(), "📎")
+
+    def _format_timestamp(self, seconds: int) -> str:
+        """Format seconds as MM:SS or HH:MM:SS (Task 66)"""
+        if seconds < 3600:
+            return f"{seconds // 60}:{seconds % 60:02d}"
+        return f"{seconds // 3600}:{(seconds % 3600) // 60:02d}:{seconds % 60:02d}"
+
+    async def get_project_chat_response(
+        self,
+        message: str,
+        project_id: str,
+        history: list[list[str]],
+        auth_token: Optional[str] = None
+    ) -> str:
+        """
+        Get complete project-scoped chat response (non-streaming).
+
+        Args:
+            message: User's message
+            project_id: Project ID
+            history: Chat history
+            auth_token: Auth token
+
+        Returns:
+            Complete response string
+        """
+        response_parts = []
+
+        async for chunk in self.stream_project_chat_response(
+            message=message,
+            project_id=project_id,
+            history=history,
+            auth_token=auth_token
+        ):
+            response_parts.append(chunk)
 
         return "".join(response_parts)
 
