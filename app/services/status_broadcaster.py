@@ -726,6 +726,95 @@ class SyncStatusBroadcaster:
             metadata=metadata
         ))
 
+    def broadcast_source_status(
+        self,
+        source_id: str,
+        project_id: str,
+        status: str,
+        progress: int,
+        message: str,
+        source_type: Optional[str] = None,
+        file_name: Optional[str] = None,
+        estimated_time_remaining: Optional[float] = None,
+        error_message: Optional[str] = None,
+        retry_count: int = 0,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Broadcast source processing status update via WebSocket - Task 62
+
+        This sends status updates to:
+        - Subscribers of the specific source (/ws/source/{source_id})
+        - Subscribers of the project's sources (/ws/project/{project_id}/sources)
+
+        Args:
+            source_id: Source UUID
+            project_id: Project UUID
+            status: Source status (pending, processing, ready, failed)
+            progress: Progress percentage (0-100)
+            message: Human-readable status message
+            source_type: Type of source (pdf, url, youtube, etc.)
+            file_name: Original file name or URL
+            estimated_time_remaining: Estimated seconds remaining
+            error_message: Error message if status is failed
+            retry_count: Number of retry attempts
+            metadata: Additional metadata
+        """
+        try:
+            from app.services.websocket_manager import get_connection_manager
+
+            manager = get_connection_manager()
+
+            notification = {
+                "type": "source_status",
+                "source_id": source_id,
+                "project_id": project_id,
+                "status": status,
+                "progress": progress,
+                "message": message,
+                "source_type": source_type,
+                "file_name": file_name,
+                "estimated_time_remaining": estimated_time_remaining,
+                "error_message": error_message,
+                "retry_count": retry_count,
+                "metadata": metadata or {},
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+            # Use the async method via the sync wrapper
+            self._run_async(
+                manager.send_source_status(
+                    source_id=source_id,
+                    project_id=project_id,
+                    status=status,
+                    progress=progress,
+                    message=message,
+                    metadata={
+                        "source_type": source_type,
+                        "file_name": file_name,
+                        "estimated_time_remaining": estimated_time_remaining,
+                        "error_message": error_message,
+                        "retry_count": retry_count,
+                        **(metadata or {})
+                    }
+                )
+            )
+
+            logger.debug(
+                "source_status_broadcast_sent",
+                source_id=source_id,
+                project_id=project_id,
+                status=status,
+                progress=progress
+            )
+
+        except Exception as e:
+            logger.error(
+                "source_status_broadcast_failed",
+                source_id=source_id,
+                error=str(e)
+            )
+
 
 # Global singleton instances
 _status_broadcaster: Optional[StatusBroadcaster] = None

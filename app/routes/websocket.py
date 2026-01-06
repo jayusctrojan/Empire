@@ -283,6 +283,197 @@ async def websocket_query_status(
         )
 
 
+@router.websocket("/source/{source_id}")
+async def websocket_source_status(
+    websocket: WebSocket,
+    source_id: str,
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None
+):
+    """
+    WebSocket endpoint for individual source processing status updates - Task 62
+
+    Clients can connect to receive real-time updates for a specific source:
+    - Processing progress (0-100%)
+    - Processing stages (pending, processing, ready, failed)
+    - Error notifications with retry options
+    - Estimated time remaining
+
+    Args:
+        websocket: WebSocket connection
+        source_id: Source identifier to subscribe to
+        session_id: Optional session identifier
+        user_id: Optional authenticated user identifier
+    """
+    connection_id = str(uuid.uuid4())
+    manager = get_connection_manager()
+
+    try:
+        # Connect WebSocket with source subscription
+        await manager.connect(
+            websocket=websocket,
+            connection_id=connection_id,
+            session_id=session_id,
+            user_id=user_id,
+            source_id=source_id,
+            connection_type="source"
+        )
+
+        logger.info(
+            "websocket_source_connected",
+            connection_id=connection_id,
+            source_id=source_id,
+            session_id=session_id,
+            user_id=user_id
+        )
+
+        # Send connection confirmation with subscription details
+        await manager.send_personal_message(
+            {
+                "type": "subscription_confirmed",
+                "resource_type": "source",
+                "resource_id": source_id,
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            connection_id
+        )
+
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                data = await websocket.receive_json()
+
+                # Handle client ping
+                if data.get("type") == "ping":
+                    await manager.send_personal_message(
+                        {"type": "pong", "timestamp": datetime.utcnow().isoformat()},
+                        connection_id
+                    )
+
+            except WebSocketDisconnect:
+                break
+
+    except Exception as e:
+        logger.error(
+            "websocket_source_error",
+            connection_id=connection_id,
+            source_id=source_id,
+            error=str(e)
+        )
+    finally:
+        # Cleanup connection
+        await manager.disconnect(connection_id)
+        logger.info(
+            "websocket_source_disconnected",
+            connection_id=connection_id,
+            source_id=source_id
+        )
+
+
+@router.websocket("/project/{project_id}/sources")
+async def websocket_project_sources_status(
+    websocket: WebSocket,
+    project_id: str,
+    session_id: Optional[str] = None,
+    user_id: Optional[str] = None
+):
+    """
+    WebSocket endpoint for all sources in a project - Task 62
+
+    Clients can connect to receive real-time updates for all sources in a project:
+    - New source added notifications
+    - Source processing status changes
+    - Source deletion notifications
+    - Batch processing progress
+
+    Visual indicators sent:
+    - green ● ready
+    - blue ◐ processing+%
+    - gray ○ pending
+    - red ✕ failed+retry
+
+    Args:
+        websocket: WebSocket connection
+        project_id: Project identifier to subscribe to
+        session_id: Optional session identifier
+        user_id: Optional authenticated user identifier
+    """
+    connection_id = str(uuid.uuid4())
+    manager = get_connection_manager()
+
+    try:
+        # Connect WebSocket with project sources subscription
+        await manager.connect(
+            websocket=websocket,
+            connection_id=connection_id,
+            session_id=session_id,
+            user_id=user_id,
+            project_id=project_id,
+            connection_type="project_sources"
+        )
+
+        logger.info(
+            "websocket_project_sources_connected",
+            connection_id=connection_id,
+            project_id=project_id,
+            session_id=session_id,
+            user_id=user_id
+        )
+
+        # Send connection confirmation with subscription details
+        await manager.send_personal_message(
+            {
+                "type": "subscription_confirmed",
+                "resource_type": "project_sources",
+                "resource_id": project_id,
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            connection_id
+        )
+
+        # Keep connection alive and handle incoming messages
+        while True:
+            try:
+                data = await websocket.receive_json()
+
+                # Handle client ping
+                if data.get("type") == "ping":
+                    await manager.send_personal_message(
+                        {"type": "pong", "timestamp": datetime.utcnow().isoformat()},
+                        connection_id
+                    )
+
+                # Handle refresh request (full sources sync on reconnect)
+                elif data.get("type") == "refresh":
+                    await manager.send_personal_message(
+                        {
+                            "type": "refresh_ack",
+                            "message": "Use GET /api/projects/{project_id}/sources for full refresh",
+                            "timestamp": datetime.utcnow().isoformat()
+                        },
+                        connection_id
+                    )
+
+            except WebSocketDisconnect:
+                break
+
+    except Exception as e:
+        logger.error(
+            "websocket_project_sources_error",
+            connection_id=connection_id,
+            project_id=project_id,
+            error=str(e)
+        )
+    finally:
+        # Cleanup connection
+        await manager.disconnect(connection_id)
+        logger.info(
+            "websocket_project_sources_disconnected",
+            connection_id=connection_id,
+            project_id=project_id
+        )
+
+
 @router.get("/stats")
 async def websocket_stats():
     """

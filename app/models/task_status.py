@@ -41,6 +41,7 @@ class TaskType(str, Enum):
     QUERY_PROCESSING = "query_processing"
     BATCH_OPERATION = "batch_operation"
     HEALTH_CHECK = "health_check"
+    SOURCE_PROCESSING = "source_processing"  # Task 61: Project source processing
     GENERIC = "generic"
 
 

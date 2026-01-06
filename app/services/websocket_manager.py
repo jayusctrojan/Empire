@@ -82,6 +82,12 @@ class ConnectionManager:
         self.document_connections: Dict[str, Set[str]] = {}
         self.query_connections: Dict[str, Set[str]] = {}
 
+        # Task 62: Project source subscriptions
+        # {source_id: Set[connection_id]}
+        self.source_connections: Dict[str, Set[str]] = {}
+        # {project_id: Set[connection_id]} - for all sources in a project
+        self.project_source_connections: Dict[str, Set[str]] = {}
+
         # Connection metadata tracking
         self.connection_metadata: Dict[str, Dict[str, Any]] = {}
 
@@ -110,6 +116,8 @@ class ConnectionManager:
         user_id: Optional[str] = None,
         document_id: Optional[str] = None,
         query_id: Optional[str] = None,
+        source_id: Optional[str] = None,
+        project_id: Optional[str] = None,
         connection_type: str = "general"
     ):
         """
@@ -122,7 +130,9 @@ class ConnectionManager:
             user_id: Optional user identifier (for authenticated users)
             document_id: Optional document ID to subscribe to - Task 10.1
             query_id: Optional query ID to subscribe to - Task 10.1
-            connection_type: Connection type for metrics (general, document, query)
+            source_id: Optional source ID to subscribe to - Task 62
+            project_id: Optional project ID to subscribe to all sources - Task 62
+            connection_type: Connection type for metrics (general, document, query, source)
         """
         try:
             await websocket.accept()
@@ -154,12 +164,25 @@ class ConnectionManager:
                         self.query_connections[query_id] = set()
                     self.query_connections[query_id].add(connection_id)
 
+                # Register source subscriptions - Task 62
+                if source_id:
+                    if source_id not in self.source_connections:
+                        self.source_connections[source_id] = set()
+                    self.source_connections[source_id].add(connection_id)
+
+                if project_id:
+                    if project_id not in self.project_source_connections:
+                        self.project_source_connections[project_id] = set()
+                    self.project_source_connections[project_id].add(connection_id)
+
                 # Store connection metadata
                 self.connection_metadata[connection_id] = {
                     "session_id": session_id,
                     "user_id": user_id,
                     "document_id": document_id,
                     "query_id": query_id,
+                    "source_id": source_id,
+                    "project_id": project_id,
                     "connection_type": connection_type,
                     "connected_at": datetime.utcnow().isoformat()
                 }
@@ -175,6 +198,8 @@ class ConnectionManager:
                 user_id=user_id,
                 document_id=document_id,
                 query_id=query_id,
+                source_id=source_id,
+                project_id=project_id,
                 connection_type=connection_type,
                 total_connections=len(self.active_connections)
             )
@@ -213,6 +238,8 @@ class ConnectionManager:
             user_id = metadata.get("user_id")
             document_id = metadata.get("document_id")
             query_id = metadata.get("query_id")
+            source_id = metadata.get("source_id")
+            project_id = metadata.get("project_id")
             connection_type = metadata.get("connection_type", "general")
 
             # Remove from active connections
@@ -241,6 +268,17 @@ class ConnectionManager:
                 self.query_connections[query_id].discard(connection_id)
                 if not self.query_connections[query_id]:
                     del self.query_connections[query_id]
+
+            # Cleanup source subscriptions - Task 62
+            if source_id and source_id in self.source_connections:
+                self.source_connections[source_id].discard(connection_id)
+                if not self.source_connections[source_id]:
+                    del self.source_connections[source_id]
+
+            if project_id and project_id in self.project_source_connections:
+                self.project_source_connections[project_id].discard(connection_id)
+                if not self.project_source_connections[project_id]:
+                    del self.project_source_connections[project_id]
 
             # Cleanup metadata
             if connection_id in self.connection_metadata:
@@ -518,6 +556,102 @@ class ConnectionManager:
             message_type=message.get("type")
         )
 
+    async def send_to_source(self, message: dict, source_id: str):
+        """
+        Send a message to all connections subscribed to a source - Task 62
+
+        Args:
+            message: Message dictionary to send
+            source_id: Target source ID
+        """
+        if source_id not in self.source_connections:
+            logger.debug(
+                "no_source_subscribers",
+                source_id=source_id,
+                message_type=message.get("type")
+            )
+            return
+
+        connection_ids = self.source_connections[source_id].copy()
+        for connection_id in connection_ids:
+            await self.send_personal_message(message, connection_id)
+
+        logger.info(
+            "message_sent_to_source_subscribers",
+            source_id=source_id,
+            connection_count=len(connection_ids),
+            message_type=message.get("type")
+        )
+
+    async def send_to_project_sources(self, message: dict, project_id: str):
+        """
+        Send a message to all connections subscribed to a project's sources - Task 62
+
+        Args:
+            message: Message dictionary to send
+            project_id: Target project ID
+        """
+        if project_id not in self.project_source_connections:
+            logger.debug(
+                "no_project_source_subscribers",
+                project_id=project_id,
+                message_type=message.get("type")
+            )
+            return
+
+        connection_ids = self.project_source_connections[project_id].copy()
+        for connection_id in connection_ids:
+            await self.send_personal_message(message, connection_id)
+
+        logger.info(
+            "message_sent_to_project_source_subscribers",
+            project_id=project_id,
+            connection_count=len(connection_ids),
+            message_type=message.get("type")
+        )
+
+    async def send_source_status(
+        self,
+        source_id: str,
+        project_id: str,
+        status: str,
+        progress: int,
+        message: str,
+        metadata: Optional[dict] = None
+    ):
+        """
+        Send a source status update to all relevant subscribers - Task 62
+
+        Sends to:
+        - Subscribers of the specific source
+        - Subscribers of the project's sources
+        - The user who owns the source
+
+        Args:
+            source_id: Source ID
+            project_id: Project ID
+            status: Source status (pending, processing, ready, failed)
+            progress: Progress percentage (0-100)
+            message: Human-readable status message
+            metadata: Optional additional metadata
+        """
+        notification = {
+            "type": "source_status",
+            "source_id": source_id,
+            "project_id": project_id,
+            "status": status,
+            "progress": progress,
+            "message": message,
+            "metadata": metadata or {},
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        # Send to source subscribers
+        await self.send_to_source(notification, source_id)
+
+        # Send to project source subscribers
+        await self.send_to_project_sources(notification, project_id)
+
     async def initialize_redis_pubsub(self):
         """
         Initialize Redis Pub/Sub for distributed WebSocket broadcasting - Task 10.3
@@ -604,6 +738,16 @@ class ConnectionManager:
                 user_id = message.get("user_id")
                 if user_id:
                     await self.send_to_user(message, user_id)
+
+            elif target_type == "source":
+                source_id = message.get("source_id")
+                if source_id:
+                    await self.send_to_source(message, source_id)
+
+            elif target_type == "project_sources":
+                project_id = message.get("project_id")
+                if project_id:
+                    await self.send_to_project_sources(message, project_id)
 
             else:
                 # Broadcast to all local connections
