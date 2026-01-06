@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   MessageSquare,
   Plus,
-  Trash2,
   MoreVertical,
   RefreshCw,
   Lock,
@@ -11,33 +10,14 @@ import {
   Check,
   X,
   Pencil,
+  Trash2,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useProjectsStore } from '@/stores/projects'
 import { useChatStore } from '@/stores/chat'
 import { useAppStore } from '@/stores/app'
-import type { Project, Conversation, ProjectFile } from '@/types'
-import { get, del, postFormData } from '@/lib/api'
-
-// File type badge colors
-const FILE_TYPE_COLORS: Record<string, string> = {
-  md: 'bg-blue-500/20 text-blue-400',
-  py: 'bg-yellow-500/20 text-yellow-400',
-  js: 'bg-yellow-500/20 text-yellow-400',
-  ts: 'bg-blue-500/20 text-blue-400',
-  tsx: 'bg-blue-500/20 text-blue-400',
-  jsx: 'bg-yellow-500/20 text-yellow-400',
-  json: 'bg-green-500/20 text-green-400',
-  txt: 'bg-gray-500/20 text-gray-400',
-  pdf: 'bg-red-500/20 text-red-400',
-  doc: 'bg-blue-500/20 text-blue-400',
-  docx: 'bg-blue-500/20 text-blue-400',
-  csv: 'bg-green-500/20 text-green-400',
-  default: 'bg-gray-500/20 text-gray-400',
-}
-
-// Max project capacity in bytes (100MB)
-const MAX_PROJECT_CAPACITY = 100 * 1024 * 1024
+import type { Project, Conversation } from '@/types'
+import { get } from '@/lib/api'
+import { SourcesSection } from './projects'
 
 interface ProjectDetailViewProps {
   project: Project
@@ -48,11 +28,6 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
   // Conversations state
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
-
-  // Files state
-  const [files, setFiles] = useState<ProjectFile[]>([])
-  const [isLoadingFiles, setIsLoadingFiles] = useState(false)
-  const [totalFileSize, setTotalFileSize] = useState(0)
 
   // Memory & Instructions state
   const [instructions, setInstructions] = useState(project.instructions || '')
@@ -72,8 +47,6 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
   const { setActiveConversation, setActiveProject } = useChatStore()
   const { setActiveView } = useAppStore()
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   // Load conversations
   const loadConversations = useCallback(async () => {
     setIsLoadingConversations(true)
@@ -88,26 +61,6 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
       console.error('Failed to load conversations:', err)
     } finally {
       setIsLoadingConversations(false)
-    }
-  }, [project.id])
-
-  // Load files
-  const loadFiles = useCallback(async () => {
-    setIsLoadingFiles(true)
-    try {
-      const response = await get<{ data: ProjectFile[] }>(
-        `/api/projects/${project.id}/files`
-      )
-      if (response?.data) {
-        setFiles(response.data)
-        const total = response.data.reduce((sum, f) => sum + f.size, 0)
-        setTotalFileSize(total)
-      }
-    } catch (err) {
-      console.error('Failed to load files:', err)
-      setFiles([])
-    } finally {
-      setIsLoadingFiles(false)
     }
   }, [project.id])
 
@@ -134,39 +87,6 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
       console.error('Failed to save memory:', err)
     } finally {
       setIsSaving(false)
-    }
-  }
-
-  // Handle file upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const uploadedFiles = e.target.files
-    if (!uploadedFiles?.length) return
-
-    const formData = new FormData()
-    formData.append('project_id', project.id)
-    for (const file of uploadedFiles) {
-      formData.append('files', file)
-    }
-
-    try {
-      await postFormData('/api/documents/upload', formData)
-      loadFiles()
-    } catch (err) {
-      console.error('Failed to upload files:', err)
-    }
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
-
-  // Delete file
-  const handleDeleteFile = async (fileId: string) => {
-    try {
-      await del(`/api/projects/${project.id}/files/${fileId}`)
-      setFiles((prev) => prev.filter((f) => f.id !== fileId))
-    } catch (err) {
-      console.error('Failed to delete file:', err)
     }
   }
 
@@ -210,31 +130,10 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showMenu])
 
-  // Get file extension
-  const getFileExtension = (filename: string): string => {
-    const parts = filename.split('.')
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : ''
-  }
-
-  // Get file type color
-  const getFileTypeColor = (filename: string): string => {
-    const ext = getFileExtension(filename)
-    return FILE_TYPE_COLORS[ext] || FILE_TYPE_COLORS.default
-  }
-
-  // Estimate line count
-  const estimateLineCount = (bytes: number): number => {
-    return Math.max(1, Math.round(bytes / 50))
-  }
-
-  // Calculate capacity percentage
-  const capacityPercentage = Math.min(100, (totalFileSize / MAX_PROJECT_CAPACITY) * 100)
-
   // Load data on mount
   useEffect(() => {
     loadConversations()
-    loadFiles()
-  }, [loadConversations, loadFiles])
+  }, [loadConversations])
 
   return (
     <div className="flex flex-col h-full bg-empire-bg">
@@ -504,91 +403,8 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
             )}
           </div>
 
-          {/* Files Section */}
-          <div className="rounded-xl border border-empire-border bg-empire-card p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-medium text-empire-text">Files</h2>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 rounded hover:bg-empire-border transition-colors"
-                aria-label="Add files"
-              >
-                <Plus className="w-5 h-5 text-empire-text-muted" />
-              </button>
-            </div>
-
-            {/* Capacity Progress Bar */}
-            <div className="mb-4">
-              <div className="h-1.5 bg-empire-border rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-empire-primary rounded-full transition-all duration-300"
-                  style={{ width: `${Math.max(1, capacityPercentage)}%` }}
-                />
-              </div>
-              <p className="text-xs text-empire-text-muted mt-2">
-                {capacityPercentage.toFixed(0)}% of project capacity used
-              </p>
-            </div>
-
-            {/* Files Grid */}
-            {isLoadingFiles ? (
-              <div className="flex items-center justify-center h-20">
-                <RefreshCw className="w-5 h-5 text-empire-text-muted animate-spin" />
-              </div>
-            ) : files.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-20 text-empire-text-muted">
-                <p className="text-sm">No files uploaded</p>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mt-1 text-sm text-empire-primary hover:text-empire-primary/80"
-                >
-                  Add files
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {files.map((file) => {
-                  const ext = getFileExtension(file.name)
-                  const lineCount = estimateLineCount(file.size)
-                  return (
-                    <div
-                      key={file.id}
-                      className="group relative rounded-lg border border-empire-border bg-empire-sidebar p-3 hover:border-empire-primary/50 transition-colors"
-                    >
-                      <button
-                        onClick={() => handleDeleteFile(file.id)}
-                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 transition-all"
-                        aria-label="Delete file"
-                      >
-                        <Trash2 className="w-3 h-3 text-red-500" />
-                      </button>
-                      <p className="text-xs font-medium text-empire-text truncate pr-5 mb-1">
-                        {file.name}
-                      </p>
-                      <p className="text-xs text-empire-text-muted mb-2">
-                        {lineCount} lines
-                      </p>
-                      <span
-                        className={cn(
-                          'inline-block px-1.5 py-0.5 rounded text-[10px] font-medium uppercase',
-                          getFileTypeColor(file.name)
-                        )}
-                      >
-                        {ext || 'FILE'}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+          {/* Sources Section */}
+          <SourcesSection projectId={project.id} />
         </div>
       </div>
     </div>

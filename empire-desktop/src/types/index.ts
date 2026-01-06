@@ -67,6 +67,48 @@ export interface ProjectFile {
   uploadedAt: Date
 }
 
+// Project Sources (NotebookLM-style)
+export type SourceType = 'file' | 'url' | 'youtube'
+export type SourceStatus = 'pending' | 'processing' | 'ready' | 'failed'
+
+export interface ProjectSource {
+  id: string
+  projectId: string
+  title: string
+  sourceType: SourceType
+  url?: string
+  filePath?: string
+  fileName?: string
+  fileSize?: number
+  mimeType?: string
+  status: SourceStatus
+  processingProgress: number
+  processingError?: string
+  retryCount: number
+  summary?: string
+  metadata?: {
+    duration?: string       // YouTube video duration
+    channel?: string        // YouTube channel
+    author?: string         // Web article author
+    publishDate?: string    // Publish date
+    pageCount?: number      // PDF page count
+    thumbnailUrl?: string   // YouTube thumbnail
+    chapters?: Array<{ title: string; timestamp: string }>
+  }
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Source status update event (WebSocket)
+export interface SourceStatusUpdate {
+  type: 'source_status'
+  sourceId: string
+  projectId: string
+  status: SourceStatus
+  progress: number
+  error?: string
+}
+
 export type Department =
   | 'IT & Engineering'
   | 'Sales & Marketing'

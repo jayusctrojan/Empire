@@ -15,6 +15,21 @@ export {
   getDocumentDownloadUrl,
 } from './documents'
 
+// Project Sources API
+export {
+  listSources,
+  getSource,
+  addFileSources,
+  addUrlSources,
+  deleteSource,
+  retrySource,
+  getCapacity,
+  detectUrlType,
+  isValidUrl,
+  type SourceSortField,
+  type SortOrder,
+} from './sources'
+
 // Query API (streaming)
 export { queryStream, query, collectStreamResponse } from './query'
 
