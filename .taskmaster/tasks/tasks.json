@@ -2716,843 +2716,171 @@
   "v7_3_features": {
     "tasks": [
       {
-        "id": "48",
-        "title": "Setup Tauri 2.0 Project with React 18 + TypeScript",
-        "description": "Initialize Tauri 2.0 desktop app with React 18 frontend, TypeScript, TailwindCSS, and shadcn/ui following PRD tech stack",
-        "details": "Use `create-tauri-app@2.0.0` with React template: `npm create tauri-app@latest -- --template react-ts`. Install React 18.3.1, TailwindCSS 3.4.17, shadcn/ui@0.9.0, Zustand 5.0.0-rc.2 for state management. Configure `tailwind.config.js` with Claude Desktop color scheme: --bg-primary #1a1a1a, --accent #e07850. Setup Rust backend with `tauri-plugin-sql` for SQLite. Enable macOS WKWebView. Binary target: ~10-15MB.",
-        "testStrategy": "Verify Tauri dev server launches on macOS (<2s), check Tailwind theme colors match spec, confirm shadcn/ui components render, test Rust-TS IPC with simple ping/pong.",
+        "id": "59",
+        "title": "Create project_sources database table",
+        "description": "Design and implement the new project_sources table in Supabase with RLS policies for project-scoped source management",
+        "details": "CREATE TABLE project_sources (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), project_id UUID REFERENCES projects(id) ON DELETE CASCADE, user_id UUID REFERENCES auth.users(id), source_type TEXT CHECK (source_type IN ('file','url','youtube')), source_url TEXT, file_name TEXT, file_size BIGINT, status TEXT CHECK (status IN ('pending','processing','ready','failed')) DEFAULT 'pending', progress INTEGER DEFAULT 0, error_message TEXT, metadata JSONB, content_length INTEGER, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()); Add RLS policies: ENABLE RLS; CREATE POLICY 'Users can view own project sources' ON project_sources FOR SELECT USING (auth.uid() = user_id); CREATE POLICY 'Users can insert own project sources' ON project_sources FOR INSERT WITH CHECK (auth.uid() = user_id); CREATE POLICY 'Users can update own project sources' ON project_sources FOR UPDATE USING (auth.uid() = user_id); Add indexes: CREATE INDEX idx_project_sources_project_id_status ON project_sources(project_id, status); CREATE INDEX idx_project_sources_user_id ON project_sources(user_id);",
+        "testStrategy": "Verify table creation with schema inspection, test RLS by inserting/updating as different users, confirm ON DELETE CASCADE removes sources when project deleted, validate CHECK constraints reject invalid status/source_type values",
         "priority": "high",
         "dependencies": [],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Initialize Tauri 2.0 Project with React TypeScript Template",
-            "description": "Create new Tauri 2.0 app using create-tauri-app with React TypeScript template and install initial dependencies.",
-            "dependencies": [],
-            "details": "Run `npm create tauri-app@latest -- --template react-ts` in new project directory. Choose project name and bundle ID. Navigate to project folder and run `npm install` followed by `npm run tauri dev` to verify basic setup works.\n<info added on 2026-01-02T22:23:41.038Z>\nCompleted Tauri 2.0 project initialization with React 18 + TypeScript + Vite:\n\n- Scaffolded Vite React TypeScript template in empire-desktop/\n- Added Tauri 2.0 CLI and initialized src-tauri/\n- Configured tauri.conf.json with:\n  - identifier: com.empire.desktop\n  - Window: 1200x800, min 800x600, centered\n  - CSP for Empire API and Clerk auth\n  - macOS targets (dmg, app)\n  - minimumSystemVersion: 12.0\n- Updated Cargo.toml with:\n  - Package name: empire-desktop\n  - Tauri plugins: http, shell, store, os, log\n  - keyring crate for macOS Keychain\n  - reqwest + tokio for API calls\n- Installed frontend dependencies:\n  - @tauri-apps/api and plugins\n  - TailwindCSS with Vite plugin\n  - Zustand for state management\n  - lucide-react icons\n  - react-router-dom\n  - clsx + tailwind-merge for class utilities\n- Created project structure:\n  - src/components/ - Sidebar, ChatView\n  - src/stores/ - app.ts, chat.ts (Zustand)\n  - src/types/ - Type definitions\n  - src/lib/utils.ts - cn() helper\n- Set up dark theme with Empire color palette\n- Vite build passes successfully\n\nPREREQUISITE:\n- Rust must be installed to build Tauri: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh\n</info added on 2026-01-02T22:23:41.038Z>",
-            "status": "done",
-            "testStrategy": "Confirm Tauri dev server launches with React app visible in desktop window (<2s startup on macOS)",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-02T22:23:48.036Z"
-          },
-          {
-            "id": 2,
-            "title": "Install and Configure React 18, TailwindCSS, and shadcn/ui",
-            "description": "Upgrade React to 18.3.1, install TailwindCSS 3.4.17 and shadcn/ui@0.9.0 with custom color theme configuration.",
-            "dependencies": [
-              1
-            ],
-            "details": "Run `npm i react@18.3.1 react-dom@18.3.1`. Install Tailwind: `npm i -D tailwindcss@3.4.17 postcss autoprefixer`. Init Tailwind and configure tailwind.config.js with colors: --bg-primary #1a1a1a, --accent #e07850. Install shadcn/ui: `npx shadcn-ui@0.9.0 init`.\n<info added on 2026-01-02T22:24:15.972Z>\nCompleted React 19.2.0 + TailwindCSS setup:\n- React 19.2.0 installed (newer than specified 18.3.1)\n- TailwindCSS configured via @tailwindcss/vite plugin\n- Custom Empire color theme defined in src/index.css with CSS variables:\n  - --color-empire-bg: #0f0f0f\n  - --color-empire-sidebar: #1a1a1a\n  - --color-empire-card: #1e1e1e\n  - --color-empire-primary: #3b82f6\n  - --color-empire-accent: #8b5cf6\n- Dark theme by default with custom scrollbar styling\n- Path alias @/* configured for clean imports\n- shadcn/ui ready using manual components pattern with cn() utility\n</info added on 2026-01-02T22:24:15.972Z>",
-            "status": "done",
-            "testStrategy": "Verify Tailwind theme colors match spec in dev server, confirm shadcn/ui components render without errors",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-02T22:24:27.587Z"
-          },
-          {
-            "id": 3,
-            "title": "Install Zustand State Management and Verify Frontend Setup",
-            "description": "Add Zustand 5.0.0-rc.2 for state management and ensure all frontend dependencies integrate correctly.",
-            "dependencies": [
-              2
-            ],
-            "details": "Run `npm i zustand@5.0.0-rc.2`. Create basic Zustand store example in src/stores/. Update App.tsx to use Tailwind classes and shadcn/ui Button component. Test hot reload functionality.\n<info added on 2026-01-02T22:24:20.743Z>\nCompleted Zustand state management setup:\n\n- Zustand 5.0.9 installed (stable version, newer than spec's RC)\n- Created src/stores/app.ts with:\n  - User state (null | User)\n  - Authentication state\n  - Sidebar state (open/closed)\n  - Active view state (chats | projects | settings)\n  - Settings persistence with zustand/persist middleware\n- Created src/stores/chat.ts with:\n  - Conversations list\n  - Active conversation ID\n  - Messages for active conversation\n  - Streaming state management\n- Stores use TypeScript with full type definitions from src/types/\n</info added on 2026-01-02T22:24:20.743Z>",
-            "status": "done",
-            "testStrategy": "Confirm Zustand store updates UI on state change, verify Tailwind + shadcn/ui styling applies correctly",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-02T22:24:27.621Z"
-          },
-          {
-            "id": 4,
-            "title": "Setup Rust Backend with tauri-plugin-sql for SQLite",
-            "description": "Configure Tauri Rust backend with SQLite plugin and create basic IPC command for database testing.",
-            "dependencies": [
-              3
-            ],
-            "details": "In src-tauri, run `cargo tauri add tauri-plugin-sql`. Update Cargo.toml and src-tauri/src/lib.rs to register SQL commands. Create simple ping/pong IPC test between Rust and TypeScript. Init SQLite database.\n<info added on 2026-01-02T22:42:57.282Z>\n- Added tauri-plugin-sql with sqlite feature to Cargo.toml\n- Created initial SQLite migration with 4 tables:\n  - users (id, email, name, avatar_url, created_at, last_login_at)\n  - conversations (id, project_id, title, timestamps, message_count)\n  - messages (id, conversation_id, role, content, sources JSON, status)\n  - projects (id, name, description, department, instructions, memory_context)\n- Created indexes for common queries\n- Added ping/pong IPC command for testing Rust-TS communication\n- Added get_version command to expose app version\n- Configured capabilities with sql:default permission\n- Installed @tauri-apps/plugin-sql for frontend\n</info added on 2026-01-02T22:42:57.282Z>",
-            "status": "done",
-            "testStrategy": "Test Rust-TS IPC with simple ping/pong command, verify SQLite plugin initializes without errors",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-02T22:43:10.923Z"
-          },
-          {
-            "id": 5,
-            "title": "Enable macOS WKWebView and Optimize Binary Size",
-            "description": "Configure Tauri for macOS WKWebView usage and verify final binary size target of 10-15MB.",
-            "dependencies": [
-              4
-            ],
-            "details": "Update tauri.conf.json to enable WKWebView on macOS. Run `npm run tauri build` for release build. Check binary size in target/release/bundle/macos/. Optimize if needed by removing unused deps and enabling code splitting.\n<info added on 2026-01-02T22:43:02.933Z>\nBuild completed successfully with the following results:\n\n- Final binary size: 19MB for Empire Desktop.app (slightly exceeding target range of 10-15MB)\n- DMG package successfully created: Empire Desktop_0.1.0_aarch64.dmg\n\nmacOS configuration:\n- Minimum system version set to macOS 12.0 (Monterey)\n- WKWebView enabled by default in Tauri 2.0\n- macOSPrivateApi enabled for native feature access\n- Bundle targets configured for both dmg and app formats\n- Release build includes standard optimizations\n\nSize analysis:\nThe 19MB binary size is primarily due to SQLite integration and Rust runtime overhead. Further optimization options include:\n- Stripping debug symbols from the final binary\n- Implementing a smaller memory allocator\n- Removing unused Rust features and dependencies\n\nAll compilation checks passed successfully.\n</info added on 2026-01-02T22:43:02.933Z>",
-            "status": "done",
-            "testStrategy": "Build macOS binary and confirm size ~10-15MB, verify WKWebView renders app correctly, test full dev-to-build workflow",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-02T22:43:10.960Z"
-          }
-        ],
-        "updatedAt": "2026-01-02T22:43:10.960Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T00:38:44.993Z"
       },
       {
-        "id": "49",
-        "title": "Implement Local SQLite Database with PRD Schema",
-        "description": "Create encrypted local SQLite database using exact PRD schema for projects, conversations, messages, files, settings",
-        "details": "Use `tauri-plugin-sqlite@2.0.0` with SQLCipher for encryption. Execute PRD schema exactly: projects(id TEXT PK, name, instructions, department), conversations(project_id FK), messages(conversation_id FK, role, content, sources JSON), project_files(project_id FK), settings(key PK, value). Add triggers for created_at/updated_at/synced_at. Init DB migration on first launch. Store in `~/.empire/empire.db` encrypted with system keychain passphrase.",
-        "testStrategy": "Insert/test all table schemas, verify foreign key constraints, confirm encryption (attempt direct file read fails), test CRUD on all tables, measure query perf (<500ms target).",
+        "id": "60",
+        "title": "Implement Source CRUD API endpoints",
+        "description": "Create FastAPI endpoints for adding, listing, updating status, retrying, and deleting project sources",
+        "details": "Add endpoints: POST /api/projects/{project_id}/sources (multipart/form-data for files + URLs), GET /api/projects/{project_id}/sources (with sort/filter/query params), PATCH /api/projects/{project_id}/sources/{source_id} (status/progress updates), DELETE /api/projects/{project_id}/sources/{source_id}, POST /api/projects/{project_id}/sources/{source_id}/retry. Implement file upload to Supabase storage with magic byte validation for 40+ types, URL validation with regex for http/https/youtube patterns, duplicate detection by hash/url, enforce 100MB limit and 100 sources/project cap. Return source_id and initial 'pending' status. Use Supabase Python client with row-level security.",
+        "testStrategy": "Test file uploads (PDF/DOCX/YT/URL) with valid/invalid types/sizes/duplicates, verify 80%/100% capacity warnings, test list with sorting (date,name,type,status) and search, confirm delete cascades embeddings, test retry increments attempt_count",
         "priority": "high",
         "dependencies": [
-          "48"
+          "59"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Install and Configure tauri-plugin-sqlite with SQLCipher",
-            "description": "Add tauri-plugin-sqlite@2.0.0 dependency and configure SQLCipher encryption using system keychain passphrase for secure local database access.",
-            "dependencies": [],
-            "details": "Update Cargo.toml and tauri.conf.json with plugin version 2.0.0. Implement passphrase retrieval from system keychain (keyring on Linux/Mac, Credential Manager on Windows). Test connection with encryption enabled.\n<info added on 2026-01-03T18:26:20.021Z>\nCompleted SQLite plugin configuration:\n- tauri-plugin-sql already added in Task 48\n- SQLite feature enabled in Cargo.toml\n- Capabilities configured with sql:default permission\n- @tauri-apps/plugin-sql installed for frontend\n\nNote: SQLCipher encryption requires bundled-sqlcipher feature in libsqlite3-sys which adds complexity. Current implementation uses standard SQLite. Encryption can be added in a future iteration.\n</info added on 2026-01-03T18:26:20.021Z>",
-            "status": "done",
-            "testStrategy": "Verify plugin compiles, test DB connection with invalid passphrase fails, confirm encrypted DB file cannot be read directly with sqlite3 CLI.",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-03T18:26:42.157Z"
-          },
-          {
-            "id": 2,
-            "title": "Create Exact PRD Database Schema with Tables and Foreign Keys",
-            "description": "Define and execute SQL CREATE TABLE statements matching PRD exactly for projects, conversations, messages, project_files, and settings tables with specified columns, PKs, and FK constraints.",
-            "dependencies": [
-              1
-            ],
-            "details": "projects(id TEXT PRIMARY KEY, name TEXT, instructions TEXT, department TEXT); conversations(project_id TEXT REFERENCES projects(id)); messages(conversation_id TEXT REFERENCES conversations(id), role TEXT, content TEXT, sources JSON); project_files(project_id TEXT REFERENCES projects(id)); settings(key TEXT PRIMARY KEY, value TEXT). Enable foreign_keys pragma.\n<info added on 2026-01-03T18:26:27.034Z>\n```sql\nCREATE TABLE users (\n    id TEXT PRIMARY KEY,\n    email TEXT NOT NULL UNIQUE,\n    name TEXT,\n    avatar_url TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    synced_at TIMESTAMP\n);\n\nCREATE TABLE projects (\n    id TEXT PRIMARY KEY,\n    name TEXT NOT NULL,\n    description TEXT,\n    department TEXT,\n    instructions TEXT,\n    memory_context TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    synced_at TIMESTAMP\n);\n\nCREATE TABLE conversations (\n    id TEXT PRIMARY KEY,\n    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,\n    title TEXT,\n    message_count INTEGER DEFAULT 0,\n    last_message_at TIMESTAMP,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    synced_at TIMESTAMP\n);\n\nCREATE TABLE messages (\n    id TEXT PRIMARY KEY,\n    conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,\n    role TEXT NOT NULL,\n    content TEXT,\n    sources JSON,\n    status TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    synced_at TIMESTAMP\n);\n\nCREATE TABLE project_files (\n    id TEXT PRIMARY KEY,\n    project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,\n    filename TEXT NOT NULL,\n    file_path TEXT NOT NULL,\n    file_size INTEGER,\n    mime_type TEXT,\n    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    synced_at TIMESTAMP\n);\n\nCREATE TABLE settings (\n    key TEXT PRIMARY KEY,\n    value JSON\n);\n\n-- Enable foreign keys\nPRAGMA foreign_keys = ON;\n\n-- Create indexes for performance optimization\nCREATE INDEX idx_conversations_project_id ON conversations(project_id);\nCREATE INDEX idx_messages_conversation_id ON messages(conversation_id);\nCREATE INDEX idx_project_files_project_id ON project_files(project_id);\nCREATE INDEX idx_messages_role ON messages(role);\nCREATE INDEX idx_conversations_last_message_at ON conversations(last_message_at);\n```\n</info added on 2026-01-03T18:26:27.034Z>",
-            "status": "done",
-            "testStrategy": "Run schema creation script, verify all 5 tables exist via PRAGMA table_info, test FK constraint violations throw errors.",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-03T18:26:42.176Z"
-          },
-          {
-            "id": 3,
-            "title": "Implement Timestamps Triggers for created_at, updated_at, synced_at",
-            "description": "Add SQLite triggers on all tables to automatically manage created_at, updated_at, and synced_at TIMESTAMP columns on INSERT/UPDATE operations.",
-            "dependencies": [
-              2
-            ],
-            "details": "CREATE TRIGGER projects_created AFTER INSERT ON projects BEGIN UPDATE projects SET created_at=CURRENT_TIMESTAMP WHERE id=NEW.id; END; Similar triggers for updated_at on UPDATE and synced_at on UPDATE. Apply to all tables with rowid support.\n<info added on 2026-01-03T18:26:30.556Z>\nImplemented 7 SQLite triggers:\n- users_updated_at: UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;\n- projects_updated_at: UPDATE projects SET updated_at = datetime('now') WHERE id = NEW.id;\n- conversations_updated_at: UPDATE conversations SET updated_at = datetime('now') WHERE id = NEW.id;\n- messages_updated_at: UPDATE messages SET updated_at = datetime('now') WHERE id = NEW.id;\n- project_files_updated_at: UPDATE project_files SET updated_at = datetime('now') WHERE id = NEW.id;\n- settings_updated_at: UPDATE settings SET updated_at = datetime('now') WHERE key = NEW.key;\n- messages_insert_update_conversation: UPDATE conversations SET message_count = message_count + 1, last_message_at = datetime('now') WHERE id = NEW.conversation_id;\n\nAll triggers use datetime('now') function to ensure ISO8601 timestamp format compatibility.\n</info added on 2026-01-03T18:26:30.556Z>",
-            "status": "done",
-            "testStrategy": "Insert record and verify created_at sets, UPDATE record and check updated_at/synced_at update, confirm timestamps are ISO8601 format.",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-03T18:26:42.193Z"
-          },
-          {
-            "id": 4,
-            "title": "Set Up Database Path and First-Launch Migration Logic",
-            "description": "Configure database storage at ~/.empire/empire.db and implement initialization/migration logic that runs schema on first launch or schema changes.",
-            "dependencies": [
-              1,
-              2,
-              3
-            ],
-            "details": "Use tauri::path::app_local_data_dir() + 'empire/empire.db'. Check if DB exists or PRAGMA user_version=0, then execute full schema in transaction. Implement simple declarative migration comparing sqlite_schema table.\n<info added on 2026-01-03T18:26:32.284Z>\nDatabase path configured as sqlite:empire.db in tauri-plugin-sql. The plugin stores this in the app's data directory (~/.local/share/com.empire.desktop on Linux, ~/Library/Application Support/com.empire.desktop on macOS).\n\nMigration runs automatically on first launch via add_migrations(). Schema versioned with version: 1.\n</info added on 2026-01-03T18:26:32.284Z>",
-            "status": "done",
-            "testStrategy": "Delete DB file, restart app, verify fresh DB created with correct schema; modify schema version and confirm migration applies without data loss.",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-03T18:26:42.207Z"
-          },
-          {
-            "id": 5,
-            "title": "Implement DB Initialization Hook and CRUD Connection Pool",
-            "description": "Create Tauri command to initialize DB on app startup and set up connection pool for efficient CRUD operations across the app.",
-            "dependencies": [
-              4
-            ],
-            "details": "#[tauri::command] async fn init_db() -> Result<(), String>. Use plugin's connection pooling. Expose get_connection() for other tasks. Ensure encryption passphrase loaded once at startup.\n<info added on 2026-01-03T18:26:35.719Z>\nTypeScript database service layer has been implemented in src/lib/database.ts with comprehensive CRUD operations for all required entities. The implementation includes:\n\n- Complete CRUD functions for conversations, messages, projects, and settings\n- Search functionality for messages with LIKE query support\n- Efficient database connection management through getDatabase()\n- Proper UUID generation for entity IDs\n- JSON serialization handling for complex data types\n- Full TypeScript type definitions ensuring type safety\n- Automatic insertion of default settings during schema initialization\n\nThis frontend service layer will interface with the Tauri backend commands to perform all database operations.\n</info added on 2026-01-03T18:26:35.719Z>",
-            "status": "done",
-            "testStrategy": "Call init_db() on launch, perform CRUD on all tables (create project+conversation+message+file+setting), verify <500ms query perf, confirm encryption persists.",
-            "parentId": "undefined",
-            "updatedAt": "2026-01-03T18:26:42.222Z"
-          }
-        ],
-        "updatedAt": "2026-01-03T18:26:42.222Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T00:46:06.907Z"
       },
       {
-        "id": "50",
-        "title": "Clerk Authentication with System Keychain JWT Storage",
-        "description": "Integrate Clerk auth with secure JWT storage in macOS Keychain, auto-refresh, biometric unlock",
-        "details": "Use `@clerk/clerk-js@latest` in frontend. Create Tauri Rust command `store_jwt` using `keychain-services` crate (macOS Security.framework). Implement biometric auth with `local-authentication` Tauri plugin. Auto-refresh tokens via Clerk's `getToken()` with 15min expiry check. Multi-device sync via Empire backend. Store: `service: 'empire-desktop', account: userId, key: 'jwt'` in keychain.",
-        "testStrategy": "Test login flow, verify JWT stored/retrieved from keychain, confirm biometric unlock, test token refresh before/after expiry, validate multi-device sync.",
+        "id": "61",
+        "title": "Develop Celery task for source processing pipeline",
+        "description": "Create unified Celery task that handles type-specific content extraction, summary generation, embedding creation, and status updates",
+        "details": "Implement @celery.task def process_source(source_id): source = fetch_source(source_id); update_status('processing', 10); content = extract_content(source.type) # LlamaParse/PyPDF/python-docx/pandas/yt-dlp/BeautifulSoup/Soniox per spec; update_progress(40); summary = claude.generate_summary(content); update_progress(60); embeddings = bge_m3.embed_chunks(chunk_content(content, 512)); store_embeddings(embeddings, source_id, project_id); update_status('ready', 100); Handle errors with max 3 retries, update 'failed' with error_message. Use existing processing libs: yt-dlp for YouTube transcripts/chapters/thumbnails, BeautifulSoup for web (respect robots.txt), Soniox for audio/video. Store metadata (title/author/date/duration).",
+        "testStrategy": "Queue tasks for each source type, verify status transitions (pending->processing->ready/failed), check progress updates via WebSocket, validate content extraction accuracy, confirm embeddings stored with correct project_id, test retry logic (3 attempts max)",
         "priority": "high",
         "dependencies": [
-          "48",
-          "49"
+          "59",
+          "60"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Implement Tauri Rust Command for Keychain JWT Storage",
-            "description": "Create a secure Rust command `store_jwt` to store and retrieve JWT tokens in macOS Keychain using specified service, account, and key parameters.",
-            "dependencies": [],
-            "details": "Use `keychain-services` crate to interface with macOS Security.framework. Implement `store_jwt` command accepting JWT string, userId; store with service: 'empire-desktop', account: userId, key: 'jwt'. Add `get_jwt` and `delete_jwt` commands. Handle errors for missing keys gracefully.",
-            "status": "pending",
-            "testStrategy": "Unit test Rust commands: verify JWT stored/retrieved correctly with exact service/account/key; test delete removes item; mock Keychain failures.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Integrate Clerk JS with Tauri Frontend IPC",
-            "description": "Set up @clerk/clerk-js@latest in React frontend and connect to Tauri Rust commands for JWT storage after authentication events.",
-            "dependencies": [
-              1
-            ],
-            "details": "Install @clerk/clerk-js@latest. On Clerk sign-in success, extract JWT via getToken(), invoke Tauri `store_jwt` command with userId from session. On sign-out, call `delete_jwt`. Expose TypeScript interfaces for Clerk user/session data.",
-            "status": "pending",
-            "testStrategy": "Mock Clerk auth events, verify Tauri IPC calls with correct JWT/userId payloads; check console logs confirm storage success.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Add Biometric Authentication with Local-Authentication Plugin",
-            "description": "Implement biometric unlock (Touch ID/Face ID) using Tauri local-authentication plugin before accessing stored JWT from Keychain.",
-            "dependencies": [
-              1
-            ],
-            "details": "Install `local-authentication` Tauri plugin. Create `authenticate_biometric` command that prompts for biometrics and returns success/failure. Before `get_jwt`, require successful biometric auth unless recently unlocked (5min cache). Fallback to device passcode.",
-            "status": "pending",
-            "testStrategy": "Test biometric prompt triggers on macOS, verify success unlocks JWT access; test fallback and cache timeout behavior.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement JWT Auto-Refresh with 15min Expiry Check",
-            "description": "Create logic to automatically refresh Clerk JWT tokens via getToken() when expiry is within 15 minutes, storing refreshed token in Keychain.",
-            "dependencies": [
-              2
-            ],
-            "details": "Parse JWT exp claim on retrieval. If exp - now() < 15min, call Clerk.getToken() to refresh, then store_jwt new token. Run check on app startup and before API calls. Use Zustand store for auth state with refresh status.",
-            "status": "pending",
-            "testStrategy": "Mock JWTs with varying expiry times; verify refresh triggers correctly before/after 15min threshold; confirm refreshed token stored.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Enable Multi-Device JWT Sync via Empire Backend",
-            "description": "Integrate JWT synchronization across devices through Empire backend API after local Keychain storage/updates.",
-            "dependencies": [
-              2,
-              4
-            ],
-            "details": "After store_jwt success, POST JWT hash/timestamp to Empire /api/auth/sync endpoint with userId. On app start, GET latest JWT version from Empire and compare/update local Keychain if newer. Handle sync conflicts by preferring Empire version.",
-            "status": "pending",
-            "testStrategy": "Mock Empire API responses with different JWT versions; verify sync updates local Keychain correctly; test conflict resolution.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T19:43:11.469Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T00:59:11.752Z"
       },
       {
-        "id": "51",
-        "title": "Empire Backend API Client with WebSocket Streaming",
-        "description": "Create TypeScript API layer connecting to Empire v7.3 endpoints with real-time streaming support",
-        "details": "Implement `EmpireAPI` interface per PRD. Use Axios 1.7.7 for REST, `ws@8.18.0` for `/ws/chat`. Support streaming via `AsyncGenerator<string>` for `/api/query/auto`. Endpoints: POST /api/query/auto, POST /api/documents/upload, GET /api/documents. Add request interceptors for Clerk JWT. Implement retry logic (3x, exponential backoff). TypeScript interfaces for all responses.",
-        "testStrategy": "Mock Empire API responses, test all endpoints, verify streaming chunks assemble correctly, confirm auth headers, test offline/retry behavior.",
+        "id": "62",
+        "title": "Build real-time status updates with WebSocket",
+        "description": "Implement Supabase Realtime subscriptions for live source status and progress updates in Project Detail view",
+        "details": "Frontend: use supabase.realtime.subscribe('project_sources', { project_id }, callback); Backend: Use Supabase triggers AFTER INSERT/UPDATE on project_sources to broadcast via pg_notify. Handle reconnect with full sources refresh. Include estimated time (e.g., PDF pages*2s, YT duration/60s). Visual indicators: green ● ready, blue ◐ processing+%, gray ○ pending, red ✕ failed+retry.",
+        "testStrategy": "Simulate processing updates, verify UI reflects changes in <2s, test disconnect/reconnect syncs correctly, confirm progress animation and ETR display, test error messages and retry button triggers re-queue",
         "priority": "high",
         "dependencies": [
-          "50"
+          "60",
+          "61"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Define TypeScript Interfaces for EmpireAPI and Responses",
-            "description": "Create comprehensive TypeScript interfaces for the EmpireAPI class and all expected request/response types based on PRD specifications.",
-            "dependencies": [],
-            "details": "Define EmpireAPI interface with methods for POST /api/query/auto (AsyncGenerator<string>), POST /api/documents/upload, GET /api/documents. Create response interfaces for each endpoint including streaming chunk format, upload results, and document lists. Export all types for use across the project.",
-            "status": "pending",
-            "testStrategy": "Validate interface completeness by compiling TypeScript and checking type errors against mock API responses.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Setup Axios Instance with JWT Interceptors and Retry Logic",
-            "description": "Configure Axios 1.7.7 instance with Clerk JWT request interceptors and implement 3x retry with exponential backoff.",
-            "dependencies": [
-              1
-            ],
-            "details": "Create axiosInstance with baseURL for Empire v7.3. Add request interceptor to attach Authorization: Bearer <Clerk JWT>. Implement response interceptor for 3 retries using exponential backoff (100ms, 200ms, 400ms). Handle 401/429 status codes appropriately.",
-            "status": "pending",
-            "testStrategy": "Mock Clerk JWT, test interceptor adds correct headers, verify retry logic triggers on 5xx errors and backs off correctly.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Implement REST Endpoints: Documents Upload and List",
-            "description": "Build typed REST methods for POST /api/documents/upload and GET /api/documents using axiosInstance.",
-            "dependencies": [
-              1,
-              2
-            ],
-            "details": "Implement uploadDocuments(file: File[]): Promise<UploadResult[]> with FormData multipart. Implement getDocuments(): Promise<Document[]>. Use defined response interfaces. Ensure proper error handling and typing throughout.",
-            "status": "pending",
-            "testStrategy": "Mock axios responses, test file upload with FormData, verify document list parsing matches Document[] interface.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement Streaming Query Endpoint with AsyncGenerator",
-            "description": "Create queryAuto(request: QueryRequest): AsyncGenerator<string> for POST /api/query/auto streaming endpoint.",
-            "dependencies": [
-              1,
-              2
-            ],
-            "details": "Use axios with responseType: 'stream'. Convert ReadableStream to AsyncGenerator<string> yielding individual chunks. Handle stream completion/error states. Implement proper TypeScript typing for streaming responses per PRD.",
-            "status": "pending",
-            "testStrategy": "Mock streaming response, verify chunks yield correctly via for await...of, test full stream assembly reconstructs original data.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Implement WebSocket Chat Client for /ws/chat Endpoint",
-            "description": "Build WebSocket client using ws@8.18.0 for real-time chat streaming at /ws/chat with JWT authentication.",
-            "dependencies": [
-              1,
-              2
-            ],
-            "details": "Create connectChat(): Promise<WebSocket> with JWT auth headers via query params or custom header. Implement onMessage, onClose, onError handlers. Add reconnect logic matching retry pattern. Export typed chat message interfaces.",
-            "status": "pending",
-            "testStrategy": "Mock WebSocket server, test connection with JWT, verify message sending/receiving, confirm reconnect on disconnect.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T19:47:28.940Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T01:04:16.003Z"
       },
       {
-        "id": "52",
-        "title": "Main Chat Interface with Streaming and Source Citations",
-        "description": "Build core chat UI with multi-line input, message display, real-time streaming, inline citations, attachments",
-        "details": "Use shadcn/ui Chat components. Implement streaming with `useEffect` polling WebSocket chunks, render token-by-token with `typewriter` effect (100ms intervals). Citations: parse `[1]`, `[2]` from API response, render expandable popover with source metadata. File drag-drop using `react-dropzone@14.2.3`. Message roles: user (right, blue), assistant (left, white). Keyboard: Cmd+Enter send.",
-        "testStrategy": "Test streaming renders progressively, verify citations expand/collapse, confirm file drag-drop uploads via API, test all chat actions (new, regenerate, copy, edit, delete).",
+        "id": "63",
+        "title": "Frontend Sources UI component",
+        "description": "Build drag & drop Sources section in Project Detail view with unified input, grid/list view, cards, search/filter/sort",
+        "details": "React component with: Dropzone for files+URLs (textarea multi-line), auto-detect type, Add button queues to backend. Source cards: type icon [PDF]/[YT]/[URL], status badge, metadata (size/pages/duration), thumbnail for YT, delete/retry buttons with confirm. Grid responsive, sort by added/date/name/type/status, search by name. Summary footer: X sources • Y ready • Z processing • progress bar. File type icons per spec table.",
+        "testStrategy": "Test drag/drop multi-file/URL input validation, verify card rendering for all types/statuses, confirm sort/filter/search functional, test responsive grid, validate delete confirm and immediate UI update",
         "priority": "high",
         "dependencies": [
-          "48",
-          "51"
+          "60",
+          "62"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Install and Configure shadcn/ui Chat Components",
-            "description": "Set up shadcn/ui in the project and install necessary chat components using CLI for the main chat interface foundation.",
-            "dependencies": [],
-            "details": "Run `npx shadcn@latest add chat` and other required components like message, input, avatar from shadcn-chat or shadcn/ui. Ensure Tailwind CSS and dependencies are configured per official docs[5][6]. Verify components render in basic demo.",
-            "status": "pending",
-            "testStrategy": "Confirm components import without errors, basic Chat demo renders with light/dark mode support[1][2].",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Implement Message Display with Role-Based Styling",
-            "description": "Build message list using shadcn Chat components with user (right, blue) and assistant (left, white) styling, including auto-scroll.",
-            "dependencies": [
-              1
-            ],
-            "details": "Use Chat.List or Conversation container with Chat.Bubble for messages. Apply role variants: user right-aligned blue theme, assistant left white. Integrate Markdown rendering and syntax highlighting[1][2][4].",
-            "status": "pending",
-            "testStrategy": "Verify messages display correctly aligned by role, auto-scroll works on new messages, Markdown renders properly.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Add Multi-line Input with Drag-Drop Attachments and Keyboard Send",
-            "description": "Create auto-resizing input textarea supporting Cmd+Enter send and file drag-drop using react-dropzone.",
-            "dependencies": [
-              1
-            ],
-            "details": "Install react-dropzone@14.2.3. Use PromptInput or Chat input component with file upload support, drag-drop zone for attachments, handle Cmd+Enter submission[1][2]. Preview files on drop.",
-            "status": "pending",
-            "testStrategy": "Test input resizes, Cmd+Enter sends message, files drag-drop and preview correctly before upload.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement Real-time Streaming with Typewriter Effect",
-            "description": "Integrate WebSocket polling via useEffect for streaming chunks, render token-by-token with 100ms typewriter intervals.",
-            "dependencies": [
-              2
-            ],
-            "details": "Use useEffect to poll WebSocket for response chunks. Append tokens progressively to assistant message with setInterval(100ms) for typewriter effect. Handle loading/stopping states[1][4].",
-            "status": "pending",
-            "testStrategy": "Simulate streaming: verify progressive rendering, typewriter speed at 100ms, stop functionality works.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Parse and Render Inline Citations as Expandable Popovers",
-            "description": "Parse [1], [2] citation markers from API responses and render as expandable popover UI with source metadata.",
-            "dependencies": [
-              2,
-              4
-            ],
-            "details": "Regex parse citation patterns in streamed text. Replace with clickable popover triggers using shadcn Popover. Display source metadata (title, snippet, URL) on expand. Ensure streaming compatibility.",
-            "status": "pending",
-            "testStrategy": "Inject test response with citations, confirm parsing accurate, popovers expand/collapse, metadata displays correctly.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T19:56:27.428Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T18:37:48.409Z"
       },
       {
-        "id": "53",
-        "title": "Projects System CRUD with Local + Cloud Sync",
-        "description": "Implement full project management: create/read/update/delete with real-time Supabase sync",
-        "details": "Zustand store for projects state. UI: shadcn/ui DataTable for project list/grid. Forms with `react-hook-form@7.52.2`. Sync strategy: local-first SQLite writes, background Supabase upsert via `supabase-js@2.45.4`. Handle conflicts: local wins. Departments: 12 predefined options dropdown. Templates: save/load project configs as JSON.",
-        "testStrategy": "Create/edit/delete projects locally, verify Supabase sync (check remote_id), test offline create + online sync, confirm department filtering.",
+        "id": "64",
+        "title": "Implement project-scoped hybrid RAG query endpoint",
+        "description": "Modify RAG pipeline for parallel vector search: project sources (primary, wt 1.0, LIMIT 8) + global KB (secondary, wt 0.7, LIMIT 5), merge/rerank/deduplicate",
+        "details": "POST /api/rag/query {project_id, query}: query_emb = bge_m3.embed(query); project_results = supabase.rpc('match_documents', {'query_embedding': query_emb, 'project_id': project_id, 'limit': 8, 'status': 'ready'}); global_results = supabase.rpc('match_documents', {'query_embedding': query_emb, 'limit': 5}); merged = rerank_combine(project_results*1.0 + global_results*0.7, dedupe similarity>0.9); response = claude.generate(prompt + merged_context, citations=true); Track source_ids used for citations.",
+        "testStrategy": "Query with/without project sources, verify project results prioritized and filtered by project_id/status='ready', confirm global KB supplements, test response time <3s, validate weighting in reranking scores",
         "priority": "high",
         "dependencies": [
-          "49",
-          "51"
+          "59",
+          "61"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Implement Zustand Store for Projects State",
-            "description": "Create and configure Zustand store to manage projects state including create, read, update, delete operations with local SQLite integration.",
-            "dependencies": [],
-            "details": "Define Zustand store with actions for CRUD on projects using local-first SQLite writes. Include state for projects list, loading, errors. Use TypeScript interfaces for project schema with fields like id, name, department, instructions, remote_id.",
-            "status": "pending",
-            "testStrategy": "Test store actions: add project, update project, delete project, verify SQLite persistence and state updates.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Build Project List UI with shadcn/ui DataTable",
-            "description": "Create projects listing page using shadcn/ui DataTable component with grid view, department filtering, and action buttons.",
-            "dependencies": [
-              1
-            ],
-            "details": "Integrate DataTable with Zustand store data. Add columns for name, department (12 predefined options), created date, actions (edit/delete). Implement department dropdown filter. Use responsive grid layout.",
-            "status": "pending",
-            "testStrategy": "Verify table renders projects, filters by department, handles empty states, responsive on mobile.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Develop Create/Edit Project Forms with react-hook-form",
-            "description": "Implement modal forms for creating and editing projects using react-hook-form v7.52.2 with department dropdown and templates support.",
-            "dependencies": [
-              1
-            ],
-            "details": "Create reusable form components with fields: name, department (12 options dropdown), instructions. Add template save/load as JSON. Use Zod for validation. Connect to Zustand store for submit actions.",
-            "status": "pending",
-            "testStrategy": "Test form validation, department selection, template save/load, form submission updates store.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement Background Supabase Sync with Conflict Resolution",
-            "description": "Add real-time Supabase sync using supabase-js v2.45.4 with upsert strategy where local changes always win on conflicts.",
-            "dependencies": [
-              1
-            ],
-            "details": "Create sync service for background upserts to Supabase projects table. Handle offline/online scenarios. Track remote_id in local SQLite. Implement conflict resolution: local wins. Use Supabase realtime subscriptions for incoming changes.",
-            "status": "pending",
-            "testStrategy": "Test offline create + online sync, verify remote_id population, conflict scenarios (local wins), realtime updates.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Add Delete Functionality and End-to-End Integration",
-            "description": "Complete CRUD implementation with delete operations, full integration testing, and UI polish for projects system.",
-            "dependencies": [
-              2,
-              3,
-              4
-            ],
-            "details": "Implement soft/hard delete in store and Supabase. Add confirmation dialogs. Ensure all operations trigger sync. Polish UI with loading states, error handling, empty states. Add keyboard shortcuts for CRUD if applicable.",
-            "status": "pending",
-            "testStrategy": "E2E: create/edit/delete projects locally and verify Supabase sync, test offline/online transitions, department filtering works.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T22:01:20.280Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T18:53:30.338Z"
       },
       {
-        "id": "54",
-        "title": "Chat History Sidebar with Global Search",
-        "description": "Build sidebar navigation: New Chat, Chats, Projects, Artifacts with global search across all content",
-        "details": "Resizable sidebar (200-400px) with shadcn/ui Accordion. Global search: SQLite FTS5 index on messages.content + conversations.title. `<500ms` target via `tauri-plugin-sql` full-text search. Results: message preview + jump-to-chat button. Recent chats: last 10 with preview. Keyboard: Cmd+K opens search.",
-        "testStrategy": "Test search speed (<500ms), verify results highlight matches, confirm jump-to-message navigation, test filters (date, project, attachments).",
+        "id": "65",
+        "title": "Integrate project-scoped RAG into Project Chat",
+        "description": "Update Project Chat to use new hybrid RAG endpoint, show scoped indicator, pass project_id automatically",
+        "details": "In ProjectChat component: onSend(message) => POST /api/rag/query({project_id, query: message}); Display 'Project-scoped chat (X ready sources)' banner. Fallback to global-only if no ready sources. Ensure chat history ties to project_id.",
+        "testStrategy": "Create project chats with/without sources, verify queries only use project+global (not other projects), confirm scoped indicator visible, test empty sources fallback gracefully",
         "priority": "high",
         "dependencies": [
-          "49",
-          "52",
-          "53"
+          "64",
+          "63"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Implement Resizable Sidebar Layout (200-400px)",
-            "description": "Create the main sidebar container with resizable width between 200-400px using TailwindCSS and mouse drag handle.",
-            "dependencies": [],
-            "details": "Use CSS Resize or custom React drag handler with `onMouseDown` for left-edge dragging. Constrain width with `min-w-[200px] max-w-[400px]`. Persist width in localStorage via Zustand. Ensure smooth transitions and mobile responsiveness.",
-            "status": "pending",
-            "testStrategy": "Test resize drag from 200px to 400px, verify localStorage persistence on reload, check no layout breaks on min/max width.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Build shadcn/ui Accordion Navigation Structure",
-            "description": "Add Accordion with sections: New Chat, Chats, Projects, Artifacts using shadcn/ui components.",
-            "dependencies": [
-              1
-            ],
-            "details": "Install `npx shadcn@latest add accordion`. Use `type='multiple'` for independent sections. Add icons (Plus, MessagesSquare, Folder, FileText) and Badge for counts. Style with Tailwind: `w-full border-0`. Connect 'New Chat' to create new conversation.",
-            "status": "pending",
-            "testStrategy": "Verify all sections expand/collapse independently, test keyboard navigation (Arrow keys), confirm Badge counts update, test New Chat button creates conversation.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Setup SQLite FTS5 Index and Global Search Backend",
-            "description": "Create FTS5 virtual table indexing messages.content and conversations.title using tauri-plugin-sql.",
-            "dependencies": [
-              1
-            ],
-            "details": "Rust backend: `CREATE VIRTUAL TABLE search_index USING fts5(messages_content, conversations_title)`. Populate via INSERT triggers on messages/conversations tables. Expose `search_query(query: String) -> Vec<SearchResult>` IPC returning {id, title, preview, type}. Target <500ms response.",
-            "status": "pending",
-            "testStrategy": "Benchmark 1000+ messages search (<500ms), verify FTS5 ranking, test empty results, confirm index updates on new messages.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement Global Search UI with Results and Jump-to-Chat",
-            "description": "Add Cmd+K search modal showing message previews with highlight matches and jump-to-chat buttons.",
-            "dependencies": [
-              2,
-              3
-            ],
-            "details": "Use `useHotkeys('cmd+k')` to open. Results list: highlight query matches in preview (50 chars). Each result: avatar + title + preview + 'Jump to Chat' button calling `navigateToMessage(chatId, messageId)`. Debounce input 200ms. Show 'Recent chats' when empty.",
-            "status": "pending",
-            "testStrategy": "Test Cmd+K opens modal, verify search results highlight matches, confirm jump-to-chat navigates correctly, test debounce prevents spam.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Add Recent Chats List and Full Integration Testing",
-            "description": "Display last 10 chats with previews in Chats accordion. Complete end-to-end testing.",
-            "dependencies": [
-              2,
-              3,
-              4
-            ],
-            "details": "Query `SELECT * FROM conversations ORDER BY updated_at DESC LIMIT 10`. Show last message preview truncated. Integrate with Projects (filter by project_id). Test full flow: search → jump → sidebar state persistence. Add loading states and error handling.",
-            "status": "pending",
-            "testStrategy": "Verify recent chats show last 10 with previews, test project filtering, end-to-end: Cmd+K search → jump-to-message works, sidebar resize persists, all accordion sections functional.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T22:15:10.207Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T20:23:40.569Z"
       },
       {
-        "id": "55",
-        "title": "Project Detail View: Instructions, Memory, Files, Conversations",
-        "description": "Create project detail screen showing conversations list, file manager, editable instructions/memory",
-        "details": "Tabbed layout: Conversations (chat list), Files (upload/list), Instructions (textarea autosave), Memory (auto-gen summary). File uploads route to `/api/documents/upload` + store metadata in project_files. Conversations: infinite scroll last-message preview. Instructions persist to project.instructions SQLite field.",
-        "testStrategy": "Upload files to project, verify document indexing, test instructions save/load, confirm conversation list filters by project_id.",
+        "id": "66",
+        "title": "Add source citations to chat responses",
+        "description": "Parse LLM citations and display clickable source links below responses with name/type/excerpt/page/timestamp",
+        "details": "Backend: Claude prompt instructs '[cite source_id:excerpt]' format; parse response for citations, enrich with source metadata. Frontend: Render citations list under AI message: [PDF] filename (p.23) • click => view source (PDF page/YT timestamp/URL open). Context-aware: extract page/chunk/timestamp from metadata.",
+        "testStrategy": "Send queries hitting multiple source types, verify citations appear with correct metadata, test click handlers (PDF jump/YT seek/URL open), confirm excerpts match relevant content",
         "priority": "medium",
         "dependencies": [
-          "53",
-          "54"
+          "64",
+          "65"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Implement Tabbed Layout for Project Detail View",
-            "description": "Create the main project detail screen using shadcn/ui Tabs component with four tabs: Conversations, Files, Instructions, and Memory.",
-            "dependencies": [],
-            "details": "Use shadcn/ui Tabs from @/components/ui/tabs. Fetch project data via Zustand store from Task 53. Display project title/header. Ensure responsive design with TailwindCSS. Route: /projects/:id.",
-            "status": "pending",
-            "testStrategy": "Verify tabs switch correctly, project data loads, responsive on desktop/mobile.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Build Instructions Tab with Editable Textarea",
-            "description": "Add textarea for editing project instructions with autosave functionality persisting to SQLite project.instructions field.",
-            "dependencies": [
-              1
-            ],
-            "details": "Use shadcn/ui Textarea with debounce (lodash.debounce 500ms). On change, update Zustand project store and SQLite via Tauri IPC. Load initial value from project.instructions. Add save indicator.",
-            "status": "pending",
-            "testStrategy": "Edit instructions, verify autosave to SQLite, reload page confirms persistence.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Implement Memory Tab with Auto-Generated Summary",
-            "description": "Display auto-generated memory summary for the project, fetched or generated via Empire API.",
-            "dependencies": [
-              1
-            ],
-            "details": "Call EmpireAPI endpoint for project memory summary using Task 51 client. Use shadcn/ui Card for display. Include refresh button. Handle loading/error states with Skeleton/Alert.",
-            "status": "pending",
-            "testStrategy": "Verify summary loads, refresh updates, error handling displays properly.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Create Files Tab with Upload and List Manager",
-            "description": "Build file manager supporting uploads to /api/documents/upload API and listing project files with metadata.",
-            "dependencies": [
-              1
-            ],
-            "details": "Use shadcn/ui DataTable for file list. Implement drag-drop upload with react-dropzone. POST to EmpireAPI /api/documents/upload (Task 51), store metadata in project_files SQLite table. Show progress bar.",
-            "status": "pending",
-            "testStrategy": "Upload file, verify API call success, metadata saves to SQLite, list updates.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Develop Conversations Tab with Infinite Scroll List",
-            "description": "Show conversations list filtered by project_id with infinite scroll and last-message preview.",
-            "dependencies": [
-              1
-            ],
-            "details": "Query SQLite conversations table WHERE project_id = ?. Use react-infinite-scroll-component. Display as shadcn/ui Card list with last message preview. Fetch older convos on scroll. Link to chat detail.",
-            "status": "pending",
-            "testStrategy": "Load conversations for project, scroll loads more, verify project_id filtering, previews accurate.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T23:08:59.023Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-06T02:20:47.683Z"
       },
       {
-        "id": "56",
-        "title": "Keyboard Shortcuts and Native macOS Features",
-        "description": "Implement all PRD keyboard shortcuts, menu bar, system tray, notifications, window management",
-        "details": "Use `use-hotkeys@3.1.1` for Cmd+N (new chat), Cmd+K (search), Cmd+Enter (send), etc. Tauri menu bar via `tauri-plugin-menubar`. System tray icon with `tauri-plugin-tray-icon`. Notifications: `tauri-plugin-notification`. Window state persistence with `tauri-plugin-window-state`. Dark mode: system preference via `useMediaQuery`.",
-        "testStrategy": "Test all 6+ keyboard shortcuts, verify menu bar items, confirm tray icon context menu, test notification delivery, validate window restore.",
-        "priority": "medium",
+        "id": "67",
+        "title": "File type validation and security scanning",
+        "description": "Implement magic byte validation for 40+ types, URL sanitization, content scanning before processing",
+        "details": "Use python-magic for file type detection (not extension), block executables/scripts. Sanitize URLs (whitelist schemes, block javascript:). Scan content with ClamAV or similar for malware. Reject at upload if invalid. Log security events.",
+        "testStrategy": "Upload valid/invalid files (rename .pdf to .exe), test URL sanitization (malformed/js), simulate malware files rejected, confirm processing only starts on clean validated sources",
+        "priority": "high",
         "dependencies": [
-          "52"
+          "60"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Install and Configure Tauri Plugins for macOS Features",
-            "description": "Add required Tauri plugins for menubar, tray icon, notifications, and window state, then update tauri.conf.json and capabilities.",
-            "dependencies": [],
-            "details": "Run `pnpm tauri add menubar tray-icon notification window-state`. Configure allowlists in tauri.conf.json and src-tauri/capabilities/default.json for globalShortcut, menubar, tray-icon, notification permissions. Verify plugin initialization in src-tauri/src/main.rs.",
-            "status": "pending",
-            "testStrategy": "Verify plugins load without errors on app startup, check console for initialization logs.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Implement Global Keyboard Shortcuts with Tauri API",
-            "description": "Register PRD shortcuts (Cmd+N new chat, Cmd+K search, Cmd+Enter send, etc.) using @tauri-apps/plugin-global-shortcut.",
-            "dependencies": [
-              1
-            ],
-            "details": "Use register('CommandOrControl+N', handler) etc. in a custom hook. Integrate with app state (Zustand stores for newChat, search, sendMessage). Add cleanup with unregisterAll on unmount. Update capabilities for global-shortcut permissions.",
-            "status": "pending",
-            "testStrategy": "Test all 6+ shortcuts globally (app minimized), verify actions trigger correct state changes.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Setup macOS Menu Bar and System Tray Icon",
-            "description": "Create native menu bar with PRD items and system tray icon with context menu using tauri-plugin-menubar and tray-icon.",
-            "dependencies": [
-              1
-            ],
-            "details": "Define menu structure in Rust (File: New Chat, Search; Window: Toggle DevTools). Configure tray icon with context menu (Show App, Quit). Handle menu events emitting to frontend via app.emit(). Set icons for light/dark mode.",
-            "status": "pending",
-            "testStrategy": "Verify menu bar items clickable and functional, test tray icon context menu options work correctly.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Add Native Notifications and Window State Persistence",
-            "description": "Implement desktop notifications for message send/receive and persist window position/size across sessions.",
-            "dependencies": [
-              1
-            ],
-            "details": "Use tauri-plugin-notification for send confirmations, new messages. Integrate tauri-plugin-window-state for save/restore position, maximized state. Trigger notifications from message send/receive handlers. Respect macOS Do Not Disturb.",
-            "status": "pending",
-            "testStrategy": "Test notification delivery/appearance, resize/move window then restart to verify state restoration.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Integrate System Dark Mode Detection and Final Testing",
-            "description": "Sync app theme with macOS system preference and perform comprehensive testing of all native features.",
-            "dependencies": [
-              2,
-              3,
-              4
-            ],
-            "details": "Use useMediaQuery('(prefers-color-scheme: dark)') to detect system theme, update CSS variables/tailwind config. Test all shortcuts (6+), menu/tray interactions, notifications, window states across app restarts. Add error boundaries for shortcut conflicts.",
-            "status": "pending",
-            "testStrategy": "Full E2E: toggle dark mode (System Settings), test all PRD shortcuts globally, verify menu/tray/notifications, measure window restore accuracy.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T23:23:43.638Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T20:15:22.872Z"
       },
       {
-        "id": "57",
-        "title": "Settings Panel and Export Functionality",
-        "description": "Build settings UI for theme, model, notifications + chat export (MD/PDF/JSON)",
-        "details": "shadcn/ui Settings tabs. Store in SQLite settings table. Export: traverse conversation messages, generate Markdown (`marked@14.1.2`), PDF (`react-pdf@9.1.0`), JSON. Theme toggle updates Tailwind CSS vars. Model selector persists to settings.default_model. History retention: SQLite cleanup cron job.",
-        "testStrategy": "Test all settings save/load/sync, verify export formats parse correctly, confirm theme switching, test history retention cleanup.",
+        "id": "68",
+        "title": "Add capacity warnings and limits enforcement",
+        "description": "Implement per-project limits: 100 sources, 500MB total, warnings at 80%, soft block at 100%",
+        "details": "API check: SELECT COUNT(*), SUM(file_size) FROM project_sources WHERE project_id=?; Block adds if >100 or >500MB, warn if >80%. Return HTTP 429 with cleanup suggestions/upgrade prompt.",
+        "testStrategy": "Fill project to 79/99, 80/100, 101/501 thresholds, verify warnings/blocks, test across concurrent uploads",
         "priority": "medium",
         "dependencies": [
-          "49",
-          "55"
+          "60"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Build Settings UI with shadcn/ui Tabs",
-            "description": "Create the settings panel using shadcn/ui tabs for theme, model, and notifications sections.",
-            "dependencies": [],
-            "details": "Use `npx shadcn@latest add tabs` to install tabs component. Structure tabs for Theme (switch), Model (select), Notifications (toggles). Integrate into main app layout with sidebar or modal trigger.",
-            "status": "pending",
-            "testStrategy": "Verify tabs switch correctly, all sections render without errors, responsive on desktop.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Implement Theme Toggle with Tailwind CSS Vars",
-            "description": "Add theme switcher that updates Tailwind CSS variables for light/dark mode.",
-            "dependencies": [
-              1
-            ],
-            "details": "Install shadcn switch: `npx shadcn@latest add switch`. Use CSS vars like --bg-primary #1a1a1a for dark. Toggle updates :root or html class, persist via localStorage or settings.",
-            "status": "pending",
-            "testStrategy": "Test toggle switches modes instantly, CSS vars update, persists across sessions.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Add Model Selector and Settings Persistence",
-            "description": "Create model dropdown and save selections to SQLite settings table.",
-            "dependencies": [
-              1
-            ],
-            "details": "Use shadcn select component. On change, invoke Tauri IPC to update settings.default_model in SQLite via tauri-plugin-sql. Load on app start.",
-            "status": "pending",
-            "testStrategy": "Confirm selection saves/loads from DB, app uses persisted default model.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement Chat Export for MD, PDF, JSON Formats",
-            "description": "Build export buttons that traverse conversation history and generate files.",
-            "dependencies": [
-              1
-            ],
-            "details": "Install marked@14.1.2 for MD, react-pdf@9.1.0 for PDF. Use Tauri fs APIs to save files. JSON: stringify messages array. MD: marked(messages). PDF: Document with message list.",
-            "status": "pending",
-            "testStrategy": "Export sample chat, verify MD renders in viewer, PDF opens correctly, JSON parses back to original data.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Add SQLite History Retention Cron Job",
-            "description": "Implement cleanup cron job for old conversation history in SQLite.",
-            "dependencies": [
-              3
-            ],
-            "details": "In Rust backend, use cron-like scheduler or Tauri interval. DELETE FROM conversations WHERE created_at < DATE('now', '-30 days'). Configurable retention days in settings.",
-            "status": "pending",
-            "testStrategy": "Insert old records, run cleanup, confirm deletion of entries older than threshold.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T23:23:43.674Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-05T20:32:33.327Z"
       },
       {
-        "id": "58",
-        "title": "Quick Actions and Basic MCP Client Foundation",
-        "description": "Implement 5 quick action buttons + basic MCP server management UI and JSON-RPC client",
-        "details": "Quick actions: buttons calling `/api/summarizer/summarize`, `/api/query/adaptive` (analyze/research/write/compare). MCP: Rust JSON-RPC client via `tauri-plugin-process` spawning servers from `~/.empire/mcp_settings.json`. Initial servers: Supabase/Neo4j configs. UI in Advanced Settings tab.",
-        "testStrategy": "Test all 5 quick actions trigger correct API, verify MCP config saves/loads, confirm server spawn/connect/disconnect.",
+        "id": "69",
+        "title": "E2E testing and performance optimization",
+        "description": "Comprehensive testing covering full user flows, optimize for specified performance metrics",
+        "details": "Cypress E2E: upload file/URL/YT -> monitor status -> chat query -> verify citations. Profile processing times (PDF<60s, YT<30s), add Celery queue prioritization, cache processed content, index optimizations. Load test 10 concurrent sources.",
+        "testStrategy": "Run full flows for all source types, measure metrics vs targets (>95% success, <3s RAG), stress test concurrency/scalability, verify retry/auto-failover works",
         "priority": "medium",
         "dependencies": [
-          "51",
-          "55"
+          "63",
+          "65",
+          "66",
+          "67",
+          "68"
         ],
         "status": "done",
-        "subtasks": [
-          {
-            "id": 1,
-            "title": "Create MCP Settings JSON Config Structure",
-            "description": "Define and implement the JSON schema for ~/.empire/mcp_settings.json including Supabase and Neo4j server configurations with required fields like host, port, credentials.",
-            "dependencies": [],
-            "details": "Use standard JSON structure with array of server objects containing id, name, type (supabase/neo4j), host, port, database, user, password fields. Ensure secure credential handling and validation.",
-            "status": "pending",
-            "testStrategy": "Validate JSON schema with sample configs, test file read/write permissions, confirm Supabase/Neo4j default values load correctly.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 2,
-            "title": "Implement Rust JSON-RPC Client with tauri-plugin-process",
-            "description": "Create Rust backend code to spawn MCP servers using tauri-plugin-process from mcp_settings.json and establish JSON-RPC connections using jsonrpc-core-client.",
-            "dependencies": [
-              1
-            ],
-            "details": "Use jsonrpc_core_client with process transport via tauri-plugin-process. Implement spawn_server(command, args), connect_rpc(url), send_jsonrpc_request(method, params) functions. Handle Supabase/Neo4j specific RPC methods.",
-            "status": "pending",
-            "testStrategy": "Test server spawn/kill cycles, verify JSON-RPC handshake succeeds, mock RPC responses for Supabase/Neo4j endpoints.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 3,
-            "title": "Build MCP Server Management UI in Advanced Settings",
-            "description": "Create React UI components in Advanced Settings tab for listing, adding, editing, spawning, connecting, and disconnecting MCP servers.",
-            "dependencies": [
-              1,
-              2
-            ],
-            "details": "Use shadcn/ui Table for server list, forms for config editing, status indicators (connecting/connected/disconnected), buttons for spawn/connect/disconnect. Zustand store for server state management.",
-            "status": "pending",
-            "testStrategy": "Test UI renders all server states, verify form validation, confirm spawn/connect buttons trigger Rust commands, check real-time status updates.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 4,
-            "title": "Implement 5 Quick Action Buttons with API Integration",
-            "description": "Create 5 prominent buttons calling /api/summarizer/summarize and /api/query/adaptive with analyze/research/write/compare modes.",
-            "dependencies": [],
-            "details": "Design buttons: 'Summarize', 'Analyze', 'Research', 'Write', 'Compare'. Use fetch/axios for API calls with selected text/content as payload. Show loading states and results in UI.",
-            "status": "pending",
-            "testStrategy": "Test each button triggers correct API endpoint with proper payload, verify loading/error states, confirm response displays correctly.",
-            "parentId": "undefined"
-          },
-          {
-            "id": 5,
-            "title": "Integrate Quick Actions with MCP Client and Full Testing",
-            "description": "Wire quick action APIs to use active MCP servers when available, implement full end-to-end testing for both features.",
-            "dependencies": [
-              2,
-              3,
-              4
-            ],
-            "details": "Add MCP server selection dropdown for quick actions. Route API calls through active JSON-RPC client when MCP connected. Implement test suite covering all functionality.",
-            "status": "pending",
-            "testStrategy": "E2E: Test quick actions with/without MCP routing, verify config persistence, full MCP lifecycle (spawn/connect/disconnect), measure API response times.",
-            "parentId": "undefined"
-          }
-        ],
-        "updatedAt": "2026-01-03T23:23:44.081Z"
+        "subtasks": [],
+        "updatedAt": "2026-01-06T03:04:20.031Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-03T23:23:44.081Z",
+      "lastModified": "2026-01-06T03:04:20.031Z",
       "taskCount": 11,
       "completedCount": 11,
       "tags": [
