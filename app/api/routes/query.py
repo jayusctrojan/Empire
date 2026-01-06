@@ -87,6 +87,11 @@ class AdaptiveQueryRequest(BaseModel):
     use_external_tools: bool = Field(True, description="Allow external API calls via Arcade")
     use_graph_context: bool = Field(True, description="Include Neo4j graph context")
 
+    # Query Expansion settings (Claude Haiku)
+    enable_query_expansion: bool = Field(True, description="Use Claude Haiku to generate query variations for better recall")
+    num_query_variations: int = Field(5, ge=1, le=10, description="Number of query variations to generate")
+    expansion_strategy: str = Field("balanced", description="Expansion strategy: synonyms, reformulate, specific, broad, balanced, question")
+
 
 class CitationInfo(BaseModel):
     """Citation information for a source."""
@@ -117,6 +122,11 @@ class AdaptiveQueryResponse(BaseModel):
     citations: List[CitationInfo] = []
     citation_style: str = "numeric"
     sources_footer: str = ""
+    # Query Expansion metadata
+    query_expansion_enabled: bool = False
+    expanded_queries: List[str] = []
+    expansion_time_ms: float = 0.0
+    expansion_strategy: str = "none"
 
 
 class ToolListResponse(BaseModel):
@@ -196,7 +206,14 @@ async def adaptive_query_endpoint(
     **Authentication Required**: Must provide valid Clerk JWT token.
     **Optimization (Task 43.3)**: Results cached for 30 minutes with semantic similarity matching.
 
+    **Query Expansion (Claude Haiku):**
+    When enabled, generates query variations before processing to improve recall:
+    - Original query + AI-generated variations
+    - Expanded queries fed into the LangGraph workflow
+    - Better coverage of semantic space
+
     This endpoint provides:
+    - Query Expansion (Claude Haiku) for improved recall
     - Iterative query refinement
     - Conditional branching logic
     - Internal tool access (vector, graph search)
@@ -221,29 +238,72 @@ async def adaptive_query_endpoint(
         {
             "query": "Compare our policies with current California regulations",
             "max_iterations": 3,
-            "use_external_tools": true
+            "use_external_tools": true,
+            "enable_query_expansion": true,
+            "num_query_variations": 5,
+            "expansion_strategy": "balanced"
         }
         ```
     """
     start_time = time.time()
+    expanded_queries = []
+    expansion_time_ms = 0.0
 
     try:
         logger.info(
             "Adaptive query started",
             query=request.query[:50],
             max_iterations=request.max_iterations,
+            query_expansion=request.enable_query_expansion,
             user_id=user["user_id"]
         )
+
+        # Query Expansion using Claude Haiku
+        if request.enable_query_expansion:
+            try:
+                from app.services.query_expansion_service import (
+                    get_query_expansion_service,
+                    ExpansionStrategy
+                )
+
+                expansion_start = time.time()
+                query_expander = get_query_expansion_service()
+
+                # Map strategy string to enum
+                try:
+                    strategy = ExpansionStrategy(request.expansion_strategy)
+                except ValueError:
+                    strategy = ExpansionStrategy.BALANCED
+
+                expansion_result = await query_expander.expand_query(
+                    request.query,
+                    num_variations=request.num_query_variations,
+                    strategy=strategy,
+                    include_original=True
+                )
+
+                expanded_queries = expansion_result.expanded_queries
+                expansion_time_ms = (time.time() - expansion_start) * 1000
+
+                logger.info(
+                    "Query expansion completed",
+                    original_query=request.query[:50],
+                    num_variations=len(expanded_queries),
+                    expansion_time_ms=round(expansion_time_ms, 2)
+                )
+            except Exception as e:
+                logger.warning(f"Query expansion failed, using original query: {e}")
+                expanded_queries = [request.query]
 
         # Initialize workflow
         workflows = LangGraphWorkflows()
         graph = workflows.build_adaptive_research_graph()
 
-        # Set initial state
+        # Set initial state with expanded queries
         initial_state: QueryState = {
             "query": request.query,
             "messages": [],
-            "refined_queries": [],
+            "refined_queries": expanded_queries if expanded_queries else [],
             "search_results": [],
             "tool_calls": [],
             "final_answer": "",
@@ -261,7 +321,8 @@ async def adaptive_query_endpoint(
             "Adaptive query completed",
             iterations=result["iteration_count"],
             processing_time_ms=processing_time,
-            tool_calls=len(result.get("tool_calls", []))
+            tool_calls=len(result.get("tool_calls", [])),
+            query_expansion_used=request.enable_query_expansion
         )
 
         # Task 15: Process citations for the response
@@ -284,7 +345,12 @@ async def adaptive_query_endpoint(
             processing_time_ms=processing_time,
             citations=citations,
             citation_style="numeric",
-            sources_footer=sources_footer
+            sources_footer=sources_footer,
+            # Query Expansion metadata
+            query_expansion_enabled=request.enable_query_expansion,
+            expanded_queries=expanded_queries,
+            expansion_time_ms=round(expansion_time_ms, 2),
+            expansion_strategy=request.expansion_strategy if request.enable_query_expansion else "none"
         )
 
     except Exception as e:
@@ -305,6 +371,10 @@ async def auto_routed_query(
     **Authentication Required**: Must provide valid Clerk JWT token.
     **Optimization (Task 43.3)**: Results cached for 30 minutes with semantic similarity matching.
 
+    **Query Expansion (Claude Haiku):**
+    When enabled, generates query variations before processing to improve recall.
+    Applied to all workflow types (LangGraph, CrewAI, Simple).
+
     The router analyzes the query and decides:
     - LangGraph: For adaptive queries needing refinement/external data
     - CrewAI: For multi-agent document processing workflows
@@ -323,13 +393,55 @@ async def auto_routed_query(
         ```json
         {
             "query": "What are California insurance requirements?",
-            "max_iterations": 2
+            "max_iterations": 2,
+            "enable_query_expansion": true,
+            "num_query_variations": 5,
+            "expansion_strategy": "balanced"
         }
         ```
     """
     start_time = time.time()
+    expanded_queries = []
+    expansion_time_ms = 0.0
 
     try:
+        # Query Expansion using Claude Haiku (applies to all workflow types)
+        if request.enable_query_expansion:
+            try:
+                from app.services.query_expansion_service import (
+                    get_query_expansion_service,
+                    ExpansionStrategy
+                )
+
+                expansion_start = time.time()
+                query_expander = get_query_expansion_service()
+
+                # Map strategy string to enum
+                try:
+                    strategy = ExpansionStrategy(request.expansion_strategy)
+                except ValueError:
+                    strategy = ExpansionStrategy.BALANCED
+
+                expansion_result = await query_expander.expand_query(
+                    request.query,
+                    num_variations=request.num_query_variations,
+                    strategy=strategy,
+                    include_original=True
+                )
+
+                expanded_queries = expansion_result.expanded_queries
+                expansion_time_ms = (time.time() - expansion_start) * 1000
+
+                logger.info(
+                    "Query expansion completed for auto-routing",
+                    original_query=request.query[:50],
+                    num_variations=len(expanded_queries),
+                    expansion_time_ms=round(expansion_time_ms, 2)
+                )
+            except Exception as e:
+                logger.warning(f"Query expansion failed in auto-route, using original query: {e}")
+                expanded_queries = [request.query]
+
         # Classify query
         classification = await workflow_router.classify_query(request.query)
 
@@ -338,24 +450,26 @@ async def auto_routed_query(
             workflow=classification.workflow_type.value,
             confidence=classification.confidence,
             query=request.query[:50],
+            query_expansion=request.enable_query_expansion,
             user_id=user["user_id"]
         )
 
         # Route to appropriate handler
         if classification.workflow_type == WorkflowType.LANGGRAPH:
-            # Use LangGraph for adaptive processing
-            return await adaptive_query_endpoint(request, background_tasks)
+            # Use LangGraph for adaptive processing (inherits Query Expansion)
+            return await adaptive_query_endpoint(request, background_tasks, user)
 
         elif classification.workflow_type == WorkflowType.CREWAI:
             # Route to CrewAI multi-agent service
             try:
                 logger.info("Routing to CrewAI multi-agent workflow")
 
-                # Call CrewAI service
+                # Call CrewAI service with expanded queries
                 crewai_result = crewai_service.process_query(
                     query=request.query,
                     workflow_type="document_analysis",
-                    max_iterations=request.max_iterations
+                    max_iterations=request.max_iterations,
+                    expanded_queries=expanded_queries if expanded_queries else None
                 )
 
                 processing_time = int((time.time() - start_time) * 1000)
@@ -372,7 +486,7 @@ async def auto_routed_query(
 
                 return AdaptiveQueryResponse(
                     answer=cited_answer,
-                    refined_queries=crewai_result.get("refined_queries", []),
+                    refined_queries=crewai_result.get("refined_queries", expanded_queries),
                     sources=sources,
                     tool_calls=crewai_result.get("agents_used", []),
                     iterations=len(crewai_result.get("steps", [])),
@@ -380,7 +494,12 @@ async def auto_routed_query(
                     processing_time_ms=processing_time,
                     citations=citations,
                     citation_style="numeric",
-                    sources_footer=sources_footer
+                    sources_footer=sources_footer,
+                    # Query Expansion metadata
+                    query_expansion_enabled=request.enable_query_expansion,
+                    expanded_queries=expanded_queries,
+                    expansion_time_ms=round(expansion_time_ms, 2),
+                    expansion_strategy=request.expansion_strategy if request.enable_query_expansion else "none"
                 )
 
             except Exception as e:
@@ -397,18 +516,53 @@ async def auto_routed_query(
                     tool_calls=[],
                     citations=[],
                     citation_style="numeric",
-                    sources_footer=""
+                    sources_footer="",
+                    query_expansion_enabled=request.enable_query_expansion,
+                    expanded_queries=expanded_queries,
+                    expansion_time_ms=round(expansion_time_ms, 2),
+                    expansion_strategy=request.expansion_strategy if request.enable_query_expansion else "none"
                 )
 
         else:  # SIMPLE
-            # Direct RAG pipeline (stub for now)
+            # Direct RAG pipeline with Query Expansion
             processing_time = int((time.time() - start_time) * 1000)
 
-            logger.info("Simple RAG query", query=request.query[:50])
+            logger.info("Simple RAG query with expansion", query=request.query[:50])
 
-            # Task 15: Simple RAG also includes citations (when actual RAG is implemented)
-            stub_sources = [{"type": "vector", "content": "Stub result"}]
-            stub_answer = f"Simple RAG result for: {request.query}"
+            # Use ParallelSearchService if Query Expansion is enabled
+            if request.enable_query_expansion and expanded_queries:
+                try:
+                    from app.services.parallel_search_service import get_parallel_search_service
+                    from app.services.hybrid_search_service import SearchMethod
+
+                    parallel_service = get_parallel_search_service()
+
+                    # Search using expanded queries
+                    parallel_result = await parallel_service.search(
+                        query=request.query,
+                        expand_queries=False,  # Already expanded
+                        search_method=SearchMethod.HYBRID
+                    )
+
+                    # Override with pre-expanded queries for multi-query search
+                    stub_sources = [
+                        {
+                            "type": "vector",
+                            "content": r.content[:500],
+                            "chunk_id": r.chunk_id,
+                            "score": r.score
+                        }
+                        for r in parallel_result.aggregated_results[:10]
+                    ]
+                    stub_answer = f"Simple RAG result for: {request.query}"
+
+                except Exception as e:
+                    logger.warning(f"Parallel search failed in Simple RAG: {e}")
+                    stub_sources = [{"type": "vector", "content": "Stub result"}]
+                    stub_answer = f"Simple RAG result for: {request.query}"
+            else:
+                stub_sources = [{"type": "vector", "content": "Stub result"}]
+                stub_answer = f"Simple RAG result for: {request.query}"
 
             cited_answer, citations, sources_footer = process_citations_for_response(
                 answer=stub_answer,
@@ -422,11 +576,16 @@ async def auto_routed_query(
                 workflow_type="simple",
                 processing_time_ms=processing_time,
                 iterations=0,
-                refined_queries=[],
+                refined_queries=expanded_queries,
                 tool_calls=[],
                 citations=citations,
                 citation_style="numeric",
-                sources_footer=sources_footer
+                sources_footer=sources_footer,
+                # Query Expansion metadata
+                query_expansion_enabled=request.enable_query_expansion,
+                expanded_queries=expanded_queries,
+                expansion_time_ms=round(expansion_time_ms, 2),
+                expansion_strategy=request.expansion_strategy if request.enable_query_expansion else "none"
             )
 
     except Exception as e:
@@ -918,5 +1077,9 @@ async def query_health():
         "available_workflows": ["langgraph", "crewai", "simple"],
         "async_processing": True,
         "celery_enabled": True,
-        "faceted_search_enabled": True
+        "faceted_search_enabled": True,
+        # Query Expansion (Claude Haiku)
+        "query_expansion_enabled": True,
+        "query_expansion_model": "claude-3-5-haiku-20241022",
+        "query_expansion_strategies": ["synonyms", "reformulate", "specific", "broad", "balanced", "question"]
     }

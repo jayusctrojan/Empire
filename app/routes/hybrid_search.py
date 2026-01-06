@@ -156,6 +156,22 @@ class HybridSearchRequest(BaseModel):
     # RRF configuration
     rrf_k: int = Field(default=60, ge=1, le=1000, description="RRF k parameter")
 
+    # Query Expansion configuration (Claude Haiku)
+    enable_query_expansion: bool = Field(
+        default=True,
+        description="Use Claude Haiku to generate query variations for better recall"
+    )
+    num_query_variations: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Number of query variations to generate"
+    )
+    expansion_strategy: str = Field(
+        default="balanced",
+        description="Expansion strategy: synonyms, reformulate, specific, broad, balanced, question"
+    )
+
     # Preference boosting configuration (Task 34.4)
     user_id: Optional[str] = Field(
         default=None,
@@ -181,6 +197,9 @@ class HybridSearchRequest(BaseModel):
                 "dense_weight": 0.5,
                 "sparse_weight": 0.3,
                 "fuzzy_weight": 0.2,
+                "enable_query_expansion": True,
+                "num_query_variations": 5,
+                "expansion_strategy": "balanced",
                 "user_id": "user-123",
                 "apply_preference_boost": True
             }
@@ -211,6 +230,11 @@ class HybridSearchResponse(BaseModel):
     total_results: int
     search_time_ms: float
     config: Dict[str, Any]
+    # Query Expansion metadata
+    query_expansion_enabled: bool = False
+    expanded_queries: List[str] = []
+    expansion_time_ms: float = 0.0
+    expansion_strategy: str = "none"
 
 
 class SearchStatsResponse(BaseModel):
@@ -245,6 +269,12 @@ async def hybrid_search(request: HybridSearchRequest):
     """
     Perform hybrid search combining multiple retrieval methods
 
+    **Query Expansion (Claude Haiku):**
+    When enabled, generates 5 query variations to improve recall:
+    - Original query + 4 AI-generated variations
+    - Parallel search across all variations
+    - Intelligent result aggregation and deduplication
+
     **Search Methods:**
     - `dense`: Vector similarity search using embeddings
     - `sparse`: BM25 full-text search using PostgreSQL ts_rank_cd
@@ -265,8 +295,15 @@ async def hybrid_search(request: HybridSearchRequest):
         SearchMethod,
         HybridSearchConfig
     )
+    from app.services.parallel_search_service import (
+        get_parallel_search_service,
+        ParallelSearchConfig
+    )
+    from app.services.query_expansion_service import ExpansionStrategy
 
     start_time = time.time()
+    expanded_queries = []
+    expansion_time_ms = 0.0
 
     try:
         # Validate weights sum to 1.0
@@ -278,7 +315,7 @@ async def hybrid_search(request: HybridSearchRequest):
             )
 
         # Create custom config
-        config = HybridSearchConfig(
+        hybrid_config = HybridSearchConfig(
             dense_weight=request.dense_weight,
             sparse_weight=request.sparse_weight,
             fuzzy_weight=request.fuzzy_weight,
@@ -289,9 +326,6 @@ async def hybrid_search(request: HybridSearchRequest):
             rrf_k=request.rrf_k,
             use_rpc=request.method == SearchMethodEnum.HYBRID_RPC
         )
-
-        # Get search service
-        search_service = get_hybrid_search_service()
 
         # Map string method to enum
         method_map = {
@@ -304,14 +338,55 @@ async def hybrid_search(request: HybridSearchRequest):
         }
         search_method = method_map.get(request.method, SearchMethod.HYBRID)
 
-        # Perform search
-        results = await search_service.search(
-            query=request.query,
-            method=search_method,
-            namespace=request.namespace,
-            metadata_filter=request.metadata_filter,
-            custom_config=config
-        )
+        # Use ParallelSearchService with Query Expansion if enabled
+        if request.enable_query_expansion:
+            # Get parallel search service (includes query expansion)
+            parallel_service = get_parallel_search_service()
+
+            # Map strategy string to enum
+            try:
+                strategy = ExpansionStrategy(request.expansion_strategy)
+            except ValueError:
+                strategy = ExpansionStrategy.BALANCED
+
+            expansion_start = time.time()
+
+            # Perform parallel search with query expansion
+            parallel_result = await parallel_service.search(
+                query=request.query,
+                expand_queries=True,
+                num_variations=request.num_query_variations,
+                expansion_strategy=strategy,
+                search_method=search_method,
+                namespace=request.namespace,
+                metadata_filter=request.metadata_filter,
+                max_results=request.top_k,
+                custom_search_config=hybrid_config
+            )
+
+            expansion_time_ms = (time.time() - expansion_start) * 1000 - parallel_result.duration_ms
+            if expansion_time_ms < 0:
+                expansion_time_ms = 0.0
+
+            results = parallel_result.aggregated_results
+            expanded_queries = parallel_result.expanded_queries
+
+            logger.info(
+                f"Query expansion search: {len(expanded_queries)} variations, "
+                f"{parallel_result.total_results_found} total -> {len(results)} unique"
+            )
+
+        else:
+            # Standard search without query expansion
+            search_service = get_hybrid_search_service()
+
+            results = await search_service.search(
+                query=request.query,
+                method=search_method,
+                namespace=request.namespace,
+                metadata_filter=request.metadata_filter,
+                custom_config=hybrid_config
+            )
 
         # Apply preference-based boosting if user_id provided (Task 34.4)
         preference_boosted = False
@@ -355,13 +430,23 @@ async def hybrid_search(request: HybridSearchRequest):
                 "fuzzy_weight": request.fuzzy_weight,
                 "top_k": request.top_k,
                 "rrf_k": request.rrf_k,
+                "query_expansion": {
+                    "enabled": request.enable_query_expansion,
+                    "num_variations": request.num_query_variations,
+                    "strategy": request.expansion_strategy
+                },
                 "preference_boosting": {
                     "enabled": request.apply_preference_boost and request.user_id is not None,
                     "user_id": request.user_id,
                     "boost_factor": request.preference_boost_factor,
                     "results_reordered": preference_boosted
                 }
-            }
+            },
+            # Query Expansion metadata
+            query_expansion_enabled=request.enable_query_expansion,
+            expanded_queries=expanded_queries,
+            expansion_time_ms=round(expansion_time_ms, 2),
+            expansion_strategy=request.expansion_strategy if request.enable_query_expansion else "none"
         )
 
     except ValueError as e:
