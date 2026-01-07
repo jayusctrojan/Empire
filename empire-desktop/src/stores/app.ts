@@ -9,7 +9,7 @@ interface AppState {
 
   // UI state
   sidebarOpen: boolean
-  activeView: 'chats' | 'projects' | 'uploads' | 'settings'
+  activeView: 'chats' | 'projects' | 'uploads' | 'ai-studio' | 'settings'
 
   // Settings
   settings: Settings
@@ -17,7 +17,7 @@ interface AppState {
   // Actions
   setUser: (user: User | null) => void
   toggleSidebar: () => void
-  setActiveView: (view: 'chats' | 'projects' | 'uploads' | 'settings') => void
+  setActiveView: (view: 'chats' | 'projects' | 'uploads' | 'ai-studio' | 'settings') => void
   updateSettings: (settings: Partial<Settings>) => void
   logout: () => void
 }
