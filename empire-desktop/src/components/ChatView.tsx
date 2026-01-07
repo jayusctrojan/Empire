@@ -15,6 +15,9 @@ export function ChatView() {
     streamingContent,
     activeConversationId,
     activeProjectId,
+    isKBMode,
+    setKBMode,
+    rateMessage,
     addMessage,
     setStreaming,
     appendStreamingContent,
@@ -26,6 +29,23 @@ export function ChatView() {
     error,
     setActiveConversation,
   } = useChatStore()
+
+  // Handle rating a message
+  const handleRateMessage = useCallback((messageId: string, rating: -1 | 0 | 1, feedback?: string) => {
+    rateMessage(messageId, rating, feedback)
+    // TODO: Send rating to backend API for AI Studio feedback collection
+  }, [rateMessage])
+
+  // Handle improve action - navigate to AI Studio with context
+  const handleImprove = useCallback((messageId: string) => {
+    window.dispatchEvent(new CustomEvent('navigate', {
+      detail: {
+        view: 'ai-studio',
+        tab: 'feedback',
+        context: { messageId, action: 'improve' }
+      }
+    }))
+  }, [])
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -179,6 +199,51 @@ export function ChatView() {
 
   return (
     <div className="flex flex-col h-full bg-empire-bg">
+      {/* KB Mode Toggle Header */}
+      <div className="px-4 py-3 border-b border-empire-border bg-empire-card/50 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-empire-text-muted">Mode:</span>
+          <div className="flex items-center gap-2 bg-empire-bg rounded-lg p-1">
+            <button
+              className={`px-3 py-1.5 text-sm rounded-md transition-all ${
+                !isKBMode
+                  ? 'bg-empire-primary text-white shadow-sm'
+                  : 'text-empire-text-muted hover:text-empire-text'
+              }`}
+              onClick={() => setKBMode(false)}
+            >
+              Project
+            </button>
+            <button
+              className={`px-3 py-1.5 text-sm rounded-md transition-all flex items-center gap-1.5 ${
+                isKBMode
+                  ? 'bg-empire-accent text-white shadow-sm'
+                  : 'text-empire-text-muted hover:text-empire-text'
+              }`}
+              onClick={() => setKBMode(true)}
+            >
+              <span>📚</span>
+              KB Chat
+            </button>
+          </div>
+          {isKBMode && (
+            <span className="text-xs px-2 py-1 rounded-full bg-empire-accent/20 text-empire-accent">
+              Response feedback enabled
+            </span>
+          )}
+        </div>
+        <button
+          className="text-sm text-empire-primary hover:text-empire-accent transition-colors flex items-center gap-1.5"
+          onClick={() => {
+            // Navigate to AI Studio - this would use the app's router
+            window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'ai-studio' } }))
+          }}
+        >
+          <span>🎨</span>
+          AI Studio
+        </button>
+      </div>
+
       {/* Error banner */}
       {error && (
         <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20">
@@ -204,9 +269,20 @@ export function ChatView() {
                   isStreaming &&
                   message.id === useChatStore.getState().streamingMessageId
                 }
+                isKBMode={isKBMode}
                 onRegenerate={
                   message.role === 'assistant' && idx === messages.length - 1
                     ? handleRegenerate
+                    : undefined
+                }
+                onRate={
+                  message.role === 'assistant'
+                    ? (rating, feedback) => handleRateMessage(message.id, rating, feedback)
+                    : undefined
+                }
+                onImprove={
+                  message.role === 'assistant'
+                    ? () => handleImprove(message.id)
                     : undefined
                 }
               />

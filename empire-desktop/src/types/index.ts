@@ -23,6 +23,13 @@ export interface Message {
   createdAt: Date
   updatedAt: Date
   status: 'sending' | 'streaming' | 'complete' | 'error'
+  // Response metadata (for KB mode)
+  rating?: -1 | 0 | 1
+  ratingFeedback?: string
+  workflow?: string
+  agent?: string
+  department?: string
+  isKBResponse?: boolean
 }
 
 export interface Source {

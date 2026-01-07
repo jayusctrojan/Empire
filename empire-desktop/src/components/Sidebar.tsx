@@ -10,10 +10,12 @@ import {
   ChevronRight,
   Trash2,
   Upload,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
+import { useAIStudioStore } from '@/stores/aistudio'
 import { UserMenu } from '@/components/auth'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { getConversations, deleteConversation } from '@/lib/database'
@@ -27,6 +29,7 @@ interface SidebarProps {
 export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
   const { sidebarOpen, toggleSidebar, activeView, setActiveView } = useAppStore()
   const { activeConversationId, setActiveConversation, setMessages } = useChatStore()
+  const { pendingClarificationsCount, hasOverdueClarifications } = useAIStudioStore()
 
   const [recentChats, setRecentChats] = useState<Conversation[]>([])
   const [isChatsExpanded, setIsChatsExpanded] = useState(true)
@@ -72,6 +75,13 @@ export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
     { id: 'chats' as const, icon: MessageSquare, label: 'Chats' },
     { id: 'projects' as const, icon: FolderOpen, label: 'Projects' },
     { id: 'uploads' as const, icon: Upload, label: 'File Uploads' },
+    {
+      id: 'ai-studio' as const,
+      icon: Sparkles,
+      label: 'AI Studio',
+      badge: pendingClarificationsCount > 0 ? pendingClarificationsCount : undefined,
+      badgeColor: hasOverdueClarifications ? 'red' : 'yellow'
+    },
     { id: 'settings' as const, icon: Settings, label: 'Settings' },
   ]
 
@@ -143,15 +153,45 @@ export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
                 <button
                   onClick={() => setActiveView(item.id)}
                   className={cn(
-                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg transition-colors',
+                    'flex items-center gap-3 w-full px-3 py-2 rounded-lg transition-colors relative',
                     activeView === item.id
                       ? 'bg-empire-border text-empire-text'
                       : 'text-empire-text-muted hover:bg-empire-border hover:text-empire-text',
                     !sidebarOpen && 'justify-center px-2'
                   )}
                 >
-                  <item.icon className="w-5 h-5" />
-                  {sidebarOpen && <span>{item.label}</span>}
+                  <div className="relative">
+                    <item.icon className="w-5 h-5" />
+                    {/* Notification badge dot (collapsed sidebar) */}
+                    {'badge' in item && item.badge && !sidebarOpen && (
+                      <span
+                        className={cn(
+                          'absolute -top-1 -right-1 w-2 h-2 rounded-full',
+                          'badgeColor' in item && item.badgeColor === 'red'
+                            ? 'bg-empire-error'
+                            : 'bg-empire-warning'
+                        )}
+                      />
+                    )}
+                  </div>
+                  {sidebarOpen && (
+                    <>
+                      <span className="flex-1">{item.label}</span>
+                      {/* Notification badge count (expanded sidebar) */}
+                      {'badge' in item && item.badge && (
+                        <span
+                          className={cn(
+                            'px-1.5 py-0.5 rounded-full text-xs font-medium',
+                            'badgeColor' in item && item.badgeColor === 'red'
+                              ? 'bg-empire-error/20 text-empire-error'
+                              : 'bg-empire-warning/20 text-empire-warning'
+                          )}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </>
+                  )}
                 </button>
               </li>
             ))}

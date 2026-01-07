@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 import type { Conversation, Message, Source, SourceCitation } from '@/types'
 
+// Response metadata from KB mode
+export interface KBResponseMetadata {
+  workflow?: string
+  agent?: string
+  department?: string
+}
+
 interface ChatState {
   // Conversations
   conversations: Conversation[]
@@ -13,6 +20,10 @@ interface ChatState {
   streamingContent: string
   streamingSources: Source[]
   streamingMessageId: string | null
+
+  // KB Mode state
+  isKBMode: boolean
+  streamingMetadata: KBResponseMetadata | null
 
   // Pending files for upload
   pendingFiles: File[]
@@ -38,6 +49,11 @@ interface ChatState {
   clearStreamingContent: () => void
   finalizeStreamingMessage: () => void
 
+  // KB Mode actions
+  setKBMode: (enabled: boolean) => void
+  setStreamingMetadata: (metadata: KBResponseMetadata | null) => void
+  rateMessage: (messageId: string, rating: -1 | 0 | 1, feedback?: string) => void
+
   // File actions
   addPendingFiles: (files: File[]) => void
   removePendingFile: (index: number) => void
@@ -57,6 +73,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamingContent: '',
   streamingSources: [],
   streamingMessageId: null,
+  isKBMode: false,
+  streamingMetadata: null,
   pendingFiles: [],
   error: null,
 
@@ -150,16 +168,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 content: s.streamingContent,
                 sources: s.streamingSources.length > 0 ? s.streamingSources : m.sources,
                 status: 'complete' as const,
+                // Include KB metadata if in KB mode
+                ...(s.isKBMode && s.streamingMetadata ? {
+                  isKBResponse: true,
+                  workflow: s.streamingMetadata.workflow,
+                  agent: s.streamingMetadata.agent,
+                  department: s.streamingMetadata.department,
+                } : {}),
               }
             : m
         ),
         streamingContent: '',
         streamingSources: [],
         streamingMessageId: null,
+        streamingMetadata: null,
         isStreaming: false,
       }))
     }
   },
+
+  // KB Mode actions
+  setKBMode: (enabled) => set({ isKBMode: enabled }),
+
+  setStreamingMetadata: (metadata) => set({ streamingMetadata: metadata }),
+
+  rateMessage: (messageId, rating, feedback) =>
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m.id === messageId
+          ? { ...m, rating, ratingFeedback: feedback }
+          : m
+      ),
+    })),
 
   // File actions
   addPendingFiles: (files) =>

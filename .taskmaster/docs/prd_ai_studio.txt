@@ -1,0 +1,1080 @@
+# Product Requirements Document (PRD)
+# Empire v7.4 - AI Studio: Chief Knowledge Officer & Asset Management
+
+## Document Information
+- **Version**: 2.0
+- **Created**: 2025-01-05
+- **Updated**: 2025-01-05
+- **Author**: Claude Code
+- **Status**: Draft for Review
+
+---
+
+## 1. Executive Summary
+
+### 1.1 Vision: The Chief Knowledge Officer (CKO)
+Empire v7.4 introduces the **Chief Knowledge Officer (CKO)** - an intelligent AI persona that serves as the user's personal knowledge manager. Unlike traditional RAG chat that simply retrieves and answers, the CKO is an active, conversational entity that:
+
+- **Manages** your entire knowledge base
+- **Understands** context, patterns, and relationships across all your content
+- **Proactively** surfaces insights, conflicts, and recommendations
+- **Asks questions** when clarification is needed (Human-in-the-Loop)
+- **Learns** from your feedback and corrections
+- **Explains** its reasoning, classifications, and decisions
+- **Orchestrates** the 15 AI agents behind the scenes
+
+**The CKO is not a search engine - it's a knowledgeable colleague who happens to have perfect recall.**
+
+### 1.2 Problem Statement
+Currently, Empire v7.3 users can:
+- Upload files to the global knowledge base (File Uploads)
+- Chat within project contexts (Project Sources with RAG)
+- Use AI agents for document analysis (AGENT-001 through AGENT-015)
+- Have content automatically classified into 12 departments
+
+However, users lack:
+1. **Intelligent KB interaction** - No conversational interface with an entity that KNOWS the KB
+2. **Proactive insights** - System doesn't surface patterns, gaps, or recommendations
+3. **Natural clarifications** - Agents can't ask users questions in a conversational way
+4. **Data priority control** - Users can't configure which content matters most
+5. **Transparency** - Users can't see WHY decisions were made
+6. **Relationship understanding** - No visibility into how content connects
+
+### 1.3 Existing Architecture (Extended by CKO)
+Empire v7.3 has a sophisticated content processing system that the CKO will serve as the face of:
+
+**5 Asset Types:**
+- **SKILL** - Complex reusable automation (YAML format)
+- **COMMAND** - Quick one-liner actions (MD format)
+- **AGENT** - Multi-step role-based tasks (YAML format)
+- **PROMPT** - Reusable templates (MD format) - DEFAULT
+- **WORKFLOW** - Multi-system automation (JSON format)
+
+**12 Departments for Classification:**
+1. IT & Engineering (it-engineering)
+2. Sales & Marketing (sales-marketing)
+3. Customer Support (customer-support)
+4. Operations/HR/Supply (operations-hr-supply)
+5. Finance & Accounting (finance-accounting)
+6. Project Management (project-management)
+7. Real Estate (real-estate)
+8. Private Equity & M&A (private-equity-ma)
+9. Consulting (consulting)
+10. Personal & Continuing Ed (personal-continuing-ed)
+11. Research & Development (research-development)
+12. Global (_global) - cross-department catch-all
+
+**15 AI Agents (Orchestrated by CKO):**
+- AGENT-001: Master Content Analyzer & Asset Orchestrator (CKO's brain)
+- AGENT-002: Content Summarizer
+- AGENT-008: Department Classifier
+- AGENT-009: Senior Research Analyst
+- AGENT-010: Content Strategist
+- AGENT-011: Fact Checker
+- AGENT-012: Research Agent
+- AGENT-013: Analysis Agent
+- AGENT-014: Writing Agent
+- AGENT-015: Review Agent
+
+### 1.4 Proposed Solution
+Introduce **"AI Studio"** - a conversational interface between File Uploads and Settings featuring:
+
+1. **Chief Knowledge Officer (CKO)** - Conversational AI persona managing the KB
+2. **Data Weights & Priorities** - User-configurable importance levels
+3. **Asset Management** - View/edit generated assets with CKO explanations
+4. **Natural Clarifications** - CKO asks questions in conversation, not system alerts
+5. **Search** - Global search across conversations, assets, and content
+6. **Notification System** - Yellow dot when CKO needs input
+
+### 1.5 Business Value
+- **Increased engagement**: Talking to a knowledgeable persona is more engaging than querying a database
+- **Better decisions**: CKO explains reasoning, helping users understand their data
+- **Improved accuracy**: Natural feedback loop improves classifications and responses
+- **Time savings**: CKO proactively surfaces relevant info, not just when asked
+- **Data governance**: Users control what matters most via weights and priorities
+- **Trust**: Transparency in AI decisions builds user confidence
+
+---
+
+## 2. Feature Requirements
+
+### 2.1 AI Studio Navigation
+**Priority: P0 (Critical)**
+
+**Requirements:**
+- FR-2.1.1: Add "AI Studio" navigation item between "File Uploads" and "Settings"
+- FR-2.1.2: Icon should represent AI/brain/neural network concept
+- FR-2.1.3: Navigation item should show notification badge when feedback is pending
+- FR-2.1.4: AI Studio should have 4 sub-sections: KB Chat, Skills, Workflows, Feedback
+
+**Acceptance Criteria:**
+- Navigation item visible in sidebar
+- Clicking opens AI Studio view with tab navigation
+- Active section highlighted
+
+---
+
+### 2.2 Chief Knowledge Officer (CKO) Conversation
+**Priority: P0 (Critical)**
+
+The CKO is the primary interface for AI Studio - a conversational AI persona that manages the knowledge base.
+
+**CKO Persona Characteristics:**
+- **Name**: "CKO" or customizable (e.g., "Atlas", "Sage", "Your KB Director")
+- **Tone**: Professional but approachable, proactive, explanatory
+- **Memory**: Remembers past conversations, preferences, and corrections
+- **Transparency**: Always explains reasoning when asked
+
+**Requirements:**
+- FR-2.2.1: Conversational interface with CKO persona (not generic RAG)
+- FR-2.2.2: CKO introduces itself and its capabilities on first interaction
+- FR-2.2.3: CKO proactively shares insights, not just when asked
+- FR-2.2.4: CKO asks clarifying questions naturally in conversation
+- FR-2.2.5: CKO explains its reasoning, classifications, and decisions
+- FR-2.2.6: CKO references specific documents with citations
+- FR-2.2.7: CKO can perform actions (reclassify, update weights, etc.) via conversation
+- FR-2.2.8: CKO respects data weights and priorities in responses
+- FR-2.2.9: Support real-time streaming responses via WebSocket
+- FR-2.2.10: Persist conversation history with CKO memory
+- FR-2.2.11: Allow users to rate responses and provide corrections inline
+- FR-2.2.12: CKO learns from corrections and applies to future responses
+
+**Example CKO Conversations:**
+
+| User Says | CKO Responds |
+|-----------|--------------|
+| "What do you know about our sales process?" | "Based on 12 documents in your Sales & Marketing department, your sales process has 5 stages... [cites sources]. I noticed a conflict between the Q3 playbook and the onboarding guide - would you like me to highlight the differences?" |
+| "Why did you classify that as Finance?" | "I classified 'Q4 Budget Review.pdf' as Finance (94% confidence) because it contained keywords like 'budget', 'expense', 'forecast' and matched patterns from 8 similar documents. The secondary match was Project Management (23%). Should I reclassify it?" |
+| "What are you unsure about?" | "I have 3 items that need your input: 1) A document that could be IT or Consulting - which fits better? 2) Should I generate a Skill or Workflow from the automation guide? 3) I found duplicate content in two uploads - keep both?" |
+| "What should I add to the KB?" | "Looking at your content distribution, you have strong coverage in Finance (45 docs) and IT (38 docs), but gaps in Customer Support (3 docs) and Real Estate (0 docs). If these are relevant to your work, I'd recommend adding foundational documents there." |
+| "Prioritize recent documents over older ones" | "Got it. I've updated your data weights to favor documents from the last 6 months (weight: 1.5x) over older content (weight: 0.7x). This will affect how I synthesize answers. Want me to apply this to all departments or specific ones?" |
+
+**CKO Capabilities:**
+- Answer questions using weighted KB content
+- Explain any classification or asset decision
+- Surface conflicts and inconsistencies
+- Recommend content gaps and improvements
+- Manage data weights via conversation
+- Reclassify content on request
+- Generate summaries and reports
+- Delegate to specialized agents when needed
+
+**UI Components:**
+- Chat interface with CKO avatar/icon
+- Message history with CKO/User distinction
+- Inline source citations (expandable)
+- Inline clarification questions (highlighted in yellow)
+- Quick action buttons on CKO suggestions
+- "New Conversation" button
+- Conversation search
+
+**API Endpoints:**
+- POST /api/studio/cko/message - Send message to CKO
+- GET /api/studio/cko/conversations - List past conversations
+- GET /api/studio/cko/conversations/{id} - Get conversation history
+- POST /api/studio/cko/conversations/{id}/rate - Rate a response
+- POST /api/studio/cko/actions - Execute CKO action (reclassify, update weights, etc.)
+- GET /api/studio/cko/pending - Get pending clarifications for this user
+- WebSocket /ws/studio/cko - Real-time streaming
+
+---
+
+### 2.3 Data Weights & Priorities
+**Priority: P0 (Critical)**
+
+Users can configure how the CKO weighs and prioritizes different content sources.
+
+**Requirements:**
+- FR-2.3.1: Configure weights by department (0.0 - 2.0 multiplier)
+- FR-2.3.2: Configure weights by content recency (newer vs older)
+- FR-2.3.3: Configure weights by source type (PDF, video, web, etc.)
+- FR-2.3.4: Configure weights by document tags/labels
+- FR-2.3.5: Pin high-priority documents (always prioritize)
+- FR-2.3.6: Mute/archive low-priority documents (reduce weight to 0)
+- FR-2.3.7: CKO explains how weights affected an answer
+- FR-2.3.8: Weights can be adjusted via CKO conversation
+- FR-2.3.9: Default weights configurable in settings
+- FR-2.3.10: Preview how weight changes would affect answers
+
+**Weight Categories:**
+
+| Category | Options | Default |
+|----------|---------|---------|
+| **Department Weight** | 0.0 - 2.0 per department | 1.0 (equal) |
+| **Recency Weight** | Last 30 days: 1.5x, Last year: 1.0x, Older: 0.7x | Enabled |
+| **Source Type Weight** | PDF: 1.0, Video: 0.9, Web: 0.8, Notes: 0.7 | Enabled |
+| **Confidence Weight** | High (>90%): 1.2x, Medium: 1.0x, Low (<70%): 0.8x | Enabled |
+| **User Verified** | Verified documents: 1.5x | Enabled |
+| **Pinned Documents** | Always included, weight: 2.0x | N/A |
+| **Muted Documents** | Excluded from responses, weight: 0.0x | N/A |
+
+**Weight Presets:**
+- **Balanced** - All weights equal (default)
+- **Recent Focus** - Heavily favor recent content
+- **Department Expert** - Boost specific department(s)
+- **Verified Only** - Only use user-verified content
+- **Custom** - User-defined weights
+
+**UI Components:**
+- Weight configuration panel (accessible from CKO settings)
+- Slider controls for each weight category
+- Preset dropdown
+- Pin/Mute buttons on documents
+- Weight explanation on CKO responses ("Based on: 60% Finance docs, weighted by recency")
+
+**API Endpoints:**
+- GET /api/studio/weights - Get current weight configuration
+- PATCH /api/studio/weights - Update weights
+- GET /api/studio/weights/presets - List available presets
+- POST /api/studio/weights/preview - Preview answer with different weights
+- POST /api/studio/documents/{id}/pin - Pin a document
+- POST /api/studio/documents/{id}/mute - Mute a document
+
+---
+
+### 2.4 Asset Management (5 Asset Types)
+**Priority: P1 (High)**
+
+The system generates 5 types of assets from processed content. Users can view, edit, and manage these assets - and ask the CKO to explain any asset decision.
+
+**Requirements:**
+- FR-2.3.1: Display all generated assets organized by type and department
+- FR-2.3.2: Show asset status (draft/published/archived)
+- FR-2.3.3: Allow users to view and edit asset content
+- FR-2.3.4: Display asset generation metadata (source document, confidence, timestamp)
+- FR-2.3.5: Allow users to re-classify assets to different types
+- FR-2.3.6: Support asset versioning and history
+- FR-2.3.7: Allow users to publish drafts or archive unwanted assets
+
+**Asset Types (from AGENT-001 orchestrator_agent_service.py):**
+
+| Type | Format | Description | Storage Path Pattern |
+|------|--------|-------------|---------------------|
+| **SKILL** | YAML | Complex reusable automation | `crewai-suggestions/claude-skills/drafts/{name}.yaml` |
+| **COMMAND** | MD | Quick one-liner actions | `crewai-suggestions/claude-commands/drafts/{name}.md` |
+| **AGENT** | YAML | Multi-step role-based tasks | `crewai-suggestions/agents/drafts/{name}.yaml` |
+| **PROMPT** | MD | Reusable templates (DEFAULT) | `crewai-suggestions/prompts/drafts/{name}.md` |
+| **WORKFLOW** | JSON | Multi-system automation | `crewai-suggestions/workflows/drafts/{name}.json` |
+
+**Asset List View:**
+- Filter by: Asset type, Department, Status, Date range
+- Sort by: Created date, Department, Type, Source document
+- Search: Full-text search across asset content
+- Bulk actions: Archive, Delete, Change status
+
+**Asset Detail View:**
+- Source document reference with link
+- Classification confidence score
+- Generated content (editable)
+- Metadata: department, creation time, last modified
+- Version history
+- Feedback/notes
+
+**API Endpoints:**
+- GET /api/studio/assets - List all assets (filterable)
+- GET /api/studio/assets/{asset_id} - Get asset details
+- PATCH /api/studio/assets/{asset_id} - Update asset content
+- POST /api/studio/assets/{asset_id}/publish - Publish draft
+- POST /api/studio/assets/{asset_id}/archive - Archive asset
+- GET /api/studio/assets/{asset_id}/history - Get version history
+- POST /api/studio/assets/{asset_id}/reclassify - Change asset type
+
+---
+
+### 2.5 Department Classification Management
+**Priority: P1 (High)**
+
+Users can view and correct how their content was classified. The CKO can also explain and reclassify via conversation.
+
+**Requirements:**
+- FR-2.4.1: Display all content classifications with confidence scores
+- FR-2.4.2: Allow users to correct misclassified content
+- FR-2.4.3: Show classification reasoning and matched keywords
+- FR-2.4.4: Display secondary classification if applicable
+- FR-2.4.5: Re-process content with corrected classification
+- FR-2.4.6: Track classification accuracy improvements from feedback
+
+**12 Departments (from orchestrator_agent_service.py):**
+
+| Department | Code | Description |
+|------------|------|-------------|
+| IT & Engineering | `it-engineering` | Software, infrastructure, DevOps |
+| Sales & Marketing | `sales-marketing` | Pipeline, CRM, campaigns |
+| Customer Support | `customer-support` | Helpdesk, tickets, service |
+| Operations/HR/Supply | `operations-hr-supply` | Workforce, logistics, procurement |
+| Finance & Accounting | `finance-accounting` | Budget, audit, reporting |
+| Project Management | `project-management` | Agile, milestones, planning |
+| Real Estate | `real-estate` | Property, leases, transactions |
+| Private Equity & M&A | `private-equity-ma` | Investments, valuations, deals |
+| Consulting | `consulting` | Strategy, advisory, frameworks |
+| Personal & Continuing Ed | `personal-continuing-ed` | Training, courses, development |
+| Research & Development | `research-development` | R&D, innovation, patents |
+| Global | `_global` | Cross-department catch-all |
+
+**Classification Review UI:**
+- List view of all classified content
+- Filter by department, confidence level, date
+- Confidence score with visual indicator (green/yellow/red)
+- One-click reclassification dropdown
+- Bulk reclassification for multiple items
+
+**API Endpoints:**
+- GET /api/studio/classifications - List all classifications
+- GET /api/studio/classifications/{id} - Get classification details
+- PATCH /api/studio/classifications/{id} - Correct classification
+- POST /api/studio/classifications/{id}/reprocess - Re-run AGENT-001
+- GET /api/studio/classifications/stats - Classification accuracy stats
+
+---
+
+### 2.6 Processing Workflow Preferences
+**Priority: P2 (Medium)**
+
+**Requirements:**
+- FR-2.5.1: Display all available query workflows (LangGraph, CrewAI, Simple RAG)
+- FR-2.5.2: Show workflow routing logic and conditions
+- FR-2.5.3: Allow users to set workflow preferences (e.g., always use LangGraph)
+- FR-2.5.4: Display workflow execution history with timing
+- FR-2.5.5: Show which agents are used in each workflow
+- FR-2.5.6: Allow custom workflow priority ordering
+
+**Query Workflows:**
+- **LangGraph Adaptive** - Iterative research with refinement loops
+- **CrewAI Multi-Agent** - Complex document analysis
+- **Simple RAG** - Direct knowledge base lookup
+
+**Content Processing Workflows (AGENT-001 orchestration):**
+- **Document Analysis Pipeline** - AGENT-009 → AGENT-010 → AGENT-011
+- **Multi-Agent Orchestration** - AGENT-012 → AGENT-013 → AGENT-014 → AGENT-015
+
+**15 AI Agents:**
+- AGENT-001: Master Content Analyzer & Asset Orchestrator
+- AGENT-002: Content Summarizer
+- AGENT-008: Department Classifier
+- AGENT-009: Senior Research Analyst
+- AGENT-010: Content Strategist
+- AGENT-011: Fact Checker
+- AGENT-012: Research Agent
+- AGENT-013: Analysis Agent
+- AGENT-014: Writing Agent
+- AGENT-015: Review Agent
+
+**Workflow Settings:**
+- Default query workflow preference
+- Max iterations for adaptive workflows
+- Routing overrides (force specific workflow for query types)
+- Tool preferences (enable/disable Arcade.dev tools)
+- Agent preferences (which agents to use)
+
+**API Endpoints:**
+- GET /api/studio/workflows - List all workflows
+- GET /api/studio/workflows/{workflow_id} - Get workflow details
+- PATCH /api/studio/workflows/preferences - Update preferences
+- GET /api/studio/workflows/history - Get execution history
+- GET /api/studio/agents - List all agents with status
+
+---
+
+### 2.7 Feedback & Training Loop
+**Priority: P0 (Critical)**
+
+The CKO learns from user interactions. This section covers tracking and visualizing that learning.
+
+**Requirements:**
+- FR-2.7.1: Dashboard showing all user feedback and corrections
+- FR-2.7.2: CKO acknowledges and learns from inline corrections
+- FR-2.7.3: Support ratings on CKO responses (thumbs up/down)
+- FR-2.7.4: Track feedback categories:
+  - CKO response quality
+  - Classification accuracy
+  - Asset type accuracy
+  - Weight effectiveness
+  - Clarification helpfulness
+- FR-2.7.5: Show CKO improvement over time (how feedback improved responses)
+- FR-2.7.6: CKO can explain what it learned from feedback
+- FR-2.7.7: Track classification corrections and asset reclassifications
+
+**Feedback Collection Points:**
+- After each KB chat response
+- After each project chat response
+- After each agent execution
+- In AI Studio feedback dashboard
+
+**Feedback Integration with Main Chat:**
+- FR-2.6.8: Add feedback buttons to main chat interface
+- FR-2.6.9: Allow inline corrections ("The answer should be...")
+- FR-2.6.10: Support "Improve this response" action
+- FR-2.6.11: Feedback persists and influences future responses
+
+**API Endpoints:**
+- GET /api/studio/feedback - List all feedback
+- POST /api/studio/feedback - Submit new feedback
+- GET /api/studio/feedback/stats - Feedback statistics
+- GET /api/studio/feedback/impact - Show how feedback improved responses
+- POST /api/studio/feedback/{id}/acknowledge - Mark as reviewed
+
+---
+
+### 2.8 CKO Clarifications & Notification System
+**Priority: P0 (Critical)**
+
+When the CKO needs user input, it asks naturally in conversation. The notification system alerts users when the CKO is waiting.
+
+**How Clarifications Work:**
+- CKO asks questions **in the conversation**, not as system alerts
+- Questions appear as **highlighted messages** (yellow background)
+- User responds inline, CKO continues processing
+- If user isn't in AI Studio, yellow dot appears on nav item
+
+**Requirements:**
+- FR-2.8.1: CKO asks clarifying questions naturally in conversation
+- FR-2.8.2: Clarification messages highlighted in yellow within chat
+- FR-2.8.3: Yellow dot (●) on AI Studio nav when CKO is waiting for input
+- FR-2.8.4: Badge count shows number of pending questions (e.g., "AI Studio (3)")
+- FR-2.8.5: User responds by replying in conversation
+- FR-2.8.6: "Skip" option lets CKO proceed with best guess
+- FR-2.8.7: Optional email notification for clarifications pending >24 hours
+- FR-2.8.8: CKO remembers user preferences to reduce future clarifications
+
+**When CKO Asks for Clarification:**
+
+| Scenario | CKO Says |
+|----------|----------|
+| Low classification confidence | "I'm not sure if this document belongs in IT-Engineering or Project Management. It mentions both software development and sprint planning. Which fits better?" |
+| Ambiguous asset type | "This automation guide could become a Skill (reusable automation) or a Workflow (multi-system process). What would be more useful to you?" |
+| Conflicting information | "I noticed this document contradicts something in your Q3 report. The Q3 report says X, but this says Y. Which is correct, or are both valid for different contexts?" |
+| Sensitive content | "This document appears to contain personal information (I spotted what looks like SSNs). Should I process it with extra privacy protections, or skip the sensitive sections?" |
+| Multiple departments | "This content spans Finance and Consulting equally. Should I classify it as one or the other, or keep it in Global?" |
+
+**Notification System:**
+- **Yellow Dot (●)** - CKO has pending question(s)
+- **Red Dot (●)** - Question pending >24 hours (needs attention)
+- **Badge Count** - Number of pending questions
+- **Toast** - "CKO has a question for you" (when app is open)
+- **Email** - Daily digest of pending questions (optional)
+
+**Clarification Flow (in conversation):**
+```
+User uploads document
+      ↓
+CKO: "Got it! Processing 'Q4_Budget.pdf'..."
+      ↓
+CKO: "I classified this as Finance (78% confidence). However, it also
+      mentions project timelines. Should I keep it as Finance, or would
+      Project Management be more appropriate?" [highlighted in yellow]
+      ↓
+User: "Keep it as Finance, the project stuff is just context"
+      ↓
+CKO: "Perfect, I'll remember that for similar documents. Classified as
+      Finance. I also generated a PROMPT asset from the budget template
+      section. Want to see it?"
+```
+
+**API Endpoints:**
+- GET /api/studio/cko/pending - List pending clarifications
+- GET /api/studio/cko/pending/count - Get count for badge
+- POST /api/studio/cko/respond - Respond to clarification (via conversation)
+- POST /api/studio/cko/skip/{clarification_id} - Skip with CKO's best guess
+
+---
+
+### 2.9 Global Search
+**Priority: P1 (High)**
+
+Search across all AI Studio content from one place.
+
+**Requirements:**
+- FR-2.9.1: Global search bar at top of AI Studio
+- FR-2.9.2: Search across: CKO conversations, assets, classifications, documents
+- FR-2.9.3: Filter results by type (conversation, asset, document, classification)
+- FR-2.9.4: Filter by department, date range, asset type
+- FR-2.9.5: Full-text search with keyword highlighting
+- FR-2.9.6: Recent searches history
+- FR-2.9.7: Search suggestions/autocomplete
+- FR-2.9.8: Keyboard shortcut (Cmd+K or Ctrl+K) to focus search
+
+**Search Result Types:**
+- **Conversations** - Past CKO conversations matching query
+- **Assets** - Skills, Commands, Agents, Prompts, Workflows
+- **Documents** - Source documents in KB
+- **Classifications** - Classification records
+
+**API Endpoints:**
+- GET /api/studio/search?q={query} - Global search
+- GET /api/studio/search/suggestions?q={query} - Autocomplete suggestions
+- GET /api/studio/search/recent - Recent searches
+
+---
+
+### 2.10 Main Chat Integration (Alternative Path)
+**Priority: P2 (Medium)**
+
+For users who prefer to stay in main chats rather than going to AI Studio:
+
+**Requirements:**
+- FR-2.10.1: Add "Ask CKO" option in main chat
+- FR-2.10.2: Add feedback buttons to all chat responses
+- FR-2.10.3: Show CKO notification badge in main navigation
+- FR-2.10.4: Quick link to AI Studio for full CKO experience
+- FR-2.10.5: CKO clarifications can appear in main chat if user prefers
+
+**UI Enhancements:**
+- "Ask CKO" button or mode toggle in main chat
+- Response metadata showing: workflow used, sources, confidence
+- Inline feedback widget (thumbs up/down)
+- "View in AI Studio" link on CKO responses
+
+---
+
+## 3. Technical Architecture
+
+### 3.1 Backend Components
+
+**New Services:**
+```
+app/services/
+├── studio_kb_chat_service.py    # Global KB chat (reuse project_rag_service patterns)
+├── skill_management_service.py   # Skill CRUD and configuration
+├── workflow_preferences_service.py  # User workflow preferences
+└── feedback_aggregation_service.py  # Feedback analysis and impact tracking
+```
+
+**New Routes:**
+```
+app/routes/
+├── studio.py                    # AI Studio main routes
+├── studio_kb_chat.py            # KB Chat routes
+├── studio_skills.py             # Skills management routes
+├── studio_workflows.py          # Workflow management routes
+└── studio_feedback.py           # Feedback routes
+```
+
+**Database Tables (New):**
+```sql
+-- =============================================================================
+-- GENERATED ASSETS TABLE (5 Asset Types)
+-- =============================================================================
+CREATE TABLE generated_assets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+
+    -- Asset identification
+    asset_type TEXT NOT NULL CHECK (asset_type IN ('skill', 'command', 'agent', 'prompt', 'workflow')),
+    department TEXT NOT NULL,  -- One of 12 departments
+    title TEXT NOT NULL,
+
+    -- Content
+    content TEXT NOT NULL,  -- YAML, MD, or JSON depending on type
+    format TEXT NOT NULL CHECK (format IN ('yaml', 'md', 'json')),
+
+    -- Status
+    status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+
+    -- Source tracking
+    source_document_id UUID,  -- Reference to original document
+    source_document_title TEXT,
+
+    -- Classification metadata (from AGENT-001)
+    classification_confidence NUMERIC(3,2),  -- 0.00 to 1.00
+    classification_reasoning TEXT,
+    keywords_matched JSONB DEFAULT '[]',
+    secondary_department TEXT,
+    secondary_confidence NUMERIC(3,2),
+
+    -- Asset decision metadata
+    asset_decision_reasoning TEXT,
+    needs_summary BOOLEAN DEFAULT false,
+
+    -- Processing metadata
+    processing_time_seconds NUMERIC(6,2),
+    agent_id TEXT DEFAULT 'AGENT-001',
+
+    -- Storage path (B2)
+    storage_path TEXT,
+
+    -- Versioning
+    version INTEGER DEFAULT 1,
+    parent_version_id UUID REFERENCES generated_assets(id),
+
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    published_at TIMESTAMPTZ,
+    archived_at TIMESTAMPTZ
+);
+
+-- Indexes for generated_assets
+CREATE INDEX idx_generated_assets_user ON generated_assets(user_id);
+CREATE INDEX idx_generated_assets_type ON generated_assets(asset_type);
+CREATE INDEX idx_generated_assets_department ON generated_assets(department);
+CREATE INDEX idx_generated_assets_status ON generated_assets(status);
+CREATE INDEX idx_generated_assets_created ON generated_assets(created_at DESC);
+
+-- =============================================================================
+-- CONTENT CLASSIFICATIONS TABLE
+-- =============================================================================
+CREATE TABLE content_classifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+
+    -- Source content
+    source_document_id UUID,
+    source_content_hash TEXT,  -- For deduplication
+    content_preview TEXT,  -- First 500 chars
+    filename TEXT,
+
+    -- Classification result
+    department TEXT NOT NULL,
+    confidence NUMERIC(3,2) NOT NULL,
+    reasoning TEXT,
+    keywords_matched JSONB DEFAULT '[]',
+
+    -- Secondary classification
+    secondary_department TEXT,
+    secondary_confidence NUMERIC(3,2),
+
+    -- Content analysis
+    word_count INTEGER,
+    complexity_score NUMERIC(3,2),
+    content_type TEXT,  -- document, video, code, etc.
+    has_code BOOLEAN DEFAULT false,
+    has_tables BOOLEAN DEFAULT false,
+    privacy_level TEXT DEFAULT 'cloud_eligible',
+
+    -- User corrections
+    user_corrected_department TEXT,
+    correction_reason TEXT,
+    corrected_at TIMESTAMPTZ,
+
+    -- Processing metadata
+    processing_time_seconds NUMERIC(6,2),
+
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Indexes for content_classifications
+CREATE INDEX idx_classifications_user ON content_classifications(user_id);
+CREATE INDEX idx_classifications_department ON content_classifications(department);
+CREATE INDEX idx_classifications_confidence ON content_classifications(confidence);
+CREATE INDEX idx_classifications_corrected ON content_classifications(user_corrected_department)
+    WHERE user_corrected_department IS NOT NULL;
+
+-- =============================================================================
+-- USER WORKFLOW PREFERENCES
+-- =============================================================================
+CREATE TABLE user_workflow_preferences (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) UNIQUE NOT NULL,
+
+    -- Query workflow preferences
+    default_query_workflow TEXT DEFAULT 'auto',  -- auto, langgraph, crewai, simple_rag
+    max_iterations INTEGER DEFAULT 3,
+
+    -- Workflow overrides by query type
+    workflow_overrides JSONB DEFAULT '{}',
+
+    -- Tool preferences
+    arcade_tools_enabled BOOLEAN DEFAULT true,
+    tool_preferences JSONB DEFAULT '{}',
+
+    -- Agent preferences
+    agent_preferences JSONB DEFAULT '{}',
+
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- =============================================================================
+-- GLOBAL KB CHAT SESSIONS
+-- =============================================================================
+CREATE TABLE studio_kb_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    title TEXT,
+
+    -- Session metadata
+    message_count INTEGER DEFAULT 0,
+    last_message_at TIMESTAMPTZ,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index
+CREATE INDEX idx_kb_sessions_user ON studio_kb_sessions(user_id);
+CREATE INDEX idx_kb_sessions_updated ON studio_kb_sessions(updated_at DESC);
+
+-- =============================================================================
+-- GLOBAL KB CHAT MESSAGES
+-- =============================================================================
+CREATE TABLE studio_kb_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES studio_kb_sessions(id) ON DELETE CASCADE NOT NULL,
+
+    -- Message content
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+
+    -- RAG metadata
+    sources JSONB DEFAULT '[]',  -- Array of source documents with citations
+    workflow_used TEXT,
+
+    -- Feedback
+    rating INTEGER CHECK (rating BETWEEN -1 AND 1),  -- -1 = down, 0 = none, 1 = up
+    feedback_id UUID REFERENCES agent_feedback(id),
+
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Indexes
+CREATE INDEX idx_kb_messages_session ON studio_kb_messages(session_id);
+CREATE INDEX idx_kb_messages_created ON studio_kb_messages(created_at);
+
+-- =============================================================================
+-- AGENT USAGE STATISTICS
+-- =============================================================================
+CREATE TABLE agent_usage_stats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id TEXT NOT NULL,  -- AGENT-001, AGENT-002, etc.
+    user_id UUID REFERENCES auth.users(id),
+    execution_date DATE DEFAULT CURRENT_DATE,
+
+    -- Counts
+    call_count INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    error_count INTEGER DEFAULT 0,
+
+    -- Latency
+    total_latency_ms BIGINT DEFAULT 0,
+    avg_latency_ms NUMERIC(10,2) GENERATED ALWAYS AS (
+        CASE WHEN call_count > 0 THEN total_latency_ms::NUMERIC / call_count ELSE 0 END
+    ) STORED,
+
+    -- Success rate
+    success_rate NUMERIC(5,2) GENERATED ALWAYS AS (
+        CASE WHEN call_count > 0 THEN (success_count::NUMERIC / call_count) * 100 ELSE 0 END
+    ) STORED,
+
+    UNIQUE(agent_id, user_id, execution_date)
+);
+
+-- Index
+CREATE INDEX idx_agent_stats_agent ON agent_usage_stats(agent_id);
+CREATE INDEX idx_agent_stats_user ON agent_usage_stats(user_id);
+CREATE INDEX idx_agent_stats_date ON agent_usage_stats(execution_date DESC);
+```
+
+### 3.2 Frontend Components (Desktop App)
+
+**New Views:**
+```
+empire-desktop/src/views/
+├── AIStudioView.tsx               # Main AI Studio container with tab navigation
+├── studio/
+│   ├── KBChatView.tsx             # Knowledge Base chat interface
+│   ├── AssetsView.tsx             # Asset management (5 types)
+│   ├── ClassificationsView.tsx    # Department classification review
+│   ├── WorkflowsView.tsx          # Workflow preferences
+│   └── FeedbackDashboardView.tsx  # Feedback dashboard
+```
+
+**New Components:**
+```
+empire-desktop/src/components/
+├── studio/
+│   ├── KBChatMessage.tsx          # Chat message with sources & citations
+│   ├── AssetCard.tsx              # Asset display card (skill/command/agent/prompt/workflow)
+│   ├── AssetDetailModal.tsx       # Asset view/edit modal
+│   ├── AssetTypeFilter.tsx        # Filter by 5 asset types
+│   ├── DepartmentFilter.tsx       # Filter by 12 departments
+│   ├── ClassificationCard.tsx     # Classification result card
+│   ├── ClassificationCorrector.tsx # Reclassification dropdown
+│   ├── WorkflowCard.tsx           # Workflow display card
+│   ├── WorkflowPreferences.tsx    # Workflow settings form
+│   ├── AgentList.tsx              # List of 15 agents with status
+│   ├── FeedbackItem.tsx           # Feedback list item
+│   └── FeedbackForm.tsx           # Detailed feedback form
+├── chat/
+│   ├── FeedbackButtons.tsx        # Thumbs up/down buttons
+│   ├── ResponseMetadata.tsx       # Shows workflow/agent/department used
+│   └── KBModeToggle.tsx           # Chat mode toggle
+├── common/
+│   ├── ConfidenceBadge.tsx        # Visual confidence indicator (green/yellow/red)
+│   └── DepartmentBadge.tsx        # Department tag badge
+```
+
+**State Management:**
+```
+empire-desktop/src/stores/
+├── studio.ts                      # AI Studio global state
+├── assets.ts                      # Assets state (5 types)
+├── classifications.ts             # Classifications state
+├── workflows.ts                   # Workflow preferences state
+└── feedback.ts                    # Feedback state
+```
+
+### 3.3 Integration Points
+
+**Existing Services to Extend:**
+- `project_rag_service.py` - Reuse for global KB chat (weight project=0, global=1.0)
+- `agent_router.py` - Add user preference overrides
+- `agent_feedback` table - Already exists, add UI
+- `chat_sessions` / `chat_messages` - Add feedback_id column
+
+**WebSocket Integration:**
+- Extend existing WebSocket manager for KB chat streaming
+- Add `/ws/studio/kb-chat` channel
+
+---
+
+## 4. User Stories
+
+### 4.1 Knowledge Worker (Primary Persona)
+- US-4.1.1: As a user, I want to chat with my knowledge base without creating a project
+- US-4.1.2: As a user, I want to see which documents were used to generate an answer
+- US-4.1.3: As a user, I want to provide feedback when an AI response is incorrect
+- US-4.1.4: As a user, I want to save useful responses to a project for later
+
+### 4.2 Power User (Secondary Persona)
+- US-4.2.1: As a power user, I want to see which AI agent handled my request
+- US-4.2.2: As a power user, I want to adjust agent behavior (temperature, model)
+- US-4.2.3: As a power user, I want to force a specific workflow for my queries
+- US-4.2.4: As a power user, I want to see how my feedback improved responses
+
+### 4.3 Admin (Tertiary Persona)
+- US-4.3.1: As an admin, I want to review all user feedback
+- US-4.3.2: As an admin, I want to see aggregate skill performance
+- US-4.3.3: As an admin, I want to enable/disable skills globally
+
+---
+
+## 5. Non-Functional Requirements
+
+### 5.1 Performance
+- NFR-5.1.1: KB Chat response time < 5 seconds for first token
+- NFR-5.1.2: Skills page load time < 2 seconds
+- NFR-5.1.3: Feedback submission < 500ms
+
+### 5.2 Scalability
+- NFR-5.2.1: Support 1000+ concurrent KB chat sessions
+- NFR-5.2.2: Feedback table should handle 100K+ records
+
+### 5.3 Security
+- NFR-5.3.1: All API endpoints require authentication
+- NFR-5.3.2: User can only see their own feedback and preferences
+- NFR-5.3.3: Skill configurations validated server-side
+- NFR-5.3.4: RLS policies on all new tables
+
+### 5.4 Accessibility
+- NFR-5.4.1: WCAG 2.1 AA compliance
+- NFR-5.4.2: Keyboard navigation support
+- NFR-5.4.3: Screen reader friendly
+
+---
+
+## 6. Success Metrics
+
+### 6.1 Adoption Metrics
+- SM-6.1.1: 50% of users access AI Studio within first month
+- SM-6.1.2: 20% of users customize at least one skill
+- SM-6.1.3: 30% of users use KB Chat weekly
+
+### 6.2 Quality Metrics
+- SM-6.2.1: User satisfaction (thumbs up rate) > 80%
+- SM-6.2.2: Feedback-driven response improvement rate > 10%
+- SM-6.2.3: Skill success rate > 95%
+
+### 6.3 Engagement Metrics
+- SM-6.3.1: Average KB Chat session length > 5 messages
+- SM-6.3.2: Feedback submission rate > 10% of responses
+- SM-6.3.3: Return user rate > 60%
+
+---
+
+## 7. Implementation Phases
+
+### Phase 1: Foundation (Tasks 70-75)
+- Task 70: Database migrations (generated_assets, content_classifications, etc.)
+- Task 71: AI Studio navigation item and tab routing in desktop app
+- Task 72: Global KB Chat service (reuse project_rag_service patterns)
+- Task 73: KB Chat API routes (/api/studio/kb-chat/*)
+- Task 74: KB Chat frontend with WebSocket streaming
+- Task 75: Basic feedback buttons (thumbs up/down) on KB Chat
+
+### Phase 2: Asset Management (Tasks 76-80)
+- Task 76: Asset management service (CRUD for 5 asset types)
+- Task 77: Asset management API routes (/api/studio/assets/*)
+- Task 78: Assets frontend - list view with filters
+- Task 79: Asset detail modal with edit capability
+- Task 80: Asset versioning and status management (draft/published/archived)
+
+### Phase 3: Classification Management (Tasks 81-84)
+- Task 81: Classification service (extends AGENT-001 orchestrator)
+- Task 82: Classification API routes (/api/studio/classifications/*)
+- Task 83: Classifications frontend with correction UI
+- Task 84: Classification re-processing on correction
+
+### Phase 4: Workflow Preferences (Tasks 85-87)
+- Task 85: Workflow preferences service and API
+- Task 86: Workflow preferences frontend
+- Task 87: User preference integration with agent router
+
+### Phase 5: Advanced Feedback & Analytics (Tasks 88-92)
+- Task 88: Extended feedback form (classification + asset feedback)
+- Task 89: Feedback dashboard frontend
+- Task 90: Main chat feedback integration (KB mode toggle, response metadata)
+- Task 91: Feedback impact tracking and reporting
+- Task 92: Agent usage statistics dashboard
+
+### Phase 6: Polish & Testing (Tasks 93-95)
+- Task 93: E2E tests for AI Studio features
+- Task 94: Performance optimization and caching
+- Task 95: Documentation and deployment
+
+---
+
+## 8. Open Questions
+
+1. **Q: Should KB Chat history be shared across devices?**
+   A: Recommend yes - store in Supabase with user_id
+
+2. **Q: What are the safe bounds for skill parameter adjustments?**
+   A: Recommend: Temperature 0.0-1.0, Max tokens 100-4000
+
+3. **Q: Should feedback be anonymous or attributed?**
+   A: Recommend attributed but private (only visible to user + admins)
+
+4. **Q: Should there be a "reset to defaults" option for skills?**
+   A: Recommend yes - one-click reset per skill or all skills
+
+---
+
+## 9. Appendix
+
+### 9.1 Existing Agent Feedback Schema (Reference)
+```sql
+-- Already exists from Task 39
+CREATE TABLE agent_feedback (
+    id UUID PRIMARY KEY,
+    routing_cache_id UUID,
+    query_text TEXT,
+    selected_workflow TEXT,
+    alternative_workflow TEXT,
+    feedback_type TEXT,
+    rating INTEGER,
+    sentiment TEXT,
+    feedback_text TEXT,
+    improvement_suggestions TEXT,
+    was_routing_correct BOOLEAN,
+    -- ... more fields
+);
+```
+
+### 9.2 Navigation Structure (with AI Studio)
+```
+Sidebar:
+├── New Chat
+├── Search (Cmd+K)
+├── Recent Chats (collapsible)
+├── ───────────────
+├── Chats
+├── Projects
+├── File Uploads
+├── [AI Studio] ● <-- Yellow dot when CKO has questions
+│   ├── 🔍 Search bar (Cmd+K)
+│   ├── 💬 CKO Conversation (PRIMARY - always visible)
+│   │   └── Clarification messages highlighted in yellow
+│   ├── 📊 Sidebar panels (collapsible):
+│   │   ├── Assets (5 types)
+│   │   ├── Classifications
+│   │   ├── Data Weights
+│   │   └── Feedback History
+│   └── ⚙️ CKO Settings (name, preferences)
+└── Settings
+```
+
+### 9.3 AI Studio Layout
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🔍 Search AI Studio...                          [Cmd+K]     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────┐  ┌───────────────────────┐ │
+│  │                             │  │ 📁 Quick Access       │ │
+│  │   CKO Conversation          │  │ ─────────────────     │ │
+│  │                             │  │ ▸ Assets (23)         │ │
+│  │   [CKO Avatar]              │  │ ▸ Classifications     │ │
+│  │   Hello! I'm your Chief     │  │ ▸ Data Weights        │ │
+│  │   Knowledge Officer. I      │  │ ▸ Feedback (5 new)    │ │
+│  │   manage your knowledge     │  │                       │ │
+│  │   base of 156 documents     │  │ ⚙️ CKO Settings       │ │
+│  │   across 8 departments.     │  │                       │ │
+│  │   How can I help?           │  │ 📈 KB Stats           │ │
+│  │                             │  │ • 156 documents       │ │
+│  │   [You]                     │  │ • 23 assets           │ │
+│  │   What are you unsure       │  │ • 8 departments       │ │
+│  │   about?                    │  │ • 94% classification  │ │
+│  │                             │  │                       │ │
+│  │   [CKO Avatar]              │  └───────────────────────┘ │
+│  │   ┌─────────────────────┐   │                            │
+│  │   │ ⚠️ I have 2 items   │   │                            │
+│  │   │ that need your      │   │                            │
+│  │   │ input:              │   │                            │
+│  │   │                     │   │                            │
+│  │   │ 1. Is "DevOps       │   │                            │
+│  │   │ Guide.pdf" IT or    │   │                            │
+│  │   │ Operations?         │   │                            │
+│  │   │ [IT] [Operations]   │   │                            │
+│  │   │                     │   │                            │
+│  │   │ 2. Should I merge   │   │                            │
+│  │   │ duplicates in       │   │                            │
+│  │   │ Finance?            │   │                            │
+│  │   │ [Yes] [No] [Show]   │   │                            │
+│  │   └─────────────────────┘   │                            │
+│  │                             │                            │
+│  │  ┌──────────────────────┐   │                            │
+│  │  │ Type a message...    │   │                            │
+│  │  └──────────────────────┘   │                            │
+│  └─────────────────────────────┘                            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 9.4 CKO Clarification Message Styling
+- **Background**: Light yellow (#FEF3C7)
+- **Border**: Yellow-orange left border (#F59E0B, 4px)
+- **Icon**: ⚠️ or 🤔 to indicate question
+- **Quick Actions**: Inline buttons for common responses
+- **Dismiss**: "Skip - use best guess" option
+
+### 9.5 Asset Type Icons & Colors
+| Type | Icon | Color | Format |
+|------|------|-------|--------|
+| SKILL | ⚙️ | Blue | YAML |
+| COMMAND | ⚡ | Green | MD |
+| AGENT | 🤖 | Purple | YAML |
+| PROMPT | 📝 | Orange | MD |
+| WORKFLOW | 🔄 | Teal | JSON |
+
+### 9.5 Department Colors
+| Department | Color |
+|------------|-------|
+| IT & Engineering | #3B82F6 (Blue) |
+| Sales & Marketing | #10B981 (Green) |
+| Customer Support | #F59E0B (Amber) |
+| Operations/HR/Supply | #8B5CF6 (Purple) |
+| Finance & Accounting | #EF4444 (Red) |
+| Project Management | #06B6D4 (Cyan) |
+| Real Estate | #84CC16 (Lime) |
+| Private Equity & M&A | #EC4899 (Pink) |
+| Consulting | #6366F1 (Indigo) |
+| Personal & Continuing Ed | #F97316 (Orange) |
+| Research & Development | #14B8A6 (Teal) |
+| Global | #6B7280 (Gray) |
+
+---
+
+**End of PRD**
