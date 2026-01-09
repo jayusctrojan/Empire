@@ -20,6 +20,10 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 
+# Mark all tests in this module as integration tests (skipped in CI)
+pytestmark = pytest.mark.integration
+
+
 # =============================================================================
 # FIXTURES
 # =============================================================================
