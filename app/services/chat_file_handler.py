@@ -312,7 +312,7 @@ class ChatFileHandler:
             if hasattr(file_data, 'read'):
                 file_data.seek(0)
             file_io = io.BytesIO(data)
-            is_valid, error = self.file_validator.validate_file(file_io, filename)
+            is_valid, error = self.file_validator.validate_file_simple(file_io, filename)
 
             if not is_valid:
                 return False, error
