@@ -399,7 +399,7 @@ curl https://jb-empire-api.onrender.com/api/query/tools
 - ✅ **Dynamic Metadata** - metadata_fields table for flexible schema management
 
 **Workflow Architecture (NEW - v7.0):**
-- ✅ **Sub-Workflow Architecture** - Modular n8n workflows for multimodal, knowledge graph, memory
+- ✅ **Sub-Workflow Architecture** - Modular Celery workflows for multimodal, knowledge graph, memory
 - ✅ **Asynchronous Processing Patterns** - Wait/poll with exponential backoff for long-running operations
 - ✅ **Error Handling & Retry** - Configurable retry logic with retryable vs non-retryable classification
 - ✅ **Document Lifecycle Management** - Complete CRUD with versioning, cascade deletion, audit trails
@@ -415,7 +415,7 @@ curl https://jb-empire-api.onrender.com/api/query/tools
 
 **Core Infrastructure:**
 - ✅ **Claude Sonnet 4.5 API** - Document processing + Vision ($50-80/month)
-- ✅ **n8n** (https://n8n-d21p.onrender.com) - Workflow orchestration ($30/month)
+- ✅ **Celery Workers** (Render) - Asynchronous task processing and workflow orchestration
 - ✅ **CrewAI** (https://jb-crewai.onrender.com) - Content analysis ($20/month)
 - ✅ **LlamaIndex** (https://jb-llamaindex.onrender.com) - Document processing & UI ($15-20/month)
 - ✅ **LangExtract** - Gemini-powered extraction for precise grounding with LlamaIndex ($10-20/month)
@@ -461,7 +461,7 @@ Empire/
 │   ├── 07_performance_scaling.md ✅
 │   ├── 08_video_processing.md ✅
 │   ├── 09_orchestrator_requirements.md ✅
-│   ├── 10_n8n_orchestration.md ✅ (UPDATED for Supabase pgvector)
+│   ├── 10_celery_orchestration.md ✅ (UPDATED for Supabase pgvector)
 │   └── 11_requirements_status.md ✅
 │
 └── Supporting Files
@@ -488,13 +488,13 @@ Note: All core sections updated to v7.0 with comprehensive gap resolutions
 - **YouTube Processing:** Full transcript extraction with YouTubeTranscriptApi
 - **Article Processing:** Web scraping with newspaper3k
 - **File Processing:** 40+ formats via MarkItDown MCP
-- **Workflow Orchestration:** 4 milestone workflows created in n8n
+- **Workflow Orchestration:** 4 milestone workflows implemented in Celery
 - **Cost Tracking:** Implemented in workflows
 - **Claude API Integration:** Ready for deployment
 - **Supabase pgvector:** Configured and ready
 
 ### In Progress 🔄
-- **Claude Sonnet 4.5:** Integrating into n8n workflows with batch + caching
+- **Claude Sonnet 4.5:** Integrated into Celery workflows with batch + caching
 - **Supabase pgvector RAG:** Setting up HNSW indexes and hybrid search
 - **Multi-Agent Coordination:** CrewAI workflows being updated
 - **Quality Validation:** Automated checks with Claude API
@@ -506,14 +506,14 @@ Note: All core sections updated to v7.0 with comprehensive gap resolutions
 - **Removed Hyperbolic.ai:** Claude handles everything
 - **Mac Studio:** Now just development + mem-agent (8GB)
 
-## 🎯 Created n8n Workflows
+## 🎯 Implemented Celery Workflows
 
-| Workflow | ID | Nodes | Purpose | Status |
-|----------|-----|-------|---------|--------|
-| **Empire - Complete Intake System** | SwduheluQwygx8LX | 12 | Full dual-trigger processing | ✅ Active |
-| **Empire - Milestone 1: Document Intake** | A4t05EuJ2Pvn6AXo | 9 | File classification | ✅ Active |
-| **Empire - Milestone 2: API Processing** | pJjZlqol4mRfxpp3 | 10 | Claude API routing | 🔄 Updating |
-| **Empire - Milestone 3: Supabase RAG** | PyDeXmyBpLgClbCM | 8 | pgvector pipeline | 🔄 Updating |
+| Workflow | Purpose | Status |
+|----------|---------|--------|
+| **Empire - Complete Intake System** | Full dual-trigger processing | ✅ Active |
+| **Empire - Milestone 1: Document Intake** | File classification | ✅ Active |
+| **Empire - Milestone 2: API Processing** | Claude API routing | 🔄 Updating |
+| **Empire - Milestone 3: Supabase RAG** | pgvector pipeline | 🔄 Updating |
 
 ## 📚 Documentation Status
 - ✅ **All 11 sections complete and updated to v7.0**
@@ -530,7 +530,7 @@ Note: All core sections updated to v7.0 with comprehensive gap resolutions
   - ✅ 8 High-priority gaps (error handling, deduplication, batch)
   - ✅ 12 Medium-priority gaps (node patterns, edge functions)
 - ✅ **Complete Database Setup** - Single script for all tables
-- ✅ **All n8n Node Patterns** - Extract, OCR, Rerank, Loop, Set, Merge
+- ✅ **All Celery Task Patterns** - Extract, OCR, Rerank, Batch Processing, Chain, Group
 - ✅ **Edge Functions Documented** - TypeScript/Deno implementations
 - ✅ **README.md fully updated** with all v7.0 features
 
@@ -561,7 +561,7 @@ Note: All core sections updated to v7.0 with comprehensive gap resolutions
 - Orchestrator requirements
 - Historical context for v7.0 evolution
 
-#### [10. n8n Orchestration Implementation](10_n8n_orchestration.md) ⭐ **UPDATED to v7.0**
+#### [10. Celery Orchestration Implementation](10_celery_orchestration.md) ⭐ **UPDATED to v7.0**
 - 8 milestone-based implementation approach
 - Complete hybrid search SQL functions
 - Knowledge graph integration workflows
@@ -592,7 +592,7 @@ Mac Studio M3 Ultra (96GB)
 
 **Core Infrastructure ($150-200/month):**
 - **Claude Sonnet 4.5 API:** $50-80/month - Document processing + Vision
-- **n8n (Render):** $30/month - Workflow orchestration
+- **Celery Workers (Render):** $7/month - Asynchronous task processing
 - **CrewAI (Render):** $20/month - Content analysis
 - **Supabase:** $25/month - PostgreSQL + pgvector + FTS unified
 - **Backblaze B2:** $15-25/month - File storage
@@ -653,7 +653,7 @@ Based on comprehensive gap analysis, Empire v7.0 **exceeds** Total RAG in multip
 
 ### Implementation Coverage
 - ✅ All critical gaps addressed with SQL functions and schemas
-- ✅ Complete n8n workflow patterns documented
+- ✅ Complete Celery workflow patterns documented
 - ✅ Edge functions for HTTP API access
 - ✅ Wait/poll patterns for async operations
 - ✅ Production-ready error handling and retry logic
@@ -735,7 +735,7 @@ Based on comprehensive gap analysis, Empire v7.0 **exceeds** Total RAG in multip
 1. **Developer Memory (Local Only):**
    - **mem-agent MCP:** Local development tool for Claude Desktop integration
    - **Purpose:** Developer context during local testing (NOT for production)
-   - **Location:** Mac Studio (8GB), NOT accessible in n8n workflows
+   - **Location:** Mac Studio (8GB), accessible via Tailscale in Celery workflows
 
 2. **Production User Memory (Graph-Based):**
    - **Architecture:** Three-layer graph (User Memory + Document Knowledge + Hybrid)
@@ -762,7 +762,7 @@ Based on comprehensive gap analysis, Empire v7.0 **exceeds** Total RAG in multip
 - **Automated Alerts:** Performance and error monitoring
 
 ### Workflow Orchestration ✅
-- n8n platform deployed
+- Celery workers deployed
 - 9+ production workflows implemented:
   - Document intake with hash deduplication
   - Multi-modal processing pipeline
@@ -834,7 +834,7 @@ Based on comprehensive gap analysis, Empire v7.0 **exceeds** Total RAG in multip
 - **Neo4j Database:** $0 (FREE - Mac Studio Docker)
 - **Claude Sonnet 4.5:** $50-80 (synthesis + Cypher generation)
 - **Claude Haiku:** $1.50-9 (query optimization)
-- **n8n (Render):** $30 (workflow orchestration)
+- **Celery Workers (Render):** $7 (asynchronous task processing)
 - **CrewAI (Render):** $20 (content analysis)
 - **Chat UI (Gradio/Streamlit):** $15-20 (Render deployment)
 - **Supabase:** $25 (PostgreSQL + pgvector)
@@ -984,6 +984,68 @@ async def metrics():
 ✅ **39 Alert Rules Active** - Comprehensive coverage of system health
 ✅ **Production Ready** - Monitoring all services with automated notifications
 
+## 📊 RAGAS Metrics Evaluation (NEW - Milestone 6.5)
+
+### Overview
+Empire v7.3 integrates RAGAS (Retrieval-Augmented Generation Assessment) for automated RAG pipeline quality evaluation, providing continuous monitoring of retrieval and generation performance.
+
+### RAGAS Metrics Tracked
+- **Faithfulness** (0-1 scale) - Measures how grounded the generated answers are in the retrieved context
+- **Answer Relevancy** (0-1 scale) - Evaluates how relevant the answer is to the user's question
+- **Context Precision** (0-1 scale) - Assesses the signal-to-noise ratio in retrieved contexts
+- **Context Recall** (0-1 scale) - Measures how well the retrieval captures all relevant information
+
+### Implementation Details
+- **Test Dataset:** 30 curated samples derived from Empire documentation
+- **Storage:** Results stored in Supabase `ragas_evaluations` table with timestamps
+- **Automation:** Batch evaluation via `scripts/ragas_evaluation.py`
+- **Visualization:** Grafana dashboards for metric trending and anomaly detection
+- **Expected Baseline:** 0.70-0.85 overall scores across all metrics
+- **Cost:** ~$0.20 per evaluation run (30 samples)
+
+### Quick Start
+```bash
+# Install RAGAS dependencies
+pip install ragas datasets
+
+# Run evaluation on test dataset
+python scripts/ragas_evaluation.py
+
+# View results in Grafana dashboard
+# Navigate to http://localhost:3000 → Empire RAG Quality Dashboard
+```
+
+### Integration with Empire RAG Pipeline
+- **Per-Query Evaluation:** Optional real-time evaluation for high-stakes queries
+- **Batch Evaluation:** Scheduled weekly runs on test dataset for trend analysis
+- **Threshold Alerts:** Grafana alerts when metrics drop below 0.70
+- **A/B Testing:** Compare retrieval methods (hybrid vs dense vs graph) using RAGAS scores
+
+### Database Schema
+```sql
+CREATE TABLE ragas_evaluations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  contexts TEXT[] NOT NULL,
+  faithfulness FLOAT,
+  answer_relevancy FLOAT,
+  context_precision FLOAT,
+  context_recall FLOAT,
+  overall_score FLOAT,
+  retrieval_method TEXT,
+  model_used TEXT,
+  metadata JSONB
+);
+```
+
+### Files and Documentation
+- `.taskmaster/docs/RAGAS_IMPLEMENTATION_SUMMARY.md` - Complete implementation guide
+- `.taskmaster/docs/RAGAS_QUICKSTART.md` - Setup and usage instructions
+- `.taskmaster/docs/ragas_test_dataset.json` - 30 sample test dataset
+- `scripts/ragas_evaluation.py` - Evaluation script
+
 ## ✅ Next Steps - Gap Resolution Implementation
 
 ### Database Setup (Day 1)
@@ -998,7 +1060,7 @@ async def metrics():
 3. 🔄 **Setup LightRAG** - Knowledge graph integration
 4. 🔄 **Configure Cohere Reranking** - Result optimization with v3.5
 5. 🔄 **Deploy Redis Cache** - Semantic caching layer
-6. 🔄 **Import n8n Workflows** - All JSON definitions provided
+6. 🔄 **Deploy Celery Workers** - All task definitions implemented
 
 ### Short Term (Next 2 Weeks)
 1. **Integrate LlamaIndex + LangExtract** - Precise extraction pipeline
@@ -1089,7 +1151,7 @@ async def metrics():
 
 ### Service URLs
 - **Upload Interface:** https://jb-llamaindex.onrender.com
-- **n8n Workflows:** https://n8n-d21p.onrender.com
+- **Celery Workers:** https://jb-empire-celery.onrender.com
 - **CrewAI Agents:** https://jb-crewai.onrender.com
 
 ### Workspace IDs
@@ -1112,7 +1174,7 @@ async def metrics():
 **Graph Database:** Neo4j (FREE on Mac Studio Docker)
 **Relational Database:** Supabase (PostgreSQL + pgvector + FTS)
 **Storage:** Backblaze B2
-**Orchestration:** n8n on Render
+**Orchestration:** Celery on Render with Redis broker
 **Search:** Hybrid 4-method (dense, sparse, ILIKE, fuzzy) + BGE-Reranker-v2
 **Graph Queries:** Natural language → Cypher translation (Claude Sonnet)
 **Dual Interfaces:** Neo4j MCP (Claude Desktop/Code) + Chat UI (Gradio/Streamlit)

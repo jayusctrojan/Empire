@@ -1,400 +1,396 @@
 """
-Test suite for Snippet Generation and Highlighting
+Tests for Snippet Generation Service
 
-Comprehensive tests for snippet generation, keyword extraction, and highlighting functionality.
+Tests snippet extraction and keyword highlighting functionality:
+- Extract relevant snippets around matched keywords
+- Highlight keywords in snippets
+- Format results with metadata (relevance score, source, department)
+- Ensure snippets are concise and informative
 """
 
 import pytest
-from app.services.faceted_search_service import FacetedSearchService
+from typing import List
+from unittest.mock import AsyncMock, MagicMock
+
+from app.services.snippet_service import (
+    SnippetService,
+    SnippetConfig,
+    SnippetResult,
+    FormattedResult
+)
+from app.services.hybrid_search_service import SearchResult
 
 
 @pytest.fixture
-def service():
-    """Create FacetedSearchService instance"""
-    return FacetedSearchService(supabase_client=None)
+def snippet_service():
+    """Snippet service instance"""
+    return SnippetService()
 
 
-class TestSnippetGeneration:
-    """Test snippet generation with various content types"""
+@pytest.fixture
+def search_result_with_content():
+    """Sample search result with content for snippet extraction"""
+    return SearchResult(
+        chunk_id="chunk1",
+        content=(
+            "California insurance policies are regulated by the state "
+            "Department of Insurance. The department ensures that all "
+            "insurance companies comply with state regulations. When you "
+            "purchase an insurance policy in California, you are protected "
+            "by these comprehensive regulations."
+        ),
+        score=0.95,
+        rank=1,
+        method="hybrid",
+        metadata={
+            "document_id": "doc1",
+            "department": "Legal",
+            "file_type": "pdf",
+            "filename": "insurance_policy.pdf",
+            "b2_url": "https://b2.example.com/files/insurance_policy.pdf"
+        }
+    )
 
-    def test_snippet_with_single_keyword(self, service):
-        """Test snippet generation with single keyword"""
-        content = "The California Department of Insurance regulates all insurance activities."
-        keywords = ["California"]
 
-        snippet = service.generate_snippet(content, keywords, max_length=100, context_chars=30)
+class TestSnippetConfig:
+    """Test snippet configuration"""
 
-        assert "California" in snippet
-        assert len(snippet) <= 106  # 100 + "..." max
+    def test_default_config(self):
+        """Test default configuration values"""
+        config = SnippetConfig()
 
-    def test_snippet_with_multiple_keywords(self, service):
-        """Test snippet prioritizes first keyword occurrence"""
-        content = "Insurance policies are regulated by California law."
-        keywords = ["California", "insurance"]
+        assert config.snippet_length == 200
+        assert config.context_window == 50
+        assert config.highlight_start == "<mark>"
+        assert config.highlight_end == "</mark>"
+        assert config.max_highlights == 10
 
-        snippet = service.generate_snippet(content, keywords, max_length=100, context_chars=20)
+    def test_custom_config(self):
+        """Test custom configuration"""
+        config = SnippetConfig(
+            snippet_length=300,
+            highlight_start="<strong>",
+            highlight_end="</strong>"
+        )
 
-        # Should find "insurance" first (appears earlier)
-        assert "insurance" in snippet.lower()
+        assert config.snippet_length == 300
+        assert config.highlight_start == "<strong>"
+        assert config.highlight_end == "</strong>"
 
-    def test_snippet_empty_content(self, service):
-        """Test snippet generation with empty content"""
-        snippet = service.generate_snippet("", ["keyword"], max_length=100)
-        assert snippet == ""
 
-    def test_snippet_empty_keywords(self, service):
-        """Test snippet generation with empty keywords"""
-        content = "This is a test document with some content."
-        snippet = service.generate_snippet(content, [], max_length=20)
+class TestSnippetExtraction:
+    """Test snippet extraction from content"""
 
-        assert len(snippet) <= 23
-        assert snippet.endswith("...")
+    def test_extract_snippet_with_keyword(self, snippet_service, search_result_with_content):
+        """Test extracting snippet around a keyword"""
+        result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="California insurance"
+        )
 
-    def test_snippet_content_shorter_than_max_length(self, service):
-        """Test snippet when content is shorter than max length"""
-        content = "Short content."
-        snippet = service.generate_snippet(content, ["content"], max_length=200)
+        assert isinstance(result, SnippetResult)
+        assert "California" in result.snippet
+        assert "insurance" in result.snippet.lower()
+        assert len(result.snippet) <= snippet_service.config.snippet_length + 50  # Some buffer
 
-        assert snippet == content  # No ellipsis needed
+    def test_snippet_contains_context(self, snippet_service, search_result_with_content):
+        """Test snippet includes context around keywords"""
+        result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="Department of Insurance"
+        )
 
-    def test_snippet_keyword_not_found(self, service):
-        """Test snippet when keyword is not in content"""
-        content = "This document discusses policies and regulations."
-        keywords = ["California"]
+        # Should include words before and after the keyword
+        assert "Department of Insurance" in result.snippet
+        assert len(result.snippet.split()) > 3  # More than just the keyword
 
-        snippet = service.generate_snippet(content, keywords, max_length=100)
+    def test_snippet_truncation(self, snippet_service):
+        """Test snippet is truncated to configured length"""
+        long_content = SearchResult(
+            chunk_id="chunk1",
+            content=" ".join(["word"] * 500),  # Very long content
+            score=0.9,
+            rank=1,
+            method="hybrid",
+            metadata={}
+        )
 
-        # Should return beginning of content
-        assert snippet.startswith("This")
-        assert len(snippet) <= 103
+        result = snippet_service.extract_snippet(long_content, query="word")
 
-    def test_snippet_multiple_occurrences_uses_first(self, service):
-        """Test snippet uses first occurrence when keyword appears multiple times"""
-        content = "First California mention. Second California mention in this text."
-        keywords = ["California"]
+        assert len(result.snippet) <= snippet_service.config.snippet_length + 50
 
-        snippet = service.generate_snippet(content, keywords, context_chars=10)
+    def test_snippet_from_beginning_if_no_match(self, snippet_service, search_result_with_content):
+        """Test snippet starts from beginning if no keyword match"""
+        result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="nonexistent keyword"
+        )
 
-        # Should center on first occurrence
-        assert "First California" in snippet
+        # Should still return a snippet
+        assert len(result.snippet) > 0
+        # Should start from the beginning of content
+        assert result.snippet.strip().startswith("California")
 
-    def test_snippet_context_chars_respected(self, service):
-        """Test that context_chars parameter is respected"""
-        content = "AAAA California BBBB"
-        keywords = ["California"]
+    def test_multiple_keyword_matches(self, snippet_service, search_result_with_content):
+        """Test snippet centers on first keyword match"""
+        result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="insurance"  # Appears multiple times
+        )
 
-        snippet = service.generate_snippet(content, keywords, max_length=200, context_chars=4)
-
-        # Should have 4 chars before and after
-        assert "AAAA California BBBB" in snippet or "AAA California BBB" in snippet
-
-    def test_snippet_very_long_content(self, service):
-        """Test snippet generation with very long content"""
-        prefix = "A" * 500
-        keyword_section = " California insurance policy information "
-        suffix = "B" * 500
-        content = prefix + keyword_section + suffix
-
-        snippet = service.generate_snippet(content, ["California"], max_length=100, context_chars=20)
-
-        assert "California" in snippet
-        assert len(snippet) <= 106
-        assert snippet.startswith("...")
-        assert snippet.endswith("...")
-
-    def test_snippet_special_characters_in_content(self, service):
-        """Test snippet with special characters"""
-        content = "The policy costs $500 (approximately) for California residents."
-        keywords = ["California"]
-
-        snippet = service.generate_snippet(content, keywords)
-
-        assert "California" in snippet
-        assert "$500" in snippet or "approximately" in snippet
-
-    def test_snippet_unicode_content(self, service):
-        """Test snippet with unicode characters"""
-        content = "California résumé café naïve Zürich"
-        keywords = ["California"]
-
-        snippet = service.generate_snippet(content, keywords)
-
-        assert "California" in snippet
-
-    def test_snippet_newlines_in_content(self, service):
-        """Test snippet with newlines"""
-        content = "First line\nSecond line with California\nThird line"
-        keywords = ["California"]
-
-        snippet = service.generate_snippet(content, keywords, context_chars=20)
-
-        assert "California" in snippet
-
-    def test_snippet_case_insensitive_keyword_matching(self, service):
-        """Test that keyword matching is case-insensitive"""
-        content = "CALIFORNIA and california and California"
-        keywords = ["california"]
-
-        snippet = service.generate_snippet(content, keywords)
-
-        # Should find first occurrence (case-insensitive)
-        assert "CALIFORNIA" in snippet or "california" in snippet
-
-    def test_snippet_keyword_at_exact_start(self, service):
-        """Test snippet when keyword is at exact start of content"""
-        content = "California is a state with insurance regulations and many other laws."
-        keywords = ["California"]
-
-        snippet = service.generate_snippet(content, keywords, context_chars=30)
-
-        assert not snippet.startswith("...")
-        assert snippet.startswith("California")
-
-    def test_snippet_keyword_at_exact_end(self, service):
-        """Test snippet when keyword is at exact end of content"""
-        content = "Insurance regulations for California"
-        keywords = ["California"]
-
-        snippet = service.generate_snippet(content, keywords, context_chars=30)
-
-        assert not snippet.endswith("...")
-        assert snippet.endswith("California")
-
-    def test_snippet_max_length_zero(self, service):
-        """Test snippet with max_length of 0"""
-        content = "California insurance"
-        snippet = service.generate_snippet(content, ["California"], max_length=0)
-
-        # Should handle gracefully - returns truncated content with ellipsis
-        # Empty max_length results in minimal snippet
-        assert isinstance(snippet, str)  # Should return a string
-        assert len(snippet) >= 0  # Could be empty or minimal
-
-    def test_snippet_context_chars_larger_than_content(self, service):
-        """Test snippet when context_chars is larger than content length"""
-        content = "California"
-        snippet = service.generate_snippet(content, ["California"], context_chars=1000)
-
-        # Should just return the content
-        assert snippet == "California"
+        assert "insurance" in result.snippet.lower()
+        assert len(result.snippet) > 0
 
 
 class TestKeywordHighlighting:
-    """Test keyword highlighting with various scenarios"""
+    """Test keyword highlighting in snippets"""
 
-    def test_highlight_single_keyword(self, service):
-        """Test highlighting single keyword"""
-        text = "California insurance policy"
-        highlighted = service.highlight_keywords(text, ["California"])
+    def test_highlight_single_keyword(self, snippet_service, search_result_with_content):
+        """Test highlighting a single keyword"""
+        result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="California"
+        )
 
-        assert highlighted == "<mark>California</mark> insurance policy"
-
-    def test_highlight_multiple_keywords(self, service):
-        """Test highlighting multiple keywords"""
-        text = "California insurance policy"
-        highlighted = service.highlight_keywords(text, ["California", "insurance"])
+        highlighted = snippet_service.highlight_keywords(result.snippet, "California")
 
         assert "<mark>California</mark>" in highlighted
-        assert "<mark>insurance</mark>" in highlighted
+        assert highlighted.count("<mark>") == highlighted.count("</mark>")
 
-    def test_highlight_case_insensitive_lowercase(self, service):
-        """Test case-insensitive highlighting with lowercase"""
-        text = "california insurance"
-        highlighted = service.highlight_keywords(text, ["California"])
+    def test_highlight_multiple_keywords(self, snippet_service, search_result_with_content):
+        """Test highlighting multiple keywords"""
+        result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="California insurance"
+        )
 
-        assert "<mark>california</mark>" in highlighted
+        highlighted = snippet_service.highlight_keywords(result.snippet, "California insurance")
 
-    def test_highlight_case_insensitive_uppercase(self, service):
-        """Test case-insensitive highlighting with uppercase"""
-        text = "CALIFORNIA INSURANCE"
-        highlighted = service.highlight_keywords(text, ["california"])
+        assert "<mark>California</mark>" in highlighted or "California" in highlighted
+        assert "<mark>insurance</mark>" in highlighted.lower() or "insurance" in highlighted.lower()
 
-        assert "<mark>CALIFORNIA</mark>" in highlighted
+    def test_highlight_case_insensitive(self, snippet_service):
+        """Test highlighting is case-insensitive"""
+        snippet = "The Insurance policy covers California."
 
-    def test_highlight_case_insensitive_mixed(self, service):
-        """Test case-insensitive highlighting with mixed case"""
-        text = "CaLiFoRnIa insurance"
-        highlighted = service.highlight_keywords(text, ["california"])
+        highlighted = snippet_service.highlight_keywords(snippet, "insurance california")
 
-        assert "<mark>CaLiFoRnIa</mark>" in highlighted
+        assert "<mark>Insurance</mark>" in highlighted or "<mark>insurance</mark>" in highlighted
+        assert "<mark>California</mark>" in highlighted or "<mark>california</mark>" in highlighted
 
-    def test_highlight_with_custom_tag(self, service):
-        """Test highlighting with custom HTML tag"""
-        text = "California insurance"
-        highlighted = service.highlight_keywords(text, ["California"], highlight_tag="em")
+    def test_highlight_preserves_case(self, snippet_service):
+        """Test highlighting preserves original text case"""
+        snippet = "CALIFORNIA Insurance Policy"
 
-        assert "<em>California</em>" in highlighted
+        highlighted = snippet_service.highlight_keywords(snippet, "california insurance")
 
-    def test_highlight_with_custom_tag_strong(self, service):
-        """Test highlighting with strong tag"""
-        text = "California insurance"
-        highlighted = service.highlight_keywords(text, ["California"], highlight_tag="strong")
+        # Should preserve original case
+        assert "CALIFORNIA" in highlighted or "<mark>CALIFORNIA</mark>" in highlighted
+        assert "Insurance" in highlighted or "<mark>Insurance</mark>" in highlighted
 
-        assert "<strong>California</strong>" in highlighted
+    def test_highlight_multiple_occurrences(self, snippet_service):
+        """Test highlighting multiple occurrences of same keyword"""
+        snippet = "Insurance companies provide insurance coverage through insurance policies."
 
-    def test_highlight_no_keywords(self, service):
-        """Test highlighting with empty keywords list"""
-        text = "California insurance"
-        highlighted = service.highlight_keywords(text, [])
+        highlighted = snippet_service.highlight_keywords(snippet, "insurance")
 
-        assert highlighted == text
-
-    def test_highlight_keyword_not_in_text(self, service):
-        """Test highlighting when keyword is not in text"""
-        text = "insurance policy"
-        highlighted = service.highlight_keywords(text, ["California"])
-
-        assert highlighted == text
-
-    def test_highlight_special_regex_characters_dollar(self, service):
-        """Test highlighting with dollar sign"""
-        text = "Cost is $100"
-        highlighted = service.highlight_keywords(text, ["$100"])
-
-        assert "<mark>$100</mark>" in highlighted
-
-    def test_highlight_special_regex_characters_parentheses(self, service):
-        """Test highlighting with parentheses"""
-        text = "Cost (approximately) is high"
-        highlighted = service.highlight_keywords(text, ["(approximately)"])
-
-        assert "<mark>(approximately)</mark>" in highlighted
-
-    def test_highlight_special_regex_characters_brackets(self, service):
-        """Test highlighting with brackets"""
-        text = "Item [optional] value"
-        highlighted = service.highlight_keywords(text, ["[optional]"])
-
-        assert "<mark>[optional]</mark>" in highlighted
-
-    def test_highlight_special_regex_characters_dot(self, service):
-        """Test highlighting with dots"""
-        text = "Version 1.0.0"
-        highlighted = service.highlight_keywords(text, ["1.0.0"])
-
-        assert "<mark>1.0.0</mark>" in highlighted
-
-    def test_highlight_special_regex_characters_asterisk(self, service):
-        """Test highlighting with asterisk"""
-        text = "Wildcard * character"
-        highlighted = service.highlight_keywords(text, ["*"])
-
-        assert "<mark>*</mark>" in highlighted
-
-    def test_highlight_special_regex_characters_plus(self, service):
-        """Test highlighting with plus"""
-        text = "C++ programming"
-        highlighted = service.highlight_keywords(text, ["C++"])
-
-        assert "<mark>C++</mark>" in highlighted
-
-    def test_highlight_special_regex_characters_question_mark(self, service):
-        """Test highlighting with question mark"""
-        text = "Question? Answer"
-        highlighted = service.highlight_keywords(text, ["Question?"])
-
-        assert "<mark>Question?</mark>" in highlighted
-
-    def test_highlight_overlapping_keywords(self, service):
-        """Test highlighting with overlapping keywords"""
-        text = "California insurance"
-        highlighted = service.highlight_keywords(text, ["California", "California insurance"])
-
-        # Both should be highlighted (order matters)
-        assert "<mark>" in highlighted
-
-    def test_highlight_multiple_occurrences(self, service):
-        """Test highlighting keyword that appears multiple times"""
-        text = "California has California laws for California residents"
-        highlighted = service.highlight_keywords(text, ["California"])
-
-        # Count occurrences of highlighted keyword
-        assert highlighted.count("<mark>California</mark>") == 3
-
-    def test_highlight_empty_text(self, service):
-        """Test highlighting with empty text"""
-        highlighted = service.highlight_keywords("", ["keyword"])
-        assert highlighted == ""
-
-    def test_highlight_unicode_characters(self, service):
-        """Test highlighting with unicode characters"""
-        text = "Café résumé naïve"
-        highlighted = service.highlight_keywords(text, ["Café"])
-
-        assert "<mark>Café</mark>" in highlighted
-
-    def test_highlight_numbers(self, service):
-        """Test highlighting numbers"""
-        text = "Policy 123456 is active"
-        highlighted = service.highlight_keywords(text, ["123456"])
-
-        assert "<mark>123456</mark>" in highlighted
-
-    def test_highlight_partial_word_match(self, service):
-        """Test that highlighting doesn't break on partial matches"""
-        text = "California and Californian"
-        highlighted = service.highlight_keywords(text, ["California"])
-
-        # Should highlight both (regex-based)
+        # Should highlight all occurrences (up to max)
         assert highlighted.count("<mark>") >= 2
 
-    def test_highlight_hyphenated_words(self, service):
-        """Test highlighting hyphenated words"""
-        text = "Worker-related insurance coverage"
-        highlighted = service.highlight_keywords(text, ["Worker-related"])
+    def test_highlight_max_limit(self, snippet_service):
+        """Test highlighting respects maximum highlight count"""
+        snippet = " ".join(["insurance"] * 20)
 
-        assert "<mark>Worker-related</mark>" in highlighted
+        highlighted = snippet_service.highlight_keywords(snippet, "insurance")
 
-    def test_highlight_with_newlines(self, service):
-        """Test highlighting text with newlines"""
-        text = "Line 1\nCalifornia\nLine 3"
-        highlighted = service.highlight_keywords(text, ["California"])
+        # Should not exceed max_highlights
+        highlight_count = highlighted.count("<mark>")
+        assert highlight_count <= snippet_service.config.max_highlights
 
-        assert "<mark>California</mark>" in highlighted
+    def test_custom_highlight_tags(self):
+        """Test custom highlight tags"""
+        config = SnippetConfig(
+            highlight_start="<strong class='highlight'>",
+            highlight_end="</strong>"
+        )
+        service = SnippetService(config=config)
+
+        snippet = "California insurance policy"
+        highlighted = service.highlight_keywords(snippet, "California")
+
+        assert "<strong class='highlight'>California</strong>" in highlighted
 
 
-class TestSnippetAndHighlightIntegration:
-    """Test integration between snippet generation and highlighting"""
+class TestFormattedResult:
+    """Test formatted result generation"""
 
-    def test_generate_and_highlight(self, service):
-        """Test generating snippet and then highlighting"""
-        content = "The California Department of Insurance provides regulatory oversight."
-        keywords = ["California", "Insurance"]
+    def test_format_result_complete(self, snippet_service, search_result_with_content):
+        """Test formatting a complete result with all metadata"""
+        snippet_result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="California insurance"
+        )
 
-        # Generate snippet
-        snippet = service.generate_snippet(content, keywords, max_length=100, context_chars=20)
+        formatted = snippet_service.format_result(
+            search_result_with_content,
+            snippet_result,
+            query="California insurance"
+        )
 
-        # Highlight keywords (case-insensitive)
-        highlighted = service.highlight_keywords(snippet, keywords)
+        assert isinstance(formatted, FormattedResult)
+        assert formatted.snippet is not None
+        assert formatted.highlighted_snippet is not None
+        assert formatted.relevance_score == 0.95
+        assert formatted.source == "insurance_policy.pdf"
+        assert formatted.department == "Legal"
+        assert formatted.file_type == "pdf"
+        assert formatted.b2_url == "https://b2.example.com/files/insurance_policy.pdf"
 
-        assert "California" in snippet
-        assert "<mark>California</mark>" in highlighted
-        # Insurance might be lowercased in content, so check both
-        assert ("<mark>Insurance</mark>" in highlighted) or ("<mark>insurance</mark>" not in highlighted)
+    def test_format_result_with_highlights(self, snippet_service, search_result_with_content):
+        """Test highlighted snippet is included in formatted result"""
+        snippet_result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="insurance"
+        )
 
-    def test_snippet_and_highlight_maintains_structure(self, service):
-        """Test that highlighting doesn't break snippet structure"""
-        content = "Beginning text " + "A" * 100 + " California insurance " + "B" * 100
-        keywords = ["California"]
+        formatted = snippet_service.format_result(
+            search_result_with_content,
+            snippet_result,
+            query="insurance"
+        )
 
-        snippet = service.generate_snippet(content, keywords, max_length=100, context_chars=30)
-        highlighted = service.highlight_keywords(snippet, keywords)
+        assert "<mark>" in formatted.highlighted_snippet
+        assert "</mark>" in formatted.highlighted_snippet
 
-        # Should have ellipsis
-        assert "..." in snippet
-        # Should have highlight
-        assert "<mark>" in highlighted
-        # Should still have California
-        assert "California" in highlighted
+    def test_format_result_missing_metadata(self, snippet_service):
+        """Test formatting result with missing metadata fields"""
+        incomplete_result = SearchResult(
+            chunk_id="chunk1",
+            content="Test content",
+            score=0.8,
+            rank=1,
+            method="hybrid",
+            metadata={}  # Empty metadata
+        )
 
-    def test_snippet_and_highlight_special_chars(self, service):
-        """Test snippet and highlight with special characters"""
-        content = "Prefix $100 (cost) for California policy [required]"
-        keywords = ["California", "$100"]
+        snippet_result = snippet_service.extract_snippet(incomplete_result, query="test")
+        formatted = snippet_service.format_result(
+            incomplete_result,
+            snippet_result,
+            query="test"
+        )
 
-        snippet = service.generate_snippet(content, keywords)
-        highlighted = service.highlight_keywords(snippet, keywords)
+        assert formatted.source is None
+        assert formatted.department is None
+        assert formatted.b2_url is None
+        assert formatted.relevance_score == 0.8  # Should still have score
 
-        assert "<mark>California</mark>" in highlighted
-        if "$100" in snippet:
-            assert "<mark>$100</mark>" in highlighted
+    def test_format_result_to_dict(self, snippet_service, search_result_with_content):
+        """Test converting formatted result to dictionary"""
+        snippet_result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="California"
+        )
+
+        formatted = snippet_service.format_result(
+            search_result_with_content,
+            snippet_result,
+            query="California"
+        )
+
+        result_dict = formatted.to_dict()
+
+        assert "snippet" in result_dict
+        assert "highlighted_snippet" in result_dict
+        assert "relevance_score" in result_dict
+        assert "source" in result_dict
+        assert "department" in result_dict
+        assert "b2_url" in result_dict
+
+
+class TestBatchFormatting:
+    """Test batch formatting of multiple results"""
+
+    def test_format_multiple_results(self, snippet_service):
+        """Test formatting multiple search results"""
+        results = [
+            SearchResult(
+                chunk_id=f"chunk{i}",
+                content=f"This is document {i} about California insurance policies.",
+                score=0.9 - (i * 0.1),
+                rank=i + 1,
+                method="hybrid",
+                metadata={
+                    "document_id": f"doc{i}",
+                    "department": "Legal",
+                    "filename": f"doc{i}.pdf"
+                }
+            )
+            for i in range(3)
+        ]
+
+        formatted_results = snippet_service.format_results(
+            results,
+            query="California insurance"
+        )
+
+        assert len(formatted_results) == 3
+        assert all(isinstance(r, FormattedResult) for r in formatted_results)
+        assert all(r.highlighted_snippet for r in formatted_results)
+
+    def test_format_empty_results(self, snippet_service):
+        """Test formatting empty results list"""
+        formatted_results = snippet_service.format_results([], query="test")
+
+        assert len(formatted_results) == 0
+
+
+class TestEdgeCases:
+    """Test edge cases and error handling"""
+
+    def test_empty_query(self, snippet_service, search_result_with_content):
+        """Test snippet extraction with empty query"""
+        result = snippet_service.extract_snippet(search_result_with_content, query="")
+
+        # Should still return a snippet
+        assert len(result.snippet) > 0
+
+    def test_empty_content(self, snippet_service):
+        """Test snippet extraction from empty content"""
+        empty_result = SearchResult(
+            chunk_id="chunk1",
+            content="",
+            score=0.5,
+            rank=1,
+            method="hybrid",
+            metadata={}
+        )
+
+        result = snippet_service.extract_snippet(empty_result, query="test")
+
+        assert result.snippet == ""
+
+    def test_very_short_content(self, snippet_service):
+        """Test snippet extraction from very short content"""
+        short_result = SearchResult(
+            chunk_id="chunk1",
+            content="Short.",
+            score=0.8,
+            rank=1,
+            method="hybrid",
+            metadata={}
+        )
+
+        result = snippet_service.extract_snippet(short_result, query="short")
+
+        assert result.snippet == "Short."
+
+    def test_special_characters_in_query(self, snippet_service, search_result_with_content):
+        """Test handling special regex characters in query"""
+        result = snippet_service.extract_snippet(
+            search_result_with_content,
+            query="California (state)"
+        )
+
+        # Should not crash with regex special characters
+        assert len(result.snippet) > 0

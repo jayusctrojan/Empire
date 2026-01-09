@@ -516,7 +516,7 @@ IMPORTANT: Empire has THREE DISTINCT memory systems:
 │   └── Privacy: Complete separation between personal/work
 │
 ├── Production User Memory: Supabase Graph-Based (v7.0)
-│   ├── Purpose: End-user memory in production n8n workflows
+│   ├── Purpose: End-user memory in production Celery workflows
 │   ├── Architecture: Three-layer graph system
 │   │   ├── User Memory Graph: facts, preferences, goals, context
 │   │   ├── Document Knowledge Graph: LightRAG entities/relationships
@@ -909,7 +909,7 @@ Input Sources:
 ├── Backblaze B2 monitoring (30-second polling for Mountain Duck auto-detection)
 ├── YouTube URLs
 ├── Web Scraping (Firecrawl)
-└── Direct file uploads (n8n webhook)
+└── Direct file uploads (FastAPI webhook)
 
 Dual Upload Architecture (NEW v7.2):
 
@@ -1210,7 +1210,7 @@ LOCAL: Development Only
 	•	Testing and experimentation
 
 ================================================================================
-Complete n8n Workflow - All Features Integrated
+Complete Celery Workflow - All Features Integrated
 ================================================================================
 
 Milestone 2: Universal Document Processing
@@ -1422,7 +1422,7 @@ Monthly Recurring (v7.2 DUAL-INTERFACE with ALL FEATURES)
 Core Infrastructure ($165-220/month):
 	•	Claude Sonnet 4.5 API: $50-80 (with batch + caching + vision)
 	•	Claude Haiku API: $1.50-9 (query expansion)
-	•	Render (n8n): $30 (workflow orchestration)
+	•	Render (Celery Workers): $7 (asynchronous task processing)
 	•	CrewAI: $20 (content analysis agent)
 	•	Chat UI (Gradio/Streamlit): $15-20 (end-user interface)
 	•	Supabase: $25 (PostgreSQL + pgvector + FTS)
@@ -1483,7 +1483,7 @@ Implementation Status - CORRECTED
 ================================================================================
 
 ✅ COMPLETED:
-	•	n8n deployed on Render
+	•	Celery workers deployed on Render
 	•	CrewAI deployed (ESSENTIAL)
 	•	Supabase database configured with pgvector
 	•	Backblaze B2 integrated
@@ -1494,7 +1494,7 @@ Implementation Status - CORRECTED
 	•	mem-agent MCP configured
 
 🔄 IN PROGRESS:
-	•	Claude Sonnet 4.5 API integration in n8n
+	•	Claude Sonnet 4.5 API integration in Celery tasks
 	•	Batch processing workflow
 	•	Prompt caching optimization
 
@@ -1608,7 +1608,7 @@ Time: 1-2 days
 Priority: URGENT
 
 ================================================================================
-n8n Workflow Architecture Patterns (NEW - v7.0)
+Celery Workflow Architecture Patterns (NEW - v7.0)
 ================================================================================
 
 Sub-Workflow Organization:
@@ -1780,7 +1780,7 @@ Batch Processing Patterns (NEW - v7.0):
     └── Large-scale data migrations
 
 ================================================================================
-n8n Node Implementation Patterns (NEW - v7.0 Complete)
+Celery Task Implementation Patterns (NEW - v7.0 Complete)
 ================================================================================
 
 Essential Node Patterns for Production Workflows:
@@ -1848,7 +1848,7 @@ Phase 2: API Integrations (Week 1-2)
 ├── Test reranking pipeline
 └── Validate graph queries
 
-Phase 3: n8n Workflows (Week 2)
+Phase 3: Celery Workflows (Week 2)
 ├── Update ingestion to extract hierarchy
 ├── Add LightRAG entity extraction step
 ├── Store all required metadata
@@ -1909,7 +1909,7 @@ High-Priority Gaps (8/8 Complete):
 ✅ Gap 2.8: Switch node routing
 
 Medium-Priority Gaps (12/12 Complete):
-✅ All n8n node patterns documented
+✅ All Celery task patterns documented
 ✅ Complete SQL schemas provided
 ✅ Edge function implementations
 ✅ Workflow JSON definitions
