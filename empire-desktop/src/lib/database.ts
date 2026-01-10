@@ -297,9 +297,6 @@ export async function syncConversationsFromCloud(projectId?: string): Promise<vo
 // ============ Messages ============
 // Messages are also stored in Supabase (cloud) for persistence
 
-// Track the conversation ID for cloud message operations
-let lastSyncedConversationId: string | null = null
-
 export async function getMessages(conversationId: string): Promise<Message[]> {
   console.log('[Database] Loading messages for conversation:', conversationId)
 
@@ -312,7 +309,6 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
 
         // Cache to local SQLite for offline access
         await cacheMessagesLocally(conversationId, messages)
-        lastSyncedConversationId = conversationId
 
         return messages
       } catch (apiError) {

@@ -201,7 +201,7 @@ export async function deleteProject(id: string): Promise<{ deletedSourcesCount: 
  * Sync projects from API to local cache
  * Returns projects that have been updated since lastSync
  */
-export async function syncProjects(lastSyncTimestamp?: string): Promise<{
+export async function syncProjects(_lastSyncTimestamp?: string): Promise<{
   projects: Project[]
   syncedAt: string
 }> {
