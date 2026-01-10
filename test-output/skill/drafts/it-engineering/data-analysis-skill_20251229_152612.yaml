@@ -1,0 +1,11 @@
+name: data-analysis-skill
+description: Analyze data and generate insights
+parameters:
+  - name: data_source
+    type: string
+    required: true
+steps:
+  - name: Load Data
+    action: load_data
+  - name: Analyze
+    action: analyze

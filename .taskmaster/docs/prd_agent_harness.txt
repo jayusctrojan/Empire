@@ -1,0 +1,921 @@
+<context>
+# Overview
+
+## Problem Statement
+Empire v7.3 currently handles document analysis and queries well for immediate, synchronous tasks. However, there's no capability for **long-running, multi-step research projects** that require:
+- Planning and decomposing complex research queries into subtasks
+- Executing multiple retrieval, synthesis, and analysis operations over time
+- Tracking progress and allowing users to check in asynchronously
+- Generating comprehensive reports from aggregated research findings
+
+Users need a way to submit complex research requests (e.g., "Research all California insurance compliance requirements and create a comprehensive guide") and have the system autonomously plan, execute, and deliver results over minutes or hours.
+
+## Solution: Agent Harness (Research Projects)
+Implement a **two-stage Agent Harness architecture** that provides:
+1. **Initializer Stage**: AI-powered planning that decomposes research requests into discrete tasks
+2. **Task Harness Stage**: Execution engine that processes tasks sequentially or concurrently, tracking state in the database
+
+This pattern, proven by AI Automators, enables long-running autonomous AI workflows with full observability.
+
+## Target Users
+- **Knowledge Workers**: Researchers needing comprehensive analysis across multiple documents
+- **Business Analysts**: Users requiring multi-source data synthesis
+- **Compliance Officers**: Users needing thorough documentation review and summarization
+- **Power Users**: Anyone with complex, time-intensive research needs
+
+## Value Proposition
+- **Autonomous Execution**: Submit once, receive comprehensive results later
+- **Full Transparency**: Track progress, view completed tasks, see partial results
+- **Scalable Research**: Handle research that would take humans hours or days
+- **Integration with Empire**: Leverages existing 15 AI agents, RAG pipeline, and knowledge graph
+- **Maximum Efficiency**: Concurrent task execution without sacrificing quality
+
+## Performance Philosophy
+**Core Principle**: Speed AND Quality - Never sacrifice one for the other.
+
+The system must be designed from the ground up to:
+1. **Execute concurrently** wherever task dependencies allow
+2. **Minimize idle time** between task completions
+3. **Optimize resource utilization** across all workers
+4. **Measure and improve** efficiency continuously
+5. **Guarantee quality** through automated validation gates
+
+# Core Features
+
+## 1. Research Project Creation
+- **What it does**: Users submit a research query with optional context/constraints
+- **Why important**: Entry point for all long-running research workflows
+- **How it works**:
+  - User provides: query, context, notification email
+  - System creates `research_job` record with status "initializing"
+  - Triggers Initializer agent to decompose into tasks
+
+## 2. Intelligent Task Planning (Initializer)
+- **What it does**: AI agent analyzes the research request and creates a structured task plan
+- **Why important**: Breaks down complex requests into actionable, trackable steps
+- **How it works**:
+  - Uses Claude Sonnet to analyze the query
+  - Identifies required task types: retrieval (RAG, NLQ, API), synthesis, writing
+  - Creates `plan_tasks` records with sequence order and dependencies
+  - Updates job status to "planned"
+
+## 3. Task Execution Engine (Task Harness)
+- **What it does**: Processes tasks according to plan with maximum concurrency
+- **Why important**: Core engine that drives research completion at optimal speed
+- **How it works**:
+  - **Dependency Graph Analysis**: Build DAG of task dependencies at planning time
+  - **Concurrent Dispatch**: Launch all tasks whose dependencies are satisfied simultaneously
+  - **Wave-Based Execution**: Tasks execute in parallel waves based on dependency levels
+  - Executes each task type:
+    - **Retrieval**: Vector search (Supabase), graph queries (Neo4j), web search
+    - **Synthesis**: Combines retrieved artifacts into coherent findings
+    - **Write Report**: Generates final deliverable from all findings
+  - Stores results in `research_artifacts` table
+  - Updates task status and triggers dependent tasks immediately
+
+## 3.1 Concurrent Execution Strategy
+- **What it does**: Maximizes parallelism while respecting task dependencies
+- **Why important**: Reduces total execution time by 50-70% compared to sequential
+- **How it works**:
+  - **Task Dependency DAG**: Each task declares dependencies on other task_keys
+  - **Ready Queue**: Tasks with all dependencies satisfied are immediately queued
+  - **Worker Pool**: Multiple Celery workers process tasks in parallel
+  - **Completion Triggers**: When a task completes, check and queue all dependent tasks
+  - **Resource Limits**: Configurable max concurrent tasks per job (default: 5)
+
+**Example Execution Pattern**:
+```
+Wave 1 (parallel): retrieval_rag_1, retrieval_rag_2, retrieval_nlq_1, retrieval_graph_1
+Wave 2 (after Wave 1): synthesis_findings
+Wave 3 (after Wave 2): write_report, fact_check
+Wave 4 (after Wave 3): review_quality
+```
+
+## 4. Progress Tracking & Notifications
+- **What it does**: Real-time visibility into research progress with email notifications
+- **Why important**: Users need to know status without constant polling
+- **How it works**:
+  - WebSocket endpoint for real-time progress updates
+  - REST endpoint for status polling
+  - Email notification on completion (or failure)
+  - Dashboard view showing all active/completed projects
+
+## 5. Report Generation & Delivery
+- **What it does**: Produces comprehensive research reports from accumulated findings
+- **Why important**: Delivers actionable output from the research process
+- **How it works**:
+  - Writing agent (AGENT-014) synthesizes all artifacts
+  - Review agent (AGENT-015) performs quality check
+  - Generates report in multiple formats (Markdown, PDF)
+  - Stores in B2 and updates job with report URL
+  - Sends completion email with report link
+
+## 6. Performance Monitoring & Quality Gates
+- **What it does**: Ensures maximum efficiency while maintaining quality standards
+- **Why important**: Validates that speed optimizations don't compromise output quality
+- **How it works**:
+  - **Execution Metrics**: Track duration, parallelism ratio, idle time per job
+  - **Quality Scores**: Each artifact gets confidence/relevance score
+  - **Quality Gates**: Minimum thresholds before proceeding to next phase
+  - **Performance Alerts**: Flag jobs that exceed expected duration
+  - **Efficiency Dashboard**: Real-time view of system throughput
+
+### Quality Gates (Non-Negotiable)
+| Phase | Gate | Threshold | Action if Failed |
+|-------|------|-----------|------------------|
+| Retrieval | Minimum relevant chunks | ≥5 chunks with score >0.7 | Expand query, retry |
+| Synthesis | Coherence score | ≥0.8 | Re-synthesize with more context |
+| Report | Fact-check pass rate | ≥90% claims verified | Flag unverified, add disclaimers |
+| Review | Overall quality score | ≥0.85 | Revision loop (max 2 iterations) |
+
+### Performance SLAs
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Simple query (3-5 tasks) | <2 minutes | End-to-end completion |
+| Medium query (6-10 tasks) | <5 minutes | End-to-end completion |
+| Complex query (11-20 tasks) | <15 minutes | End-to-end completion |
+| Task parallelism ratio | >0.6 | Concurrent tasks / total tasks |
+| Worker utilization | >80% | Active time / total time |
+| Idle time between waves | <500ms | Time from completion to next dispatch |
+
+# User Experience
+
+## User Personas
+
+### Persona 1: Business Analyst (Primary)
+- Needs comprehensive market research and competitive analysis
+- Wants to submit requests and focus on other work
+- Values detailed, well-cited reports
+
+### Persona 2: Compliance Officer
+- Needs thorough policy and regulation analysis
+- Requires audit trails and source citations
+- Values completeness over speed
+
+### Persona 3: Knowledge Worker
+- Explores topics across multiple documents
+- Wants iterative refinement of research
+- Values ability to add follow-up questions
+
+## Key User Flows
+
+### Flow 1: Create Research Project
+1. User navigates to "Research Projects" in Empire
+2. Enters research query: "Analyze all vendor contracts for renewal terms and pricing"
+3. Optionally adds context: "Focus on IT and SaaS vendors"
+4. Clicks "Start Research"
+5. Sees confirmation with estimated task count
+6. Receives email confirming project started
+
+### Flow 2: Monitor Progress
+1. User opens "My Projects" dashboard
+2. Sees list of active/completed projects with progress bars
+3. Clicks on project to see task breakdown
+4. Views completed tasks and their findings
+5. Optionally cancels or modifies project
+
+### Flow 3: Receive & Review Results
+1. User receives email: "Research Complete"
+2. Clicks link to view report in Empire
+3. Reviews executive summary, key findings, full report
+4. Downloads PDF version
+5. Optionally requests follow-up research
+
+## UI/UX Considerations
+- **Dashboard**: Card-based view of projects with status indicators
+- **Progress**: Visual progress bar + task checklist
+- **Report Viewer**: Rich markdown rendering with table of contents
+- **Mobile**: Responsive design for checking status on mobile
+- **Notifications**: Toast notifications for real-time updates when app is open
+</context>
+<PRD>
+# Technical Architecture
+
+## System Components
+
+### 1. Research Projects API (`/api/research-projects`)
+New FastAPI router with endpoints:
+- `POST /` - Create new research project
+- `GET /` - List user's projects
+- `GET /{id}` - Get project details with tasks
+- `GET /{id}/status` - Get current status and progress
+- `DELETE /{id}` - Cancel project
+- `GET /{id}/report` - Get final report
+- `WebSocket /ws/{id}` - Real-time progress stream
+
+### 2. Initializer Service (`app/services/research_initializer.py`)
+AI-powered planning service:
+- Analyzes research query using Claude Sonnet
+- Determines required task types and sequence
+- Creates task plan in database
+- Triggers task execution
+
+### 3. Task Harness Service (`app/services/task_harness.py`)
+Execution engine:
+- Picks up pending tasks by sequence order
+- Routes to appropriate executor based on task_type
+- Handles retries and error recovery
+- Updates task and job status
+
+### 4. Task Executors (`app/services/task_executors/`)
+Specialized executors for each task type:
+- `retrieval_executor.py` - RAG, NLQ, API calls
+- `synthesis_executor.py` - Combines findings
+- `report_executor.py` - Generates final report
+
+### 5. Background Workers
+Celery tasks for async execution:
+- `initialize_research_job` - Run initializer
+- `execute_research_task` - Run individual task
+- `generate_research_report` - Final report generation
+
+## Data Models
+
+### Research Jobs Table
+```sql
+CREATE TABLE research_jobs (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
+  customer_id TEXT NOT NULL,
+  query TEXT NOT NULL,
+  context TEXT,
+  status TEXT DEFAULT 'initializing',
+  -- Status values: initializing, planning, executing, synthesizing, complete, failed, cancelled
+  notify_email TEXT NOT NULL,
+  locked_at TIMESTAMP,
+  report_content TEXT,
+  report_url TEXT,
+  summary TEXT,
+  key_findings TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  completed_at TIMESTAMP,
+  execution_id INTEGER,
+  retries SMALLINT DEFAULT 0,
+  error_message TEXT
+);
+```
+
+### Plan Tasks Table
+```sql
+CREATE TABLE plan_tasks (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  job_id BIGINT REFERENCES research_jobs(id) ON DELETE CASCADE,
+  task_key TEXT NOT NULL,
+  sequence_order INTEGER NOT NULL,
+  task_type TEXT NOT NULL,
+  -- Task types: retrieval_rag, retrieval_nlq, retrieval_api, synthesis, write_report
+  query TEXT,
+  config JSONB,
+  status TEXT DEFAULT 'pending',
+  -- Status values: pending, running, complete, failed, skipped
+  result_summary TEXT,
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  error_message TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(job_id, task_key)
+);
+```
+
+### Research Artifacts Table
+```sql
+CREATE TABLE research_artifacts (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  job_id BIGINT REFERENCES research_jobs(id) ON DELETE CASCADE,
+  task_id BIGINT REFERENCES plan_tasks(id) ON DELETE SET NULL,
+  artifact_type TEXT NOT NULL,
+  -- Types: retrieved_chunk, synthesis_finding, report_section
+  source TEXT,
+  query_used TEXT,
+  raw_response JSONB,
+  processed_content TEXT,
+  confidence_score FLOAT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## APIs and Integrations
+
+### Internal Empire Integrations
+- **Existing RAG Pipeline**: Vector search via Supabase pgvector
+- **Knowledge Graph**: Neo4j for entity relationships
+- **AI Agents**: AGENT-009 through AGENT-015 for analysis/writing
+- **Celery**: Background task execution
+- **WebSocket**: Real-time status updates (existing infrastructure)
+- **B2 Storage**: Report file storage
+
+### External Integrations
+- **Email Service**: SendGrid/Postmark for notifications
+- **Web Search**: Perplexity API for external research (optional)
+
+## Infrastructure Requirements
+- **Database**: 3 new tables in Supabase
+- **Celery Queues**: New `research` queue for isolation
+- **Redis**: Task state caching
+- **B2 Bucket**: `research-reports/` prefix for output files
+
+# Development Roadmap
+
+## Phase 1: Foundation (MVP)
+**Goal**: Basic end-to-end research project flow
+
+### 1.1 Database Schema
+- Create research_jobs, plan_tasks, research_artifacts tables
+- Add RLS policies for user isolation
+- Create indexes for query performance
+
+### 1.2 Research Projects API
+- CRUD endpoints for research jobs
+- Status endpoint with task breakdown
+- Basic authentication/authorization
+
+### 1.3 Initializer Service
+- Claude-based query analysis
+- Simple task decomposition (3-5 task types)
+- Task plan creation in database
+
+### 1.4 Task Harness (Sequential)
+- Sequential task execution
+- Basic retrieval executor (RAG only)
+- Simple synthesis executor
+- Status updates to database
+
+### 1.5 Basic UI
+- Project creation form
+- Project list view
+- Simple progress display
+
+## Phase 2: Concurrent Execution & Performance (PRIORITY)
+**Goal**: Maximum parallelism with quality guarantees - this is NOT optional
+
+### 2.1 Concurrent Execution Engine (CRITICAL)
+- **Task Dependency DAG Builder**: Analyze task plan, build dependency graph
+- **Parallel Dispatcher**: Launch all ready tasks simultaneously
+- **Completion Listener**: Trigger dependent tasks within 100ms of completion
+- **Wave Orchestrator**: Manage parallel execution waves
+- **Concurrency Limiter**: Prevent resource exhaustion (configurable per-job limit)
+
+### 2.2 Multiple Retrieval Types (Parallel)
+- NLQ executor (natural language queries)
+- Graph retrieval executor (Neo4j)
+- API retrieval executor (external data)
+- **All retrieval tasks run in parallel when no dependencies**
+
+### 2.3 Performance Instrumentation
+- **Per-task timing**: Start, end, duration for every task
+- **Queue wait time**: Time from ready to execution start
+- **Parallelism metrics**: Concurrent tasks at each moment
+- **Bottleneck detection**: Identify tasks blocking others
+
+### 2.4 Error Handling & Retries
+- Automatic retry with exponential backoff
+- Graceful degradation (skip failed non-critical tasks)
+- **Parallel retry**: Failed tasks don't block other branches
+- Error reporting and alerting
+
+### 2.5 Progress Notifications
+- WebSocket real-time updates
+- Email notifications (start, progress milestones, complete)
+
+## Phase 3: Report Generation
+**Goal**: High-quality, comprehensive research reports
+
+### 3.1 Writing Agent Integration
+- AGENT-014 for report generation
+- AGENT-015 for quality review
+- Revision loop for quality assurance
+
+### 3.2 Report Formats
+- Markdown with rich formatting
+- PDF generation
+- Executive summary extraction
+
+### 3.3 Report Storage & Delivery
+- B2 storage with signed URLs
+- Email delivery with download link
+- In-app report viewer
+
+## Phase 4: Advanced Features
+**Goal**: Power user features and optimizations
+
+### 4.1 Project Templates
+- Predefined research templates
+- Custom template creation
+- Template marketplace
+
+### 4.2 Follow-up Research
+- Add questions to existing project
+- Iterative refinement
+- Conversation-style interaction
+
+### 4.3 Collaboration
+- Share projects with team members
+- Comments on findings
+- Export to external tools
+
+### 4.4 Analytics & Optimization
+- Research performance metrics
+- Cost tracking per project
+- Query optimization suggestions
+
+# Logical Dependency Chain
+
+## Foundation First (Build Order)
+
+### Layer 1: Data Layer
+1. **Database Schema** - All tables with proper relationships and indexes
+2. **Pydantic Models** - Request/response schemas for API
+3. **Database Service** - CRUD operations for all tables
+
+### Layer 2: Core Services
+4. **Initializer Service** - Query analysis and task planning
+5. **Basic Retrieval Executor** - RAG-based retrieval only
+6. **Task Harness (Sequential)** - Execute tasks one by one
+
+### Layer 3: API Layer
+7. **Research Projects Router** - All REST endpoints
+8. **Celery Tasks** - Background job definitions
+9. **Authentication Integration** - User context for RLS
+
+### Layer 4: Minimum Viable UI
+10. **Project Creation Page** - Form to submit research
+11. **Project List Page** - View all user projects
+12. **Project Detail Page** - Status and task breakdown
+
+### Layer 5: Enhanced Capabilities
+13. **Additional Executors** - NLQ, Graph, API retrievers
+14. **Concurrent Execution** - Parallel task processing
+15. **WebSocket Progress** - Real-time updates
+
+### Layer 6: Report Generation
+16. **Synthesis Service** - Combine artifacts into findings
+17. **Report Writer Service** - Generate final report
+18. **Report Storage** - B2 upload and URL generation
+
+### Layer 7: Notifications
+19. **Email Service** - SendGrid integration
+20. **Notification Triggers** - Start, progress, complete events
+
+## Quick Win Path to Visible Output
+The fastest path to a working demo:
+1. Database schema (1)
+2. Basic Initializer (4) - hardcoded simple task plan
+3. Basic Retrieval (5) - existing RAG pipeline
+4. Task Harness (6) - sequential execution
+5. Simple API (7) - create and status endpoints
+6. Minimal UI (10, 11, 12) - form, list, detail views
+
+This gives a working end-to-end flow in ~6 tasks, then iterate from there.
+
+# Risks and Mitigations
+
+## Technical Risks
+
+### Risk 1: Long-Running Task Failures
+**Description**: Celery tasks may fail mid-execution, losing progress
+**Mitigation**:
+- Checkpoint progress to database after each subtask
+- Implement task resumption from last checkpoint
+- Use Celery's built-in retry mechanisms
+
+### Risk 2: AI Planning Inconsistency
+**Description**: Initializer may create inconsistent or poor task plans
+**Mitigation**:
+- Use structured output (JSON schema) for task plans
+- Validate task plan before execution
+- Provide fallback templates for common research types
+
+### Risk 3: Resource Exhaustion
+**Description**: Too many concurrent research projects could overwhelm system
+**Mitigation**:
+- Dedicated Celery queue with concurrency limits
+- Per-user project limits
+- Priority queuing for premium users
+
+### Risk 4: Report Quality Variance
+**Description**: Generated reports may vary significantly in quality
+**Mitigation**:
+- Use AGENT-015 review loop with quality threshold
+- Implement minimum artifact requirements before report generation
+- Allow user feedback to improve prompts
+
+## MVP Definition
+
+### Must Have (MVP)
+- Create research project with query
+- AI-generated task plan (3-5 tasks)
+- Sequential task execution with RAG retrieval
+- Basic synthesis of findings
+- Project status API
+- Simple UI for create/view projects
+
+### Should Have (v1.1)
+- Email notifications
+- WebSocket progress updates
+- Multiple retrieval types
+- PDF report generation
+
+### Could Have (v1.2)
+- Concurrent execution
+- Project templates
+- Follow-up questions
+- Team collaboration
+
+### Won't Have (Future)
+- Custom agent configuration
+- External API integrations
+- White-label reports
+- Marketplace for templates
+
+# Performance Testing Requirements
+
+## Efficiency Test Suite (MANDATORY)
+
+All performance tests must pass before any release. These tests ensure we are maximizing efficiency without sacrificing quality.
+
+### 1. Concurrency Tests
+
+#### Test: Parallel Retrieval Execution
+```python
+def test_parallel_retrieval_tasks():
+    """
+    Given: A job with 4 independent retrieval tasks (no dependencies)
+    When: Job is executed
+    Then: All 4 tasks should start within 500ms of each other
+    And: Total execution time should be ~max(individual times), not sum
+    """
+    # Measure: parallel_start_delta < 500ms
+    # Measure: total_time < (sum_of_individual_times * 0.4)
+```
+
+#### Test: Wave-Based Execution
+```python
+def test_wave_execution_timing():
+    """
+    Given: A job with tasks in 3 dependency waves
+    When: Job is executed
+    Then: Wave 2 should start within 100ms of Wave 1 completion
+    And: No artificial delays between waves
+    """
+    # Measure: inter_wave_delay < 100ms
+```
+
+#### Test: Dependency Respect Under Concurrency
+```python
+def test_dependency_order_maintained():
+    """
+    Given: Task B depends on Task A
+    When: Both are queued
+    Then: Task B must not start until Task A completes
+    And: Task B should start within 100ms of Task A completion
+    """
+    # Verify: dependency order preserved
+    # Measure: dependency_trigger_latency < 100ms
+```
+
+### 2. Throughput Tests
+
+#### Test: Maximum Concurrent Tasks
+```python
+def test_max_concurrency_limit():
+    """
+    Given: A job with 10 independent tasks, max_concurrent=5
+    When: Job is executed
+    Then: Never more than 5 tasks running simultaneously
+    And: As soon as one completes, next should start within 100ms
+    """
+    # Measure: max_concurrent_at_any_time <= 5
+    # Measure: slot_fill_latency < 100ms
+```
+
+#### Test: Worker Utilization
+```python
+def test_worker_utilization_efficiency():
+    """
+    Given: Multiple jobs submitted
+    When: System is under load
+    Then: Worker utilization should be >80%
+    And: No worker should be idle while tasks are queued
+    """
+    # Measure: worker_utilization > 0.80
+    # Measure: idle_while_queued_events = 0
+```
+
+### 3. Latency Tests
+
+#### Test: Task Dispatch Latency
+```python
+def test_task_dispatch_latency():
+    """
+    Given: A task becomes ready (dependencies satisfied)
+    When: Completion event is processed
+    Then: Task should be dispatched to worker within 50ms
+    """
+    # Measure: ready_to_dispatch_latency < 50ms
+```
+
+#### Test: End-to-End SLA Compliance
+```python
+def test_sla_compliance_simple_query():
+    """
+    Given: A simple research query (3-5 tasks)
+    When: Job is submitted
+    Then: Job should complete within 2 minutes
+    """
+    # SLA: simple_query_completion < 120 seconds
+
+def test_sla_compliance_medium_query():
+    """
+    Given: A medium research query (6-10 tasks)
+    When: Job is submitted
+    Then: Job should complete within 5 minutes
+    """
+    # SLA: medium_query_completion < 300 seconds
+
+def test_sla_compliance_complex_query():
+    """
+    Given: A complex research query (11-20 tasks)
+    When: Job is submitted
+    Then: Job should complete within 15 minutes
+    """
+    # SLA: complex_query_completion < 900 seconds
+```
+
+### 4. Quality Under Speed Tests
+
+#### Test: Quality Not Degraded by Parallelism
+```python
+def test_quality_maintained_under_concurrency():
+    """
+    Given: Same query executed sequentially vs concurrently
+    When: Both complete
+    Then: Quality scores should be within 5% of each other
+    And: Concurrent should be faster
+    """
+    # Measure: quality_delta < 0.05
+    # Measure: concurrent_time < sequential_time
+```
+
+#### Test: Quality Gates Enforced
+```python
+def test_quality_gates_block_bad_output():
+    """
+    Given: A retrieval task returns low-quality results
+    When: Quality gate checks results
+    Then: Task should be retried or expanded
+    And: Low-quality results should not propagate to synthesis
+    """
+    # Verify: quality_gate_triggered = True
+    # Verify: retry_or_expand_executed = True
+```
+
+### 5. Efficiency Metrics Collection
+
+#### Test: All Metrics Captured
+```python
+def test_efficiency_metrics_captured():
+    """
+    Given: A job is executed
+    When: Job completes
+    Then: All efficiency metrics should be recorded
+    """
+    required_metrics = [
+        'total_duration_seconds',
+        'task_durations',
+        'parallelism_ratio',
+        'max_concurrent_tasks',
+        'queue_wait_times',
+        'inter_wave_delays',
+        'worker_utilization',
+        'idle_time_total',
+        'quality_scores',
+        'retry_count'
+    ]
+    # Verify: all metrics present and valid
+```
+
+## Benchmark Suite
+
+### Baseline Benchmarks (Run Weekly)
+| Benchmark | Metric | Baseline | Alert Threshold |
+|-----------|--------|----------|-----------------|
+| 5-task parallel retrieval | Total time | 15s | >25s |
+| 10-task mixed workflow | Total time | 45s | >75s |
+| Wave transition latency | p95 latency | 80ms | >150ms |
+| Task dispatch latency | p95 latency | 40ms | >100ms |
+| Parallelism ratio | Ratio | 0.65 | <0.50 |
+
+### Load Test Scenarios
+1. **Burst Load**: 10 jobs submitted simultaneously
+2. **Sustained Load**: 5 jobs/minute for 30 minutes
+3. **Mixed Complexity**: Random mix of simple/medium/complex queries
+
+## Continuous Performance Monitoring
+
+### Prometheus Metrics (Required)
+```python
+# Task execution metrics
+research_task_duration_seconds = Histogram(
+    'research_task_duration_seconds',
+    'Task execution duration',
+    ['task_type', 'job_id']
+)
+
+research_task_queue_wait_seconds = Histogram(
+    'research_task_queue_wait_seconds',
+    'Time task spent waiting in queue',
+    ['task_type']
+)
+
+research_concurrent_tasks = Gauge(
+    'research_concurrent_tasks',
+    'Current number of concurrent tasks',
+    ['job_id']
+)
+
+research_parallelism_ratio = Gauge(
+    'research_parallelism_ratio',
+    'Ratio of concurrent execution achieved',
+    ['job_id']
+)
+
+research_wave_transition_latency_seconds = Histogram(
+    'research_wave_transition_latency_seconds',
+    'Time between wave completion and next wave start'
+)
+
+research_quality_score = Gauge(
+    'research_quality_score',
+    'Quality score for artifacts',
+    ['artifact_type', 'job_id']
+)
+```
+
+### Grafana Dashboard Panels (Required)
+1. **Task Execution Timeline**: Gantt chart showing parallel execution
+2. **Parallelism Ratio Over Time**: Line chart per job
+3. **Queue Depth & Wait Times**: Stacked area chart
+4. **Quality Score Distribution**: Histogram by artifact type
+5. **SLA Compliance Rate**: Percentage meeting target times
+6. **Worker Utilization Heatmap**: Per-worker activity
+
+### Alerts (Required)
+```yaml
+- alert: LowParallelismRatio
+  expr: research_parallelism_ratio < 0.5
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Research job not achieving expected parallelism"
+
+- alert: HighQueueWaitTime
+  expr: histogram_quantile(0.95, research_task_queue_wait_seconds) > 2
+  for: 5m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Tasks waiting too long in queue"
+
+- alert: SLAViolation
+  expr: research_job_duration_seconds > research_job_sla_seconds
+  labels:
+    severity: critical
+  annotations:
+    summary: "Research job exceeded SLA"
+
+- alert: QualityGateFailed
+  expr: increase(research_quality_gate_failures_total[5m]) > 5
+  labels:
+    severity: warning
+  annotations:
+    summary: "Multiple quality gate failures"
+```
+
+## Resource Constraints
+
+### Development Effort
+- Leverages existing Empire infrastructure (Celery, Supabase, AI agents)
+- New code primarily in services and routes
+- UI can use existing Empire component patterns
+
+### Infrastructure Cost
+- Celery workers: Existing Render worker can handle initial load
+- Database: Minimal additional storage
+- AI API calls: Primary cost driver - implement usage tracking
+
+### Timeline Considerations
+- Phase 1 (MVP): Foundation + basic flow
+- Phase 2: Enhanced execution
+- Phase 3: Reports
+- Phase 4: Advanced features
+
+# Appendix
+
+## Research Findings
+
+### AI Automators Agent Harness Pattern
+Source: AI Automators course materials
+Key concepts:
+- Two-stage architecture (Initializer + Task Harness)
+- Database-driven task state management
+- Separation of planning and execution
+- Task types: retrieval, synthesis, write
+
+### Database Schema Reference
+Adapted from AI Automators' `harness_database_setup.txt`:
+- research_jobs: Main job tracking
+- plan_tasks: Individual task records
+- research_artifacts: Retrieved/generated content
+
+### Empire v7.3 Integration Points
+Existing services to leverage:
+- AGENT-009 (Senior Research Analyst)
+- AGENT-010 (Content Strategist)
+- AGENT-011 (Fact Checker)
+- AGENT-012 (Research Agent)
+- AGENT-013 (Analysis Agent)
+- AGENT-014 (Writing Agent)
+- AGENT-015 (Review Agent)
+- Supabase pgvector for RAG
+- Neo4j for knowledge graph queries
+- Celery for background tasks
+- WebSocket for real-time updates
+
+## Technical Specifications
+
+### API Endpoint Specifications
+
+#### POST /api/research-projects
+```json
+Request:
+{
+  "query": "Research all California insurance compliance requirements",
+  "context": "Focus on commercial auto insurance",
+  "notify_email": "user@example.com"
+}
+
+Response:
+{
+  "id": 123,
+  "status": "initializing",
+  "created_at": "2025-01-10T12:00:00Z",
+  "estimated_tasks": null
+}
+```
+
+#### GET /api/research-projects/{id}
+```json
+Response:
+{
+  "id": 123,
+  "query": "Research all California insurance compliance requirements",
+  "status": "executing",
+  "progress": {
+    "total_tasks": 5,
+    "completed_tasks": 2,
+    "current_task": "retrieval_rag_2"
+  },
+  "tasks": [
+    {"id": 1, "task_key": "retrieval_rag_1", "status": "complete"},
+    {"id": 2, "task_key": "retrieval_rag_2", "status": "running"},
+    {"id": 3, "task_key": "retrieval_nlq_1", "status": "pending"},
+    {"id": 4, "task_key": "synthesis_1", "status": "pending"},
+    {"id": 5, "task_key": "write_report", "status": "pending"}
+  ],
+  "created_at": "2025-01-10T12:00:00Z",
+  "updated_at": "2025-01-10T12:15:00Z"
+}
+```
+
+### Task Type Definitions
+
+| Task Type | Description | Executor | Inputs | Outputs |
+|-----------|-------------|----------|--------|---------|
+| retrieval_rag | Vector similarity search | retrieval_executor | query, filters | chunks, scores |
+| retrieval_nlq | Natural language query | retrieval_executor | question, tables | structured data |
+| retrieval_graph | Knowledge graph traversal | retrieval_executor | entity, depth | nodes, edges |
+| retrieval_api | External API call | retrieval_executor | endpoint, params | API response |
+| synthesis | Combine findings | synthesis_executor | artifacts | summary, findings |
+| write_report | Generate final report | report_executor | all artifacts | markdown, pdf |
+
+### Celery Task Signatures
+
+```python
+@celery_app.task(bind=True, max_retries=3)
+def initialize_research_job(self, job_id: int) -> dict:
+    """Analyze query and create task plan."""
+    pass
+
+@celery_app.task(bind=True, max_retries=2)
+def execute_research_task(self, task_id: int) -> dict:
+    """Execute a single research task."""
+    pass
+
+@celery_app.task(bind=True)
+def generate_research_report(self, job_id: int) -> dict:
+    """Generate final report from all artifacts."""
+    pass
+```
+</PRD>

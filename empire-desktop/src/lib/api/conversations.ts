@@ -163,7 +163,7 @@ function toClientMessage(apiMsg: APIMessage): Message {
     conversationId: apiMsg.session_id,
     role: apiMsg.role,
     content: apiMsg.content,
-    sources: apiMsg.sources as Source[] | undefined,
+    sources: apiMsg.sources as unknown as Source[] | undefined,
     createdAt: new Date(apiMsg.created_at),
     updatedAt: new Date(apiMsg.created_at), // API doesn't track updated_at for messages
     status: 'complete',
@@ -313,7 +313,7 @@ export async function createMessage(
     content,
   }
 
-  if (options?.sources) body.sources = options.sources as Array<Record<string, unknown>>
+  if (options?.sources) body.sources = options.sources as unknown as Array<Record<string, unknown>>
   if (options?.modelName) body.model_name = options.modelName
   if (options?.tokensUsed) body.tokens_used = options.tokensUsed
   if (options?.processingTimeMs) body.processing_time_ms = options.processingTimeMs

@@ -1972,3 +1972,10 @@ If you're unsure which tool to use:
 ## Task Master AI Instructions
 **Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
 @./.taskmaster/CLAUDE.md
+
+## Active Technologies
+- Python 3.11 + FastAPI, Celery, Anthropic SDK, Pydantic v2, structlog (004-agent-harness)
+- Supabase PostgreSQL (pgvector), Neo4j (knowledge graph), Backblaze B2 (reports), Upstash Redis (cache/broker) (004-agent-harness)
+
+## Recent Changes
+- 004-agent-harness: Added Python 3.11 + FastAPI, Celery, Anthropic SDK, Pydantic v2, structlog

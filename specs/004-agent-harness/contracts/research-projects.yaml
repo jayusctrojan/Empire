@@ -1,0 +1,426 @@
+openapi: 3.1.0
+info:
+  title: Research Projects API
+  description: API for managing long-running autonomous research projects
+  version: 1.0.0
+  contact:
+    name: Empire API
+
+servers:
+  - url: https://jb-empire-api.onrender.com/api
+    description: Production server
+
+tags:
+  - name: Research Projects
+    description: Research project lifecycle management
+  - name: Reports
+    description: Report access and sharing
+
+paths:
+  /research-projects:
+    post:
+      tags: [Research Projects]
+      summary: Create a new research project
+      description: |
+        Submits a research query for autonomous processing.
+        The system will analyze the query, create a task plan, and begin execution.
+      operationId: createResearchProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResearchProjectRequest'
+      responses:
+        '201':
+          description: Project created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchProjectResponse'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '429':
+          description: Too many concurrent projects (limit 3)
+
+    get:
+      tags: [Research Projects]
+      summary: List research projects
+      description: Returns all research projects for the authenticated user
+      operationId: listResearchProjects
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResearchProjectResponse'
+
+  /research-projects/{projectId}:
+    get:
+      tags: [Research Projects]
+      summary: Get project details
+      description: Returns detailed information about a project including tasks
+      operationId: getResearchProject
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchProjectDetailResponse'
+        '404':
+          description: Project not found
+
+    delete:
+      tags: [Research Projects]
+      summary: Cancel a project
+      description: Cancels an active project. Running tasks complete gracefully.
+      operationId: cancelResearchProject
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '204':
+          description: Project cancelled
+        '404':
+          description: Project not found
+        '409':
+          description: Project already completed
+
+  /research-projects/{projectId}/status:
+    get:
+      tags: [Research Projects]
+      summary: Get project status
+      description: Returns current status and progress
+      operationId: getProjectStatus
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '200':
+          description: Project status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchProjectStatusResponse'
+
+  /research-projects/{projectId}/report:
+    get:
+      tags: [Reports]
+      summary: Get research report
+      description: Returns the completed research report
+      operationId: getResearchReport
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [markdown, pdf]
+            default: markdown
+      responses:
+        '200':
+          description: Research report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResearchReportResponse'
+        '404':
+          description: Report not found
+        '409':
+          description: Project not yet complete
+
+  /research-projects/{projectId}/share:
+    post:
+      tags: [Reports]
+      summary: Create shareable link
+      description: Generates a public shareable link for the report
+      operationId: createShareLink
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '201':
+          description: Share link created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareLinkResponse'
+        '404':
+          description: Project not found
+        '409':
+          description: Project not yet complete
+
+    delete:
+      tags: [Reports]
+      summary: Revoke shareable link
+      description: Revokes the public shareable link
+      operationId: revokeShareLink
+      parameters:
+        - $ref: '#/components/parameters/projectId'
+      responses:
+        '204':
+          description: Share link revoked
+        '404':
+          description: Share link not found
+
+  /research-projects/shared/{shareToken}:
+    get:
+      tags: [Reports]
+      summary: Access shared report
+      description: Public endpoint to view a shared report (no auth required)
+      operationId: getSharedReport
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Shared report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedReportResponse'
+        '404':
+          description: Share link not found or revoked
+
+components:
+  parameters:
+    projectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+  schemas:
+    ResearchType:
+      type: string
+      enum: [general, compliance, competitive, technical, financial]
+
+    JobStatus:
+      type: string
+      enum:
+        - initializing
+        - planning
+        - planned
+        - executing
+        - synthesizing
+        - generating_report
+        - complete
+        - failed
+        - cancelled
+
+    TaskStatus:
+      type: string
+      enum: [pending, queued, running, complete, failed, skipped, cancelled]
+
+    TaskType:
+      type: string
+      enum:
+        - retrieval_rag
+        - retrieval_nlq
+        - retrieval_graph
+        - retrieval_api
+        - synthesis
+        - fact_check
+        - write_section
+        - write_report
+        - review
+
+    CreateResearchProjectRequest:
+      type: object
+      required: [query, notify_email]
+      properties:
+        query:
+          type: string
+          minLength: 10
+          maxLength: 2000
+          description: The research question or topic
+        context:
+          type: string
+          maxLength: 5000
+          description: Additional context or constraints
+        research_type:
+          $ref: '#/components/schemas/ResearchType'
+        notify_email:
+          type: string
+          format: email
+          description: Email for completion notification
+
+    ResearchProjectResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        query:
+          type: string
+        context:
+          type: string
+        research_type:
+          $ref: '#/components/schemas/ResearchType'
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        total_tasks:
+          type: integer
+        completed_tasks:
+          type: integer
+        progress_percentage:
+          type: number
+          format: float
+        current_task_key:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    ResearchProjectDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ResearchProjectResponse'
+        - type: object
+          properties:
+            tasks:
+              type: array
+              items:
+                $ref: '#/components/schemas/TaskResponse'
+            summary:
+              type: string
+            key_findings:
+              type: object
+
+    ResearchProjectStatusResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        total_tasks:
+          type: integer
+        completed_tasks:
+          type: integer
+        progress_percentage:
+          type: number
+          format: float
+        current_task:
+          $ref: '#/components/schemas/TaskResponse'
+        estimated_completion:
+          type: string
+          format: date-time
+
+    TaskResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        task_key:
+          type: string
+        sequence_order:
+          type: integer
+        task_type:
+          $ref: '#/components/schemas/TaskType'
+        task_title:
+          type: string
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        result_summary:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    ResearchReportResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        query:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        summary:
+          type: string
+        key_findings:
+          type: object
+        report_content:
+          type: string
+          description: Full report in Markdown format
+        report_url:
+          type: string
+          format: uri
+          description: URL to download report file
+        completed_at:
+          type: string
+          format: date-time
+
+    ShareLinkResponse:
+      type: object
+      properties:
+        share_url:
+          type: string
+          format: uri
+        share_token:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    SharedReportResponse:
+      type: object
+      properties:
+        query:
+          type: string
+        summary:
+          type: string
+        key_findings:
+          type: object
+        report_content:
+          type: string
+        completed_at:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []
