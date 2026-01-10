@@ -7,7 +7,7 @@ Enables persistent chat history in Supabase for the desktop app.
 
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
-from app.core.auth import get_current_user
+from app.middleware.auth import get_current_user
 from app.services.conversation_service import get_conversation_service, ConversationService
 from app.models.conversations import (
     CreateConversationRequest,
