@@ -63,6 +63,9 @@ export interface Project {
   conversationCount: number
   fileCount?: number
   memoryContext?: string
+  // Cloud-synced source counts from Supabase
+  sourceCount?: number
+  readySourceCount?: number
 }
 
 // Project Files
