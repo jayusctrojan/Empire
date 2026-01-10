@@ -11,6 +11,24 @@ import { listClassifications as _listClassifications } from './classifications'
 // Core client
 export { apiRequest, get, post, postFormData, del, getApiBaseUrl, EmpireAPIError } from './client'
 
+// Projects API (cloud-persisted)
+export {
+  listProjects,
+  getProject,
+  createProject as createRemoteProject,
+  updateProject as updateRemoteProject,
+  deleteProject as deleteRemoteProject,
+  syncProjects,
+  type APIProject,
+  type CreateProjectRequest,
+  type UpdateProjectRequest,
+  type CreateProjectResponse,
+  type GetProjectResponse,
+  type ListProjectsResponse,
+  type UpdateProjectResponse,
+  type DeleteProjectResponse,
+} from './projects'
+
 // Documents API
 export {
   uploadDocuments,
@@ -46,6 +64,27 @@ export {
   type ConnectionState,
   type ChatClientHandlers,
 } from './websocket'
+
+// Conversations API (cloud-persisted chat history)
+export {
+  listConversations as apiListConversations,
+  getConversation as apiGetConversation,
+  createConversation as createRemoteConversation,
+  updateConversation as updateRemoteConversation,
+  deleteConversation as deleteRemoteConversation,
+  listMessages as apiListMessages,
+  createMessage as createRemoteMessage,
+  updateMessage as updateRemoteMessage,
+  syncConversations,
+  type APIConversation,
+  type APIConversationSummary,
+  type APIMessage,
+  type CreateConversationRequest,
+  type UpdateConversationRequest,
+  type CreateMessageRequest,
+  type UpdateMessageRequest,
+  type MessageRole,
+} from './conversations'
 
 // CKO Conversation API (AI Studio)
 export {
