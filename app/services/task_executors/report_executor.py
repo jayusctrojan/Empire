@@ -25,7 +25,7 @@ import structlog
 from anthropic import AsyncAnthropic
 from supabase import Client
 
-from app.database.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 from app.services.task_harness import TaskExecutor
 from app.models.research_project import TaskType, ArtifactType
 

@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 import structlog
 from supabase import Client
 
-from app.database.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 from app.models.research_project import JobStatus, TaskStatus, TaskType
 
 logger = structlog.get_logger(__name__)
