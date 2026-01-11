@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 import structlog
 from prometheus_client import Histogram, Gauge, Counter, Summary
 
-from app.database.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 from app.models.research_project import JobStatus, TaskStatus
 
 logger = structlog.get_logger(__name__)

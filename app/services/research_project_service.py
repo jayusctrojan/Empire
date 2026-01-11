@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import structlog
 from supabase import Client
 
-from app.database.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 from app.models.research_project import (
     ResearchType,
     JobStatus,

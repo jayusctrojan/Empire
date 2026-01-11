@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 import structlog
 from supabase import Client
 
-from app.database.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 from app.services.email_service import get_email_service, EmailService
 
 logger = structlog.get_logger(__name__)

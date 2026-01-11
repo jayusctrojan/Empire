@@ -25,7 +25,7 @@ from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 from supabase import Client
 
-from app.database.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 from app.models.research_project import (
     JobStatus,
     TaskType,
