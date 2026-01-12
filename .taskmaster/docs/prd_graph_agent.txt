@@ -1,0 +1,975 @@
+<context>
+# Overview
+
+## Problem Statement
+Empire v7.3's Chief Knowledge Officer (CKO) Chat currently handles document queries through vector search (RAG) and natural language queries, but lacks the ability to:
+- **Navigate complex relationships**: Users cannot traverse connections between entities across documents, support tickets, orders, and interactions
+- **Understand document structure**: Legal, regulatory, and contract documents have complex internal structures with clause references and cross-links that are invisible to flat vector search
+- **Provide unified views**: Customer data is siloed - there's no way to get a "Customer 360" view that consolidates all touchpoints and relationships
+- **Expand search context intelligently**: Vector search returns isolated chunks without understanding the broader graph context of related entities and documents
+
+Users need intelligent graph traversal capabilities that can:
+1. Provide unified customer views across all data sources
+2. Navigate document hierarchies and cross-references intelligently
+3. Expand vector search results using relationship context from Neo4j
+
+## Solution: Graph Agent for CKO Chat
+Implement **three interconnected graph intelligence capabilities** that enhance the existing CKO Chat:
+
+1. **Customer 360 Graph Agent**: Unified customer views that consolidate data from multiple sources (documents, support tickets, orders, interactions) into a queryable knowledge graph with natural language interface
+
+2. **Document Structure Graph**: Automatic extraction of document hierarchy, clause references, and cross-links for complex documents (legal, regulatory, contracts) with intelligent retrieval that follows cross-references
+
+3. **Graph-Enhanced RAG**: Use Neo4j graph context to expand vector search results by traversing relationships to find connected documents, entities, and related content that vector search alone would miss
+
+This pattern, proven by AI Automators, enables context-aware document intelligence that understands relationships, not just content similarity.
+
+## Target Users
+- **Knowledge Workers**: Researchers needing to understand relationships between documents and entities
+- **Legal/Compliance Teams**: Users working with complex legal documents containing clause references and cross-links
+- **Customer Success Teams**: Users needing unified customer views across all touchpoints
+- **Business Analysts**: Users requiring comprehensive entity relationship analysis
+- **Power Users**: Anyone needing context-expanded search beyond basic vector similarity
+
+## Value Proposition
+- **Unified Customer Intelligence**: Single query to understand all customer touchpoints, orders, tickets, and interactions
+- **Smart Document Navigation**: Automatically follow cross-references in legal/regulatory documents
+- **Context-Aware Search**: Vector search results enriched with graph relationship context
+- **Relationship Discovery**: Surface hidden connections between entities and documents
+- **Integration with Existing Empire**: Leverages existing Neo4j, RAG pipeline, and 15 AI agents
+
+## Performance Philosophy
+**Core Principle**: Graph intelligence should enhance, not replace, existing search capabilities.
+
+The system must be designed to:
+1. **Augment vector search** with relationship context
+2. **Navigate efficiently** through graph structures
+3. **Provide relevant context** without overwhelming users
+4. **Maintain response times** comparable to standard queries
+5. **Scale gracefully** as graph data grows
+
+# Core Features
+
+## 1. Customer 360 Graph Agent
+
+### What it does
+Provides a unified view of any customer by consolidating data from multiple sources into a single, queryable knowledge graph interface.
+
+### Why important
+Customer data is typically siloed across:
+- Documents (contracts, agreements, proposals)
+- Support tickets (issues, resolutions, history)
+- Orders (purchases, renewals, cancellations)
+- Interactions (emails, calls, meetings)
+- Products/Services used
+
+Without a unified view, users must manually search multiple systems to understand a customer's full context.
+
+### How it works
+1. **Data Model**: Neo4j graph with Customer nodes connected to:
+   - Document nodes (contracts, agreements)
+   - Ticket nodes (support cases)
+   - Order nodes (transactions)
+   - Interaction nodes (communications)
+   - Product nodes (subscriptions, licenses)
+
+2. **Natural Language Queries**:
+   - "Show me everything about customer Acme Corp"
+   - "What products does customer X use?"
+   - "What support issues has customer Y had in the last 6 months?"
+   - "Find customers with similar profiles to ABC Company"
+
+3. **Relationship Traversal**:
+   - 1-hop: Direct connections (customer → documents)
+   - 2-hop: Indirect connections (customer → documents → related entities)
+   - Path finding: Shortest path between customer and any entity
+
+### API Endpoints
+- `POST /api/graph/customer360/query` - Natural language customer query
+- `GET /api/graph/customer360/{customer_id}` - Full customer graph view
+- `GET /api/graph/customer360/{customer_id}/documents` - Customer documents
+- `GET /api/graph/customer360/{customer_id}/interactions` - Customer interactions
+- `GET /api/graph/customer360/similar/{customer_id}` - Similar customers
+
+## 2. Document Structure Graph
+
+### What it does
+Automatically extracts and indexes document hierarchy, clause references, and cross-links from complex documents, enabling intelligent retrieval that follows cross-references.
+
+### Why important
+Legal, regulatory, and contract documents contain:
+- Section hierarchies (Chapter → Section → Subsection → Clause)
+- Internal cross-references ("See Section 3.2(a)")
+- External citations (references to other documents, regulations)
+- Defined terms that link to definitions elsewhere
+
+Flat vector search treats these documents as isolated chunks, missing critical contextual relationships.
+
+### How it works
+1. **Document Parsing**: Extract structure from uploaded documents:
+   - Headers and section hierarchy
+   - Cross-references and citations
+   - Defined terms and their definitions
+   - Table of contents structure
+
+2. **Graph Construction**:
+   - Document → Sections → Subsections → Paragraphs
+   - Cross-reference relationships between sections
+   - Citation links to external documents
+   - Definition → Usage relationships
+
+3. **Smart Retrieval**:
+   - When a chunk is retrieved, automatically fetch:
+     - Parent sections for context
+     - Referenced sections
+     - Related definitions
+   - "Smart expand" that follows cross-references
+
+4. **Natural Language Queries**:
+   - "What does Section 5.2 say about termination?"
+   - "Find all clauses that reference the indemnification section"
+   - "What are the defined terms used in Article 3?"
+
+### API Endpoints
+- `POST /api/graph/document-structure/extract` - Extract structure from document
+- `GET /api/graph/document-structure/{doc_id}` - Get document graph structure
+- `POST /api/graph/document-structure/query` - Query within document structure
+- `GET /api/graph/document-structure/{doc_id}/cross-refs` - Get cross-references
+- `POST /api/graph/document-structure/smart-retrieve` - Context-aware retrieval
+
+## 3. Graph-Enhanced RAG
+
+### What it does
+Enhances vector search results by using Neo4j graph context to expand and enrich retrieved chunks with related documents and entities.
+
+### Why important
+Standard RAG returns chunks based solely on vector similarity. This misses:
+- Documents about the same entity but with different wording
+- Related documents that provide context
+- Entity relationships that inform the answer
+- Connected information across document boundaries
+
+### How it works
+1. **Standard Vector Search**: Perform initial embedding-based retrieval
+2. **Graph Expansion**: For each retrieved chunk:
+   - Extract mentioned entities
+   - Traverse relationships in Neo4j
+   - Find connected documents/chunks
+3. **Context Enrichment**: Add graph context to results:
+   - Entity information (definitions, relationships)
+   - Related documents (same entity, same topic)
+   - Path context (how entities connect)
+4. **Re-ranking**: Use graph relevance to re-rank expanded results
+
+### API Endpoints
+- `POST /api/graph/enhanced-rag/query` - Graph-enhanced search
+- `POST /api/graph/enhanced-rag/expand` - Expand results with graph context
+- `GET /api/graph/enhanced-rag/entities/{entity_id}/related` - Related content
+- `POST /api/graph/enhanced-rag/context` - Get graph context for entities
+
+### Enhancement Strategies
+1. **Neighbor Expansion**: Get 1-hop neighbors of retrieved entities
+2. **Parent Context**: Get parent documents/sections for chunks
+3. **Similar Entity Search**: Find documents mentioning similar entities
+4. **Relationship Context**: Include relationship metadata in context
+
+# User Experience
+
+## User Personas
+
+### Persona 1: Legal Analyst (Primary - Document Structure)
+- Works with complex contracts and legal documents
+- Needs to understand clause relationships and cross-references
+- Values accuracy and complete context
+- Typical query: "What does the force majeure clause say, and what sections reference it?"
+
+### Persona 2: Customer Success Manager (Primary - Customer 360)
+- Manages multiple customer accounts
+- Needs quick access to full customer history
+- Values unified view across all touchpoints
+- Typical query: "Give me everything about Acme Corp before my renewal call"
+
+### Persona 3: Research Analyst (Primary - Graph-Enhanced RAG)
+- Performs deep research across document collections
+- Needs to discover hidden connections
+- Values comprehensive coverage
+- Typical query: "Find all documents related to California insurance regulations"
+
+## Key User Flows
+
+### Flow 1: Customer 360 Query
+1. User opens CKO Chat
+2. Types: "Show me everything about customer ABC Corp"
+3. System identifies Customer 360 query intent
+4. Traverses Neo4j graph from Customer node
+5. Returns unified view:
+   - Customer profile
+   - Active contracts (with links)
+   - Recent support tickets
+   - Order history
+   - Key contacts
+   - Related documents
+6. User can click to expand any section
+
+### Flow 2: Document Structure Navigation
+1. User uploads complex legal document
+2. System extracts document structure graph
+3. User queries: "What does Section 5.2 say?"
+4. System retrieves Section 5.2 AND:
+   - Parent section context
+   - Any referenced sections
+   - Relevant definitions
+5. User sees enriched response with cross-reference links
+6. User clicks link to navigate to referenced section
+
+### Flow 3: Graph-Enhanced Search
+1. User queries: "Compliance requirements for data retention"
+2. System performs vector search (top 10 chunks)
+3. System extracts entities from chunks (regulations, companies, dates)
+4. System expands via Neo4j:
+   - Documents mentioning same entities
+   - Related regulations
+   - Linked compliance documents
+5. User receives enriched results with graph context
+6. Results show relationships between documents
+
+## UI/UX Considerations
+- **Graph Visualization**: Optional visual graph view of relationships
+- **Expand/Collapse**: Let users expand graph context as needed
+- **Source Links**: Clear links to original documents and sections
+- **Relationship Indicators**: Show how results are connected
+- **Context Toggle**: Allow users to show/hide graph-enhanced context
+
+</context>
+<PRD>
+# Technical Architecture
+
+## System Components
+
+### 1. Graph Agent Router (`/api/graph`)
+Extends existing `/api/graph` routes with new capabilities:
+- Customer 360 endpoints
+- Document Structure endpoints
+- Graph-Enhanced RAG endpoints
+- Real-time graph traversal
+
+### 2. Customer 360 Service (`app/services/customer360_service.py`)
+Customer graph traversal service:
+- Query parser for customer-related queries
+- Multi-hop graph traversal
+- Result aggregation and formatting
+- Similar customer detection
+
+### 3. Document Structure Service (`app/services/document_structure_service.py`)
+Document graph extraction and navigation:
+- Structure extraction from documents (using LLM)
+- Cross-reference detection and linking
+- Smart retrieval with context expansion
+- Definition linking
+
+### 4. Graph-Enhanced RAG Service (`app/services/graph_enhanced_rag_service.py`)
+RAG augmentation with graph context:
+- Entity extraction from chunks
+- Graph expansion strategies
+- Context enrichment
+- Result re-ranking
+
+### 5. Neo4j Direct HTTP Client (`app/services/neo4j_http_client.py`)
+Production-optimized Neo4j connection:
+- Direct HTTP to transaction/commit endpoint
+- Connection pooling
+- Query batching
+- Better performance than driver for high-volume operations
+
+## Data Models
+
+### Neo4j Graph Schema
+
+#### Customer 360 Nodes
+```cypher
+// Customer node
+(:Customer {
+  id: string,
+  name: string,
+  type: string,  // enterprise, smb, individual
+  industry: string,
+  created_at: datetime,
+  metadata: map
+})
+
+// Document node (existing, extended)
+(:Document {
+  id: string,
+  title: string,
+  type: string,
+  customer_id: string,
+  created_at: datetime,
+  embedding_id: string
+})
+
+// Ticket node
+(:Ticket {
+  id: string,
+  title: string,
+  status: string,
+  priority: string,
+  customer_id: string,
+  created_at: datetime,
+  resolved_at: datetime
+})
+
+// Order node
+(:Order {
+  id: string,
+  order_number: string,
+  amount: float,
+  status: string,
+  customer_id: string,
+  created_at: datetime
+})
+
+// Interaction node
+(:Interaction {
+  id: string,
+  type: string,  // email, call, meeting
+  summary: string,
+  customer_id: string,
+  occurred_at: datetime
+})
+
+// Product node
+(:Product {
+  id: string,
+  name: string,
+  category: string,
+  description: string
+})
+```
+
+#### Customer 360 Relationships
+```cypher
+(:Customer)-[:HAS_DOCUMENT]->(:Document)
+(:Customer)-[:HAS_TICKET]->(:Ticket)
+(:Customer)-[:PLACED_ORDER]->(:Order)
+(:Customer)-[:HAD_INTERACTION]->(:Interaction)
+(:Customer)-[:USES_PRODUCT]->(:Product)
+(:Order)-[:CONTAINS_PRODUCT]->(:Product)
+(:Ticket)-[:RELATED_TO]->(:Document)
+(:Ticket)-[:ABOUT_PRODUCT]->(:Product)
+```
+
+#### Document Structure Nodes
+```cypher
+// Section node
+(:Section {
+  id: string,
+  document_id: string,
+  title: string,
+  level: integer,  // 1 = chapter, 2 = section, 3 = subsection
+  number: string,  // "5.2.1"
+  content_start: integer,
+  content_end: integer,
+  embedding_id: string
+})
+
+// DefinedTerm node
+(:DefinedTerm {
+  id: string,
+  document_id: string,
+  term: string,
+  definition: string,
+  section_id: string
+})
+
+// Citation node
+(:Citation {
+  id: string,
+  source_document_id: string,
+  target_document_id: string,
+  citation_text: string,
+  context: string
+})
+```
+
+#### Document Structure Relationships
+```cypher
+(:Document)-[:HAS_SECTION]->(:Section)
+(:Section)-[:HAS_SUBSECTION]->(:Section)
+(:Section)-[:REFERENCES]->(:Section)  // Cross-references
+(:Section)-[:CITES]->(:Citation)
+(:DefinedTerm)-[:DEFINED_IN]->(:Section)
+(:Section)-[:USES_TERM]->(:DefinedTerm)
+```
+
+### Pydantic Models
+
+```python
+# app/models/graph_agent.py
+
+from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from enum import Enum
+
+class QueryType(str, Enum):
+    CUSTOMER_360 = "customer_360"
+    DOCUMENT_STRUCTURE = "document_structure"
+    GRAPH_ENHANCED_RAG = "graph_enhanced_rag"
+
+class TraversalDepth(str, Enum):
+    SHALLOW = "shallow"  # 1 hop
+    MEDIUM = "medium"    # 2 hops
+    DEEP = "deep"        # 3+ hops
+
+# Customer 360 Models
+class Customer360Request(BaseModel):
+    query: str = Field(..., description="Natural language query about customer")
+    customer_id: Optional[str] = None
+    include_documents: bool = True
+    include_tickets: bool = True
+    include_orders: bool = True
+    include_interactions: bool = True
+    max_items_per_category: int = 10
+
+class CustomerNode(BaseModel):
+    id: str
+    name: str
+    type: str
+    industry: Optional[str]
+    metadata: Dict[str, Any] = {}
+
+class Customer360Response(BaseModel):
+    customer: CustomerNode
+    documents: List[Dict[str, Any]]
+    tickets: List[Dict[str, Any]]
+    orders: List[Dict[str, Any]]
+    interactions: List[Dict[str, Any]]
+    products: List[Dict[str, Any]]
+    summary: str
+    relationship_count: int
+
+# Document Structure Models
+class DocumentStructureRequest(BaseModel):
+    document_id: str
+    extract_cross_refs: bool = True
+    extract_definitions: bool = True
+    max_depth: int = 5
+
+class SectionNode(BaseModel):
+    id: str
+    title: str
+    number: str
+    level: int
+    content_preview: str
+    child_count: int
+    reference_count: int
+
+class DocumentStructureResponse(BaseModel):
+    document_id: str
+    title: str
+    sections: List[SectionNode]
+    definitions: List[Dict[str, Any]]
+    cross_references: List[Dict[str, Any]]
+    structure_depth: int
+
+class SmartRetrievalRequest(BaseModel):
+    document_id: str
+    query: str
+    include_parent_context: bool = True
+    include_cross_refs: bool = True
+    include_definitions: bool = True
+    max_context_depth: int = 2
+
+class SmartRetrievalResponse(BaseModel):
+    primary_results: List[Dict[str, Any]]
+    parent_context: Optional[Dict[str, Any]]
+    cross_references: List[Dict[str, Any]]
+    definitions: List[Dict[str, Any]]
+    context_chain: List[str]
+
+# Graph-Enhanced RAG Models
+class GraphEnhancedRAGRequest(BaseModel):
+    query: str
+    top_k: int = 10
+    expansion_depth: int = 1
+    include_entity_context: bool = True
+    include_related_documents: bool = True
+    min_relevance_score: float = 0.5
+
+class GraphExpansionResult(BaseModel):
+    original_chunks: List[Dict[str, Any]]
+    expanded_context: List[Dict[str, Any]]
+    entities_found: List[Dict[str, Any]]
+    relationship_paths: List[Dict[str, Any]]
+    expansion_stats: Dict[str, int]
+
+class GraphEnhancedRAGResponse(BaseModel):
+    answer: str
+    sources: List[Dict[str, Any]]
+    graph_context: GraphExpansionResult
+    confidence_score: float
+    total_chunks_considered: int
+```
+
+## APIs and Integrations
+
+### Internal Empire Integrations
+- **Existing RAG Pipeline**: Vector search via Supabase pgvector
+- **Existing Neo4j Integration**: `neo4j_connection.py`, `neo4j_graph_queries.py`
+- **Knowledge Graph Routes**: Extend existing `/api/graph` endpoints
+- **AI Agents**: AGENT-009 through AGENT-015 for analysis
+- **LlamaIndex Service**: Document parsing for structure extraction
+
+### Neo4j Integration Options (from AI Automators)
+
+#### Option 1: Direct HTTP API (Recommended)
+```python
+# Production-optimized approach
+# Hit Neo4j transaction/commit endpoint directly
+
+import httpx
+from typing import Dict, Any, List
+
+class Neo4jHTTPClient:
+    def __init__(self, uri: str, username: str, password: str):
+        self.base_url = uri.replace("bolt://", "http://").replace("bolt+ssc://", "https://")
+        self.base_url = f"{self.base_url}/db/neo4j/tx/commit"
+        self.auth = (username, password)
+        self.client = httpx.AsyncClient(timeout=30.0)
+
+    async def execute_query(
+        self,
+        query: str,
+        parameters: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
+        payload = {
+            "statements": [{
+                "statement": query,
+                "parameters": parameters or {}
+            }]
+        }
+
+        response = await self.client.post(
+            self.base_url,
+            json=payload,
+            auth=self.auth,
+            headers={"Content-Type": "application/json"}
+        )
+
+        result = response.json()
+        if result.get("errors"):
+            raise Exception(result["errors"][0]["message"])
+
+        return self._parse_results(result)
+
+    def _parse_results(self, result: Dict) -> List[Dict]:
+        rows = []
+        for statement_result in result.get("results", []):
+            columns = statement_result.get("columns", [])
+            for row in statement_result.get("data", []):
+                rows.append(dict(zip(columns, row["row"])))
+        return rows
+```
+
+#### Option 2: Existing Driver (Fallback)
+```python
+# Use existing neo4j_connection.py for compatibility
+from app.services.neo4j_connection import Neo4jConnection
+
+neo4j = Neo4jConnection.get_instance()
+results = neo4j.execute_query(query, parameters)
+```
+
+### External Integrations
+- **LlamaIndex Service**: Document structure extraction
+- **Claude API**: Natural language understanding for queries
+
+## Infrastructure Requirements
+- **Neo4j**: Extended schema (existing database)
+- **Supabase**: No new tables (uses existing document embeddings)
+- **Redis**: Cache for graph query results
+- **No new services**: Integrates into existing FastAPI service
+
+# Development Roadmap
+
+## Phase 1: Foundation (Customer 360 MVP)
+**Goal**: Basic Customer 360 graph queries
+
+### 1.1 Neo4j Schema Extension
+- Add Customer, Ticket, Order, Interaction, Product nodes
+- Create relationships to existing Document nodes
+- Add indexes for query performance
+
+### 1.2 Neo4j HTTP Client
+- Implement direct HTTP API client
+- Add connection pooling
+- Implement query batching
+
+### 1.3 Customer 360 Service
+- Query parser for customer queries
+- Graph traversal logic
+- Result aggregation
+
+### 1.4 Customer 360 API Endpoints
+- `/api/graph/customer360/query`
+- `/api/graph/customer360/{customer_id}`
+- Basic response formatting
+
+## Phase 2: Document Structure
+**Goal**: Extract and navigate document structure
+
+### 2.1 Structure Extraction
+- LLM-based section extraction
+- Cross-reference detection
+- Definition extraction
+
+### 2.2 Graph Construction
+- Section → Subsection relationships
+- Cross-reference edges
+- Definition linking
+
+### 2.3 Smart Retrieval
+- Parent context inclusion
+- Cross-reference following
+- Definition resolution
+
+### 2.4 API Endpoints
+- `/api/graph/document-structure/extract`
+- `/api/graph/document-structure/query`
+- `/api/graph/document-structure/smart-retrieve`
+
+## Phase 3: Graph-Enhanced RAG
+**Goal**: Augment RAG with graph context
+
+### 3.1 Entity Extraction
+- Extract entities from retrieved chunks
+- Link to Neo4j nodes
+
+### 3.2 Graph Expansion
+- Neighbor expansion (1-hop, 2-hop)
+- Related document discovery
+- Path context
+
+### 3.3 Result Enrichment
+- Combine vector + graph results
+- Re-ranking with graph relevance
+- Context formatting
+
+### 3.4 API Endpoints
+- `/api/graph/enhanced-rag/query`
+- `/api/graph/enhanced-rag/expand`
+- Integration with existing query endpoints
+
+## Phase 4: CKO Chat Integration
+**Goal**: Seamless integration with chat interface
+
+### 4.1 Query Intent Detection
+- Detect Customer 360 queries
+- Detect document structure queries
+- Route to appropriate handler
+
+### 4.2 Response Formatting
+- Graph visualization for chat
+- Expandable context sections
+- Source linking
+
+### 4.3 Streaming Support
+- Stream graph results
+- Progressive context loading
+
+# Logical Dependency Chain
+
+## Foundation First (Build Order)
+
+### Layer 1: Neo4j Infrastructure
+1. **Neo4j HTTP Client** - Direct API for production performance
+2. **Schema Extensions** - New node types and relationships
+3. **Index Creation** - Query performance optimization
+
+### Layer 2: Customer 360
+4. **Customer 360 Service** - Core traversal logic
+5. **Customer Query Parser** - NL to Cypher translation
+6. **Customer 360 Endpoints** - REST API implementation
+
+### Layer 3: Document Structure
+7. **Structure Extraction Service** - Document parsing
+8. **Cross-Reference Detection** - Link identification
+9. **Smart Retrieval Service** - Context-aware queries
+10. **Document Structure Endpoints** - REST API
+
+### Layer 4: Graph-Enhanced RAG
+11. **Entity Extractor** - Chunk to entity mapping
+12. **Graph Expansion Service** - Neighbor traversal
+13. **Context Enrichment** - Result augmentation
+14. **Enhanced RAG Endpoints** - REST API
+
+### Layer 5: Integration
+15. **Query Intent Router** - Automatic query classification
+16. **Chat Integration** - CKO Chat hooks
+17. **Response Formatter** - Unified response structure
+
+## Quick Win Path to Visible Output
+The fastest path to a working demo:
+1. Neo4j HTTP Client (1) - Better performance
+2. Customer 360 Service (4) - Core feature
+3. Customer 360 Endpoints (6) - API access
+4. Basic query parser - Simple NL support
+
+This gives a working Customer 360 feature in ~4 tasks, then iterate.
+
+# Risks and Mitigations
+
+## Technical Risks
+
+### Risk 1: Graph Query Performance
+**Description**: Complex traversals may be slow on large graphs
+**Mitigation**:
+- Use Neo4j HTTP API for better connection handling
+- Implement query result caching in Redis
+- Limit traversal depth with configurable max_hops
+- Add query timeouts and fallbacks
+
+### Risk 2: Entity Extraction Accuracy
+**Description**: LLM may miss or misidentify entities
+**Mitigation**:
+- Use structured extraction prompts
+- Validate entities against known Neo4j nodes
+- Allow fuzzy matching with confidence scores
+- Fall back to vector-only results on extraction failure
+
+### Risk 3: Document Structure Complexity
+**Description**: Some documents have irregular structures
+**Mitigation**:
+- Start with well-structured document types
+- Implement structure validation
+- Fall back to flat chunks for unparseable documents
+- User feedback loop for structure corrections
+
+### Risk 4: Integration Complexity
+**Description**: Multiple services need coordination
+**Mitigation**:
+- Use existing Empire patterns (services, routes)
+- Leverage existing Neo4j integration as foundation
+- Incremental feature rollout
+- Feature flags for graph features
+
+## MVP Definition
+
+### Must Have (MVP)
+- Customer 360 basic query and view
+- Neo4j HTTP client implementation
+- Single-hop graph traversal
+- Integration with existing `/api/graph` routes
+
+### Should Have (v1.1)
+- Document structure extraction (basic)
+- Cross-reference detection
+- Graph-enhanced RAG (basic expansion)
+- CKO Chat integration
+
+### Could Have (v1.2)
+- Multi-hop traversal
+- Definition linking
+- Graph visualization
+- Similar customer detection
+
+### Won't Have (Future)
+- Real-time graph updates from external systems
+- Custom graph schema editor
+- Graph-based recommendations
+- Multi-tenant graph isolation
+
+# Success Metrics
+
+## Performance SLAs
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Customer 360 query | <2 seconds | End-to-end response |
+| Document structure extraction | <30 seconds | Per document |
+| Graph expansion (1-hop) | <500ms | Additional latency |
+| Graph expansion (2-hop) | <1.5 seconds | Additional latency |
+| Concurrent graph queries | 50/second | Throughput |
+
+## Quality Metrics
+| Metric | Target |
+|--------|--------|
+| Entity extraction precision | >85% |
+| Cross-reference detection | >90% |
+| User satisfaction (graph features) | >4.0/5.0 |
+| Graph query cache hit rate | >60% |
+
+# Appendix
+
+## Research Findings
+
+### AI Automators Graph Agent Patterns
+Source: AI Automators course materials (Customer360 GraphAgent, Graph-Based Context Expansion)
+Key concepts:
+- Knowledge graphs as "mind maps instead of spreadsheets"
+- Customer 360 for unified entity views
+- Document Structure Graph for complex documents
+- Graph enrichment using LLM + vector search
+
+### Neo4j Integration Best Practices
+- Direct HTTP API preferred for production (faster than driver)
+- APOC plugin enables dynamic Cypher queries
+- Self-referencing relationships for document sections
+- Cypher query patterns for traversal
+
+### Empire v7.3 Integration Points
+Existing services to leverage:
+- `app/services/neo4j_connection.py` - Existing connection manager
+- `app/services/neo4j_graph_queries.py` - Existing query patterns
+- `app/routes/knowledge_graph.py` - Existing graph endpoints
+- AGENT-009 through AGENT-015 for analysis
+- LlamaIndex service for document parsing
+
+## Technical Specifications
+
+### API Endpoint Specifications
+
+#### POST /api/graph/customer360/query
+```json
+Request:
+{
+  "query": "Show me everything about Acme Corp",
+  "include_documents": true,
+  "include_tickets": true,
+  "include_orders": true,
+  "include_interactions": true,
+  "max_items_per_category": 10
+}
+
+Response:
+{
+  "customer": {
+    "id": "cust_123",
+    "name": "Acme Corp",
+    "type": "enterprise",
+    "industry": "Manufacturing"
+  },
+  "documents": [...],
+  "tickets": [...],
+  "orders": [...],
+  "interactions": [...],
+  "products": [...],
+  "summary": "Acme Corp is an enterprise customer with 5 active contracts...",
+  "relationship_count": 47
+}
+```
+
+#### POST /api/graph/document-structure/smart-retrieve
+```json
+Request:
+{
+  "document_id": "doc_456",
+  "query": "What does Section 5.2 say about termination?",
+  "include_parent_context": true,
+  "include_cross_refs": true,
+  "include_definitions": true,
+  "max_context_depth": 2
+}
+
+Response:
+{
+  "primary_results": [
+    {
+      "section": "5.2",
+      "title": "Termination",
+      "content": "...",
+      "relevance_score": 0.95
+    }
+  ],
+  "parent_context": {
+    "section": "5",
+    "title": "Term and Termination",
+    "summary": "..."
+  },
+  "cross_references": [
+    {"from": "5.2", "to": "3.1", "text": "subject to Section 3.1 obligations"}
+  ],
+  "definitions": [
+    {"term": "Termination Date", "definition": "..."}
+  ],
+  "context_chain": ["Document", "Article 5", "Section 5.2"]
+}
+```
+
+#### POST /api/graph/enhanced-rag/query
+```json
+Request:
+{
+  "query": "California insurance compliance requirements",
+  "top_k": 10,
+  "expansion_depth": 2,
+  "include_entity_context": true,
+  "include_related_documents": true,
+  "min_relevance_score": 0.5
+}
+
+Response:
+{
+  "answer": "California insurance compliance requires...",
+  "sources": [...],
+  "graph_context": {
+    "original_chunks": [...],
+    "expanded_context": [...],
+    "entities_found": [
+      {"name": "California", "type": "State", "related_docs": 15},
+      {"name": "Insurance", "type": "Industry", "related_docs": 23}
+    ],
+    "relationship_paths": [...],
+    "expansion_stats": {
+      "chunks_before_expansion": 10,
+      "chunks_after_expansion": 34,
+      "entities_extracted": 12,
+      "relationships_traversed": 28
+    }
+  },
+  "confidence_score": 0.87,
+  "total_chunks_considered": 34
+}
+```
+
+### Cypher Query Patterns
+
+#### Customer 360 Query
+```cypher
+// Get full customer context
+MATCH (c:Customer {id: $customer_id})
+OPTIONAL MATCH (c)-[:HAS_DOCUMENT]->(d:Document)
+OPTIONAL MATCH (c)-[:HAS_TICKET]->(t:Ticket)
+OPTIONAL MATCH (c)-[:PLACED_ORDER]->(o:Order)
+OPTIONAL MATCH (c)-[:HAD_INTERACTION]->(i:Interaction)
+OPTIONAL MATCH (c)-[:USES_PRODUCT]->(p:Product)
+RETURN c, collect(DISTINCT d) as documents,
+       collect(DISTINCT t) as tickets,
+       collect(DISTINCT o) as orders,
+       collect(DISTINCT i) as interactions,
+       collect(DISTINCT p) as products
+```
+
+#### Document Structure Navigation
+```cypher
+// Get section with parent context and cross-references
+MATCH (d:Document {id: $doc_id})-[:HAS_SECTION]->(s:Section {number: $section_num})
+OPTIONAL MATCH (parent:Section)-[:HAS_SUBSECTION*]->(s)
+OPTIONAL MATCH (s)-[:REFERENCES]->(ref:Section)
+OPTIONAL MATCH (s)-[:USES_TERM]->(term:DefinedTerm)
+RETURN s, collect(DISTINCT parent) as parents,
+       collect(DISTINCT ref) as references,
+       collect(DISTINCT term) as terms
+```
+
+#### Graph Expansion
+```cypher
+// Expand from entities to related documents
+MATCH (e:Entity {name: $entity_name})
+MATCH (e)<-[:MENTIONS]-(chunk:DocumentChunk)
+MATCH (chunk)-[:BELONGS_TO]->(d:Document)
+OPTIONAL MATCH (d)-[:RELATED_TO]->(related:Document)
+OPTIONAL MATCH (e)-[:RELATED_TO]->(related_entity:Entity)
+RETURN d, related, related_entity
+LIMIT 20
+```
+</PRD>
