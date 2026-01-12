@@ -2,6 +2,19 @@
 # Daily Supabase Database Backup to Backblaze B2 - Task 42.1
 # Runs daily at 2:00 AM UTC
 #
+# IMPORTANT: GitHub Actions only supports IPv4. You MUST use the Session Pooler connection.
+#
+# Required GitHub Secrets (use Session Pooler, NOT Direct Connection):
+#   SUPABASE_DB_HOST: aws-0-us-west-1.pooler.supabase.com (Session Pooler host - has IPv4)
+#   SUPABASE_DB_USER: postgres.YOUR_PROJECT_REF (note the dot separator)
+#   SUPABASE_DB_PASSWORD: Your database password
+#   SUPABASE_DB_NAME: postgres
+#   SUPABASE_DB_PORT: 5432 (Session mode) or 6543 (Transaction mode)
+#
+# Get these from: Supabase Dashboard -> Settings -> Database -> Connection Pooling -> Session Mode
+#
+# DO NOT use the Direct Connection (db.xxx.supabase.co) - it only has IPv6!
+#
 
 name: Daily Database Backup
 
@@ -43,65 +56,41 @@ jobs:
           pip install --upgrade pip
           pip install b2sdk psycopg2-binary
 
-      - name: Install PostgreSQL client and DNS tools
+      - name: Install PostgreSQL client
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client dnsutils
+          sudo apt-get install -y postgresql-client
 
       - name: Create logs directory
         run: mkdir -p logs
 
-      - name: Force IPv4 for database connection
+      - name: Verify connection settings
         env:
           SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
         run: |
-          set +e  # Don't exit on error for this step
-          echo "Attempting to resolve $SUPABASE_DB_HOST to IPv4..."
+          echo "Checking database connection configuration..."
 
-          # Try multiple methods to get IPv4 address
-          IPV4_ADDR=""
-
-          # Method 1: dig for A record
-          echo "Trying dig..."
-          IPV4_ADDR=$(dig +short "$SUPABASE_DB_HOST" A 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-          echo "dig A result: '$IPV4_ADDR'"
-
-          # Method 2: host command
-          if [ -z "$IPV4_ADDR" ]; then
-            echo "Trying host..."
-            IPV4_ADDR=$(host -t A "$SUPABASE_DB_HOST" 2>/dev/null | grep "has address" | awk '{print $NF}' | head -1) || true
-            echo "host result: '$IPV4_ADDR'"
-          fi
-
-          # Method 3: getent
-          if [ -z "$IPV4_ADDR" ]; then
-            echo "Trying getent..."
-            IPV4_ADDR=$(getent ahosts "$SUPABASE_DB_HOST" 2>/dev/null | grep "STREAM" | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1) || true
-            echo "getent result: '$IPV4_ADDR'"
-          fi
-
-          # Debug: Show all DNS records
-          echo "=== Debug: All DNS records for $SUPABASE_DB_HOST ==="
-          echo "A records:"
-          dig +short "$SUPABASE_DB_HOST" A || true
-          echo "AAAA records:"
-          dig +short "$SUPABASE_DB_HOST" AAAA || true
-          echo "CNAME records:"
-          dig +short "$SUPABASE_DB_HOST" CNAME || true
-          echo "=== End debug ==="
-
-          if [ -n "$IPV4_ADDR" ]; then
-            echo "Resolved to IPv4: $IPV4_ADDR"
-            echo "$IPV4_ADDR $SUPABASE_DB_HOST" | sudo tee -a /etc/hosts
-            echo "Added hosts entry to force IPv4"
+          # Check if using Session Pooler (has IPv4) vs Direct Connection (IPv6 only)
+          if [[ "$SUPABASE_DB_HOST" == *"pooler.supabase.com"* ]]; then
+            echo "✅ Using Session Pooler (IPv4 compatible)"
+          elif [[ "$SUPABASE_DB_HOST" == db.*.supabase.co ]]; then
+            echo "❌ ERROR: Using Direct Connection which only has IPv6!"
+            echo "GitHub Actions requires IPv4. Please update SUPABASE_DB_HOST secret to use Session Pooler."
+            echo "Get it from: Supabase Dashboard -> Settings -> Database -> Connection Pooling"
+            exit 1
           else
-            echo "::warning::No IPv4 address found - host may only have IPv6"
+            echo "⚠️ Unknown host format: $SUPABASE_DB_HOST"
+            echo "Attempting connection anyway..."
           fi
 
-          # Disable IPv6 at kernel level
-          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-          set -e  # Re-enable exit on error
+          # Check username format for Session Pooler
+          if [[ "$SUPABASE_DB_USER" == postgres.* ]]; then
+            echo "✅ Username format correct for Session Pooler"
+          elif [[ "$SUPABASE_DB_USER" == "postgres" ]]; then
+            echo "⚠️ Username 'postgres' is for Direct Connection."
+            echo "Session Pooler requires: postgres.YOUR_PROJECT_REF"
+          fi
 
       - name: Run backup script
         env:
