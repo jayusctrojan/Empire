@@ -55,19 +55,47 @@ jobs:
         env:
           SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
         run: |
-          # Get the IPv4 address for the database host
-          IPV4_ADDR=$(dig +short A "$SUPABASE_DB_HOST" | head -1)
+          echo "Attempting to resolve $SUPABASE_DB_HOST to IPv4..."
+
+          # Try multiple methods to get IPv4 address
+          IPV4_ADDR=""
+
+          # Method 1: dig (may follow CNAMEs)
+          echo "Trying dig..."
+          IPV4_ADDR=$(dig +short "$SUPABASE_DB_HOST" A 2>/dev/null | grep -E '^[0-9]+\.' | head -1)
+
+          # Method 2: host command
+          if [ -z "$IPV4_ADDR" ]; then
+            echo "Trying host..."
+            IPV4_ADDR=$(host -t A "$SUPABASE_DB_HOST" 2>/dev/null | grep "has address" | awk '{print $NF}' | head -1)
+          fi
+
+          # Method 3: getent
+          if [ -z "$IPV4_ADDR" ]; then
+            echo "Trying getent..."
+            IPV4_ADDR=$(getent ahosts "$SUPABASE_DB_HOST" 2>/dev/null | grep "STREAM" | awk '{print $1}' | grep -E '^[0-9]+\.' | head -1)
+          fi
+
+          # Method 4: nslookup
+          if [ -z "$IPV4_ADDR" ]; then
+            echo "Trying nslookup..."
+            IPV4_ADDR=$(nslookup "$SUPABASE_DB_HOST" 2>/dev/null | grep "Address:" | tail -1 | awk '{print $2}' | grep -E '^[0-9]+\.')
+          fi
 
           if [ -n "$IPV4_ADDR" ]; then
-            echo "Resolved $SUPABASE_DB_HOST to IPv4: $IPV4_ADDR"
+            echo "Resolved to IPv4: $IPV4_ADDR"
             # Add to /etc/hosts to force IPv4 resolution
             echo "$IPV4_ADDR $SUPABASE_DB_HOST" | sudo tee -a /etc/hosts
             echo "Added hosts entry to force IPv4"
           else
-            echo "::warning::Could not resolve IPv4 address, backup may fail"
+            echo "::warning::Could not resolve IPv4 address"
+            echo "Debug - full dig output:"
+            dig "$SUPABASE_DB_HOST" ANY +noall +answer || true
+            echo "Debug - full host output:"
+            host "$SUPABASE_DB_HOST" || true
           fi
 
-          # Also disable IPv6 at kernel level
+          # Disable IPv6 at kernel level
           sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
           sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
