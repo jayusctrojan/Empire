@@ -55,49 +55,53 @@ jobs:
         env:
           SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
         run: |
+          set +e  # Don't exit on error for this step
           echo "Attempting to resolve $SUPABASE_DB_HOST to IPv4..."
 
           # Try multiple methods to get IPv4 address
           IPV4_ADDR=""
 
-          # Method 1: dig (may follow CNAMEs)
+          # Method 1: dig for A record
           echo "Trying dig..."
-          IPV4_ADDR=$(dig +short "$SUPABASE_DB_HOST" A 2>/dev/null | grep -E '^[0-9]+\.' | head -1)
+          IPV4_ADDR=$(dig +short "$SUPABASE_DB_HOST" A 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          echo "dig A result: '$IPV4_ADDR'"
 
           # Method 2: host command
           if [ -z "$IPV4_ADDR" ]; then
             echo "Trying host..."
-            IPV4_ADDR=$(host -t A "$SUPABASE_DB_HOST" 2>/dev/null | grep "has address" | awk '{print $NF}' | head -1)
+            IPV4_ADDR=$(host -t A "$SUPABASE_DB_HOST" 2>/dev/null | grep "has address" | awk '{print $NF}' | head -1) || true
+            echo "host result: '$IPV4_ADDR'"
           fi
 
           # Method 3: getent
           if [ -z "$IPV4_ADDR" ]; then
             echo "Trying getent..."
-            IPV4_ADDR=$(getent ahosts "$SUPABASE_DB_HOST" 2>/dev/null | grep "STREAM" | awk '{print $1}' | grep -E '^[0-9]+\.' | head -1)
+            IPV4_ADDR=$(getent ahosts "$SUPABASE_DB_HOST" 2>/dev/null | grep "STREAM" | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1) || true
+            echo "getent result: '$IPV4_ADDR'"
           fi
 
-          # Method 4: nslookup
-          if [ -z "$IPV4_ADDR" ]; then
-            echo "Trying nslookup..."
-            IPV4_ADDR=$(nslookup "$SUPABASE_DB_HOST" 2>/dev/null | grep "Address:" | tail -1 | awk '{print $2}' | grep -E '^[0-9]+\.')
-          fi
+          # Debug: Show all DNS records
+          echo "=== Debug: All DNS records for $SUPABASE_DB_HOST ==="
+          echo "A records:"
+          dig +short "$SUPABASE_DB_HOST" A || true
+          echo "AAAA records:"
+          dig +short "$SUPABASE_DB_HOST" AAAA || true
+          echo "CNAME records:"
+          dig +short "$SUPABASE_DB_HOST" CNAME || true
+          echo "=== End debug ==="
 
           if [ -n "$IPV4_ADDR" ]; then
             echo "Resolved to IPv4: $IPV4_ADDR"
-            # Add to /etc/hosts to force IPv4 resolution
             echo "$IPV4_ADDR $SUPABASE_DB_HOST" | sudo tee -a /etc/hosts
             echo "Added hosts entry to force IPv4"
           else
-            echo "::warning::Could not resolve IPv4 address"
-            echo "Debug - full dig output:"
-            dig "$SUPABASE_DB_HOST" ANY +noall +answer || true
-            echo "Debug - full host output:"
-            host "$SUPABASE_DB_HOST" || true
+            echo "::warning::No IPv4 address found - host may only have IPv6"
           fi
 
           # Disable IPv6 at kernel level
           sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
           sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          set -e  # Re-enable exit on error
 
       - name: Run backup script
         env:
