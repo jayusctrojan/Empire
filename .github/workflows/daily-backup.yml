@@ -43,52 +43,25 @@ jobs:
           pip install --upgrade pip
           pip install b2sdk psycopg2-binary
 
-      - name: Install PostgreSQL client and DNS tools
+      - name: Install PostgreSQL client
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client dnsutils
+          sudo apt-get install -y postgresql-client
 
       - name: Create logs directory
         run: mkdir -p logs
 
-      - name: Resolve database host to IPv4
-        id: resolve-host
-        env:
-          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+      - name: Disable IPv6 to force IPv4 connections
         run: |
-          # Force IPv4 resolution to avoid GitHub Actions IPv6 connectivity issues
-          # Try multiple methods to get IPv4 address
-          IPV4_HOST=""
-
-          # Method 1: Use dig to get A record (IPv4)
-          if command -v dig &> /dev/null; then
-            IPV4_HOST=$(dig +short A "$SUPABASE_DB_HOST" | head -1)
-          fi
-
-          # Method 2: Fall back to host command
-          if [ -z "$IPV4_HOST" ] && command -v host &> /dev/null; then
-            IPV4_HOST=$(host -t A "$SUPABASE_DB_HOST" 2>/dev/null | grep "has address" | head -1 | awk '{print $NF}')
-          fi
-
-          # Method 3: Fall back to getent
-          if [ -z "$IPV4_HOST" ]; then
-            IPV4_HOST=$(getent ahostsv4 "$SUPABASE_DB_HOST" 2>/dev/null | head -1 | awk '{print $1}')
-          fi
-
-          # Validate we got an IPv4 address
-          if [ -z "$IPV4_HOST" ]; then
-            echo "::warning::Could not resolve to IPv4, using original hostname"
-            IPV4_HOST="$SUPABASE_DB_HOST"
-          else
-            echo "Resolved to IPv4: $IPV4_HOST"
-          fi
-
-          echo "ipv4_host=$IPV4_HOST" >> $GITHUB_OUTPUT
+          # Disable IPv6 on the runner to force pg_dump to use IPv4
+          # This is needed because GitHub Actions runners have intermittent IPv6 issues
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+          echo "IPv6 disabled, connections will use IPv4"
 
       - name: Run backup script
         env:
-          # Use resolved IPv4 address to avoid IPv6 connectivity issues
-          SUPABASE_DB_HOST: ${{ steps.resolve-host.outputs.ipv4_host }}
+          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
           SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
           SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
