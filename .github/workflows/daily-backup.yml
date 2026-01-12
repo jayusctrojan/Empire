@@ -51,13 +51,18 @@ jobs:
       - name: Create logs directory
         run: mkdir -p logs
 
-      - name: Disable IPv6 to force IPv4 connections
+      - name: Configure DNS to prefer IPv4
         run: |
-          # Disable IPv6 on the runner to force pg_dump to use IPv4
+          # Configure gai.conf to prefer IPv4 over IPv6 for DNS resolution
           # This is needed because GitHub Actions runners have intermittent IPv6 issues
+          # The precedence rule gives IPv4-mapped addresses higher priority
+          # See: https://man7.org/linux/man-pages/man5/gai.conf.5.html
+          echo "precedence ::ffff:0:0/96 100" | sudo tee -a /etc/gai.conf
+          echo "DNS configured to prefer IPv4 addresses"
+
+          # Also disable IPv6 at kernel level as backup
           sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
           sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
-          echo "IPv6 disabled, connections will use IPv4"
 
       - name: Run backup script
         env:
