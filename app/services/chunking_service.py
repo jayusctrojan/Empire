@@ -35,6 +35,7 @@ class ChunkingStrategy(str, Enum):
     CODE_AST = "code_ast"
     TRANSCRIPT_TIME = "transcript_time"
     TRANSCRIPT_TOPIC = "transcript_topic"
+    MARKDOWN = "markdown"
 
 
 @dataclass
@@ -59,6 +60,13 @@ class ChunkMetadata:
     end_time: Optional[float] = None
     speaker: Optional[str] = None
     topic: Optional[str] = None
+
+    # Markdown-specific metadata
+    section_header: Optional[str] = None
+    header_level: Optional[int] = None
+    header_hierarchy: Optional[Dict[str, str]] = None
+    is_header_split: bool = True
+    total_section_chunks: int = 1
 
 
 @dataclass
@@ -86,7 +94,377 @@ class Chunk:
             "end_time": self.metadata.end_time,
             "speaker": self.metadata.speaker,
             "topic": self.metadata.topic,
+            # Markdown-specific fields
+            "section_header": self.metadata.section_header,
+            "header_level": self.metadata.header_level,
+            "header_hierarchy": self.metadata.header_hierarchy,
+            "is_header_split": self.metadata.is_header_split,
+            "total_section_chunks": self.metadata.total_section_chunks,
         }
+
+
+# ============================================================================
+# MARKDOWN CHUNKING DATA STRUCTURES
+# ============================================================================
+
+# Header detection regex pattern: matches # through ###### headers
+HEADER_PATTERN = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
+
+
+@dataclass
+class MarkdownSection:
+    """
+    Represents a section of a markdown document delimited by headers.
+
+    Attributes:
+        header: Full header text including # markers (e.g., "## Methods")
+        header_text: Header text without # markers (e.g., "Methods")
+        level: Header level 1-6
+        content: Section content including the header line
+        start_line: Line number where section starts (0-indexed)
+        end_line: Line number where section ends (0-indexed)
+        parent_headers: List of parent header texts for hierarchy
+    """
+    header: str
+    header_text: str
+    level: int
+    content: str
+    start_line: int
+    end_line: int
+    parent_headers: List[str]
+
+
+@dataclass
+class MarkdownChunkerConfig:
+    """
+    Configuration for the MarkdownChunkerStrategy.
+
+    Attributes:
+        max_chunk_size: Maximum tokens per chunk (default 1024)
+        chunk_overlap: Token overlap for sentence-split fallback (default 200)
+        min_headers_threshold: Minimum headers to trigger markdown splitting (default 2)
+        include_header_in_chunk: Whether to include header text in chunk content (default True)
+        preserve_hierarchy: Whether to include parent headers in metadata (default True)
+        max_header_length: Maximum characters for header text (default 200)
+    """
+    max_chunk_size: int = 1024
+    chunk_overlap: int = 200
+    min_headers_threshold: int = 2
+    include_header_in_chunk: bool = True
+    preserve_hierarchy: bool = True
+    max_header_length: int = 200
+
+
+# ============================================================================
+# MARKDOWN CHUNKING STRATEGY (Feature 006)
+# ============================================================================
+
+class MarkdownChunkerStrategy:
+    """
+    Chunking strategy that splits markdown documents by headers.
+
+    This strategy preserves semantic context by splitting at header boundaries
+    instead of character counts. For sections exceeding max_chunk_size, it
+    falls back to sentence-based splitting while preserving header metadata.
+
+    Usage:
+        chunker = MarkdownChunkerStrategy()
+        nodes = await chunker.chunk(markdown_text, document_id="doc-123")
+    """
+
+    def __init__(self, config: Optional[MarkdownChunkerConfig] = None):
+        """
+        Initialize the markdown chunker.
+
+        Args:
+            config: Configuration options. Uses defaults if not provided.
+        """
+        self.config = config or MarkdownChunkerConfig()
+        self._sentence_splitter = None
+
+        if LLAMAINDEX_SUPPORT:
+            self._sentence_splitter = SentenceSplitter(
+                chunk_size=self.config.max_chunk_size,
+                chunk_overlap=self.config.chunk_overlap
+            )
+
+    def is_markdown_content(self, text: str) -> bool:
+        """
+        Detect if text contains sufficient markdown headers for header-based splitting.
+
+        Args:
+            text: Document text to analyze
+
+        Returns:
+            True if text has >= min_headers_threshold markdown headers
+        """
+        headers = HEADER_PATTERN.findall(text)
+        return len(headers) >= self.config.min_headers_threshold
+
+    def _count_tokens(self, text: str) -> int:
+        """
+        Estimate token count for text.
+
+        Uses a simple heuristic of ~4 characters per token as approximation.
+        For production, consider using tiktoken for accurate counts.
+
+        Args:
+            text: Text to count tokens for
+
+        Returns:
+            Estimated token count
+        """
+        # Simple estimation: ~4 characters per token
+        return len(text) // 4
+
+    def _split_by_headers(self, text: str) -> List[MarkdownSection]:
+        """
+        Extract sections from markdown text based on headers.
+
+        Args:
+            text: Markdown document text
+
+        Returns:
+            List of MarkdownSection objects representing each section
+        """
+        sections = []
+        lines = text.split('\n')
+        current_section_start = 0
+        current_header = ""
+        current_header_text = ""
+        current_level = 0
+        header_stack: List[Tuple[int, str]] = []  # (level, header_text)
+
+        for i, line in enumerate(lines):
+            match = HEADER_PATTERN.match(line)
+            if match:
+                # Save previous section if exists
+                if current_section_start < i or current_header:
+                    section_content = '\n'.join(lines[current_section_start:i])
+                    if section_content.strip():
+                        # Build parent headers list
+                        parent_headers = [h[1] for h in header_stack if h[0] < current_level]
+                        sections.append(MarkdownSection(
+                            header=current_header,
+                            header_text=current_header_text,
+                            level=current_level,
+                            content=section_content,
+                            start_line=current_section_start,
+                            end_line=i - 1,
+                            parent_headers=parent_headers
+                        ))
+
+                # Start new section
+                hashes, header_text = match.groups()
+                current_level = len(hashes)
+                current_header = line
+                current_header_text = header_text.strip()[:self.config.max_header_length]
+                current_section_start = i
+
+                # Update header stack
+                while header_stack and header_stack[-1][0] >= current_level:
+                    header_stack.pop()
+                header_stack.append((current_level, current_header_text))
+
+        # Add final section
+        section_content = '\n'.join(lines[current_section_start:])
+        if section_content.strip():
+            parent_headers = [h[1] for h in header_stack[:-1]] if header_stack else []
+            sections.append(MarkdownSection(
+                header=current_header,
+                header_text=current_header_text,
+                level=current_level,
+                content=section_content,
+                start_line=current_section_start,
+                end_line=len(lines) - 1,
+                parent_headers=parent_headers
+            ))
+
+        return sections
+
+    def _build_header_hierarchy(self, section: MarkdownSection) -> Dict[str, str]:
+        """
+        Build the header hierarchy dict for a section.
+
+        Args:
+            section: MarkdownSection to build hierarchy for
+
+        Returns:
+            Dict mapping h1, h2, etc. to header text
+        """
+        hierarchy = {}
+        for i, parent in enumerate(section.parent_headers):
+            hierarchy[f"h{i + 1}"] = parent
+        if section.header_text:
+            hierarchy[f"h{section.level}"] = section.header_text
+        return hierarchy
+
+    def _chunk_oversized_section(
+        self,
+        section: MarkdownSection,
+        document_id: str,
+        base_chunk_index: int
+    ) -> List[Chunk]:
+        """
+        Split an oversized section using sentence-based chunking.
+
+        Args:
+            section: MarkdownSection that exceeds max_chunk_size
+            document_id: Source document identifier
+            base_chunk_index: Starting chunk index for numbering
+
+        Returns:
+            List of Chunk objects with preserved header metadata
+        """
+        if not self._sentence_splitter:
+            # Fallback: simple character-based splitting
+            content = section.content
+            chunks = []
+            chunk_size = self.config.max_chunk_size * 4  # Approximate chars
+            for i in range(0, len(content), chunk_size - self.config.chunk_overlap * 4):
+                chunk_text = content[i:i + chunk_size]
+                if not chunk_text.strip():
+                    continue
+                chunks.append(Chunk(
+                    content=chunk_text,
+                    metadata=ChunkMetadata(
+                        chunk_index=base_chunk_index + len(chunks),
+                        source_document_id=document_id,
+                        strategy=ChunkingStrategy.MARKDOWN,
+                        start_line=section.start_line,
+                        end_line=section.end_line,
+                        section_header=section.header,
+                        header_level=section.level,
+                        header_hierarchy=self._build_header_hierarchy(section),
+                        is_header_split=False,
+                        total_section_chunks=0  # Will be updated after
+                    )
+                ))
+            # Update total_section_chunks
+            for chunk in chunks:
+                chunk.metadata.total_section_chunks = len(chunks)
+            return chunks
+
+        # Use LlamaIndex SentenceSplitter
+        if LLAMAINDEX_SUPPORT:
+            doc = Document(text=section.content)
+            nodes = self._sentence_splitter.get_nodes_from_documents([doc])
+            chunks = []
+            for node in nodes:
+                chunks.append(Chunk(
+                    content=node.text,
+                    metadata=ChunkMetadata(
+                        chunk_index=base_chunk_index + len(chunks),
+                        source_document_id=document_id,
+                        strategy=ChunkingStrategy.MARKDOWN,
+                        start_line=section.start_line,
+                        end_line=section.end_line,
+                        section_header=section.header,
+                        header_level=section.level,
+                        header_hierarchy=self._build_header_hierarchy(section),
+                        is_header_split=False,
+                        total_section_chunks=len(nodes)
+                    )
+                ))
+            return chunks
+
+        return []
+
+    async def chunk(
+        self,
+        text: str,
+        document_id: str,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> List[Chunk]:
+        """
+        Chunk markdown document by headers.
+
+        Args:
+            text: Markdown document text
+            document_id: Source document identifier
+            metadata: Additional metadata to attach to chunks
+
+        Returns:
+            List of Chunk objects with header-aware metadata
+        """
+        if not self.is_markdown_content(text):
+            logger.info(
+                "Text does not meet markdown threshold, using sentence splitting",
+                doc_id=document_id,
+                threshold=self.config.min_headers_threshold
+            )
+            # Fallback to sentence splitting
+            if self._sentence_splitter and LLAMAINDEX_SUPPORT:
+                doc = Document(text=text)
+                nodes = self._sentence_splitter.get_nodes_from_documents([doc])
+                return [
+                    Chunk(
+                        content=node.text,
+                        metadata=ChunkMetadata(
+                            chunk_index=i,
+                            source_document_id=document_id,
+                            strategy=ChunkingStrategy.SENTENCE,
+                            is_header_split=False
+                        )
+                    )
+                    for i, node in enumerate(nodes)
+                ]
+            return []
+
+        # Split by headers
+        sections = self._split_by_headers(text)
+        logger.info(
+            "Markdown document split by headers",
+            doc_id=document_id,
+            section_count=len(sections)
+        )
+
+        chunks = []
+        chunk_index = 0
+
+        for section in sections:
+            token_count = self._count_tokens(section.content)
+
+            if token_count > self.config.max_chunk_size:
+                # Oversized section: use sentence splitting
+                logger.debug(
+                    "Section exceeds max_chunk_size, using sentence splitting",
+                    header=section.header_text,
+                    tokens=token_count
+                )
+                section_chunks = self._chunk_oversized_section(
+                    section, document_id, chunk_index
+                )
+                chunks.extend(section_chunks)
+                chunk_index += len(section_chunks)
+            else:
+                # Section fits in one chunk
+                hierarchy = self._build_header_hierarchy(section)
+                chunks.append(Chunk(
+                    content=section.content,
+                    metadata=ChunkMetadata(
+                        chunk_index=chunk_index,
+                        source_document_id=document_id,
+                        strategy=ChunkingStrategy.MARKDOWN,
+                        start_line=section.start_line,
+                        end_line=section.end_line,
+                        section_header=section.header,
+                        header_level=section.level,
+                        header_hierarchy=hierarchy,
+                        is_header_split=True,
+                        total_section_chunks=1
+                    )
+                ))
+                chunk_index += 1
+
+        logger.info(
+            "Markdown chunking complete",
+            doc_id=document_id,
+            total_chunks=len(chunks),
+            header_split_chunks=sum(1 for c in chunks if c.metadata.is_header_split)
+        )
+
+        return chunks
 
 
 # ============================================================================
@@ -701,7 +1079,9 @@ class TranscriptChunker:
 class ChunkingService:
     """
     Unified service for all chunking strategies.
-    Provides a single interface for document, code, and transcript chunking.
+    Provides a single interface for document, code, transcript, and markdown chunking.
+
+    Feature 006: Added MarkdownChunkerStrategy for header-aware document splitting.
     """
 
     def __init__(self):
@@ -709,6 +1089,7 @@ class ChunkingService:
         self.semantic_chunker = SemanticChunker()
         self.code_chunker = CodeChunker()
         self.transcript_chunker = TranscriptChunker()
+        self.markdown_chunker = MarkdownChunkerStrategy()
 
     async def chunk_document(
         self,
@@ -757,6 +1138,329 @@ class ChunkingService:
             use_topic_detection=(strategy == "topic")
         )
         return await chunker.chunk_transcript(transcript, document_id, strategy)
+
+    async def chunk_markdown(
+        self,
+        text: str,
+        document_id: str,
+        max_chunk_size: int = 1024,
+        chunk_overlap: int = 200,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> List[Chunk]:
+        """
+        Chunk markdown document by headers.
+
+        Feature 006: Header-aware document splitting.
+
+        Args:
+            text: Markdown document text
+            document_id: Source document identifier
+            max_chunk_size: Maximum tokens per chunk
+            chunk_overlap: Token overlap for oversized sections
+            metadata: Additional metadata to attach
+
+        Returns:
+            List of Chunk objects with header-aware metadata
+        """
+        config = MarkdownChunkerConfig(
+            max_chunk_size=max_chunk_size,
+            chunk_overlap=chunk_overlap
+        )
+        chunker = MarkdownChunkerStrategy(config=config)
+        return await chunker.chunk(text, document_id, metadata)
+
+    async def auto_chunk(
+        self,
+        text: str,
+        document_id: str,
+        chunk_size: int = 1024,
+        chunk_overlap: int = 200,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> List[Chunk]:
+        """
+        Automatically select the best chunking strategy based on content.
+
+        Feature 006: Auto-detects markdown and uses header-aware splitting.
+
+        Args:
+            text: Document text
+            document_id: Source document identifier
+            chunk_size: Maximum tokens per chunk
+            chunk_overlap: Token overlap between chunks
+            metadata: Additional metadata to attach
+
+        Returns:
+            List of Chunk objects
+        """
+        # Check if content is markdown with sufficient headers
+        if self.markdown_chunker.is_markdown_content(text):
+            logger.info(
+                "Auto-chunk: Using markdown strategy",
+                extra={"document_id": document_id}
+            )
+            return await self.chunk_markdown(
+                text, document_id, chunk_size, chunk_overlap, metadata
+            )
+
+        # Default to semantic/sentence chunking
+        logger.info(
+            "Auto-chunk: Using semantic strategy",
+            extra={"document_id": document_id}
+        )
+        return await self.chunk_document(
+            text, document_id, chunk_size, chunk_overlap, False, metadata
+        )
+
+    def get_strategy(self, strategy: ChunkingStrategy) -> Any:
+        """
+        Get a chunker instance by strategy type.
+
+        Args:
+            strategy: The chunking strategy enum value
+
+        Returns:
+            The corresponding chunker instance
+        """
+        strategy_map = {
+            ChunkingStrategy.SEMANTIC: self.semantic_chunker,
+            ChunkingStrategy.SENTENCE: self.semantic_chunker,
+            ChunkingStrategy.CODE_AST: self.code_chunker,
+            ChunkingStrategy.TRANSCRIPT_TIME: self.transcript_chunker,
+            ChunkingStrategy.TRANSCRIPT_TOPIC: self.transcript_chunker,
+            ChunkingStrategy.MARKDOWN: self.markdown_chunker,
+        }
+        return strategy_map.get(strategy, self.semantic_chunker)
+
+
+# ============================================================================
+# CHUNK FILTERING BY HEADER METADATA (Feature 006 - Task 119)
+# ============================================================================
+
+@dataclass
+class ChunkFilter:
+    """
+    Filter criteria for chunks based on header metadata.
+
+    Feature 006: Enables filtered search by section type using header metadata.
+
+    Attributes:
+        header_level: Filter by exact header level (1-6)
+        header_levels: Filter by multiple header levels
+        section_header: Filter by section header text (substring match)
+        section_header_exact: Filter by exact section header text
+        header_hierarchy_contains: Filter by text in header hierarchy
+        is_header_split: Filter by whether chunk was header-split
+        min_header_level: Filter by minimum header level (inclusive)
+        max_header_level: Filter by maximum header level (inclusive)
+    """
+    header_level: Optional[int] = None
+    header_levels: Optional[List[int]] = None
+    section_header: Optional[str] = None
+    section_header_exact: Optional[str] = None
+    header_hierarchy_contains: Optional[str] = None
+    is_header_split: Optional[bool] = None
+    min_header_level: Optional[int] = None
+    max_header_level: Optional[int] = None
+
+
+def filter_chunks_by_header(
+    chunks: List[Chunk],
+    filter_criteria: ChunkFilter
+) -> List[Chunk]:
+    """
+    Filter chunks based on header metadata criteria.
+
+    Feature 006: Enables filtered search by section type.
+
+    Args:
+        chunks: List of Chunk objects to filter
+        filter_criteria: ChunkFilter with criteria to apply
+
+    Returns:
+        List of chunks matching all specified criteria
+
+    Example:
+        >>> filtered = filter_chunks_by_header(chunks, ChunkFilter(header_level=2))
+        >>> filtered = filter_chunks_by_header(chunks, ChunkFilter(section_header="Methods"))
+    """
+    result = chunks
+
+    # Filter by exact header level
+    if filter_criteria.header_level is not None:
+        result = [
+            c for c in result
+            if c.metadata.header_level == filter_criteria.header_level
+        ]
+
+    # Filter by multiple header levels
+    if filter_criteria.header_levels is not None:
+        result = [
+            c for c in result
+            if c.metadata.header_level in filter_criteria.header_levels
+        ]
+
+    # Filter by section header substring
+    if filter_criteria.section_header is not None:
+        search_text = filter_criteria.section_header.lower()
+        result = [
+            c for c in result
+            if c.metadata.section_header and
+               search_text in c.metadata.section_header.lower()
+        ]
+
+    # Filter by exact section header
+    if filter_criteria.section_header_exact is not None:
+        result = [
+            c for c in result
+            if c.metadata.section_header == filter_criteria.section_header_exact
+        ]
+
+    # Filter by header hierarchy contains text
+    if filter_criteria.header_hierarchy_contains is not None:
+        search_text = filter_criteria.header_hierarchy_contains.lower()
+        result = [
+            c for c in result
+            if c.metadata.header_hierarchy and
+               any(search_text in v.lower() for v in c.metadata.header_hierarchy.values())
+        ]
+
+    # Filter by is_header_split flag
+    if filter_criteria.is_header_split is not None:
+        result = [
+            c for c in result
+            if c.metadata.is_header_split == filter_criteria.is_header_split
+        ]
+
+    # Filter by minimum header level
+    if filter_criteria.min_header_level is not None:
+        result = [
+            c for c in result
+            if c.metadata.header_level is not None and
+               c.metadata.header_level >= filter_criteria.min_header_level
+        ]
+
+    # Filter by maximum header level
+    if filter_criteria.max_header_level is not None:
+        result = [
+            c for c in result
+            if c.metadata.header_level is not None and
+               c.metadata.header_level <= filter_criteria.max_header_level
+        ]
+
+    return result
+
+
+def filter_chunks_by_header_level(chunks: List[Chunk], level: int) -> List[Chunk]:
+    """
+    Convenience function to filter chunks by header level.
+
+    Args:
+        chunks: List of chunks to filter
+        level: Header level (1-6)
+
+    Returns:
+        List of chunks with the specified header level
+    """
+    return filter_chunks_by_header(chunks, ChunkFilter(header_level=level))
+
+
+def filter_chunks_by_section(chunks: List[Chunk], section_name: str) -> List[Chunk]:
+    """
+    Convenience function to filter chunks by section name.
+
+    Args:
+        chunks: List of chunks to filter
+        section_name: Text to search for in section headers
+
+    Returns:
+        List of chunks with matching section headers
+    """
+    return filter_chunks_by_header(chunks, ChunkFilter(section_header=section_name))
+
+
+def filter_chunks_by_hierarchy(chunks: List[Chunk], hierarchy_text: str) -> List[Chunk]:
+    """
+    Convenience function to filter chunks by header hierarchy.
+
+    Args:
+        chunks: List of chunks to filter
+        hierarchy_text: Text to search for in header hierarchy
+
+    Returns:
+        List of chunks with matching hierarchy text
+    """
+    return filter_chunks_by_header(chunks, ChunkFilter(header_hierarchy_contains=hierarchy_text))
+
+
+def get_chunks_under_header(
+    chunks: List[Chunk],
+    parent_header: str,
+    include_parent: bool = True
+) -> List[Chunk]:
+    """
+    Get all chunks that fall under a specific parent header.
+
+    Args:
+        chunks: List of chunks to filter
+        parent_header: The parent header text to search for
+        include_parent: Whether to include the parent header's chunk
+
+    Returns:
+        List of chunks under the specified parent header
+    """
+    result = []
+    search_text = parent_header.lower()
+
+    for chunk in chunks:
+        # Check if this chunk's hierarchy contains the parent
+        if chunk.metadata.header_hierarchy:
+            hierarchy_values = [v.lower() for v in chunk.metadata.header_hierarchy.values()]
+            if any(search_text in v for v in hierarchy_values):
+                result.append(chunk)
+        # Also check if this is the parent header itself
+        elif include_parent and chunk.metadata.section_header:
+            if search_text in chunk.metadata.section_header.lower():
+                result.append(chunk)
+
+    return result
+
+
+def group_chunks_by_header_level(chunks: List[Chunk]) -> Dict[int, List[Chunk]]:
+    """
+    Group chunks by their header level.
+
+    Args:
+        chunks: List of chunks to group
+
+    Returns:
+        Dictionary mapping header level to list of chunks
+    """
+    groups: Dict[int, List[Chunk]] = {}
+    for chunk in chunks:
+        level = chunk.metadata.header_level or 0
+        if level not in groups:
+            groups[level] = []
+        groups[level].append(chunk)
+    return groups
+
+
+def group_chunks_by_section(chunks: List[Chunk]) -> Dict[str, List[Chunk]]:
+    """
+    Group chunks by their section header.
+
+    Args:
+        chunks: List of chunks to group
+
+    Returns:
+        Dictionary mapping section header to list of chunks
+    """
+    groups: Dict[str, List[Chunk]] = {}
+    for chunk in chunks:
+        section = chunk.metadata.section_header or "No Header"
+        if section not in groups:
+            groups[section] = []
+        groups[section].append(chunk)
+    return groups
 
 
 # Singleton instance
