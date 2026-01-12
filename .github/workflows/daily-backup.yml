@@ -43,10 +43,10 @@ jobs:
           pip install --upgrade pip
           pip install b2sdk psycopg2-binary
 
-      - name: Install PostgreSQL client
+      - name: Install PostgreSQL client and DNS tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client dnsutils
 
       - name: Create logs directory
         run: mkdir -p logs
@@ -57,12 +57,32 @@ jobs:
           SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
         run: |
           # Force IPv4 resolution to avoid GitHub Actions IPv6 connectivity issues
-          IPV4_HOST=$(getent ahostsv4 "$SUPABASE_DB_HOST" | head -1 | awk '{print $1}')
-          if [ -z "$IPV4_HOST" ]; then
-            echo "Failed to resolve $SUPABASE_DB_HOST to IPv4"
-            exit 1
+          # Try multiple methods to get IPv4 address
+          IPV4_HOST=""
+
+          # Method 1: Use dig to get A record (IPv4)
+          if command -v dig &> /dev/null; then
+            IPV4_HOST=$(dig +short A "$SUPABASE_DB_HOST" | head -1)
           fi
-          echo "Resolved $SUPABASE_DB_HOST to $IPV4_HOST"
+
+          # Method 2: Fall back to host command
+          if [ -z "$IPV4_HOST" ] && command -v host &> /dev/null; then
+            IPV4_HOST=$(host -t A "$SUPABASE_DB_HOST" 2>/dev/null | grep "has address" | head -1 | awk '{print $NF}')
+          fi
+
+          # Method 3: Fall back to getent
+          if [ -z "$IPV4_HOST" ]; then
+            IPV4_HOST=$(getent ahostsv4 "$SUPABASE_DB_HOST" 2>/dev/null | head -1 | awk '{print $1}')
+          fi
+
+          # Validate we got an IPv4 address
+          if [ -z "$IPV4_HOST" ]; then
+            echo "::warning::Could not resolve to IPv4, using original hostname"
+            IPV4_HOST="$SUPABASE_DB_HOST"
+          else
+            echo "Resolved to IPv4: $IPV4_HOST"
+          fi
+
           echo "ipv4_host=$IPV4_HOST" >> $GITHUB_OUTPUT
 
       - name: Run backup script
