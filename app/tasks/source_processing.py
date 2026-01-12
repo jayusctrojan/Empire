@@ -23,6 +23,13 @@ from app.celery_app import celery_app, get_source_priority
 from app.utils.performance_profiler import get_performance_profiler, Benchmark
 from app.services.source_content_cache import get_source_content_cache
 
+# Feature 006: Markdown-aware chunking
+from app.services.chunking_service import (
+    MarkdownChunkerStrategy,
+    MarkdownChunkerConfig,
+    HEADER_PATTERN
+)
+
 logger = logging.getLogger(__name__)
 
 # Task 69: Initialize profiler and cache
@@ -1013,9 +1020,78 @@ Summary:"""
 # Embedding Generation
 # ============================================================================
 
-def _chunk_content(content: str, chunk_size: int = 512) -> List[str]:
-    """Split content into chunks for embedding"""
-    # Simple sentence-aware chunking
+def _is_markdown_content(content: str, min_headers: int = 2) -> bool:
+    """
+    Detect if content contains sufficient markdown headers for header-based chunking.
+
+    Feature 006: Markdown-aware document splitting
+
+    Args:
+        content: Document text to analyze
+        min_headers: Minimum number of headers required (default 2)
+
+    Returns:
+        True if content has sufficient markdown structure
+    """
+    headers = HEADER_PATTERN.findall(content)
+    return len(headers) >= min_headers
+
+
+def _chunk_content(content: str, chunk_size: int = 512, document_id: str = None) -> List[str]:
+    """
+    Split content into chunks for embedding.
+
+    Feature 006: Uses markdown-aware chunking when headers are detected,
+    otherwise falls back to simple sentence-aware chunking.
+
+    Args:
+        content: Document text to chunk
+        chunk_size: Target size for chunks in tokens
+        document_id: Optional document identifier for logging
+
+    Returns:
+        List of chunk strings
+    """
+    # Feature 006: Try markdown-aware chunking first
+    if _is_markdown_content(content):
+        try:
+            logger.info(
+                "Using markdown-aware chunking",
+                extra={"document_id": document_id, "strategy": "markdown"}
+            )
+            config = MarkdownChunkerConfig(
+                max_chunk_size=chunk_size,
+                chunk_overlap=int(chunk_size * 0.2),  # 20% overlap
+                min_headers_threshold=2
+            )
+            chunker = MarkdownChunkerStrategy(config=config)
+
+            # Run async chunk method synchronously
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            chunks = loop.run_until_complete(
+                chunker.chunk(content, document_id=document_id or "unknown")
+            )
+
+            # Extract text content from Chunk objects
+            return [chunk.content for chunk in chunks]
+
+        except Exception as e:
+            logger.warning(
+                f"Markdown chunking failed, falling back to sentence chunking: {e}",
+                extra={"document_id": document_id, "error": str(e)}
+            )
+
+    # Fallback: Simple sentence-aware chunking
+    logger.debug(
+        "Using sentence-aware chunking",
+        extra={"document_id": document_id, "strategy": "sentence"}
+    )
     sentences = re.split(r'(?<=[.!?])\s+', content)
     chunks = []
     current_chunk = []
