@@ -3355,13 +3355,421 @@
         "status": "done",
         "subtasks": [],
         "updatedAt": "2026-01-12T02:34:20.210Z"
+      },
+      {
+        "id": "122",
+        "title": "Create Content Prep Agent Service",
+        "description": "Implement the core Content Prep Agent (AGENT-016) service that will validate, order, and prepare content before ingestion into the knowledge base.",
+        "details": "Create the `app/services/content_prep_agent.py` file with the following components:\n\n1. Implement the CrewAI agent definition as specified in the PRD\n2. Create the ContentSet, ContentFile, and ProcessingManifest data classes\n3. Implement the three main components:\n   - Set Detector: Pattern matching and grouping logic\n   - Order Resolver: Sequence parsing and gap detection\n   - Manifest Generator: Ordered queue and dependency tracking\n\nPseudo-code:\n```python\nfrom dataclasses import dataclass\nfrom datetime import datetime\nfrom typing import List, Dict, Optional\nimport re\nimport uuid\n\n# Data models as specified in PRD\n@dataclass\nclass ContentFile:\n    b2_path: str\n    filename: str\n    sequence_number: Optional[int] = None\n    dependencies: List[str] = None\n    estimated_complexity: str = \"medium\"\n    file_type: str = \"\"\n    size_bytes: int = 0\n    metadata: Dict = None\n    \n    def __post_init__(self):\n        if self.dependencies is None:\n            self.dependencies = []\n        if self.metadata is None:\n            self.metadata = {}\n\n@dataclass\nclass ContentSet:\n    id: str\n    name: str\n    detection_method: str\n    files: List[ContentFile]\n    is_complete: bool = False\n    missing_files: List[str] = None\n    processing_status: str = \"pending\"\n    created_at: datetime = None\n    metadata: Dict = None\n    \n    def __post_init__(self):\n        if self.missing_files is None:\n            self.missing_files = []\n        if self.created_at is None:\n            self.created_at = datetime.now()\n        if self.metadata is None:\n            self.metadata = {}\n\n@dataclass\nclass ProcessingManifest:\n    content_set_id: str\n    ordered_files: List[ContentFile]\n    total_files: int\n    estimated_processing_time: int\n    warnings: List[str] = None\n    context: Dict = None\n    \n    def __post_init__(self):\n        if self.warnings is None:\n            self.warnings = []\n        if self.context is None:\n            self.context = {}\n\n# Sequence detection patterns as specified in PRD\nSEQUENCE_PATTERNS = [\n    # Numeric prefix patterns\n    r\"^(\\d{1,3})[-_\\s]\",              # \"01-intro.pdf\", \"1_chapter.pdf\"\n    r\"[-_\\s](\\d{1,3})[-_\\s.]\",        # \"chapter-01-intro.pdf\"\n    r\"module[-_\\s]?(\\d{1,3})\",        # \"module01.pdf\", \"module-1.pdf\"\n    r\"chapter[-_\\s]?(\\d{1,3})\",       # \"chapter1.pdf\", \"chapter-01.pdf\"\n    r\"lesson[-_\\s]?(\\d{1,3})\",        # \"lesson5.pdf\"\n    r\"part[-_\\s]?(\\d{1,3})\",          # \"part-1.pdf\"\n    r\"week[-_\\s]?(\\d{1,3})\",          # \"week-01.pdf\"\n    r\"unit[-_\\s]?(\\d{1,3})\",          # \"unit-1.pdf\"\n\n    # Alpha sequence patterns\n    r\"^([a-z])[-_\\s]\",                # \"a-intro.pdf\", \"b-basics.pdf\"\n\n    # Roman numerals\n    r\"^(i{1,3}|iv|v|vi{0,3}|ix|x)[-_\\s]\",  # \"i-intro.pdf\", \"ii-basics.pdf\"\n]\n\nCONTENT_SET_INDICATORS = [\n    r\"course[-_\\s]?\",\n    r\"tutorial[-_\\s]?\",\n    r\"training[-_\\s]?\",\n    r\"documentation[-_\\s]?\",\n    r\"manual[-_\\s]?\",\n    r\"series[-_\\s]?\",\n    r\"book[-_\\s]?\",\n]\n\nclass ContentPrepAgent:\n    \"\"\"AGENT-016: Content Prep Agent implementation\"\"\"\n    \n    def __init__(self):\n        self.agent_config = {\n            \"id\": \"AGENT-016\",\n            \"name\": \"Content Prep Agent\",\n            \"role\": \"Content Preparation Specialist\",\n            \"goal\": \"Validate, order, and prepare content sets for optimal knowledge base ingestion\",\n            \"backstory\": \"\"\"You are an expert in content organization and curriculum design.\n            You understand that learning materials must be processed in logical sequence\n            to maintain prerequisite relationships. You detect patterns in file naming,\n            identify content sets, and ensure completeness before processing begins.\"\"\",\n            \"model\": \"claude-3-5-haiku-20241022\",  # Fast, cost-effective for ordering\n            \"tools\": [\n                \"file_metadata_reader\",\n                \"sequence_pattern_detector\",\n                \"b2_file_lister\",\n                \"manifest_generator\"\n            ],\n            \"allow_delegation\": False,\n            \"verbose\": True\n        }\n    \n    def detect_content_sets(self, files, detection_mode=\"auto\"):\n        \"\"\"Detect related content sets from a list of files\"\"\"\n        # Implementation of set detection logic\n        # Group by naming patterns, prefixes, etc.\n        pass\n        \n    def validate_completeness(self, content_set):\n        \"\"\"Check for missing files in sequence\"\"\"\n        # Gap detection in sequence numbers\n        # Return list of missing files\n        pass\n        \n    def resolve_order(self, files):\n        \"\"\"Determine the correct processing order\"\"\"\n        # Parse file names for sequence indicators\n        # Sort by detected sequence\n        # Fall back to LLM for ambiguous cases\n        pass\n        \n    def generate_manifest(self, content_set, proceed_incomplete=False):\n        \"\"\"Create processing manifest with ordered files\"\"\"\n        # Generate ordered queue\n        # Add dependencies and context\n        # Include warnings for missing files\n        pass\n        \n    def estimate_processing_time(self, files):\n        \"\"\"Estimate processing time based on file types and sizes\"\"\"\n        # Calculate based on file size, type, and complexity\n        pass\n        \n    def detect_sequence_number(self, filename):\n        \"\"\"Extract sequence number from filename using patterns\"\"\"\n        # Try each pattern in SEQUENCE_PATTERNS\n        # Return extracted number if found\n        pass\n```",
+        "testStrategy": "1. Unit tests for each component (Set Detector, Order Resolver, Manifest Generator)\n2. Test with various file naming patterns to ensure correct sequence detection\n3. Test gap detection with incomplete sequences\n4. Test with edge cases (single files, very large sets)\n5. Verify correct data model instantiation\n6. Mock B2 file listing for integration testing",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create data classes for ContentFile, ContentSet, and ProcessingManifest",
+            "description": "Implement the data models needed for the Content Prep Agent service as specified in the PRD.",
+            "dependencies": [],
+            "details": "Create the data classes ContentFile, ContentSet, and ProcessingManifest with all required fields and proper type annotations. Implement the __post_init__ methods to handle default values for lists and dictionaries. Ensure all fields match the specifications in the PRD and pseudo-code.",
+            "status": "pending",
+            "testStrategy": "Test data class instantiation with various parameters. Verify default values are properly initialized. Test serialization/deserialization of the data classes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement sequence detection patterns and content set indicators",
+            "description": "Define the regex patterns for sequence detection and content set identification.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create the SEQUENCE_PATTERNS list containing all regex patterns for detecting sequence numbers in filenames. Implement the CONTENT_SET_INDICATORS list with patterns for identifying related content sets. Ensure patterns cover all specified cases in the PRD including numeric prefixes, alpha sequences, and roman numerals.",
+            "status": "pending",
+            "testStrategy": "Test each regex pattern against sample filenames to verify correct matching. Create comprehensive test cases covering all pattern variations.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create ContentPrepAgent class skeleton with CrewAI configuration",
+            "description": "Implement the base ContentPrepAgent class with CrewAI agent configuration.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create the ContentPrepAgent class with proper initialization and CrewAI agent configuration as specified in the PRD. Include the agent_config dictionary with all required fields (id, name, role, goal, backstory, model, tools, etc.). Define method stubs for all required functionality.",
+            "status": "pending",
+            "testStrategy": "Verify agent initialization and configuration. Test that the agent_config contains all required fields with correct values.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement sequence detection and extraction methods",
+            "description": "Create methods for extracting sequence numbers and prefixes from filenames.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Implement the detect_sequence_number method to extract sequence numbers from filenames using the defined regex patterns. Create helper methods for extracting prefixes and other metadata from filenames. Ensure proper handling of edge cases and different sequence formats.",
+            "status": "pending",
+            "testStrategy": "Test sequence detection with various filename formats. Verify correct extraction of sequence numbers, prefixes, and other metadata. Test edge cases like missing sequences or unusual formats.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement content set detection functionality",
+            "description": "Create the detect_content_sets method to identify related content sets from file lists.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Implement the detect_content_sets method that groups files into related content sets based on naming patterns, prefixes, and other indicators. Include support for different detection modes (auto, pattern-based, prefix-based). Create helper methods for pattern matching and grouping logic.",
+            "status": "pending",
+            "testStrategy": "Test content set detection with various file collections. Verify correct grouping of related files. Test different detection modes and edge cases like single files or ambiguous groupings.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement order resolution and completeness validation",
+            "description": "Create methods for determining processing order and detecting missing files.",
+            "dependencies": [
+              4,
+              5
+            ],
+            "details": "Implement the resolve_order method to determine the correct processing sequence for files based on detected sequence numbers. Create the validate_completeness method to identify gaps in sequences and generate a list of potentially missing files. Include logic for handling ambiguous cases using LLM fallback.",
+            "status": "pending",
+            "testStrategy": "Test order resolution with various file sequences. Verify correct ordering based on sequence numbers. Test gap detection with incomplete sequences. Test LLM fallback for ambiguous cases.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Implement manifest generation and processing time estimation",
+            "description": "Create methods for generating processing manifests and estimating processing times.",
+            "dependencies": [
+              5,
+              6
+            ],
+            "details": "Implement the generate_manifest method to create a ProcessingManifest with ordered files, dependencies, and context information. Create the estimate_processing_time method to calculate expected processing duration based on file types, sizes, and complexity. Include handling for warnings about missing files and incomplete sets.",
+            "status": "pending",
+            "testStrategy": "Test manifest generation with various content sets. Verify correct ordering and dependency tracking. Test processing time estimation with different file types and sizes. Verify warning generation for incomplete sets.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Implement database storage and retrieval methods",
+            "description": "Create methods for persisting content sets and manifests to the database.",
+            "dependencies": [
+              1,
+              7
+            ],
+            "details": "Implement methods for storing ContentSet and ProcessingManifest objects in the database. Create retrieval methods for loading existing content sets and manifests. Ensure proper error handling and transaction management. Implement status update methods for tracking processing progress.",
+            "status": "pending",
+            "testStrategy": "Test database storage and retrieval with mock database connections. Verify correct serialization and deserialization of objects. Test error handling and transaction management. Verify status updates work correctly.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-13T21:05:19.213Z"
+      },
+      {
+        "id": "123",
+        "title": "Create Content Sets Database Schema",
+        "description": "Create the database schema for content sets and content set files in Supabase as specified in the PRD.",
+        "details": "Create the migration file `migrations/create_content_sets.sql` with the SQL schema for the content_sets and content_set_files tables. This will store metadata about detected content sets and their files.\n\nThe schema should include:\n1. content_sets table with fields for id, name, detection method, completeness, etc.\n2. content_set_files table with fields for file metadata and sequence information\n3. Appropriate indexes for efficient querying\n4. Foreign key relationships\n\nSQL Schema:\n```sql\nCREATE TABLE content_sets (\n    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n    name VARCHAR(255) NOT NULL,\n    detection_method VARCHAR(50) NOT NULL,\n    is_complete BOOLEAN DEFAULT FALSE,\n    missing_files JSONB DEFAULT '[]',\n    file_count INTEGER NOT NULL,\n    processing_status VARCHAR(50) DEFAULT 'pending',\n    created_at TIMESTAMPTZ DEFAULT NOW(),\n    updated_at TIMESTAMPTZ DEFAULT NOW(),\n    metadata JSONB DEFAULT '{}'\n);\n\nCREATE TABLE content_set_files (\n    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n    content_set_id UUID REFERENCES content_sets(id) ON DELETE CASCADE,\n    b2_path VARCHAR(500) NOT NULL,\n    filename VARCHAR(255) NOT NULL,\n    sequence_number INTEGER,\n    dependencies JSONB DEFAULT '[]',\n    estimated_complexity VARCHAR(20),\n    file_type VARCHAR(50),\n    size_bytes BIGINT,\n    processing_status VARCHAR(50) DEFAULT 'pending',\n    created_at TIMESTAMPTZ DEFAULT NOW(),\n    metadata JSONB DEFAULT '{}'\n);\n\nCREATE INDEX idx_content_sets_status ON content_sets(processing_status);\nCREATE INDEX idx_content_set_files_set ON content_set_files(content_set_id);\nCREATE INDEX idx_content_set_files_sequence ON content_set_files(content_set_id, sequence_number);\n\n-- Index for retention policy\nCREATE INDEX idx_content_sets_updated ON content_sets(updated_at);\n```\n\nAlso create a Pydantic model file `app/models/content_sets.py` to define the data models for the API:\n\n```python\nfrom pydantic import BaseModel, Field\nfrom typing import List, Dict, Optional\nfrom datetime import datetime\nimport uuid\n\nclass ContentFileBase(BaseModel):\n    b2_path: str\n    filename: str\n    sequence_number: Optional[int] = None\n    dependencies: List[str] = Field(default_factory=list)\n    estimated_complexity: str = \"medium\"\n    file_type: str = \"\"\n    size_bytes: int = 0\n    metadata: Dict = Field(default_factory=dict)\n\nclass ContentFile(ContentFileBase):\n    id: uuid.UUID\n    content_set_id: uuid.UUID\n    processing_status: str = \"pending\"\n    created_at: datetime\n\nclass ContentFileCreate(ContentFileBase):\n    content_set_id: uuid.UUID\n\nclass ContentSetBase(BaseModel):\n    name: str\n    detection_method: str\n    is_complete: bool = False\n    missing_files: List[str] = Field(default_factory=list)\n    file_count: int\n    metadata: Dict = Field(default_factory=dict)\n\nclass ContentSet(ContentSetBase):\n    id: uuid.UUID\n    processing_status: str = \"pending\"\n    created_at: datetime\n    updated_at: datetime\n\nclass ContentSetCreate(ContentSetBase):\n    pass\n\nclass ProcessingManifest(BaseModel):\n    content_set_id: uuid.UUID\n    ordered_files: List[ContentFile]\n    total_files: int\n    estimated_processing_time: int\n    warnings: List[str] = Field(default_factory=list)\n    context: Dict = Field(default_factory=dict)\n```",
+        "testStrategy": "1. Verify SQL schema with test database\n2. Test foreign key constraints\n3. Test index performance with large datasets\n4. Validate Pydantic models with sample data\n5. Test serialization/deserialization of JSON fields\n6. Ensure UUID generation works correctly",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-13T21:01:44.521Z"
+      },
+      {
+        "id": "124",
+        "title": "Implement Content Prep API Routes",
+        "description": "Create the API routes for the Content Prep Agent as specified in the PRD, including endpoints for analyzing files, validating content sets, and generating processing manifests.",
+        "details": "Create the file `app/routes/content_prep.py` with FastAPI routes for the Content Prep Agent. Implement all the endpoints specified in the PRD:\n\n1. POST /api/content-prep/analyze - Analyze pending files, detect sets\n2. POST /api/content-prep/validate - Validate completeness of content set\n3. POST /api/content-prep/order - Generate processing order\n4. GET /api/content-prep/sets - List detected content sets\n5. GET /api/content-prep/sets/{set_id} - Get content set details\n6. POST /api/content-prep/manifest - Generate processing manifest\n7. GET /api/content-prep/health - Service health check\n\nPseudo-code:\n```python\nfrom fastapi import APIRouter, Depends, HTTPException, BackgroundTasks\nfrom typing import List, Optional\nfrom app.models.content_sets import ContentSet, ContentSetCreate, ProcessingManifest\nfrom app.services.content_prep_agent import ContentPrepAgent\nfrom app.db.supabase import get_supabase_client\n\nrouter = APIRouter(prefix=\"/api/content-prep\", tags=[\"content-prep\"])\ncontent_prep_agent = ContentPrepAgent()\n\n@router.post(\"/analyze\", response_model=dict)\nasync def analyze_pending_files(data: dict):\n    \"\"\"Analyze pending files and detect content sets\"\"\"\n    b2_folder = data.get(\"b2_folder\", \"pending/\")\n    detection_mode = data.get(\"detection_mode\", \"auto\")\n    \n    # Get files from B2\n    # Detect content sets\n    # Return results\n    \n    return {\n        \"content_sets\": [],  # List of detected sets\n        \"standalone_files\": []  # List of files not in sets\n    }\n\n@router.post(\"/validate\", response_model=dict)\nasync def validate_content_set(data: dict):\n    \"\"\"Validate completeness of a content set\"\"\"\n    content_set_id = data.get(\"content_set_id\")\n    \n    # Get content set\n    # Validate completeness\n    # Return validation results\n    \n    return {\n        \"is_complete\": True,\n        \"missing_files\": [],\n        \"warnings\": []\n    }\n\n@router.post(\"/order\", response_model=dict)\nasync def generate_processing_order(data: dict):\n    \"\"\"Generate processing order for a content set\"\"\"\n    content_set_id = data.get(\"content_set_id\")\n    \n    # Get content set\n    # Generate order\n    # Return ordered files\n    \n    return {\n        \"ordered_files\": []\n    }\n\n@router.get(\"/sets\", response_model=List[ContentSet])\nasync def list_content_sets(status: Optional[str] = None):\n    \"\"\"List detected content sets\"\"\"\n    # Query database for content sets\n    # Filter by status if provided\n    # Return list\n    \n    return []\n\n@router.get(\"/sets/{set_id}\", response_model=ContentSet)\nasync def get_content_set(set_id: str):\n    \"\"\"Get content set details\"\"\"\n    # Query database for content set\n    # Return details or 404\n    \n    return {}\n\n@router.post(\"/manifest\", response_model=ProcessingManifest)\nasync def generate_processing_manifest(data: dict):\n    \"\"\"Generate processing manifest for a content set\"\"\"\n    content_set_id = data.get(\"content_set_id\")\n    proceed_incomplete = data.get(\"proceed_incomplete\", False)\n    add_context = data.get(\"add_context\", True)\n    \n    # Get content set\n    # Generate manifest\n    # Return manifest\n    \n    return {}\n\n@router.get(\"/health\")\nasync def health_check():\n    \"\"\"Service health check\"\"\"\n    return {\"status\": \"healthy\"}\n```\n\nAlso update the main FastAPI app to include these routes:\n\n```python\n# In app/main.py\nfrom app.routes import content_prep\n\napp.include_router(content_prep.router)\n```",
+        "testStrategy": "1. Unit tests for each API endpoint\n2. Test with valid and invalid request data\n3. Test error handling and edge cases\n4. Integration tests with mocked B2 service\n5. Test response formats match API specifications\n6. Load testing with multiple concurrent requests",
+        "priority": "high",
+        "dependencies": [
+          "122",
+          "123"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-13T21:05:19.254Z"
+      },
+      {
+        "id": "125",
+        "title": "Implement Set Detection and Ordering Logic",
+        "description": "Implement the core algorithms for detecting content sets, validating completeness, and determining the correct processing order.",
+        "details": "Enhance the ContentPrepAgent class with detailed implementations of the set detection and ordering algorithms. This includes:\n\n1. Pattern-based content set detection\n2. Sequence number extraction from filenames\n3. Gap detection in sequences\n4. Chronological ordering logic\n\nPseudo-code for key methods:\n\n```python\nclass ContentPrepAgent:\n    # ... existing code ...\n    \n    def detect_content_sets(self, files, detection_mode=\"auto\"):\n        \"\"\"Detect related content sets from a list of files\"\"\"\n        content_sets = []\n        standalone_files = []\n        \n        # Group files by common prefixes\n        prefix_groups = self._group_by_prefix(files)\n        \n        for prefix, group_files in prefix_groups.items():\n            # Skip single files\n            if len(group_files) <= 1:\n                standalone_files.extend(group_files)\n                continue\n                \n            # Check if group matches content set indicators\n            is_content_set = any(re.search(pattern, prefix, re.IGNORECASE) \n                               for pattern in CONTENT_SET_INDICATORS)\n            \n            # If it's a potential content set or has >3 files with sequence numbers\n            if is_content_set or self._has_sequence_numbers(group_files, threshold=0.7):\n                # Create content set\n                content_set = ContentSet(\n                    id=str(uuid.uuid4()),\n                    name=self._generate_set_name(prefix, group_files),\n                    detection_method=detection_mode,\n                    files=[self._create_content_file(f) for f in group_files],\n                )\n                \n                # Validate completeness\n                self.validate_completeness(content_set)\n                \n                content_sets.append(content_set)\n            else:\n                standalone_files.extend(group_files)\n        \n        return content_sets, standalone_files\n    \n    def _group_by_prefix(self, files):\n        \"\"\"Group files by common prefixes\"\"\"\n        groups = {}\n        \n        for file in files:\n            filename = os.path.basename(file['path'])\n            \n            # Try to find a common prefix\n            prefix = self._extract_prefix(filename)\n            if prefix not in groups:\n                groups[prefix] = []\n            \n            groups[prefix].append(file)\n            \n        return groups\n    \n    def _extract_prefix(self, filename):\n        \"\"\"Extract prefix from filename\"\"\"\n        # Remove extension\n        name = os.path.splitext(filename)[0]\n        \n        # Try to match common content set patterns\n        for pattern in CONTENT_SET_INDICATORS:\n            match = re.search(pattern, name, re.IGNORECASE)\n            if match:\n                return name[:match.end()]\n        \n        # Fall back to first part of name (before first number or separator)\n        match = re.search(r'^([^\\d\\-_\\s]+)', name)\n        if match:\n            return match.group(1)\n            \n        return name\n    \n    def _has_sequence_numbers(self, files, threshold=0.7):\n        \"\"\"Check if files have sequence numbers\"\"\"\n        count = sum(1 for f in files if self.detect_sequence_number(os.path.basename(f['path'])) is not None)\n        return count / len(files) >= threshold\n    \n    def detect_sequence_number(self, filename):\n        \"\"\"Extract sequence number from filename using patterns\"\"\"\n        for pattern in SEQUENCE_PATTERNS:\n            match = re.search(pattern, filename, re.IGNORECASE)\n            if match:\n                # Extract the captured group\n                sequence_str = match.group(1)\n                \n                # Convert to integer if numeric\n                if sequence_str.isdigit():\n                    return int(sequence_str)\n                    \n                # Handle roman numerals\n                if re.match(r'^(i{1,3}|iv|v|vi{0,3}|ix|x)$', sequence_str, re.IGNORECASE):\n                    return self._roman_to_int(sequence_str.lower())\n                    \n                # Handle alpha sequence (a, b, c...)\n                if len(sequence_str) == 1 and sequence_str.isalpha():\n                    return ord(sequence_str.lower()) - ord('a') + 1\n        \n        return None\n    \n    def _roman_to_int(self, s):\n        \"\"\"Convert Roman numeral to integer\"\"\"\n        roman_map = {'i': 1, 'v': 5, 'x': 10}\n        result = 0\n        \n        for i in range(len(s)):\n            if i > 0 and roman_map[s[i]] > roman_map[s[i-1]]:\n                result += roman_map[s[i]] - 2 * roman_map[s[i-1]]\n            else:\n                result += roman_map[s[i]]\n                \n        return result\n    \n    def validate_completeness(self, content_set):\n        \"\"\"Check for missing files in sequence\"\"\"\n        # Get sequence numbers\n        sequence_numbers = []\n        for file in content_set.files:\n            if file.sequence_number is not None:\n                sequence_numbers.append(file.sequence_number)\n        \n        if not sequence_numbers:\n            # No sequence numbers detected\n            content_set.is_complete = True\n            return content_set\n        \n        # Find min and max sequence\n        min_seq = min(sequence_numbers)\n        max_seq = max(sequence_numbers)\n        \n        # Check for gaps\n        expected_range = set(range(min_seq, max_seq + 1))\n        actual_set = set(sequence_numbers)\n        missing = expected_range - actual_set\n        \n        if missing:\n            content_set.is_complete = False\n            content_set.missing_files = [f\"Missing sequence {num}\" for num in missing]\n        else:\n            content_set.is_complete = True\n            content_set.missing_files = []\n        \n        return content_set\n    \n    def resolve_order(self, content_set):\n        \"\"\"Determine the correct processing order\"\"\"\n        # Sort files by sequence number if available\n        files_with_sequence = []\n        files_without_sequence = []\n        \n        for file in content_set.files:\n            if file.sequence_number is not None:\n                files_with_sequence.append(file)\n            else:\n                files_without_sequence.append(file)\n        \n        # Sort by sequence number\n        files_with_sequence.sort(key=lambda f: f.sequence_number)\n        \n        # For files without sequence, try to use creation date or name\n        files_without_sequence.sort(key=lambda f: f.filename)\n        \n        # Combine the lists\n        ordered_files = files_with_sequence + files_without_sequence\n        \n        return ordered_files\n```",
+        "testStrategy": "1. Unit tests for each algorithm (prefix grouping, sequence detection, gap detection)\n2. Test with various file naming patterns\n3. Test with edge cases (no sequence numbers, mixed formats)\n4. Test completeness validation with different gap scenarios\n5. Benchmark performance with large file sets\n6. Test with real-world examples of course materials",
+        "priority": "high",
+        "dependencies": [
+          "122"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement analyze_folder() method for content set detection",
+            "description": "Create the analyze_folder() method that scans a directory and identifies potential content sets based on file patterns.",
+            "dependencies": [],
+            "details": "Implement the analyze_folder() method in ContentPrepAgent class that takes a folder path as input, scans all files, and calls detect_content_sets() with the file list. Include logic to handle large directories by processing files in batches. The method should return a tuple of (content_sets, standalone_files).",
+            "status": "pending",
+            "testStrategy": "Unit test with various folder structures, test with empty folders, test with folders containing only standalone files, test with mixed content sets and standalone files.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement _create_content_set() builder method",
+            "description": "Create a helper method to build ContentSet objects with proper metadata extraction and initialization.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the _create_content_set() method that takes a group of files and creates a properly initialized ContentSet object. This includes generating a unique ID, determining an appropriate name based on common prefixes, setting the detection method, and initializing the files list with proper metadata for each file.",
+            "status": "pending",
+            "testStrategy": "Test with various file naming patterns, verify correct ID generation, test name generation with different prefix patterns, verify all file metadata is correctly extracted.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement sequence number extraction from filenames",
+            "description": "Create robust methods to detect and extract sequence numbers from various filename formats.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement the detect_sequence_number() method to extract sequence numbers from filenames using regular expressions. Handle numeric sequences, roman numerals, and alphabetic sequences. Include the _roman_to_int() helper method for converting roman numerals to integers. Ensure the method can handle various delimiter patterns and position of sequence numbers in filenames.",
+            "status": "pending",
+            "testStrategy": "Test with various filename patterns including numeric sequences (1, 2, 3), roman numerals (i, ii, iii), alphabetic sequences (a, b, c), test with different delimiters, test with sequence numbers in different positions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement gap detection for missing files in sequences",
+            "description": "Create the validate_completeness() method to identify gaps in file sequences and mark content sets as incomplete when files are missing.",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement the validate_completeness() method that analyzes a content set's files to detect missing sequence numbers. The method should extract sequence numbers from all files, determine the expected range, identify any gaps, and update the content set's is_complete flag and missing_files list accordingly. Handle edge cases where no sequence numbers are detected.",
+            "status": "pending",
+            "testStrategy": "Test with complete sequences, test with sequences missing files in the middle, at the beginning, and at the end, test with non-sequential files, test with mixed content types.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement chronological ordering logic for content sets",
+            "description": "Create the resolve_order() method to determine the correct processing order for files within a content set.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Implement the resolve_order() method that sorts files within a content set based on sequence numbers when available. For files without sequence numbers, implement fallback ordering based on creation date or filename. The method should return an ordered list of files and handle mixed cases where some files have sequence numbers and others don't.",
+            "status": "pending",
+            "testStrategy": "Test ordering with sequence numbers, test fallback to creation date, test fallback to filename, test with mixed file types, verify correct ordering with various sequence patterns.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement batched analysis for large file sets",
+            "description": "Enhance the content set detection to handle large directories by processing files in batches and merging results.",
+            "dependencies": [
+              1,
+              2,
+              5
+            ],
+            "details": "Modify the analyze_folder() method to process large directories (>100 files) in batches to prevent memory issues. Implement a merge_content_sets() helper method that combines results from multiple batches while preserving chronological ordering. Include progress tracking and logging for batch processing. Ensure the final merged result maintains all metadata and relationships between files.",
+            "status": "pending",
+            "testStrategy": "Test with directories containing >100 files, verify memory usage remains stable, test merging of content sets across batches, verify chronological ordering is preserved after merging, test with edge cases like all files belonging to one content set split across batches.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-13T21:06:53.806Z"
+      },
+      {
+        "id": "126",
+        "title": "Implement Processing Manifest Generation",
+        "description": "Create the functionality to generate processing manifests that specify the ordered processing queue, dependencies, and context for downstream agents.",
+        "details": "Enhance the ContentPrepAgent class with methods to generate processing manifests. This includes:\n\n1. Creating an ordered processing queue\n2. Identifying dependencies between files\n3. Estimating processing complexity and time\n4. Adding context metadata for downstream agents\n\nPseudo-code:\n\n```python\nclass ContentPrepAgent:\n    # ... existing code ...\n    \n    def generate_manifest(self, content_set, proceed_incomplete=False):\n        \"\"\"Create processing manifest with ordered files\"\"\"\n        # Check if content set is complete\n        if not content_set.is_complete and not proceed_incomplete:\n            raise ValueError(\"Content set is incomplete. Set proceed_incomplete=True to generate manifest anyway.\")\n        \n        # Get ordered files\n        ordered_files = self.resolve_order(content_set)\n        \n        # Identify dependencies\n        self._identify_dependencies(ordered_files)\n        \n        # Estimate processing time\n        estimated_time = self.estimate_processing_time(ordered_files)\n        \n        # Create manifest\n        manifest = ProcessingManifest(\n            content_set_id=content_set.id,\n            ordered_files=ordered_files,\n            total_files=len(ordered_files),\n            estimated_processing_time=estimated_time,\n            warnings=content_set.missing_files if not content_set.is_complete else [],\n            context={\n                \"content_set_name\": content_set.name,\n                \"is_complete\": content_set.is_complete,\n                \"detection_method\": content_set.detection_method,\n                \"total_files\": len(ordered_files),\n            }\n        )\n        \n        return manifest\n    \n    def _identify_dependencies(self, ordered_files):\n        \"\"\"Identify dependencies between files based on order\"\"\"\n        # Simple sequential dependencies - each file depends on the previous one\n        for i in range(1, len(ordered_files)):\n            prev_file = ordered_files[i-1]\n            curr_file = ordered_files[i]\n            \n            # Add dependency on previous file\n            curr_file.dependencies.append(prev_file.b2_path)\n    \n    def estimate_processing_time(self, files):\n        \"\"\"Estimate processing time based on file types and sizes\"\"\"\n        total_time = 0\n        \n        for file in files:\n            # Base time by file type\n            if file.file_type.lower() == \"pdf\":\n                base_time = 30  # 30 seconds base for PDF\n            elif file.file_type.lower() in [\"docx\", \"doc\"]:\n                base_time = 25  # 25 seconds base for Word docs\n            elif file.file_type.lower() in [\"txt\", \"md\"]:\n                base_time = 10  # 10 seconds base for text files\n            else:\n                base_time = 20  # Default base time\n            \n            # Adjust by file size (very simple heuristic)\n            size_factor = max(1, file.size_bytes / (1024 * 1024))  # Size in MB, minimum 1\n            \n            # Adjust by complexity\n            complexity_factor = 1.0\n            if file.estimated_complexity == \"high\":\n                complexity_factor = 1.5\n            elif file.estimated_complexity == \"low\":\n                complexity_factor = 0.8\n            \n            # Calculate time for this file\n            file_time = base_time * size_factor * complexity_factor\n            total_time += file_time\n        \n        return int(total_time)  # Return as integer seconds\n    \n    def estimate_file_complexity(self, file):\n        \"\"\"Estimate file complexity based on size, type, and content\"\"\"\n        # Simple heuristic based on file size\n        if file.size_bytes > 5 * 1024 * 1024:  # > 5MB\n            return \"high\"\n        elif file.size_bytes < 100 * 1024:  # < 100KB\n            return \"low\"\n        else:\n            return \"medium\"\n```",
+        "testStrategy": "1. Unit tests for manifest generation\n2. Test dependency identification with different file orders\n3. Test processing time estimation with various file types and sizes\n4. Verify manifest structure matches expected schema\n5. Test error handling for incomplete sets\n6. Test with large file sets to ensure performance",
+        "priority": "medium",
+        "dependencies": [
+          "122",
+          "125"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-13T21:06:53.847Z"
+      },
+      {
+        "id": "127",
+        "title": "Integrate with B2 Workflow Service",
+        "description": "Integrate the Content Prep Agent with the B2 Workflow Service to intercept file uploads and trigger content preparation.",
+        "details": "Modify the existing B2 Workflow Service to hook into the Content Prep Agent. This involves:\n\n1. Intercepting new file uploads to the `pending/` folder\n2. Triggering content set detection and analysis\n3. Moving files to `processing/` in the correct order based on the manifest\n\nPseudo-code for the integration:\n\n```python\n# In app/services/b2_workflow.py\n\nfrom app.services.content_prep_agent import ContentPrepAgent\n\nclass B2WorkflowService:\n    # ... existing code ...\n    \n    def __init__(self):\n        # ... existing init ...\n        self.content_prep_agent = ContentPrepAgent()\n    \n    async def process_pending_folder(self):\n        \"\"\"Process files in the pending folder\"\"\"\n        # Get files from pending folder\n        pending_files = await self.list_pending_files()\n        \n        if not pending_files:\n            return\n        \n        # Check if we need content preparation\n        if len(pending_files) > 1:\n            # Detect content sets\n            content_sets, standalone_files = self.content_prep_agent.detect_content_sets(pending_files)\n            \n            # Process standalone files immediately\n            for file in standalone_files:\n                await self.move_to_processing(file['path'])\n                await self.trigger_processing(file['path'])\n            \n            # Process content sets\n            for content_set in content_sets:\n                # Store content set in database\n                await self.store_content_set(content_set)\n                \n                # Check completeness\n                if not content_set.is_complete:\n                    # Log warning about incomplete set\n                    self.logger.warning(f\"Incomplete content set detected: {content_set.name}\")\n                    # Send notification to user (implementation depends on notification system)\n                    await self.notify_incomplete_set(content_set)\n                    # Skip processing until user acknowledges\n                    continue\n                \n                # Generate manifest\n                manifest = self.content_prep_agent.generate_manifest(content_set)\n                \n                # Process files in order\n                for file in manifest.ordered_files:\n                    await self.move_to_processing(file.b2_path)\n                    # Pass content set context to processing task\n                    await self.trigger_processing(file.b2_path, context=manifest.context)\n        else:\n            # Single file - process immediately\n            file = pending_files[0]\n            await self.move_to_processing(file['path'])\n            await self.trigger_processing(file['path'])\n    \n    async def store_content_set(self, content_set):\n        \"\"\"Store content set in database\"\"\"\n        # Implementation depends on database access method\n        pass\n    \n    async def notify_incomplete_set(self, content_set):\n        \"\"\"Notify user about incomplete content set\"\"\"\n        # Implementation depends on notification system\n        pass\n    \n    async def trigger_processing(self, file_path, context=None):\n        \"\"\"Trigger processing task for a file\"\"\"\n        # ... existing code ...\n        \n        # Add content set context if available\n        task_data = {\n            \"file_path\": file_path,\n            # ... existing task data ...\n        }\n        \n        if context:\n            task_data[\"content_set_context\"] = context\n        \n        # Trigger Celery task\n        # ... existing code ...\n```\n\nAlso create a Celery task for content set detection and processing:\n\n```python\n# In app/tasks/content_prep_tasks.py\n\nfrom celery import shared_task\nfrom app.services.content_prep_agent import ContentPrepAgent\n\n@shared_task\ndef detect_content_sets(b2_folder):\n    \"\"\"Detect content sets in a B2 folder\"\"\"\n    agent = ContentPrepAgent()\n    \n    # List files in folder\n    # Detect content sets\n    # Store in database\n    \n    return {\"content_sets\": [], \"standalone_files\": []}\n\n@shared_task\ndef process_content_set(content_set_id, proceed_incomplete=False):\n    \"\"\"Process a content set\"\"\"\n    agent = ContentPrepAgent()\n    \n    # Get content set from database\n    # Generate manifest\n    # Trigger processing for each file in order\n    \n    return {\"status\": \"processing\", \"files_count\": 0}\n```",
+        "testStrategy": "1. Integration tests with mocked B2 service\n2. Test single file pass-through\n3. Test multi-file content set detection\n4. Test incomplete set handling and notification\n5. Verify correct processing order\n6. Test with various file naming patterns\n7. Test error handling and recovery",
+        "priority": "high",
+        "dependencies": [
+          "122",
+          "125",
+          "126"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-13T21:10:04.660Z"
+      },
+      {
+        "id": "128",
+        "title": "Implement Source Processing Task Integration",
+        "description": "Modify the existing Source Processing Task (Celery) to accept processing manifests and handle content set context.",
+        "details": "Update the Source Processing Task to work with the Content Prep Agent by:\n\n1. Accepting manifest-based processing instructions\n2. Handling content set context metadata\n3. Passing context to downstream services (chunking, embedding)\n\nPseudo-code for the integration:\n\n```python\n# In app/tasks/source_processing.py\n\nfrom celery import shared_task\nfrom app.services.content_prep_agent import ContentPrepAgent\n\n@shared_task\ndef process_source(file_path, **kwargs):\n    \"\"\"Process a source file\"\"\"\n    # ... existing code ...\n    \n    # Check for content set context\n    content_set_context = kwargs.get(\"content_set_context\")\n    \n    # Process the file\n    result = process_file(file_path)\n    \n    # Pass content set context to chunking task\n    if content_set_context:\n        # Add content set context to chunking task\n        chunking_task.delay(result[\"processed_path\"], content_set_context=content_set_context)\n    else:\n        # Normal processing without content set context\n        chunking_task.delay(result[\"processed_path\"])\n    \n    return result\n\n# Update the chunking task to accept content set context\n@shared_task\ndef chunking_task(processed_path, **kwargs):\n    \"\"\"Chunk a processed file\"\"\"\n    # ... existing code ...\n    \n    # Check for content set context\n    content_set_context = kwargs.get(\"content_set_context\")\n    \n    # Process chunks\n    chunks = chunk_document(processed_path)\n    \n    # Add content set metadata to chunks if available\n    if content_set_context:\n        for chunk in chunks:\n            chunk.metadata[\"content_set\"] = content_set_context.get(\"content_set_name\")\n            chunk.metadata[\"content_set_id\"] = content_set_context.get(\"content_set_id\")\n            chunk.metadata[\"is_part_of_sequence\"] = True\n    \n    # Pass to embedding task with context\n    embedding_task.delay(chunks, content_set_context=content_set_context if content_set_context else None)\n    \n    return {\"chunks_count\": len(chunks)}\n```\n\nAlso update the knowledge graph integration to create relationships for content sets:\n\n```python\n# In app/services/knowledge_graph.py\n\nclass KnowledgeGraphService:\n    # ... existing code ...\n    \n    def add_document_node(self, document, **kwargs):\n        \"\"\"Add a document node to the knowledge graph\"\"\"\n        # ... existing code ...\n        \n        # Check for content set context\n        content_set_context = kwargs.get(\"content_set_context\")\n        \n        if content_set_context:\n            # Create content set node if it doesn't exist\n            self.create_content_set_node(content_set_context)\n            \n            # Create PART_OF relationship\n            self.create_part_of_relationship(document.id, content_set_context.get(\"content_set_id\"))\n            \n            # Create PRECEDES/FOLLOWS relationships if this document has dependencies\n            for dependency in document.get(\"dependencies\", []):\n                self.create_dependency_relationship(document.id, dependency)\n    \n    def create_content_set_node(self, content_set_context):\n        \"\"\"Create a ContentSet node in Neo4j\"\"\"\n        query = \"\"\"\n        MERGE (cs:ContentSet {id: $id})\n        ON CREATE SET \n            cs.name = $name,\n            cs.is_complete = $is_complete,\n            cs.total_files = $total_files,\n            cs.created_at = datetime()\n        \"\"\"\n        \n        params = {\n            \"id\": content_set_context.get(\"content_set_id\"),\n            \"name\": content_set_context.get(\"content_set_name\"),\n            \"is_complete\": content_set_context.get(\"is_complete\", False),\n            \"total_files\": content_set_context.get(\"total_files\", 0)\n        }\n        \n        self.graph.run(query, params)\n    \n    def create_part_of_relationship(self, document_id, content_set_id):\n        \"\"\"Create PART_OF relationship between document and content set\"\"\"\n        query = \"\"\"\n        MATCH (d:Document {id: $document_id})\n        MATCH (cs:ContentSet {id: $content_set_id})\n        MERGE (d)-[:PART_OF]->(cs)\n        \"\"\"\n        \n        params = {\n            \"document_id\": document_id,\n            \"content_set_id\": content_set_id\n        }\n        \n        self.graph.run(query, params)\n    \n    def create_dependency_relationship(self, document_id, dependency_id):\n        \"\"\"Create FOLLOWS/PRECEDES relationships between documents\"\"\"\n        query = \"\"\"\n        MATCH (d1:Document {id: $document_id})\n        MATCH (d2:Document {id: $dependency_id})\n        MERGE (d1)-[:FOLLOWS]->(d2)\n        MERGE (d2)-[:PRECEDES]->(d1)\n        \"\"\"\n        \n        params = {\n            \"document_id\": document_id,\n            \"dependency_id\": dependency_id\n        }\n        \n        self.graph.run(query, params)\n```",
+        "testStrategy": "1. Integration tests with mocked Celery tasks\n2. Test context propagation through the pipeline\n3. Verify Neo4j relationships are created correctly\n4. Test with various content set scenarios\n5. Test error handling and recovery\n6. Verify metadata is preserved throughout processing",
+        "priority": "medium",
+        "dependencies": [
+          "122",
+          "127"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-13T21:12:14.216Z"
+      },
+      {
+        "id": "129",
+        "title": "Implement Chat-Based Ordering Clarification",
+        "description": "Implement the chat-based ordering clarification feature that allows the Content Prep Agent to ask users questions via CKO Chat when ordering confidence is below threshold.",
+        "details": "Create functionality for the Content Prep Agent to interact with users via CKO Chat when it needs clarification about file ordering. This includes:\n\n1. Detecting when ordering confidence is below threshold\n2. Sending clarification messages to CKO Chat\n3. Parsing user responses\n4. Updating ordering based on user input\n\nPseudo-code:\n\n```python\nclass ContentPrepAgent:\n    # ... existing code ...\n    \n    async def resolve_order_with_clarification(self, content_set, confidence_threshold=0.8):\n        \"\"\"Resolve order with user clarification if needed\"\"\"\n        # Try automatic ordering first\n        ordered_files = self.resolve_order(content_set)\n        \n        # Calculate confidence in ordering\n        confidence = self._calculate_ordering_confidence(ordered_files)\n        \n        if confidence < confidence_threshold:\n            # Need user clarification\n            clarification = await self._request_user_clarification(content_set, ordered_files)\n            \n            if clarification:\n                # Update ordering based on user input\n                ordered_files = self._update_ordering(ordered_files, clarification)\n        \n        return ordered_files\n    \n    def _calculate_ordering_confidence(self, ordered_files):\n        \"\"\"Calculate confidence in the ordering\"\"\"\n        # Count files with explicit sequence numbers\n        files_with_sequence = sum(1 for f in ordered_files if f.sequence_number is not None)\n        total_files = len(ordered_files)\n        \n        # Base confidence on percentage of files with sequence numbers\n        if total_files == 0:\n            return 1.0\n        \n        return files_with_sequence / total_files\n    \n    async def _request_user_clarification(self, content_set, ordered_files):\n        \"\"\"Request clarification from user via CKO Chat\"\"\"\n        from app.services.cko_chat import CKOChatService\n        \n        chat_service = CKOChatService()\n        \n        # Identify ambiguous files (those without sequence numbers)\n        ambiguous_files = [f for f in ordered_files if f.sequence_number is None]\n        \n        if not ambiguous_files:\n            return None\n        \n        # Create clarification message\n        message = f\"I'm processing your content set '{content_set.name}' and need help with the correct order. \"\n        message += \"I've detected these files without clear sequence indicators:\\n\"\n        \n        for i, file in enumerate(ambiguous_files[:5]):  # Limit to 5 files to avoid long messages\n            message += f\"- {file.filename}\\n\"\n        \n        if len(ambiguous_files) > 5:\n            message += f\"...and {len(ambiguous_files) - 5} more.\\n\"\n        \n        message += \"\\nCould you please tell me the correct order for these files? \"\n        message += \"You can respond with file names in the desired order, or with instructions like 'File A comes before File B'.\"\n        \n        # Send message to CKO Chat\n        chat_id = await chat_service.send_agent_message(\n            agent_id=\"AGENT-016\",\n            user_id=content_set.metadata.get(\"user_id\"),\n            message=message\n        )\n        \n        # Wait for user response (with timeout)\n        response = await chat_service.wait_for_user_response(chat_id, timeout=3600)  # 1 hour timeout\n        \n        if not response:\n            # No response within timeout\n            return None\n        \n        # Log the conversation for audit trail\n        await self._log_clarification_conversation(content_set.id, message, response)\n        \n        return response\n    \n    def _update_ordering(self, ordered_files, clarification):\n        \"\"\"Update ordering based on user clarification\"\"\"\n        # This would use LLM to parse the user's response and update the ordering\n        # For simplicity, we'll assume the response is a comma-separated list of filenames\n        \n        # Create a map of filename to file object\n        file_map = {f.filename: f for f in ordered_files}\n        \n        # Try to extract filenames from the response\n        # This is a simplified approach - in reality, you'd use an LLM to parse natural language\n        filenames = [name.strip() for name in clarification.split(',')]\n        \n        # Create new ordered list based on user input\n        new_order = []\n        for filename in filenames:\n            if filename in file_map:\n                new_order.append(file_map[filename])\n                # Remove from map to avoid duplicates\n                del file_map[filename]\n        \n        # Add any remaining files at the end\n        new_order.extend(file_map.values())\n        \n        return new_order\n    \n    async def _log_clarification_conversation(self, content_set_id, question, answer):\n        \"\"\"Log the clarification conversation for audit trail\"\"\"\n        # Implementation depends on logging system\n        pass\n```\n\nCreate a simple CKO Chat service interface:\n\n```python\n# In app/services/cko_chat.py\n\nclass CKOChatService:\n    \"\"\"Interface to the CKO Chat system\"\"\"\n    \n    async def send_agent_message(self, agent_id, user_id, message):\n        \"\"\"Send a message from an agent to a user\"\"\"\n        # Implementation depends on chat system\n        # This would create a new chat or add to existing chat\n        # Return chat ID\n        pass\n    \n    async def wait_for_user_response(self, chat_id, timeout=3600):\n        \"\"\"Wait for user response with timeout\"\"\"\n        # Implementation depends on chat system\n        # This would poll or use websockets to wait for response\n        # Return user message or None if timeout\n        pass\n```",
+        "testStrategy": "1. Unit tests for ordering confidence calculation\n2. Test message generation for different ambiguous file scenarios\n3. Test response parsing with various user input formats\n4. Integration tests with mocked CKO Chat service\n5. Test timeout handling\n6. Verify audit trail logging\n7. Test end-to-end flow with simulated user responses",
+        "priority": "medium",
+        "dependencies": [
+          "122",
+          "125"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement ordering confidence calculation method",
+            "description": "Create the _calculate_ordering_confidence() method that determines when user clarification is needed",
+            "dependencies": [],
+            "details": "Implement the method that calculates confidence based on the percentage of files with explicit sequence numbers. Set the threshold at 80% as specified. Include edge case handling for empty file sets and ensure the method returns a value between 0 and 1.",
+            "status": "pending",
+            "testStrategy": "Unit test with various file sets: all files with sequence numbers, mixed sets, empty sets. Verify threshold behavior at boundary conditions (79% vs 81%).",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create CKOChatService interface",
+            "description": "Implement the CKOChatService class with methods for agent-user communication",
+            "dependencies": [],
+            "details": "Create the CKOChatService class in app/services/cko_chat.py with methods for sending agent messages and waiting for user responses. Implement timeout handling for response waiting and proper error handling for communication failures.",
+            "status": "pending",
+            "testStrategy": "Mock the underlying chat system API. Test successful message sending, response waiting with and without timeouts, and error handling scenarios.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement clarification message generation",
+            "description": "Create logic to generate clear, user-friendly clarification messages about ambiguous file ordering",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the first part of _request_user_clarification() that identifies ambiguous files and creates a well-formatted message explaining the issue to the user. Include file listing with truncation for large sets and clear instructions on how to respond.",
+            "status": "pending",
+            "testStrategy": "Test message generation with various file sets, including edge cases like all files being ambiguous or only one ambiguous file. Verify message formatting and clarity.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement chat integration for sending clarification requests",
+            "description": "Connect the Content Prep Agent to CKO Chat for sending clarification requests to users",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Complete the _request_user_clarification() method to send the generated clarification message to users via the CKOChatService. Implement proper error handling for failed message delivery and configure the agent ID ('AGENT-016') and user ID extraction from content set metadata.",
+            "status": "pending",
+            "testStrategy": "Integration test with mocked CKOChatService. Verify correct message delivery, proper agent and user ID handling, and error case management.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement natural language response parsing",
+            "description": "Create logic to interpret user responses to ordering clarification requests",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement the _update_ordering() method that parses user responses and updates file ordering accordingly. Handle various response formats including comma-separated lists, natural language descriptions ('file A before file B'), and numbered lists. Use pattern matching or LLM-based parsing as appropriate.",
+            "status": "pending",
+            "testStrategy": "Test with various response formats including comma-separated lists, natural language instructions, and edge cases like partial responses or responses with unknown files.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement clarification conversation logging",
+            "description": "Create audit trail logging for clarification conversations",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement the _log_clarification_conversation() method to record all clarification questions and user responses for audit purposes. Store conversation details including timestamps, content set ID, question text, response text, and outcome (whether ordering was successfully updated).",
+            "status": "pending",
+            "testStrategy": "Verify log entries are created with correct data. Test with various conversation scenarios including successful clarifications and timeouts.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Integrate all components in resolve_order_with_clarification method",
+            "description": "Connect all components in the main workflow method that handles the entire clarification process",
+            "dependencies": [
+              1,
+              5,
+              6
+            ],
+            "details": "Implement the resolve_order_with_clarification() method that orchestrates the entire process: calculating confidence, requesting clarification when needed, waiting for and processing responses, updating ordering, and returning the final ordered files. Include proper state management to pause processing while awaiting responses.",
+            "status": "pending",
+            "testStrategy": "End-to-end testing with mocked dependencies. Test the full workflow with scenarios above and below confidence threshold. Verify correct handling of timeouts and user responses.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-13T21:19:08.764Z"
+      },
+      {
+        "id": "130",
+        "title": "Implement Retention Policy and Cleanup",
+        "description": "Implement the 90-day retention policy for content set metadata and create a scheduled cleanup task.",
+        "details": "Create a scheduled task to enforce the 90-day retention policy for content set metadata. This includes:\n\n1. Creating a Celery periodic task for cleanup\n2. Implementing the database cleanup logic\n3. Adding logging and monitoring\n\nPseudo-code:\n\n```python\n# In app/tasks/scheduled_tasks.py\n\nfrom celery import shared_task\nfrom celery.schedules import crontab\nfrom app.db.supabase import get_supabase_client\nfrom datetime import datetime, timedelta\nimport logging\n\nlogger = logging.getLogger(__name__)\n\n# Register as a periodic task to run daily at 3 AM\n@shared_task\ndef cleanup_content_sets():\n    \"\"\"Clean up content sets older than 90 days\"\"\"\n    logger.info(\"Starting content set cleanup task\")\n    \n    try:\n        # Calculate cutoff date (90 days ago)\n        cutoff_date = datetime.now() - timedelta(days=90)\n        \n        # Get Supabase client\n        supabase = get_supabase_client()\n        \n        # Find completed content sets older than 90 days\n        response = supabase.table(\"content_sets\") \\\n            .select(\"id\") \\\n            .eq(\"processing_status\", \"complete\") \\\n            .lt(\"updated_at\", cutoff_date.isoformat()) \\\n            .execute()\n        \n        if response.data:\n            content_set_ids = [item[\"id\"] for item in response.data]\n            count = len(content_set_ids)\n            logger.info(f\"Found {count} content sets to clean up\")\n            \n            # Delete in batches to avoid timeout\n            batch_size = 50\n            for i in range(0, count, batch_size):\n                batch = content_set_ids[i:i+batch_size]\n                \n                # Delete content set files first (due to foreign key constraint)\n                supabase.table(\"content_set_files\") \\\n                    .delete() \\\n                    .in_(\"content_set_id\", batch) \\\n                    .execute()\n                \n                # Delete content sets\n                supabase.table(\"content_sets\") \\\n                    .delete() \\\n                    .in_(\"id\", batch) \\\n                    .execute()\n                \n                logger.info(f\"Deleted batch {i//batch_size + 1} ({len(batch)} content sets)\")\n            \n            return {\"status\": \"success\", \"deleted_count\": count}\n        else:\n            logger.info(\"No content sets to clean up\")\n            return {\"status\": \"success\", \"deleted_count\": 0}\n    \n    except Exception as e:\n        logger.error(f\"Error in content set cleanup: {str(e)}\")\n        return {\"status\": \"error\", \"error\": str(e)}\n```\n\nRegister the periodic task in Celery beat schedule:\n\n```python\n# In app/celery_app.py\n\napp.conf.beat_schedule = {\n    # ... existing scheduled tasks ...\n    \n    'cleanup-content-sets-daily': {\n        'task': 'app.tasks.scheduled_tasks.cleanup_content_sets',\n        'schedule': crontab(hour=3, minute=0),  # Run at 3:00 AM\n    },\n}\n```\n\nAdd monitoring and metrics:\n\n```python\n# In app/monitoring/metrics.py\n\nfrom prometheus_client import Counter, Gauge\n\n# Counters for content set operations\ncontent_sets_created = Counter('content_sets_created', 'Number of content sets created')\ncontent_sets_processed = Counter('content_sets_processed', 'Number of content sets processed')\ncontent_sets_deleted = Counter('content_sets_deleted', 'Number of content sets deleted by retention policy')\n\n# Gauges for current state\ncontent_sets_pending = Gauge('content_sets_pending', 'Number of pending content sets')\ncontent_sets_processing = Gauge('content_sets_processing', 'Number of processing content sets')\ncontent_sets_complete = Gauge('content_sets_complete', 'Number of complete content sets')\n```",
+        "testStrategy": "1. Unit tests for cleanup logic\n2. Test with mock database responses\n3. Test date calculation and filtering\n4. Test batch processing\n5. Test error handling\n6. Integration test with test database\n7. Verify metrics are updated correctly",
+        "priority": "low",
+        "dependencies": [
+          "123"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-13T21:23:08.753Z"
+      },
+      {
+        "id": "131",
+        "title": "Create Comprehensive Test Suite",
+        "description": "Create a comprehensive test suite for the Content Prep Agent, including unit tests, integration tests, and performance benchmarks.",
+        "details": "Create the file `tests/test_content_prep_agent.py` with a comprehensive test suite for the Content Prep Agent. This includes:\n\n1. Unit tests for each component (set detection, ordering, manifest generation)\n2. Integration tests with mocked dependencies\n3. Performance benchmarks for large file sets\n4. Test cases for all user stories\n\nPseudo-code:\n\n```python\n# In tests/test_content_prep_agent.py\n\nimport unittest\nfrom unittest.mock import patch, MagicMock\nimport pytest\nfrom app.services.content_prep_agent import ContentPrepAgent, ContentSet, ContentFile, ProcessingManifest\n\nclass TestContentPrepAgent(unittest.TestCase):\n    def setUp(self):\n        self.agent = ContentPrepAgent()\n        \n        # Sample test files\n        self.test_files = [\n            {\"path\": \"pending/course/01-intro.pdf\", \"size\": 1024 * 1024, \"type\": \"pdf\"},\n            {\"path\": \"pending/course/02-basics.pdf\", \"size\": 2 * 1024 * 1024, \"type\": \"pdf\"},\n            {\"path\": \"pending/course/03-advanced.pdf\", \"size\": 3 * 1024 * 1024, \"type\": \"pdf\"},\n            {\"path\": \"pending/course/10-appendix.pdf\", \"size\": 500 * 1024, \"type\": \"pdf\"},\n            {\"path\": \"pending/random.txt\", \"size\": 10 * 1024, \"type\": \"txt\"},\n        ]\n    \n    def test_detect_sequence_number(self):\n        \"\"\"Test sequence number detection from filenames\"\"\"\n        test_cases = [\n            (\"01-intro.pdf\", 1),\n            (\"chapter-02-basics.pdf\", 2),\n            (\"module03.pdf\", 3),\n            (\"lesson_4_advanced.pdf\", 4),\n            (\"part-v-conclusion.pdf\", 5),  # Roman numeral\n            (\"a-intro.pdf\", 1),  # Alpha sequence\n            (\"random.pdf\", None),  # No sequence\n        ]\n        \n        for filename, expected in test_cases:\n            result = self.agent.detect_sequence_number(filename)\n            self.assertEqual(result, expected, f\"Failed for {filename}\")\n    \n    def test_detect_content_sets(self):\n        \"\"\"Test content set detection\"\"\"\n        content_sets, standalone = self.agent.detect_content_sets(self.test_files)\n        \n        # Should detect one content set with 4 files\n        self.assertEqual(len(content_sets), 1)\n        self.assertEqual(len(content_sets[0].files), 4)\n        \n        # Should have one standalone file\n        self.assertEqual(len(standalone), 1)\n        self.assertEqual(standalone[0][\"path\"], \"pending/random.txt\")\n    \n    def test_validate_completeness(self):\n        \"\"\"Test completeness validation\"\"\"\n        # Create a content set with files 1, 2, 4 (missing 3)\n        files = [\n            ContentFile(b2_path=\"file1.pdf\", filename=\"file1.pdf\", sequence_number=1),\n            ContentFile(b2_path=\"file2.pdf\", filename=\"file2.pdf\", sequence_number=2),\n            ContentFile(b2_path=\"file4.pdf\", filename=\"file4.pdf\", sequence_number=4),\n        ]\n        \n        content_set = ContentSet(\n            id=\"test-id\",\n            name=\"Test Set\",\n            detection_method=\"pattern\",\n            files=files\n        )\n        \n        # Validate completeness\n        self.agent.validate_completeness(content_set)\n        \n        # Should be incomplete with missing file 3\n        self.assertFalse(content_set.is_complete)\n        self.assertEqual(len(content_set.missing_files), 1)\n        \n        # Add the missing file and revalidate\n        content_set.files.append(\n            ContentFile(b2_path=\"file3.pdf\", filename=\"file3.pdf\", sequence_number=3)\n        )\n        \n        self.agent.validate_completeness(content_set)\n        \n        # Should now be complete\n        self.assertTrue(content_set.is_complete)\n        self.assertEqual(len(content_set.missing_files), 0)\n    \n    def test_resolve_order(self):\n        \"\"\"Test ordering resolution\"\"\"\n        # Create a content set with files in random order\n        files = [\n            ContentFile(b2_path=\"file3.pdf\", filename=\"file3.pdf\", sequence_number=3),\n            ContentFile(b2_path=\"file1.pdf\", filename=\"file1.pdf\", sequence_number=1),\n            ContentFile(b2_path=\"file2.pdf\", filename=\"file2.pdf\", sequence_number=2),\n        ]\n        \n        content_set = ContentSet(\n            id=\"test-id\",\n            name=\"Test Set\",\n            detection_method=\"pattern\",\n            files=files\n        )\n        \n        # Resolve order\n        ordered_files = self.agent.resolve_order(content_set)\n        \n        # Should be ordered by sequence number\n        self.assertEqual(ordered_files[0].sequence_number, 1)\n        self.assertEqual(ordered_files[1].sequence_number, 2)\n        self.assertEqual(ordered_files[2].sequence_number, 3)\n    \n    def test_generate_manifest(self):\n        \"\"\"Test manifest generation\"\"\"\n        # Create a complete content set\n        files = [\n            ContentFile(b2_path=\"file1.pdf\", filename=\"file1.pdf\", sequence_number=1),\n            ContentFile(b2_path=\"file2.pdf\", filename=\"file2.pdf\", sequence_number=2),\n            ContentFile(b2_path=\"file3.pdf\", filename=\"file3.pdf\", sequence_number=3),\n        ]\n        \n        content_set = ContentSet(\n            id=\"test-id\",\n            name=\"Test Set\",\n            detection_method=\"pattern\",\n            files=files,\n            is_complete=True\n        )\n        \n        # Generate manifest\n        manifest = self.agent.generate_manifest(content_set)\n        \n        # Verify manifest\n        self.assertEqual(manifest.content_set_id, \"test-id\")\n        self.assertEqual(manifest.total_files, 3)\n        self.assertEqual(len(manifest.ordered_files), 3)\n        self.assertEqual(len(manifest.warnings), 0)\n        \n        # Check dependencies\n        self.assertEqual(len(manifest.ordered_files[0].dependencies), 0)  # First file has no dependencies\n        self.assertEqual(len(manifest.ordered_files[1].dependencies), 1)  # Second depends on first\n        self.assertEqual(len(manifest.ordered_files[2].dependencies), 1)  # Third depends on second\n    \n    @patch('app.services.content_prep_agent.ContentPrepAgent._request_user_clarification')\n    async def test_resolve_order_with_clarification(self, mock_clarification):\n        \"\"\"Test ordering with user clarification\"\"\"\n        # Create a content set with some files missing sequence numbers\n        files = [\n            ContentFile(b2_path=\"file1.pdf\", filename=\"file1.pdf\", sequence_number=1),\n            ContentFile(b2_path=\"fileA.pdf\", filename=\"fileA.pdf\", sequence_number=None),\n            ContentFile(b2_path=\"fileB.pdf\", filename=\"fileB.pdf\", sequence_number=None),\n        ]\n        \n        content_set = ContentSet(\n            id=\"test-id\",\n            name=\"Test Set\",\n            detection_method=\"pattern\",\n            files=files\n        )\n        \n        # Mock user clarification response\n        mock_clarification.return_value = \"fileA.pdf, fileB.pdf\"\n        \n        # Resolve order with clarification\n        ordered_files = await self.agent.resolve_order_with_clarification(content_set, confidence_threshold=0.9)\n        \n        # Should have requested clarification\n        mock_clarification.assert_called_once()\n        \n        # Should be ordered according to user input\n        self.assertEqual(ordered_files[0].filename, \"file1.pdf\")  # Has sequence number, comes first\n        self.assertEqual(ordered_files[1].filename, \"fileA.pdf\")  # From user input\n        self.assertEqual(ordered_files[2].filename, \"fileB.pdf\")  # From user input\n\n# Performance tests\n@pytest.mark.benchmark\ndef test_performance_large_set(benchmark):\n    \"\"\"Benchmark performance with large file sets\"\"\"\n    agent = ContentPrepAgent()\n    \n    # Generate 100 test files\n    large_set = []\n    for i in range(1, 101):\n        large_set.append({\n            \"path\": f\"pending/course/module-{i:02d}.pdf\",\n            \"size\": 1024 * 1024,\n            \"type\": \"pdf\"\n        })\n    \n    # Benchmark content set detection\n    result = benchmark(agent.detect_content_sets, large_set)\n    \n    # Verify result\n    content_sets, standalone = result\n    assert len(content_sets) == 1\n    assert len(content_sets[0].files) == 100\n```\n\nCreate integration tests for the API endpoints:\n\n```python\n# In tests/test_content_prep_api.py\n\nfrom fastapi.testclient import TestClient\nfrom app.main import app\nimport pytest\nfrom unittest.mock import patch\n\nclient = TestClient(app)\n\n@pytest.fixture\ndef mock_content_prep_agent():\n    with patch('app.routes.content_prep.ContentPrepAgent') as mock:\n        yield mock\n\ndef test_analyze_endpoint(mock_content_prep_agent):\n    \"\"\"Test the analyze endpoint\"\"\"\n    # Mock agent response\n    mock_instance = mock_content_prep_agent.return_value\n    mock_instance.detect_content_sets.return_value = ([], [])\n    \n    # Test API\n    response = client.post(\n        \"/api/content-prep/analyze\",\n        json={\"b2_folder\": \"pending/test/\", \"detection_mode\": \"auto\"}\n    )\n    \n    # Verify response\n    assert response.status_code == 200\n    assert \"content_sets\" in response.json()\n    assert \"standalone_files\" in response.json()\n    \n    # Verify agent was called correctly\n    mock_instance.detect_content_sets.assert_called_once()\n\ndef test_manifest_endpoint(mock_content_prep_agent):\n    \"\"\"Test the manifest endpoint\"\"\"\n    # Mock agent response\n    mock_instance = mock_content_prep_agent.return_value\n    mock_instance.generate_manifest.return_value = {\n        \"content_set_id\": \"test-id\",\n        \"ordered_files\": [],\n        \"total_files\": 0,\n        \"estimated_processing_time\": 0,\n        \"warnings\": [],\n        \"context\": {}\n    }\n    \n    # Test API\n    response = client.post(\n        \"/api/content-prep/manifest\",\n        json={\"content_set_id\": \"test-id\", \"proceed_incomplete\": True}\n    )\n    \n    # Verify response\n    assert response.status_code == 200\n    assert \"content_set_id\" in response.json()\n    assert \"ordered_files\" in response.json()\n    \n    # Verify agent was called correctly\n    mock_instance.generate_manifest.assert_called_once()\n```",
+        "testStrategy": "1. Run unit tests for each component\n2. Run integration tests with mocked dependencies\n3. Run performance benchmarks with large file sets\n4. Test with various file naming patterns\n5. Test error handling and edge cases\n6. Verify test coverage meets targets (>90%)\n7. Run tests in CI/CD pipeline",
+        "priority": "medium",
+        "dependencies": [
+          "122",
+          "124",
+          "125",
+          "126",
+          "127",
+          "128",
+          "129",
+          "130"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-13T21:30:07.791Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-12T03:12:51.430Z",
-      "taskCount": 21,
-      "completedCount": 21,
+      "lastModified": "2026-01-13T21:30:07.793Z",
+      "taskCount": 31,
+      "completedCount": 31,
       "tags": [
         "v7_3_features"
       ]

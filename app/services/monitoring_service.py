@@ -165,6 +165,90 @@ QUEUE_LATENCY = Histogram(
     buckets=[1.0, 5.0, 10.0, 30.0, 60.0, 300.0, 600.0]
 )
 
+# ============================================================================
+# Content Prep Agent Metrics (Feature 007 / Task 130)
+# ============================================================================
+
+# Counters for content set operations
+CONTENT_SETS_CREATED = Counter(
+    'empire_content_sets_created_total',
+    'Number of content sets created',
+    ['detection_mode']  # auto, pattern, metadata, llm
+)
+
+CONTENT_SETS_PROCESSED = Counter(
+    'empire_content_sets_processed_total',
+    'Number of content sets processed',
+    ['status']  # success, failed, incomplete
+)
+
+CONTENT_SETS_DELETED = Counter(
+    'empire_content_sets_deleted_total',
+    'Number of content sets deleted by retention policy',
+    ['reason']  # retention_policy, manual, error
+)
+
+# Gauges for current state
+CONTENT_SETS_PENDING = Gauge(
+    'empire_content_sets_pending',
+    'Number of pending content sets'
+)
+
+CONTENT_SETS_PROCESSING = Gauge(
+    'empire_content_sets_processing',
+    'Number of content sets currently processing'
+)
+
+CONTENT_SETS_COMPLETE = Gauge(
+    'empire_content_sets_complete',
+    'Number of completed content sets'
+)
+
+# Content set processing metrics
+CONTENT_SET_FILES = Histogram(
+    'empire_content_set_files_count',
+    'Number of files per content set',
+    buckets=[1, 5, 10, 20, 50, 100, 200, 500]
+)
+
+CONTENT_SET_PROCESSING_DURATION = Histogram(
+    'empire_content_set_processing_duration_seconds',
+    'Content set processing duration',
+    ['content_type'],  # course, documentation, book, standalone
+    buckets=[10, 30, 60, 120, 300, 600, 1800, 3600]
+)
+
+# Ordering confidence metrics
+ORDERING_CONFIDENCE = Histogram(
+    'empire_content_set_ordering_confidence',
+    'Ordering confidence score for content sets',
+    buckets=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+)
+
+CLARIFICATION_REQUESTS = Counter(
+    'empire_content_set_clarification_requests_total',
+    'Number of clarification requests sent to users',
+    ['clarification_type', 'outcome']  # ordering, content_type; answered, timeout, cancelled
+)
+
+# Retention cleanup metrics
+RETENTION_CLEANUP_RUNS = Counter(
+    'empire_content_set_cleanup_runs_total',
+    'Number of retention cleanup task runs',
+    ['status']  # success, error
+)
+
+RETENTION_CLEANUP_DELETED = Counter(
+    'empire_content_set_cleanup_deleted_total',
+    'Number of content sets deleted during cleanup'
+)
+
+RETENTION_CLEANUP_DURATION = Histogram(
+    'empire_content_set_cleanup_duration_seconds',
+    'Retention cleanup task duration',
+    buckets=[1, 5, 10, 30, 60, 120, 300]
+)
+
 
 # ============================================================================
 # Metrics Data Classes

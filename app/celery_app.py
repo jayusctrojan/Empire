@@ -71,7 +71,8 @@ celery_app = Celery(
         'app.tasks.embedding_generation',
         'app.tasks.graph_sync',
         'app.tasks.crewai_workflows',
-        'app.tasks.source_processing'  # Task 61: Project source processing
+        'app.tasks.source_processing',  # Task 61: Project source processing
+        'app.tasks.content_prep_tasks'  # Feature 007: Content Prep Agent
     ]
 )
 
@@ -99,12 +100,14 @@ celery_app.conf.update(
 
     # Task routing - default queues by task type
     # Task 69: Added project sources queue with priority support
+    # Feature 007: Added content_prep queue for content set processing
     task_routes={
         'app.tasks.document_processing.*': {'queue': 'documents'},
         'app.tasks.embedding_generation.*': {'queue': 'embeddings'},
         'app.tasks.graph_sync.*': {'queue': 'graph'},
         'app.tasks.crewai_workflows.*': {'queue': 'crewai'},
         'app.tasks.source_processing.*': {'queue': 'project_sources'},  # Task 69: Dedicated queue
+        'app.tasks.content_prep_tasks.*': {'queue': 'content_prep'},  # Feature 007: Content Prep Agent
         'app.tasks.send_to_dead_letter_queue': {'queue': 'dead_letter'},
         'app.tasks.inspect_dead_letter_queue': {'queue': 'dead_letter'},
         'app.tasks.retry_from_dead_letter_queue': {'queue': 'dead_letter'}
@@ -114,6 +117,24 @@ celery_app.conf.update(
     task_default_exchange='default',
     task_default_routing_key='default',
     task_default_priority=5,  # Default priority (middle of 0-9 scale)
+
+    # Celery Beat schedule for periodic tasks
+    beat_schedule={
+        # Feature 007 / Task 130: Content Set Retention Cleanup
+        # Run daily at 3:00 AM UTC to clean up content sets older than 90 days
+        'cleanup-content-sets-daily': {
+            'task': 'app.tasks.content_prep_tasks.cleanup_old_content_sets',
+            'schedule': 86400,  # Run every 24 hours (in seconds)
+            # For crontab scheduling, use: 'schedule': crontab(hour=3, minute=0)
+            'options': {
+                'queue': 'content_prep',
+                'priority': 1,  # Background priority (low, 0-9 scale)
+            },
+            'kwargs': {
+                'retention_days': 90,
+            },
+        },
+    },
 )
 
 # Priority levels (0-9 scale, 9 is highest)
