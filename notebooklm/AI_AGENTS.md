@@ -8,7 +8,7 @@
 
 ## Overview
 
-Empire v7.3 features a **15-agent AI system** where all agents are powered by **Claude Sonnet 4.5** via Anthropic's cloud API. This is NOT local processing - all AI reasoning happens through Anthropic's API.
+Empire v7.3 features a **17-agent AI system** where all agents are powered by **Claude Sonnet 4.5** via Anthropic's cloud API. This is NOT local processing - all AI reasoning happens through Anthropic's API.
 
 ---
 
@@ -37,6 +37,13 @@ Empire v7.3 features a **15-agent AI system** where all agents are powered by **
 | **AGENT-013** | Analysis Agent | Pattern detection, statistical analysis, correlation identification |
 | **AGENT-014** | Writing Agent | Report generation, multi-format output, citation formatting |
 | **AGENT-015** | Review Agent | Quality assurance, fact verification, revision recommendations |
+
+### Content Preparation & Knowledge Graph
+
+| Agent ID | Name | Purpose |
+|----------|------|---------|
+| **AGENT-016** | Content Prep Agent | Content set detection, file grouping, preparation workflows |
+| **AGENT-017** | Graph Agent | Customer 360 views, document structure navigation, graph-enhanced RAG |
 
 ---
 
@@ -167,8 +174,10 @@ AGENT-008 classifies content into these departments:
 1. **ALL AI processing uses Claude Sonnet 4.5** via Anthropic's cloud API
 2. **No local LLM inference** - agents make API calls to Anthropic
 3. **Cost is usage-based** - pay per token through Anthropic API
-4. **15 specialized agents** for different document processing tasks
+4. **17 specialized agents** for different document processing tasks
 5. **Multi-agent workflows** coordinate multiple agents for complex analysis
+6. **Graph Agent (AGENT-017)** provides Customer 360 views and graph-enhanced RAG
+7. **Content Prep Agent (AGENT-016)** handles content set detection and file grouping
 
 ---
 

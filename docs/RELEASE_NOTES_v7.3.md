@@ -8,13 +8,13 @@
 
 ## Overview
 
-Empire v7.3 is a major release featuring a comprehensive 15-agent AI system, real-time WebSocket processing, multi-agent orchestration with CrewAI and LangGraph, and significant infrastructure improvements including security hardening, monitoring, and performance optimizations.
+Empire v7.3 is a major release featuring a comprehensive 17-agent AI system, real-time WebSocket processing, multi-agent orchestration with CrewAI and LangGraph, and significant infrastructure improvements including security hardening, monitoring, and performance optimizations.
 
 ---
 
 ## Highlights
 
-- **15 AI Agents** for document analysis, content summarization, department classification, and multi-agent orchestration
+- **17 AI Agents** for document analysis, content summarization, department classification, multi-agent orchestration, content preparation, and knowledge graph operations
 - **26 API Routes** across summarizer, classifier, document analysis, and orchestration endpoints
 - **Real-time WebSocket** processing status updates with Redis Pub/Sub
 - **Multi-Agent Workflows** using CrewAI and LangGraph with intelligent routing
