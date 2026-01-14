@@ -40,10 +40,11 @@ def mock_supabase():
 @pytest.fixture
 def mock_monitoring_metrics():
     """Mock monitoring metrics."""
-    with patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_RUNS') as runs, \
-         patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DELETED') as deleted, \
-         patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DURATION') as duration, \
-         patch('app.tasks.content_prep_tasks.CONTENT_SETS_DELETED') as sets_deleted:
+    # Patch at the source module since tasks use lazy imports
+    with patch('app.services.monitoring_service.RETENTION_CLEANUP_RUNS') as runs, \
+         patch('app.services.monitoring_service.RETENTION_CLEANUP_DELETED') as deleted, \
+         patch('app.services.monitoring_service.RETENTION_CLEANUP_DURATION') as duration, \
+         patch('app.services.monitoring_service.CONTENT_SETS_DELETED') as sets_deleted:
         yield {
             'runs': runs,
             'deleted': deleted,
