@@ -19,7 +19,10 @@ from uuid import uuid4
 @pytest.fixture
 def mock_content_prep_agent():
     """Mock ContentPrepAgent for API tests."""
-    with patch('app.routes.content_prep.ContentPrepAgent') as MockAgent:
+    # Patch at multiple levels to ensure the mock is used
+    with patch('app.routes.content_prep.ContentPrepAgent') as MockAgent, \
+         patch('app.services.content_prep_agent.get_supabase_client'), \
+         patch('app.services.content_prep_agent.B2StorageService'):
         agent_instance = MagicMock()
         MockAgent.return_value = agent_instance
         yield agent_instance
@@ -101,9 +104,9 @@ def sample_manifest():
         "content_set_id": str(uuid4()),
         "content_set_name": "Test Course",
         "ordered_files": [
-            {"sequence": 1, "file": "01-intro.pdf", "dependencies": []},
-            {"sequence": 2, "file": "02-basics.pdf", "dependencies": ["01-intro.pdf"]},
-            {"sequence": 3, "file": "03-advanced.pdf", "dependencies": ["02-basics.pdf"]},
+            {"sequence": 1, "file": "01-intro.pdf", "b2_path": "courses/01-intro.pdf", "dependencies": []},
+            {"sequence": 2, "file": "02-basics.pdf", "b2_path": "courses/02-basics.pdf", "dependencies": ["01-intro.pdf"]},
+            {"sequence": 3, "file": "03-advanced.pdf", "b2_path": "courses/03-advanced.pdf", "dependencies": ["02-basics.pdf"]},
         ],
         "total_files": 3,
         "warnings": [],
@@ -624,7 +627,7 @@ class TestCleanupEndpoints:
 
     def test_trigger_cleanup_async(self, client):
         """Test triggering async cleanup."""
-        with patch('app.routes.content_prep.cleanup_old_content_sets') as mock_task:
+        with patch('app.tasks.content_prep_tasks.cleanup_old_content_sets') as mock_task:
             mock_result = MagicMock()
             mock_result.id = "task-123"
             mock_task.apply_async.return_value = mock_result
@@ -644,7 +647,7 @@ class TestCleanupEndpoints:
 
     def test_trigger_cleanup_sync(self, client):
         """Test triggering synchronous cleanup."""
-        with patch('app.routes.content_prep.cleanup_old_content_sets') as mock_task:
+        with patch('app.tasks.content_prep_tasks.cleanup_old_content_sets') as mock_task:
             mock_task.return_value = {
                 "status": "success",
                 "deleted_count": 5,
