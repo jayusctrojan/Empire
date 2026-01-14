@@ -234,10 +234,13 @@ class TestGetCustomer360:
     @pytest.mark.asyncio
     async def test_get_customer_360_no_query_or_id(self, service):
         """Test error when neither query nor ID provided."""
-        request = Customer360Request()
+        from pydantic import ValidationError
 
-        with pytest.raises(CustomerNotFoundError):
-            await service.get_customer_360(request)
+        with pytest.raises(ValidationError) as exc_info:
+            Customer360Request()
+
+        # Verify the validation error message
+        assert "Either 'query' or 'customer_id' must be provided" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_get_customer_360_cache_hit(self, service, mock_customer_360_response):
