@@ -80,7 +80,7 @@ async def create_course(course_data: dict):
 
 ## 🤖 v7.3 AI AGENT SYSTEM (Tasks 42-46 - COMPLETED)
 
-Empire v7.3 includes a comprehensive **15-agent AI system** powered by Claude Sonnet 4.5 for document analysis, content summarization, department classification, and multi-agent orchestration.
+Empire v7.3 includes a comprehensive **17-agent AI system** powered by Claude Sonnet 4.5 for document analysis, content summarization, department classification, multi-agent orchestration, content preparation, and knowledge graph operations.
 
 ### Agent Registry
 
@@ -95,6 +95,8 @@ Empire v7.3 includes a comprehensive **15-agent AI system** powered by Claude So
 | **AGENT-013** | Analysis Agent | Pattern detection, statistical analysis, correlations | Task 46 |
 | **AGENT-014** | Writing Agent | Report generation, multi-format output, citations | Task 46 |
 | **AGENT-015** | Review Agent | Quality assurance, fact verification, revision loop | Task 46 |
+| **AGENT-016** | Content Prep Agent | Content set detection, file grouping, preparation workflows | Task 139 |
+| **AGENT-017** | Graph Agent | Customer 360, document structure, graph-enhanced RAG | Task 102-111 |
 
 ### API Endpoints
 
