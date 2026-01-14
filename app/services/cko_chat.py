@@ -19,7 +19,7 @@ from typing import Optional, Dict, Any, List
 from uuid import uuid4
 import structlog
 
-from app.services.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 
 logger = structlog.get_logger(__name__)
 
