@@ -968,7 +968,7 @@ class TestWritingAgentRevision:
     @pytest.fixture
     def writing_agent(self, mock_anthropic_client):
         """Create WritingAgent with mocked client"""
-        with patch('app.services.multi_agent_orchestration.Anthropic', return_value=mock_anthropic_client):
+        with patch('app.services.multi_agent_orchestration.ResilientAnthropicClient', return_value=mock_anthropic_client):
             agent = WritingAgent()
             agent.llm = mock_anthropic_client
             return agent

@@ -1,13 +1,13 @@
 """
 Empire v7.3 - Row-Level Security (RLS) Context Middleware
-Task 41.2: Database-Level Data Isolation
+Task 41.2 + Task 151: Database-Level Data Isolation
 
 Sets PostgreSQL session variables for RLS policy enforcement.
 This ensures that database-level policies can enforce user data isolation.
 
 How it works:
 1. After authentication succeeds, this middleware extracts user_id and role
-2. Sets PostgreSQL session variables: app.current_user_id, app.user_role
+2. Sets PostgreSQL session variables: app.current_user_id, app.user_role, app.request_id
 3. RLS policies in the database use these variables to filter queries
 4. Ensures data isolation even if application-level security is bypassed
 
@@ -15,18 +15,35 @@ Security Benefits:
 - Defense in depth: Database enforces isolation independently
 - SQL injection mitigation: Attackers cannot access other users' data
 - Compliance: GDPR, HIPAA, SOC 2 enforced at database level
+
+Error Handling (Task 151 - Security-first approach):
+- Connection failure: Reject request with 503 Service Unavailable
+- Invalid user_id: Reject request with 401 Unauthorized
+- Missing user context: Reject request with 401 Unauthorized
 """
 
-from fastapi import Request, Response
+from fastapi import Request, Response, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Callable
+from starlette.responses import JSONResponse
+from typing import Callable, Optional
 import structlog
 import os
+import uuid
 
 from app.services.rbac_service import get_rbac_service
-from app.services.supabase_storage import get_supabase_storage
+from app.core.database import db_manager
 
 logger = structlog.get_logger(__name__)
+
+
+class RLSContextError(Exception):
+    """Exception raised when RLS context cannot be set"""
+
+    def __init__(self, message: str, user_id: str = None, role: str = None):
+        super().__init__(message)
+        self.message = message
+        self.user_id = user_id
+        self.role = role
 
 
 class RLSContextMiddleware(BaseHTTPMiddleware):
@@ -102,38 +119,73 @@ class RLSContextMiddleware(BaseHTTPMiddleware):
                         path=request.url.path
                     )
 
+        # Generate unique request ID for tracing
+        request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
+
         # Set PostgreSQL session variables if user is authenticated
         if user_id:
             try:
-                await self._set_rls_context(user_id, user_role)
+                await self._set_rls_context(user_id, user_role, request_id)
 
                 logger.debug(
                     "rls_context_set",
                     user_id=user_id,
                     role=user_role,
+                    request_id=request_id,
                     path=request.url.path
                 )
-            except Exception as e:
+            except RLSContextError as e:
+                # Security-first: Reject request if RLS context cannot be set
                 logger.error(
-                    "rls_context_set_failed",
+                    "rls_context_set_failed_rejecting",
                     error=str(e),
                     user_id=user_id,
+                    request_id=request_id,
                     path=request.url.path
                 )
-                # Continue even if RLS context fails - application security still applies
-        else:
-            # For unauthenticated requests, set guest context
-            try:
-                await self._set_rls_context("anonymous", "guest")
-                logger.debug(
-                    "rls_context_set_anonymous",
-                    path=request.url.path
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "error": "service_unavailable",
+                        "message": "Database security context could not be established",
+                        "request_id": request_id
+                    }
                 )
             except Exception as e:
-                logger.debug(
-                    "rls_context_set_anonymous_failed",
+                # Unexpected error - also reject for security
+                logger.error(
+                    "rls_context_unexpected_error",
                     error=str(e),
+                    error_type=type(e).__name__,
+                    user_id=user_id,
+                    request_id=request_id,
                     path=request.url.path
+                )
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "error": "service_unavailable",
+                        "message": "Database security context could not be established",
+                        "request_id": request_id
+                    }
+                )
+        else:
+            # For unauthenticated API requests, require authentication
+            # (security-first approach - no anonymous access to API)
+            if request.url.path.startswith("/api/"):
+                logger.warning(
+                    "rls_context_no_user",
+                    path=request.url.path,
+                    request_id=request_id
+                )
+                return JSONResponse(
+                    status_code=401,
+                    content={
+                        "error": "unauthorized",
+                        "message": "Authentication required",
+                        "request_id": request_id
+                    }
                 )
 
         # Process the request
@@ -200,35 +252,61 @@ class RLSContextMiddleware(BaseHTTPMiddleware):
             logger.warning("get_user_role_failed", error=str(e), user_id=user_id)
             return "guest"
 
-    async def _set_rls_context(self, user_id: str, role: str):
+    async def _set_rls_context(self, user_id: str, role: str, request_id: str):
         """
         Set PostgreSQL session variables for RLS enforcement
 
-        This sets two session variables:
+        This sets three session variables:
         - app.current_user_id: Current user's ID
         - app.user_role: Current user's role (admin, editor, viewer, guest)
+        - app.request_id: Unique request identifier for tracing
 
         These variables are used by RLS policies to filter data.
 
         Args:
             user_id: User ID to set
             role: User role to set
+            request_id: Request ID for tracing
+
+        Raises:
+            RLSContextError: If setting context fails (will be caught by middleware)
         """
-        # For now, store in request state
-        # Full PostgreSQL session variable implementation requires direct DB connection
-        # This will be implemented when applying the RLS migration
+        try:
+            # Get Supabase client
+            supabase = db_manager.get_supabase()
 
-        # TODO: Implement actual PostgreSQL session variable setting
-        # Once RLS migration is applied, use:
-        # SELECT set_config('app.current_user_id', user_id, false);
-        # SELECT set_config('app.user_role', role, false);
+            # Call the set_rls_context RPC function
+            # This function must exist in the database (created by migration)
+            result = supabase.rpc(
+                "set_rls_context",
+                {
+                    "p_user_id": user_id,
+                    "p_role": role,
+                    "p_request_id": request_id
+                }
+            ).execute()
 
-        logger.debug(
-            "rls_context_prepared",
-            user_id=user_id,
-            role=role,
-            note="RLS context middleware ready - apply migration to enable database-level enforcement"
-        )
+            logger.info(
+                "rls_context_set",
+                user_id=user_id,
+                role=role,
+                request_id=request_id,
+                success=True
+            )
+
+            return True
+
+        except Exception as e:
+            # Log the error and re-raise for middleware to handle
+            logger.error(
+                "rls_context_set_failed",
+                user_id=user_id,
+                role=role,
+                request_id=request_id,
+                error=str(e),
+                error_type=type(e).__name__
+            )
+            raise RLSContextError(f"Failed to set RLS context: {str(e)}")
 
     async def _clear_rls_context(self):
         """
