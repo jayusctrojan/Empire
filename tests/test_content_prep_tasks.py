@@ -459,8 +459,8 @@ class TestCleanupOldContentSetsTask:
             mock_get.return_value = mock_client
 
             # Mock metrics
-            with patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_RUNS') as mock_runs, \
-                 patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DURATION') as mock_duration:
+            with patch('app.services.monitoring_service.RETENTION_CLEANUP_RUNS') as mock_runs, \
+                 patch('app.services.monitoring_service.RETENTION_CLEANUP_DURATION') as mock_duration:
 
                 result = cleanup_old_content_sets(retention_days=90)
 
@@ -482,10 +482,10 @@ class TestCleanupOldContentSetsTask:
             mock_get.return_value = mock_client
 
             # Mock metrics
-            with patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_RUNS'), \
-                 patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DELETED'), \
-                 patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DURATION'), \
-                 patch('app.tasks.content_prep_tasks.CONTENT_SETS_DELETED'):
+            with patch('app.services.monitoring_service.RETENTION_CLEANUP_RUNS'), \
+                 patch('app.services.monitoring_service.RETENTION_CLEANUP_DELETED'), \
+                 patch('app.services.monitoring_service.RETENTION_CLEANUP_DURATION'), \
+                 patch('app.services.monitoring_service.CONTENT_SETS_DELETED'):
 
                 result = cleanup_old_content_sets(retention_days=90)
 
@@ -505,8 +505,8 @@ class TestCleanupOldContentSetsTask:
             mock_client.table().select().eq().lt().execute.return_value = mock_result
             mock_get.return_value = mock_client
 
-            with patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_RUNS'), \
-                 patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DURATION'):
+            with patch('app.services.monitoring_service.RETENTION_CLEANUP_RUNS'), \
+                 patch('app.services.monitoring_service.RETENTION_CLEANUP_DURATION'):
 
                 result = cleanup_old_content_sets(retention_days=30)
 
@@ -521,8 +521,8 @@ class TestCleanupOldContentSetsTask:
             mock_client.table().select().eq().lt().execute.side_effect = Exception("DB error")
             mock_get.return_value = mock_client
 
-            with patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_RUNS') as mock_runs, \
-                 patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DURATION') as mock_duration:
+            with patch('app.services.monitoring_service.RETENTION_CLEANUP_RUNS') as mock_runs, \
+                 patch('app.services.monitoring_service.RETENTION_CLEANUP_DURATION') as mock_duration:
 
                 with pytest.raises(Exception, match="DB error"):
                     cleanup_old_content_sets(retention_days=90)
@@ -546,10 +546,10 @@ class TestCleanupOldContentSetsTask:
             mock_client.table().delete().eq().execute.return_value = MagicMock()
             mock_get.return_value = mock_client
 
-            with patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_RUNS'), \
-                 patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DELETED'), \
-                 patch('app.tasks.content_prep_tasks.RETENTION_CLEANUP_DURATION'), \
-                 patch('app.tasks.content_prep_tasks.CONTENT_SETS_DELETED'):
+            with patch('app.services.monitoring_service.RETENTION_CLEANUP_RUNS'), \
+                 patch('app.services.monitoring_service.RETENTION_CLEANUP_DELETED'), \
+                 patch('app.services.monitoring_service.RETENTION_CLEANUP_DURATION'), \
+                 patch('app.services.monitoring_service.CONTENT_SETS_DELETED'):
 
                 result = cleanup_old_content_sets(retention_days=90)
 
