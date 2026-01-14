@@ -717,9 +717,9 @@ class TestOrderingConfidence:
     def test_calculate_ordering_confidence_all_sequential(self, content_prep_agent):
         """Test confidence calculation with all sequential files."""
         files = [
-            ContentFile(b2_path="f1.pdf", filename="f1.pdf", sequence_number=1),
-            ContentFile(b2_path="f2.pdf", filename="f2.pdf", sequence_number=2),
-            ContentFile(b2_path="f3.pdf", filename="f3.pdf", sequence_number=3),
+            ContentFile(b2_path="f1.pdf", filename="f1.pdf", sequence_number=1, detection_pattern="numeric_prefix"),
+            ContentFile(b2_path="f2.pdf", filename="f2.pdf", sequence_number=2, detection_pattern="numeric_prefix"),
+            ContentFile(b2_path="f3.pdf", filename="f3.pdf", sequence_number=3, detection_pattern="numeric_prefix"),
         ]
         content_set = ContentSet(files=files)
 

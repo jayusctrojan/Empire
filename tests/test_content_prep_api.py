@@ -59,13 +59,15 @@ def sample_analyze_response():
                 "id": str(uuid4()),
                 "name": "Test Course",
                 "detection_method": "pattern",
-                "file_count": 5,
+                "files_count": 5,
                 "is_complete": True,
+                "missing_files": [],
+                "processing_status": "pending",
                 "confidence": 0.95,
             }
         ],
         "standalone_files": [
-            {"filename": "random.txt", "size": 1024}
+            {"filename": "random.txt", "path": "pending/random.txt", "size_bytes": 1024}
         ],
         "analysis_time_ms": 150,
     }
@@ -78,12 +80,13 @@ def sample_content_set():
         "id": str(uuid4()),
         "name": "Test Course",
         "detection_method": "pattern",
+        "files_count": 3,
         "is_complete": True,
         "missing_files": [],
         "files": [
-            {"filename": "01-intro.pdf", "sequence_number": 1},
-            {"filename": "02-basics.pdf", "sequence_number": 2},
-            {"filename": "03-advanced.pdf", "sequence_number": 3},
+            {"filename": "01-intro.pdf", "sequence": 1, "b2_path": "courses/01-intro.pdf"},
+            {"filename": "02-basics.pdf", "sequence": 2, "b2_path": "courses/02-basics.pdf"},
+            {"filename": "03-advanced.pdf", "sequence": 3, "b2_path": "courses/03-advanced.pdf"},
         ],
         "processing_status": "pending",
         "confidence": 0.95,
