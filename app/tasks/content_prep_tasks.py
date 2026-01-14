@@ -533,6 +533,7 @@ def cleanup_old_content_sets(
                 "status": "success",
                 "message": "No content sets to clean up",
                 "deleted_count": 0,
+                "retention_days": retention_days,
                 "duration_seconds": round(duration, 2)
             }
 

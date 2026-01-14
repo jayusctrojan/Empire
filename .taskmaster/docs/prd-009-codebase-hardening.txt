@@ -1,0 +1,667 @@
+# PRD: Empire v7.3 Codebase Hardening & Completion
+
+## Executive Summary
+
+This PRD addresses 11 critical and high-priority gaps identified in the Empire v7.3 codebase analysis. These improvements are essential before production deployment to ensure data security, system reliability, and code maintainability.
+
+---
+
+## Problem Statement
+
+The Empire codebase analysis revealed:
+- **Security gaps**: RLS not enforced at DB level, WebSocket auth missing
+- **Incomplete integrations**: Neo4j graph sync, LlamaIndex, B2 storage, CrewAI workflows
+- **Code quality issues**: 48+ bare exceptions, large monolithic files
+- **Reliability gaps**: No circuit breaker pattern for external services
+- **Testing gaps**: Only 45% coverage, 12+ untested services
+
+---
+
+## Goals
+
+1. **Security**: Enforce RLS at database level, secure WebSocket connections
+2. **Reliability**: Complete all integrations, add circuit breaker patterns
+3. **Maintainability**: Refactor large files, improve error handling
+4. **Quality**: Increase test coverage from 45% to 75%
+
+---
+
+## Feature Areas (11 Total)
+
+### Area 1: RLS Database Context Implementation
+**Priority**: CRITICAL
+**Files**: `app/middleware/rls_context.py`
+
+**Current State**:
+- RLS policies exist on 14 Supabase tables
+- Middleware exists but PostgreSQL session variables not set (TODO lines 89-90)
+- Data isolation not enforced at database layer
+
+**Requirements**:
+1. Implement `SET app.current_user_id = '<user_id>'` for each authenticated request
+2. Implement `SET app.current_role = '<role>'` for RBAC enforcement
+3. Add connection cleanup to reset session variables
+4. Add error handling for RLS context failures
+5. Add logging for RLS context operations
+6. Create tests for RLS enforcement
+
+**Technical Approach**:
+```python
+# In rls_context.py middleware
+async def set_rls_context(request: Request, user_id: str, role: str):
+    async with get_db_connection() as conn:
+        await conn.execute(f"SET app.current_user_id = '{user_id}'")
+        await conn.execute(f"SET app.current_role = '{role}'")
+```
+
+**Success Criteria**:
+- All database queries respect user_id context
+- Unauthorized cross-user data access blocked at DB level
+- Tests verify RLS enforcement
+
+---
+
+### Area 2: Neo4j Graph Sync Completion
+**Priority**: CRITICAL
+**Files**: `app/tasks/graph_sync.py`
+
+**Current State**:
+- 4 TODO markers for incomplete implementations
+- Document nodes not created in Neo4j
+- Entity extraction not working
+- Relationships not being populated
+- Knowledge graph is empty
+
+**Requirements**:
+1. Implement `create_document_node()` - Create Document nodes with metadata
+2. Implement `extract_entities()` - Extract named entities from documents using LLM
+3. Implement `create_entity_nodes()` - Create Entity nodes (Person, Organization, Location, etc.)
+4. Implement `create_relationships()` - Create MENTIONS, RELATED_TO, REFERENCES relationships
+5. Implement `update_graph_on_document_change()` - Handle document updates/deletes
+6. Add batch processing for large document sets
+7. Add error recovery and retry logic
+8. Create integration tests for graph sync
+
+**Entity Types**:
+- Person, Organization, Location, Date, Event
+- Product, Policy, Contract, Regulation
+- Custom types based on document content
+
+**Relationship Types**:
+- MENTIONS (Document -> Entity)
+- RELATED_TO (Entity -> Entity)
+- REFERENCES (Document -> Document)
+- AUTHORED_BY (Document -> Person)
+- BELONGS_TO (Entity -> Organization)
+
+**Success Criteria**:
+- Documents processed create corresponding graph nodes
+- Entities extracted and linked to documents
+- Graph queries return meaningful results
+- Sync handles 1000+ documents without timeout
+
+---
+
+### Area 3: Exception Handling Overhaul
+**Priority**: CRITICAL
+**Files**: Multiple (48+ locations)
+
+**Current State**:
+- 48+ bare `except:` or `except Exception:` blocks
+- 13 instances of `except: pass` (silent swallowing)
+- No error differentiation or context logging
+- Generic error messages like "Task execution failed"
+
+**Requirements**:
+1. Replace all bare exceptions with specific exception types
+2. Add structured error logging with context (user_id, request_id, operation)
+3. Create custom exception hierarchy for Empire:
+   - `EmpireBaseException`
+   - `DatabaseException` (Supabase, Neo4j errors)
+   - `ExternalServiceException` (Arcade, CrewAI, LlamaIndex)
+   - `ValidationException` (Input validation failures)
+   - `AuthenticationException` (Auth failures)
+   - `RateLimitException` (Rate limit exceeded)
+4. Remove all `except: pass` blocks - log or handle properly
+5. Add error codes for client-facing errors
+6. Create error handling decorators for common patterns
+7. Add tests for error scenarios
+
+**Files to Fix** (Priority Order):
+1. `app/tasks/research_tasks.py` - 12 bare exceptions
+2. `app/services/document_management.py` - 8 bare exceptions
+3. `app/services/classification_service.py` - 6 bare exceptions
+4. `app/tasks/document_processing.py` - 5 bare exceptions
+5. `app/tasks/graph_sync.py` - 4 bare exceptions
+6. Remaining 13+ files
+
+**Success Criteria**:
+- Zero bare `except:` or `except: pass` blocks
+- All exceptions logged with context
+- Custom exception hierarchy implemented
+- Error decorators reduce code duplication
+
+---
+
+### Area 4: Research Task Completion
+**Priority**: CRITICAL
+**Files**: `app/tasks/research_tasks.py`
+
+**Current State**:
+- `_generate_placeholder_report()` returns placeholder text
+- CrewAI routing is stub only
+- Direct RAG pipeline is stub only
+- Report generation not functional
+
+**Requirements**:
+1. Implement actual report generation using Claude/CrewAI
+2. Complete CrewAI workflow routing
+3. Complete direct RAG pipeline for simple queries
+4. Implement report templates (Executive Summary, Detailed Analysis, Research Brief)
+5. Add report formatting (Markdown, PDF export ready)
+6. Add citation and source tracking in reports
+7. Implement report caching to avoid regeneration
+8. Add progress tracking for long-running reports
+9. Create tests for report generation
+
+**Report Structure**:
+```markdown
+# Research Report: {topic}
+
+## Executive Summary
+{key_findings}
+
+## Detailed Analysis
+{section_by_section_analysis}
+
+## Sources
+{citations_with_confidence}
+
+## Methodology
+{how_research_was_conducted}
+
+## Confidence Score: {0-100}%
+```
+
+**Success Criteria**:
+- Reports contain actual researched content
+- Citations link to source documents
+- Reports generated within 60 seconds for standard queries
+- PDF export functional
+
+---
+
+### Area 5: WebSocket Authentication
+**Priority**: CRITICAL
+**Files**: `app/routes/research_projects.py`
+
+**Current State**:
+- TODO at line 89: "Implement proper WebSocket authentication"
+- WebSocket connections not validated
+- Any client can connect to WebSocket endpoints
+
+**Requirements**:
+1. Add JWT validation in WebSocket handshake
+2. Extract user_id and role from token
+3. Reject connections with invalid/expired tokens
+4. Add connection tracking per user
+5. Implement connection limits per user (max 5 concurrent)
+6. Add heartbeat/ping-pong for connection health
+7. Graceful handling of token expiration mid-session
+8. Add WebSocket-specific rate limiting
+9. Create tests for WebSocket auth
+
+**Implementation**:
+```python
+@router.websocket("/ws/{project_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    project_id: str,
+    token: str = Query(...)
+):
+    # Validate JWT token
+    user = await validate_websocket_token(token)
+    if not user:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    # Check connection limits
+    if await get_user_connection_count(user.id) >= 5:
+        await websocket.close(code=4002, reason="Connection limit exceeded")
+        return
+
+    await websocket.accept()
+    # ... handle messages
+```
+
+**Success Criteria**:
+- Invalid tokens rejected immediately
+- User context available in WebSocket handlers
+- Connection limits enforced
+- Graceful handling of expired tokens
+
+---
+
+### Area 6: LlamaIndex Integration Completion
+**Priority**: HIGH
+**Files**: `app/tasks/document_processing.py`
+
+**Current State**:
+- TODO at line 134: LlamaIndex service integration incomplete
+- Document parsing returns placeholder
+- Course classifier is stub
+- Metadata extraction returns "placeholder - implementation pending"
+
+**Requirements**:
+1. Complete LlamaIndex service integration for document parsing
+2. Implement PDF, DOCX, TXT, MD parsing
+3. Implement chunking with configurable strategies
+4. Implement metadata extraction (title, author, date, keywords)
+5. Implement course/content classification
+6. Add document validation (file type, size, content safety)
+7. Add progress callbacks for large documents
+8. Implement retry logic for parsing failures
+9. Create tests for document processing
+
+**Supported Formats**:
+- PDF (via LlamaParse)
+- DOCX, DOC (via python-docx)
+- TXT, MD (direct parsing)
+- PPTX (slide extraction)
+- XLSX (table extraction)
+
+**Success Criteria**:
+- All supported formats parse correctly
+- Metadata extracted accurately
+- Chunking produces semantic units
+- Large documents (100+ pages) process within 5 minutes
+
+---
+
+### Area 7: B2 Storage Implementation
+**Priority**: HIGH
+**Files**: `app/services/document_management.py`, `app/services/b2_storage.py`, `app/services/b2_workflow.py`
+
+**Current State**:
+- Upload operation is placeholder (line 172)
+- Delete operation is placeholder (line 268)
+- File verification incomplete
+- No error handling for B2 failures
+
+**Requirements**:
+1. Implement file upload to B2 with progress tracking
+2. Implement file deletion with cleanup
+3. Implement file download with streaming
+4. Add file verification (hash check after upload)
+5. Implement presigned URLs for secure downloads
+6. Add retry logic with exponential backoff
+7. Implement multipart upload for large files (>100MB)
+8. Add storage quota tracking
+9. Create tests for B2 operations
+
+**B2 Folder Structure**:
+```
+empire/
+├── documents/{user_id}/{document_id}/
+│   ├── original/
+│   └── processed/
+├── reports/{user_id}/{report_id}/
+├── crewai/assets/{department}/{type}/
+└── temp/
+```
+
+**Success Criteria**:
+- Files upload reliably with retry
+- Large files (1GB+) handled via multipart
+- Presigned URLs expire correctly
+- Storage quota enforced
+
+---
+
+### Area 8: CrewAI Workflow Completion
+**Priority**: HIGH
+**Files**: `app/tasks/crewai_workflows.py`, `app/services/async_crew_execution.py`
+
+**Current State**:
+- Asset storage implemented but workflows incomplete
+- Multi-agent task handling incomplete
+- Error handling missing for crew failures
+- No fallback when agents fail
+
+**Requirements**:
+1. Complete multi-agent task orchestration
+2. Implement proper task routing to crews
+3. Add agent failure handling and retry
+4. Implement fallback to single-agent mode
+5. Add progress tracking for crew executions
+6. Implement result aggregation from multiple agents
+7. Add timeout handling for long-running crews
+8. Implement crew execution caching
+9. Create tests for crew workflows
+
+**Crew Types**:
+- Research Crew (Researcher, Analyst, Writer)
+- Document Analysis Crew (Parser, Extractor, Summarizer)
+- Content Review Crew (Reviewer, Fact-Checker, Editor)
+
+**Success Criteria**:
+- Crews execute end-to-end without errors
+- Agent failures handled gracefully
+- Results aggregated correctly
+- Execution time within SLA (5 min for standard tasks)
+
+---
+
+### Area 9: Circuit Breaker Pattern Implementation
+**Priority**: HIGH
+**Files**: New file `app/core/circuit_breaker.py`, updates to service files
+
+**Current State**:
+- No circuit breaker pattern
+- External service failures cascade
+- No fallback when Arcade, CrewAI, LlamaIndex fail
+- No automatic recovery
+
+**Requirements**:
+1. Implement circuit breaker with three states (Closed, Open, Half-Open)
+2. Configure thresholds per service:
+   - Failure threshold: 5 failures in 60 seconds
+   - Recovery timeout: 30 seconds
+   - Half-open max requests: 3
+3. Add fallback handlers for each external service
+4. Implement health check probes
+5. Add circuit breaker metrics (state changes, failures, recoveries)
+6. Integrate with Prometheus for monitoring
+7. Add manual override for circuit state
+8. Create tests for circuit breaker behavior
+
+**Services to Protect**:
+- Arcade.dev (external tools)
+- CrewAI service
+- LlamaIndex service
+- Ollama embeddings
+- Neo4j graph queries
+- Supabase (optional, for graceful degradation)
+
+**Fallback Strategies**:
+- Arcade → Local tool implementations
+- CrewAI → Single-agent Claude
+- LlamaIndex → Simple text extraction
+- Ollama → Cached embeddings or API embeddings
+- Neo4j → Skip graph enhancement, use vector-only
+
+**Success Criteria**:
+- Circuit opens after threshold failures
+- Fallback activates when circuit open
+- Automatic recovery when service healthy
+- Metrics visible in Prometheus/Grafana
+
+---
+
+### Area 10: Large File Refactoring
+**Priority**: HIGH
+**Files**:
+- `app/services/multi_agent_orchestration.py` (2,224 lines)
+- `app/services/content_summarizer_agent.py` (1,508 lines)
+- `app/services/document_analysis_agents.py` (1,285 lines)
+- `app/services/chunking_service.py` (1,475 lines)
+
+**Current State**:
+- Files exceed 1000+ lines
+- Multiple responsibilities mixed
+- High cyclomatic complexity
+- Difficult to test and maintain
+
+**Requirements**:
+1. Break `multi_agent_orchestration.py` into:
+   - `orchestration/coordinator.py` - Main orchestration logic
+   - `orchestration/agents/research.py` - Research agent
+   - `orchestration/agents/analysis.py` - Analysis agent
+   - `orchestration/agents/writing.py` - Writing agent
+   - `orchestration/agents/review.py` - Review agent
+   - `orchestration/utils.py` - Shared utilities
+
+2. Break `content_summarizer_agent.py` into:
+   - `summarizer/agent.py` - Core summarizer logic
+   - `summarizer/formatters.py` - Output formatters
+   - `summarizer/extractors.py` - Key point extraction
+   - `summarizer/templates.py` - Summary templates
+
+3. Break `document_analysis_agents.py` into:
+   - `analysis/research_analyst.py` - AGENT-009
+   - `analysis/content_strategist.py` - AGENT-010
+   - `analysis/fact_checker.py` - AGENT-011
+   - `analysis/base.py` - Shared base class
+
+4. Break `chunking_service.py` into:
+   - `chunking/strategies/sentence.py` - Sentence splitter
+   - `chunking/strategies/markdown.py` - Markdown chunker
+   - `chunking/strategies/semantic.py` - Semantic chunker
+   - `chunking/validator.py` - Chunk validation
+   - `chunking/service.py` - Main service interface
+
+5. Maintain backward compatibility with existing imports
+6. Add deprecation warnings for old import paths
+7. Update all import statements across codebase
+8. Create tests for refactored modules
+
+**Success Criteria**:
+- No file exceeds 500 lines
+- Each module has single responsibility
+- All existing tests pass
+- Import compatibility maintained
+
+---
+
+### Area 11: Test Coverage Improvement
+**Priority**: HIGH
+**Target**: Increase from 45% to 75% coverage
+
+**Current State**:
+- 118 test files, 2,924 test functions
+- 12+ services completely untested
+- Neo4j and B2 modules have <10% coverage
+- No E2E tests
+
+**Untested Services** (Priority Order):
+1. `adaptive_retrieval_service.py` - New RAG service
+2. `agent_selector_service.py` - New RAG service
+3. `answer_grounding_evaluator.py` - New RAG service
+4. `quality_gate_service.py` - New RAG service
+5. `mountain_duck_poller.py` - File sync
+6. `async_crew_execution.py` - CrewAI execution
+7. `cypher_generation_service.py` - Neo4j queries
+8. `url_processing.py` - URL handling
+9. `virus_scanner.py` - Security
+10. `audio_video_processor.py` - Media processing
+11. `concurrent_execution.py` - Task execution
+12. `ab_testing_service.py` - A/B testing
+
+**Requirements**:
+1. Add unit tests for all 12 untested services
+2. Add integration tests for:
+   - Neo4j graph operations
+   - B2 storage operations
+   - CrewAI workflow execution
+   - Research project lifecycle
+3. Add E2E tests for critical user flows:
+   - Document upload → processing → query
+   - Research project creation → execution → report
+   - User registration → authentication → API access
+4. Add performance benchmarks for:
+   - Query response time (<2s target)
+   - Document processing time
+   - Graph sync time
+5. Add security tests:
+   - Authentication bypass attempts
+   - RLS enforcement verification
+   - Input validation (fuzzing)
+6. Configure coverage reporting in CI
+7. Add coverage gates (fail if below 70%)
+
+**Test Structure**:
+```
+tests/
+├── unit/
+│   ├── services/
+│   ├── routes/
+│   ├── models/
+│   └── middleware/
+├── integration/
+│   ├── neo4j/
+│   ├── supabase/
+│   ├── b2/
+│   └── crewai/
+├── e2e/
+│   ├── document_flow/
+│   ├── research_flow/
+│   └── auth_flow/
+├── performance/
+│   └── benchmarks/
+└── security/
+    └── fuzzing/
+```
+
+**Success Criteria**:
+- Overall coverage ≥75%
+- All critical paths covered
+- CI fails on coverage regression
+- Performance benchmarks establish baselines
+
+---
+
+## Implementation Order
+
+### Phase 1: Security Critical (Week 1)
+1. Area 1: RLS Database Context
+2. Area 5: WebSocket Authentication
+3. Area 3: Exception Handling (security-related files first)
+
+### Phase 2: Core Functionality (Week 2)
+4. Area 2: Neo4j Graph Sync
+5. Area 4: Research Task Completion
+6. Area 6: LlamaIndex Integration
+
+### Phase 3: Infrastructure (Week 3)
+7. Area 7: B2 Storage Implementation
+8. Area 8: CrewAI Workflow Completion
+9. Area 9: Circuit Breaker Pattern
+
+### Phase 4: Quality (Week 4)
+10. Area 10: Large File Refactoring
+11. Area 11: Test Coverage Improvement
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Security Score | 80/100 | 95/100 |
+| Code Quality Score | 72/100 | 85/100 |
+| Integration Score | 65/100 | 90/100 |
+| Test Coverage | 45% | 75% |
+| Bare Exceptions | 48 | 0 |
+| Files >1000 lines | 4 | 0 |
+
+---
+
+## Dependencies
+
+- Existing Supabase RLS policies (Area 1)
+- Neo4j database running (Area 2)
+- LlamaIndex service on Render (Area 6)
+- B2 bucket configured (Area 7)
+- CrewAI service on Render (Area 8)
+
+---
+
+## Risks and Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| RLS changes break existing queries | HIGH | Thorough testing, staged rollout |
+| Graph sync impacts performance | MEDIUM | Batch processing, async execution |
+| Refactoring breaks imports | MEDIUM | Backward-compatible aliases |
+| Test coverage slows CI | LOW | Parallel test execution |
+
+---
+
+## File Changes Summary
+
+| Area | Files Modified | Files Created |
+|------|----------------|---------------|
+| Area 1 (RLS) | 2 | 1 |
+| Area 2 (Graph) | 1 | 0 |
+| Area 3 (Exceptions) | 15+ | 2 |
+| Area 4 (Research) | 1 | 0 |
+| Area 5 (WebSocket) | 2 | 1 |
+| Area 6 (LlamaIndex) | 2 | 0 |
+| Area 7 (B2) | 3 | 0 |
+| Area 8 (CrewAI) | 2 | 0 |
+| Area 9 (Circuit) | 6+ | 1 |
+| Area 10 (Refactor) | 4 | 15+ |
+| Area 11 (Tests) | 0 | 30+ |
+| **Total** | **38+** | **50+** |
+
+---
+
+## Appendix: Exception Hierarchy
+
+```python
+class EmpireBaseException(Exception):
+    """Base exception for all Empire errors."""
+    def __init__(self, message: str, error_code: str, details: dict = None):
+        self.message = message
+        self.error_code = error_code
+        self.details = details or {}
+        super().__init__(self.message)
+
+class DatabaseException(EmpireBaseException):
+    """Database operation failures."""
+    pass
+
+class SupabaseException(DatabaseException):
+    """Supabase-specific errors."""
+    pass
+
+class Neo4jException(DatabaseException):
+    """Neo4j-specific errors."""
+    pass
+
+class ExternalServiceException(EmpireBaseException):
+    """External service failures."""
+    pass
+
+class ArcadeException(ExternalServiceException):
+    """Arcade.dev service errors."""
+    pass
+
+class CrewAIException(ExternalServiceException):
+    """CrewAI service errors."""
+    pass
+
+class LlamaIndexException(ExternalServiceException):
+    """LlamaIndex service errors."""
+    pass
+
+class ValidationException(EmpireBaseException):
+    """Input validation failures."""
+    pass
+
+class AuthenticationException(EmpireBaseException):
+    """Authentication failures."""
+    pass
+
+class AuthorizationException(EmpireBaseException):
+    """Authorization/permission failures."""
+    pass
+
+class RateLimitException(EmpireBaseException):
+    """Rate limit exceeded."""
+    pass
+
+class CircuitBreakerException(EmpireBaseException):
+    """Circuit breaker is open."""
+    pass
+```
