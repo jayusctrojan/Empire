@@ -18,7 +18,11 @@ from uuid import uuid4
 @pytest.fixture
 def mock_content_prep_agent():
     """Mock ContentPrepAgent."""
-    with patch('app.tasks.content_prep_tasks.ContentPrepAgent') as MockAgent:
+    # Patch at the source module since tasks use lazy imports
+    # Also mock dependencies to prevent initialization errors
+    with patch('app.services.content_prep_agent.ContentPrepAgent') as MockAgent, \
+         patch('app.services.content_prep_agent.get_supabase_client'), \
+         patch('app.services.content_prep_agent.B2StorageService'):
         agent = MagicMock()
         MockAgent.return_value = agent
         yield agent
@@ -27,7 +31,7 @@ def mock_content_prep_agent():
 @pytest.fixture
 def mock_supabase():
     """Mock Supabase client."""
-    with patch('app.tasks.content_prep_tasks.get_supabase_client') as mock_get:
+    with patch('app.core.supabase_client.get_supabase_client') as mock_get:
         client = MagicMock()
         mock_get.return_value = client
         yield client

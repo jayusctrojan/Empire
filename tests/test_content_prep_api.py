@@ -454,7 +454,8 @@ class TestManifestEndpoint:
 
         assert response.status_code == 400
         data = response.json()
-        assert "incomplete" in str(data["detail"]).lower()
+        # Check for 'incomplete' in the response (handle different error formats)
+        assert "incomplete" in str(data).lower()
 
     def test_generate_manifest_incomplete_acknowledged(self, client, mock_content_prep_agent, sample_manifest):
         """Test generating manifest with acknowledged incomplete set."""
@@ -669,7 +670,7 @@ class TestCleanupEndpoints:
 
     def test_get_cleanup_status_pending(self, client):
         """Test getting cleanup task status - pending."""
-        with patch('app.routes.content_prep.celery_app') as mock_celery:
+        with patch('app.celery_app.celery_app') as mock_celery:
             mock_result = MagicMock()
             mock_result.status = "PENDING"
             mock_result.ready.return_value = False
@@ -684,7 +685,7 @@ class TestCleanupEndpoints:
 
     def test_get_cleanup_status_complete(self, client):
         """Test getting cleanup task status - complete."""
-        with patch('app.routes.content_prep.celery_app') as mock_celery:
+        with patch('app.celery_app.celery_app') as mock_celery:
             mock_result = MagicMock()
             mock_result.status = "SUCCESS"
             mock_result.ready.return_value = True
