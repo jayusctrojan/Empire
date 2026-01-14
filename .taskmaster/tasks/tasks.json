@@ -3910,142 +3910,156 @@
         "updatedAt": "2026-01-13T22:34:55.721Z"
       },
       {
-        "id": 141,
+        "id": "141",
         "title": "Design and Implement RAG Quality Metrics Database Schema",
         "description": "Create the database tables and indexes required to store RAG quality metrics, agent performance history, retrieval parameter configurations, and grounding results.",
         "details": "Implement the following tables in Supabase:\n- rag_quality_metrics (with indexes on intent_type, agent_id, created_at, and quality scores)\n- agent_performance_history (with indexes on agent_id and task_type)\n- retrieval_parameter_configs (with unique constraint on intent_type and query_complexity)\n- grounding_results (with indexes on query_id and grounding_score)\nEnsure all tables use UUID primary keys and appropriate foreign key relationships where needed.",
         "testStrategy": "Validate schema creation with SQL scripts. Confirm indexes are created and test insert/query performance with sample data.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:33:44.923Z"
       },
       {
-        "id": 142,
+        "id": "142",
         "title": "Implement Query Intent Analyzer Service",
         "description": "Develop a service that classifies user queries into intent types and extracts relevant metadata.",
         "details": "Create app/services/query_intent_analyzer.py with a class that:\n- Classifies queries as factual, analytical, comparative, procedural, or creative\n- Extracts entities and calculates complexity score (0-1)\n- Suggests optimal retrieval strategy and expected output format\n- Uses lightweight LLM (Claude Haiku) for classification and entity extraction\n- Returns QueryIntent object with all required fields",
         "testStrategy": "Test with labeled query dataset. Validate classification accuracy (>90%) and entity extraction completeness.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:37:04.909Z"
       },
       {
-        "id": 143,
+        "id": "143",
         "title": "Implement Retrieval Evaluator Service with RAGAS",
         "description": "Build a service that evaluates retrieval quality using RAGAS metrics.",
         "details": "Create app/services/retrieval_evaluator.py with:\n- Real-time evaluation for high-value queries using Claude 3.5 Haiku\n- Batch evaluation with 10% sampling for high-volume queries using Anthropic Batch API\n- Storage of metrics in rag_quality_metrics table\n- Configurable quality thresholds and retry logic (expanded retrieval, low confidence warning)\n- /api/rag/metrics endpoint for admin access",
         "testStrategy": "Test with various query types. Validate metric calculation, storage, and threshold enforcement. Confirm batch vs real-time evaluation works as specified.",
         "priority": "high",
         "dependencies": [
-          141
+          "141"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:39:13.312Z"
       },
       {
-        "id": 144,
+        "id": "144",
         "title": "Implement Answer Grounding Evaluator Service",
         "description": "Develop a service that verifies answer claims against source documents to prevent hallucinations.",
         "details": "Create app/services/answer_grounding_evaluator.py with:\n- Claim extraction from answers using LLM\n- Claim-to-source alignment scoring (0-1)\n- Calculation of overall grounding score and confidence level\n- Flagging of ungrounded claims\n- Storage of results in grounding_results table\n- Blocking of answers below critical grounding threshold",
         "testStrategy": "Test with answers containing known hallucinations. Validate claim extraction, grounding scoring, and blocking logic.",
         "priority": "high",
         "dependencies": [
-          141
+          "141"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:41:24.087Z"
       },
       {
-        "id": 145,
+        "id": "145",
         "title": "Implement Adaptive Retrieval Service",
         "description": "Build a service that dynamically adjusts retrieval parameters based on query characteristics and historical performance.",
         "details": "Create app/services/adaptive_retrieval_service.py with:\n- Retrieval parameter configuration per intent type and complexity\n- Adjustment of weights (dense, sparse, fuzzy), top_k, rerank_threshold, graph_expansion_depth\n- Feedback recording and parameter optimization\n- Manual override capability\n- Audit logging of parameter decisions",
         "testStrategy": "Test with different query types and feedback scenarios. Validate parameter adjustment and optimization logic.",
         "priority": "medium",
         "dependencies": [
-          141,
-          142
+          "141",
+          "142"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:44:12.061Z"
       },
       {
-        "id": 146,
+        "id": "146",
         "title": "Implement Agent Selector Service",
         "description": "Develop a service that intelligently routes tasks to optimal agents based on capabilities and performance history.",
         "details": "Create app/services/agent_selector_service.py with:\n- Agent capability mapping for all 17 agents\n- Historical performance tracking per agent per task type\n- Optimal agent selection based on performance history\n- Exploration factor for underutilized agents\n- Selection explanation for transparency\n- Outcome recording for future optimization",
         "testStrategy": "Test with various task types and agent performance scenarios. Validate selection logic and exploration factor.",
         "priority": "medium",
         "dependencies": [
-          141,
-          142
+          "141",
+          "142"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:46:27.280Z"
       },
       {
-        "id": 147,
+        "id": "147",
         "title": "Implement Output Validator Service",
         "description": "Build a service that validates and corrects agent outputs before delivery.",
         "details": "Create app/services/output_validator_service.py with:\n- Format compliance checking (JSON, markdown, etc.)\n- Completeness validation (required sections present)\n- Consistency checking (no internal contradictions)\n- Style guideline enforcement\n- Auto-correction of formatting issues\n- Flagging of uncorrectable issues for human review",
         "testStrategy": "Test with outputs containing various issues. Validate detection, correction, and flagging logic.",
         "priority": "medium",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:48:43.869Z"
       },
       {
-        "id": 148,
+        "id": "148",
         "title": "Integrate Services into RAG Pipeline",
         "description": "Connect all enhancement services into the existing RAG pipeline.",
         "details": "Update the RAG pipeline to:\n- Route queries through Query Intent Analyzer\n- Use Adaptive Retrieval Service for parameter adjustment\n- Evaluate retrieval quality with Retrieval Evaluator\n- Select agent with Agent Selector Service\n- Validate answer grounding with Answer Grounding Evaluator\n- Validate output with Output Validator Service\n- Ensure proper error handling and fallback mechanisms",
         "testStrategy": "Test end-to-end pipeline with various query types. Validate service integration and error handling.",
         "priority": "high",
         "dependencies": [
-          142,
-          143,
-          144,
-          145,
-          146,
-          147
+          "142",
+          "143",
+          "144",
+          "145",
+          "146",
+          "147"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:50:59.604Z"
       },
       {
-        "id": 149,
+        "id": "149",
         "title": "Develop Metrics Dashboard",
         "description": "Create a dashboard for administrators to monitor RAG quality metrics.",
         "details": "Build a web interface that:\n- Displays real-time RAGAS scores (Context Relevance, Answer Relevance, Faithfulness, Coverage)\n- Allows drill-down by query type, time period, and agent\n- Shows trends and optimization opportunities\n- Loads within 2 seconds with 30-day data",
         "testStrategy": "Test dashboard performance and data accuracy with sample metrics data.",
         "priority": "medium",
         "dependencies": [
-          143
+          "143"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:54:03.894Z"
       },
       {
-        "id": 150,
+        "id": "150",
         "title": "Implement Quality Gate and Fallback Logic",
         "description": "Add logic to handle quality gate failures and provide fallback options.",
         "details": "Implement:\n- Retry with expanded retrieval (increased top_k, graph expansion) when quality threshold breached\n- Visible 'low confidence' warning if still below threshold\n- Logging of quality gate failures and fallback actions\n- Alert system for persistent quality issues",
         "testStrategy": "Test with queries that trigger quality gate failures. Validate retry logic and warning display.",
         "priority": "medium",
         "dependencies": [
-          143,
-          144
+          "143",
+          "144"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-14T18:56:19.646Z"
       }
     ],
     "metadata": {
-      "created": "2026-01-14T18:17:36.921Z",
-      "updated": "2026-01-14T18:17:36.921Z",
-      "description": "Tasks for v7_3_features context"
+      "version": "1.0.0",
+      "lastModified": "2026-01-14T18:56:19.648Z",
+      "taskCount": 50,
+      "completedCount": 50,
+      "tags": [
+        "v7_3_features"
+      ]
     }
   },
   "empire_desktop_v75": {
