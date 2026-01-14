@@ -56,10 +56,10 @@ SEQUENCE_PATTERNS: list[tuple[str, str]] = [
     (r"week[-_\s]?(\d{1,3})", "week"),                # "week-01.pdf"
     (r"unit[-_\s]?(\d{1,3})", "unit"),                # "unit-1.pdf"
     (r"section[-_\s]?(\d{1,3})", "section"),          # "section-1.pdf"
-    # Alpha sequence patterns
-    (r"^([a-z])[-_\s]", "alpha_prefix"),              # "a-intro.pdf"
-    # Roman numerals
+    # Roman numerals (must come before alpha to avoid i=9th letter bug)
     (r"^(i{1,3}|iv|v|vi{0,3}|ix|x)[-_\s]", "roman"), # "i-intro.pdf"
+    # Alpha sequence patterns (excluding roman numeral letters at start)
+    (r"^([a-hjk-uwyz])[-_\s]", "alpha_prefix"),      # "a-intro.pdf" (excludes i,v,x)
 ]
 
 CONTENT_SET_INDICATORS: list[str] = [
