@@ -32,7 +32,7 @@ except ImportError as e:
     logging.warning(f"CrewAI not available, LLM-based detection disabled: {e}")
 
 from app.services.b2_storage import B2StorageService
-from app.services.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 
 logger = structlog.get_logger(__name__)
 
