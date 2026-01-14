@@ -449,7 +449,7 @@ class TestCleanupOldContentSetsTask:
         """Test cleanup when no old sets exist."""
         from app.tasks.content_prep_tasks import cleanup_old_content_sets
 
-        with patch('app.tasks.content_prep_tasks.get_supabase_client') as mock_get:
+        with patch('app.core.supabase_client.get_supabase_client') as mock_get:
             mock_client = MagicMock()
             mock_result = MagicMock()
             mock_result.data = []
@@ -471,7 +471,7 @@ class TestCleanupOldContentSetsTask:
         """Test cleanup deletes old content sets."""
         from app.tasks.content_prep_tasks import cleanup_old_content_sets
 
-        with patch('app.tasks.content_prep_tasks.get_supabase_client') as mock_get:
+        with patch('app.core.supabase_client.get_supabase_client') as mock_get:
             mock_client = MagicMock()
             mock_result = MagicMock()
             mock_result.data = sample_content_sets
@@ -496,7 +496,7 @@ class TestCleanupOldContentSetsTask:
         """Test cleanup with custom retention period."""
         from app.tasks.content_prep_tasks import cleanup_old_content_sets
 
-        with patch('app.tasks.content_prep_tasks.get_supabase_client') as mock_get:
+        with patch('app.core.supabase_client.get_supabase_client') as mock_get:
             mock_client = MagicMock()
             mock_result = MagicMock()
             mock_result.data = []
@@ -515,7 +515,7 @@ class TestCleanupOldContentSetsTask:
         """Test cleanup error handling and metrics."""
         from app.tasks.content_prep_tasks import cleanup_old_content_sets
 
-        with patch('app.tasks.content_prep_tasks.get_supabase_client') as mock_get:
+        with patch('app.core.supabase_client.get_supabase_client') as mock_get:
             mock_client = MagicMock()
             mock_client.table().select().eq().lt().execute.side_effect = Exception("DB error")
             mock_get.return_value = mock_client
@@ -536,7 +536,7 @@ class TestCleanupOldContentSetsTask:
         # Create 100 content sets
         many_sets = [{"id": str(uuid4())} for _ in range(100)]
 
-        with patch('app.tasks.content_prep_tasks.get_supabase_client') as mock_get:
+        with patch('app.core.supabase_client.get_supabase_client') as mock_get:
             mock_client = MagicMock()
             mock_result = MagicMock()
             mock_result.data = many_sets
