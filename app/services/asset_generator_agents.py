@@ -31,6 +31,13 @@ from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
 from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+from app.services.agent_metrics import (
+    AgentMetricsContext,
+    AgentID,
+    track_agent_request,
+    track_agent_error,
+    track_llm_call,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -211,61 +218,68 @@ class BaseAssetGenerator(ABC):
 
     async def generate(self, request: AssetGenerationRequest) -> AssetGenerationResult:
         """Generate an asset from the request"""
-        start_time = datetime.now()
-
-        logger.info(
-            f"{self.agent_id} generation started",
-            asset_type=self.asset_type.value,
-            name=request.name,
-            department=request.department
-        )
-
-        try:
-            # Generate content
-            content = await self._generate_content(request)
-
-            # Save to file
-            output_path = self._get_output_path(request.department, request.name)
-            with open(output_path, 'w') as f:
-                f.write(content)
-
-            # Update stats
-            processing_time = (datetime.now() - start_time).total_seconds()
-            self._update_stats(request.department)
-
-            result = AssetGenerationResult(
-                success=True,
-                asset_type=self.asset_type.value,
-                asset_name=request.name,
-                file_path=str(output_path),
-                content=content,
-                department=request.department,
-                processing_time_seconds=processing_time,
-                metadata={
-                    "agent_id": self.agent_id,
-                    "agent_name": self.agent_name,
-                    "timestamp": datetime.now().isoformat()
-                }
-            )
+        async with AgentMetricsContext(
+            self.agent_id,
+            "generate",
+            model="claude-sonnet-4-5-20250514"
+        ) as metrics_ctx:
+            start_time = datetime.now()
 
             logger.info(
-                f"{self.agent_id} generation complete",
-                file_path=str(output_path),
-                processing_time=f"{processing_time:.2f}s"
-            )
-
-            return result
-
-        except Exception as e:
-            logger.error(f"{self.agent_id} generation failed", error=str(e))
-            return AssetGenerationResult(
-                success=False,
+                f"{self.agent_id} generation started",
                 asset_type=self.asset_type.value,
-                asset_name=request.name,
-                department=request.department,
-                error=str(e),
-                processing_time_seconds=(datetime.now() - start_time).total_seconds()
+                name=request.name,
+                department=request.department
             )
+
+            try:
+                # Generate content
+                content = await self._generate_content(request)
+
+                # Save to file
+                output_path = self._get_output_path(request.department, request.name)
+                with open(output_path, 'w') as f:
+                    f.write(content)
+
+                # Update stats
+                processing_time = (datetime.now() - start_time).total_seconds()
+                self._update_stats(request.department)
+
+                result = AssetGenerationResult(
+                    success=True,
+                    asset_type=self.asset_type.value,
+                    asset_name=request.name,
+                    file_path=str(output_path),
+                    content=content,
+                    department=request.department,
+                    processing_time_seconds=processing_time,
+                    metadata={
+                        "agent_id": self.agent_id,
+                        "agent_name": self.agent_name,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+
+                logger.info(
+                    f"{self.agent_id} generation complete",
+                    file_path=str(output_path),
+                    processing_time=f"{processing_time:.2f}s"
+                )
+
+                metrics_ctx.set_success()
+                return result
+
+            except Exception as e:
+                logger.error(f"{self.agent_id} generation failed", error=str(e))
+                metrics_ctx.set_failure(type(e).__name__)
+                return AssetGenerationResult(
+                    success=False,
+                    asset_type=self.asset_type.value,
+                    asset_name=request.name,
+                    department=request.department,
+                    error=str(e),
+                    processing_time_seconds=(datetime.now() - start_time).total_seconds()
+                )
 
     def _update_stats(self, department: str):
         """Update generation statistics"""
@@ -359,6 +373,17 @@ tags:
                     }]
                 )
 
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.SKILL_GENERATOR,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
                 content = response.content[0].text.strip()
                 # Remove any markdown code blocks if present
                 if content.startswith("```"):
@@ -371,6 +396,7 @@ tags:
 
             except Exception as e:
                 logger.warning("LLM skill generation failed", error=str(e))
+                track_llm_call(AgentID.SKILL_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic skill
         skill = SkillSpec(
@@ -447,6 +473,17 @@ Output ONLY the Markdown content (no code blocks, no explanation):"""
                     }]
                 )
 
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.COMMAND_GENERATOR,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
                 content = response.content[0].text.strip()
                 # Remove any markdown code blocks if present
                 if content.startswith("```"):
@@ -456,6 +493,7 @@ Output ONLY the Markdown content (no code blocks, no explanation):"""
 
             except Exception as e:
                 logger.warning("LLM command generation failed", error=str(e))
+                track_llm_call(AgentID.COMMAND_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic command
         command_name = re.sub(r'[^a-z0-9-]', '-', request.name.lower())
@@ -560,6 +598,17 @@ memory: true"""
                     }]
                 )
 
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.AGENT_GENERATOR,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
                 content = response.content[0].text.strip()
                 if content.startswith("```"):
                     content = re.sub(r'^```\w*\n?', '', content)
@@ -571,6 +620,7 @@ memory: true"""
 
             except Exception as e:
                 logger.warning("LLM agent generation failed", error=str(e))
+                track_llm_call(AgentID.AGENT_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic agent config
         agent = AgentSpec(
@@ -668,6 +718,17 @@ tags:
                     }]
                 )
 
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.PROMPT_GENERATOR,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
                 content = response.content[0].text.strip()
                 if content.startswith("```"):
                     content = re.sub(r'^```\w*\n?', '', content)
@@ -679,6 +740,7 @@ tags:
 
             except Exception as e:
                 logger.warning("LLM prompt generation failed", error=str(e))
+                track_llm_call(AgentID.PROMPT_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic prompt template
         prompt = PromptSpec(
@@ -781,6 +843,17 @@ Output ONLY valid JSON (no markdown code blocks, no explanation). Use this struc
                     }]
                 )
 
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.WORKFLOW_GENERATOR,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
                 content = response.content[0].text.strip()
                 if content.startswith("```"):
                     content = re.sub(r'^```\w*\n?', '', content)
@@ -792,6 +865,7 @@ Output ONLY valid JSON (no markdown code blocks, no explanation). Use this struc
 
             except Exception as e:
                 logger.warning("LLM workflow generation failed", error=str(e))
+                track_llm_call(AgentID.WORKFLOW_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic workflow
         workflow_name = re.sub(r'[^a-z0-9_]', '_', request.name.lower())

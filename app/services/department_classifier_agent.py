@@ -30,6 +30,14 @@ from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
 from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+from app.services.agent_metrics import (
+    AgentMetricsContext,
+    AgentID,
+    track_agent_request,
+    track_agent_error,
+    track_llm_call,
+    track_confidence_score,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -642,6 +650,17 @@ Content:
                 ]
             )
 
+            # Track LLM call metrics (Task 132)
+            input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+            output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+            track_llm_call(
+                AgentID.DEPARTMENT_CLASSIFIER,
+                "claude-3-5-haiku-20241022",
+                "success",
+                input_tokens,
+                output_tokens
+            )
+
             response_text = response.content[0].text.strip()
 
             # Extract JSON from response
@@ -675,8 +694,10 @@ Content:
 
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse LLM response as JSON", error=str(e))
+            track_llm_call(AgentID.DEPARTMENT_CLASSIFIER, "claude-3-5-haiku-20241022", "failure")
         except Exception as e:
             logger.error("LLM classification error", error=str(e))
+            track_llm_call(AgentID.DEPARTMENT_CLASSIFIER, "claude-3-5-haiku-20241022", "failure")
 
         return None
 
@@ -868,39 +889,60 @@ class DepartmentClassifierAgentService:
         Returns:
             ClassificationResult with department and confidence
         """
-        result = await self.classifier.classify(content, filename)
+        # Use metrics context for comprehensive tracking (Task 132)
+        async with AgentMetricsContext(
+            AgentID.DEPARTMENT_CLASSIFIER,
+            "classify",
+            model="claude-3-5-haiku-20241022"
+        ) as metrics_ctx:
+            try:
+                result = await self.classifier.classify(content, filename)
 
-        # Update statistics
-        self._stats["classifications_total"] += 1
-        self._stats["classifications_by_department"][result.department.value] += 1
+                # Update statistics
+                self._stats["classifications_total"] += 1
+                self._stats["classifications_by_department"][result.department.value] += 1
 
-        if result.llm_enhanced:
-            self._stats["llm_enhanced_count"] += 1
+                if result.llm_enhanced:
+                    self._stats["llm_enhanced_count"] += 1
 
-        if result.confidence >= 0.80:
-            self._stats["high_confidence_count"] += 1
-        elif result.confidence < 0.50:
-            self._stats["low_confidence_count"] += 1
+                if result.confidence >= 0.80:
+                    self._stats["high_confidence_count"] += 1
+                elif result.confidence < 0.50:
+                    self._stats["low_confidence_count"] += 1
 
-        # Update average confidence
-        total = self._stats["classifications_total"]
-        old_avg = self._stats["average_confidence"]
-        self._stats["average_confidence"] = (
-            (old_avg * (total - 1) + result.confidence) / total
-        )
+                # Update average confidence
+                total = self._stats["classifications_total"]
+                old_avg = self._stats["average_confidence"]
+                self._stats["average_confidence"] = (
+                    (old_avg * (total - 1) + result.confidence) / total
+                )
 
-        # Optionally remove detailed scores to reduce response size
-        if not include_all_scores:
-            result.all_scores = []
+                # Optionally remove detailed scores to reduce response size
+                if not include_all_scores:
+                    result.all_scores = []
 
-        logger.info(
-            "Content classified",
-            department=result.department.value,
-            confidence=f"{result.confidence:.2%}",
-            llm_enhanced=result.llm_enhanced
-        )
+                # Track confidence score for quality metrics (Task 132)
+                track_confidence_score(
+                    AgentID.DEPARTMENT_CLASSIFIER,
+                    "classify",
+                    result.confidence
+                )
 
-        return result
+                # Mark metrics as successful
+                metrics_ctx.set_success()
+
+                logger.info(
+                    "Content classified",
+                    department=result.department.value,
+                    confidence=f"{result.confidence:.2%}",
+                    llm_enhanced=result.llm_enhanced
+                )
+
+                return result
+
+            except Exception as e:
+                metrics_ctx.set_failure(type(e).__name__)
+                raise
 
     async def classify_file(
         self,

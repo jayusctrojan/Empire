@@ -11,6 +11,7 @@ REST API endpoints for asset generation (AGENT-003 to AGENT-007):
 
 import os
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 import structlog
@@ -90,6 +91,36 @@ class GeneratorStatsResponse(BaseModel):
 class AllStatsResponse(BaseModel):
     """Response model for all generator statistics"""
     generators: Dict[str, GeneratorStatsResponse]
+
+
+class GeneratorHealthStatus(BaseModel):
+    """Health status for an individual generator"""
+    agent_id: str
+    agent_name: str
+    asset_type: str
+    status: str = "healthy"  # healthy, degraded, unhealthy
+    file_extension: str
+    output_directory: str
+    capabilities: List[str]
+    last_generation_time: Optional[str] = None
+    error_message: Optional[str] = None
+
+
+class ServiceHealthResponse(BaseModel):
+    """Comprehensive health response for Asset Generator service"""
+    status: str = "healthy"  # healthy, degraded, unhealthy
+    service_name: str = "Asset Generator Service"
+    version: str = "7.3.0"
+    timestamp: str
+    generators_count: int
+    generators: Dict[str, GeneratorHealthStatus]
+    llm_available: bool
+    llm_model: str
+    output_base_path: str
+    supported_departments: List[str]
+    supported_asset_types: List[str]
+    capabilities: Dict[str, bool]
+    metrics: Dict[str, Any]
 
 
 # =============================================================================
@@ -627,30 +658,143 @@ async def get_all_stats(
 # HEALTH CHECK
 # =============================================================================
 
-@router.get("/health")
-async def asset_generators_health() -> Dict[str, Any]:
-    """Health check for Asset Generator agents."""
-    service = get_asset_generator_service()
-    generators = service.list_generators()
+@router.get("/health", response_model=ServiceHealthResponse)
+async def asset_generators_health(
+    service: AssetGeneratorService = Depends(get_generator_service)
+) -> ServiceHealthResponse:
+    """
+    Comprehensive health check for Asset Generator agents (AGENT-003 to AGENT-007).
 
-    return {
-        "status": "healthy",
-        "agents": {
-            "AGENT-003": "Skill Generator",
-            "AGENT-004": "Command Generator",
-            "AGENT-005": "Agent Generator",
-            "AGENT-006": "Prompt Generator",
-            "AGENT-007": "Workflow Generator"
+    Returns detailed status information including:
+    - Individual generator health status
+    - LLM availability
+    - Supported departments and asset types
+    - Service capabilities
+    - Generation metrics
+    """
+    generators_list = service.list_generators()
+    all_stats = service.get_all_stats()
+
+    # Check LLM availability
+    llm_available = bool(os.getenv("ANTHROPIC_API_KEY"))
+
+    # Build individual generator health status
+    generators_health: Dict[str, GeneratorHealthStatus] = {}
+
+    # Generator configurations
+    generator_configs = {
+        "AGENT-003": {
+            "agent_name": "Skill Generator",
+            "asset_type": "skill",
+            "file_extension": ".yaml",
+            "capabilities": [
+                "Generate Claude Code skills",
+                "Create tool definitions",
+                "Write usage examples",
+                "Add organization tags"
+            ]
         },
-        "generators_available": len(generators),
-        "llm_available": bool(os.getenv("ANTHROPIC_API_KEY")),
-        "output_path": service.output_base_path,
-        "capabilities": {
+        "AGENT-004": {
+            "agent_name": "Command Generator",
+            "asset_type": "command",
+            "file_extension": ".md",
+            "capabilities": [
+                "Generate slash commands",
+                "Define command arguments",
+                "Create step-by-step instructions",
+                "Include usage examples"
+            ]
+        },
+        "AGENT-005": {
+            "agent_name": "Agent Generator",
+            "asset_type": "agent",
+            "file_extension": ".yaml",
+            "capabilities": [
+                "Generate CrewAI agent configs",
+                "Define agent roles and goals",
+                "Assign tools and LLMs",
+                "Create agent backstories"
+            ]
+        },
+        "AGENT-006": {
+            "agent_name": "Prompt Generator",
+            "asset_type": "prompt",
+            "file_extension": ".yaml",
+            "capabilities": [
+                "Generate prompt templates",
+                "Define variable placeholders",
+                "Create usage examples",
+                "Add organization tags"
+            ]
+        },
+        "AGENT-007": {
+            "agent_name": "Workflow Generator",
+            "asset_type": "workflow",
+            "file_extension": ".json",
+            "capabilities": [
+                "Generate n8n workflows",
+                "Create node definitions",
+                "Define connection mappings",
+                "Configure workflow settings"
+            ]
+        }
+    }
+
+    # Build health status for each generator
+    for agent_id, config in generator_configs.items():
+        asset_type = config["asset_type"]
+        stats = all_stats.get(agent_id, {})
+
+        generators_health[agent_id] = GeneratorHealthStatus(
+            agent_id=agent_id,
+            agent_name=config["agent_name"],
+            asset_type=asset_type,
+            status="healthy" if llm_available else "degraded",
+            file_extension=config["file_extension"],
+            output_directory=f"processed/crewai-suggestions/{asset_type}/drafts/",
+            capabilities=config["capabilities"],
+            last_generation_time=None,  # Could be tracked in stats
+            error_message=None if llm_available else "LLM API key not configured"
+        )
+
+    # Calculate total assets generated
+    total_assets_generated = sum(
+        stats.get("assets_generated", 0) for stats in all_stats.values()
+    )
+
+    # Determine overall service status
+    if not llm_available:
+        overall_status = "degraded"
+    elif len(generators_list) < 5:
+        overall_status = "degraded"
+    else:
+        overall_status = "healthy"
+
+    return ServiceHealthResponse(
+        status=overall_status,
+        service_name="Asset Generator Service",
+        version="7.3.0",
+        timestamp=datetime.utcnow().isoformat() + "Z",
+        generators_count=len(generators_list),
+        generators=generators_health,
+        llm_available=llm_available,
+        llm_model="claude-sonnet-4-5-20250514",
+        output_base_path=service.output_base_path,
+        supported_departments=[d.value for d in Department],
+        supported_asset_types=[t.value for t in AssetType],
+        capabilities={
             "skill_generation": True,
             "command_generation": True,
             "agent_generation": True,
             "prompt_generation": True,
             "workflow_generation": True,
-            "batch_generation": True
+            "batch_generation": True,
+            "department_organization": True,
+            "file_persistence": True
+        },
+        metrics={
+            "total_assets_generated": total_assets_generated,
+            "generators_active": len(generators_list),
+            "generators_expected": 5
         }
-    }
+    )

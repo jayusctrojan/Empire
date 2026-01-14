@@ -30,6 +30,13 @@ from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
 from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+from app.services.agent_metrics import (
+    AgentMetricsContext,
+    AgentID,
+    track_agent_request,
+    track_agent_error,
+    track_llm_call,
+)
 
 # PDF Generation
 from reportlab.lib.pagesizes import letter, A4
@@ -964,67 +971,77 @@ class ContentSummarizerAgentService:
             content_length=len(content)
         )
 
-        try:
-            # Step 1: Extract and structure content
-            extracted = await self._extract_content(content, title, source_type)
+        # Use metrics context for comprehensive tracking (Task 132)
+        async with AgentMetricsContext(
+            AgentID.CONTENT_SUMMARIZER,
+            "generate_summary",
+            model="claude-sonnet-4-5-20250514"
+        ) as metrics_ctx:
+            try:
+                # Step 1: Extract and structure content
+                extracted = await self._extract_content(content, title, source_type)
 
-            # Step 2: Generate section contents using LLM
-            sections = await self._generate_sections(extracted, department)
+                # Step 2: Generate section contents using LLM
+                sections = await self._generate_sections(extracted, department)
 
-            # Step 3: Create visual diagrams
-            diagram_paths = await self._create_diagrams(extracted, department)
+                # Step 3: Create visual diagrams
+                diagram_paths = await self._create_diagrams(extracted, department)
 
-            # Add diagrams to appropriate sections
-            for section in sections:
-                if section.section_type == SummarySection.VISUAL_ELEMENTS:
-                    section.diagrams = diagram_paths
+                # Add diagrams to appropriate sections
+                for section in sections:
+                    if section.section_type == SummarySection.VISUAL_ELEMENTS:
+                        section.diagrams = diagram_paths
 
-            # Step 4: Generate PDF
-            pdf_path = self.pdf_generator.generate_pdf(
-                department=department,
-                title=title,
-                sections=sections
-            )
+                # Step 4: Generate PDF
+                pdf_path = self.pdf_generator.generate_pdf(
+                    department=department,
+                    title=title,
+                    sections=sections
+                )
 
-            # Update stats
-            processing_time = (datetime.now() - start_time).total_seconds()
-            self._update_stats(department, len(diagram_paths))
+                # Update stats
+                processing_time = (datetime.now() - start_time).total_seconds()
+                self._update_stats(department, len(diagram_paths))
 
-            result = SummaryGenerationResult(
-                success=True,
-                pdf_path=pdf_path,
-                department=department,
-                title=title,
-                sections_generated=[s.section_type.value for s in sections],
-                diagrams_generated=len(diagram_paths),
-                tables_generated=sum(len(s.tables) for s in sections),
-                processing_time_seconds=processing_time,
-                metadata={
-                    "source_type": source_type,
-                    "content_length": len(content),
-                    "extracted_concepts": len(extracted.key_concepts),
-                    "agent_id": "AGENT-002",
-                    "timestamp": datetime.now().isoformat()
-                }
-            )
+                # Mark metrics as successful
+                metrics_ctx.set_success()
 
-            logger.info(
-                "AGENT-002 summary generation complete",
-                pdf_path=pdf_path,
-                processing_time=f"{processing_time:.2f}s"
-            )
+                result = SummaryGenerationResult(
+                    success=True,
+                    pdf_path=pdf_path,
+                    department=department,
+                    title=title,
+                    sections_generated=[s.section_type.value for s in sections],
+                    diagrams_generated=len(diagram_paths),
+                    tables_generated=sum(len(s.tables) for s in sections),
+                    processing_time_seconds=processing_time,
+                    metadata={
+                        "source_type": source_type,
+                        "content_length": len(content),
+                        "extracted_concepts": len(extracted.key_concepts),
+                        "agent_id": "AGENT-002",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
 
-            return result
+                logger.info(
+                    "AGENT-002 summary generation complete",
+                    pdf_path=pdf_path,
+                    processing_time=f"{processing_time:.2f}s"
+                )
 
-        except Exception as e:
-            logger.error("AGENT-002 summary generation failed", error=str(e))
-            return SummaryGenerationResult(
-                success=False,
-                department=department,
-                title=title,
-                error=str(e),
-                processing_time_seconds=(datetime.now() - start_time).total_seconds()
-            )
+                return result
+
+            except Exception as e:
+                logger.error("AGENT-002 summary generation failed", error=str(e))
+                metrics_ctx.set_failure(type(e).__name__)
+                return SummaryGenerationResult(
+                    success=False,
+                    department=department,
+                    title=title,
+                    error=str(e),
+                    processing_time_seconds=(datetime.now() - start_time).total_seconds()
+                )
 
     async def _extract_content(
         self,
@@ -1074,6 +1091,17 @@ Respond in this exact JSON format:
                     }]
                 )
 
+                # Track LLM call metrics (Task 132)
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.CONTENT_SUMMARIZER,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
                 # Parse response
                 response_text = response.content[0].text
                 if "{" in response_text:
@@ -1086,6 +1114,7 @@ Respond in this exact JSON format:
 
             except Exception as e:
                 logger.warning("LLM extraction failed", error=str(e))
+                track_llm_call(AgentID.CONTENT_SUMMARIZER, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback extraction if LLM failed
         if not key_concepts:
@@ -1222,9 +1251,20 @@ The summary should:
 Write in a professional, business tone."""
                     }]
                 )
+                # Track LLM call metrics (Task 132)
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.CONTENT_SUMMARIZER,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
                 return response.content[0].text
             except Exception as e:
                 logger.warning("LLM summary generation failed", error=str(e))
+                track_llm_call(AgentID.CONTENT_SUMMARIZER, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback
         return f"""This {extracted.source_type} titled "{extracted.title}" provides comprehensive coverage of key business and technical concepts. The material spans approximately {extracted.word_count} words and covers {len(extracted.key_concepts)} main topics.
@@ -1249,9 +1289,20 @@ Frameworks: {', '.join([f.get('name', '') for f in extracted.frameworks[:3]])}
 Focus on actionable takeaways that readers can reference quickly."""
                     }]
                 )
+                # Track LLM call metrics (Task 132)
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.CONTENT_SUMMARIZER,
+                    "claude-sonnet-4-5-20250514",
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
                 return response.content[0].text
             except Exception as e:
                 logger.warning("LLM quick reference failed", error=str(e))
+                track_llm_call(AgentID.CONTENT_SUMMARIZER, "claude-sonnet-4-5-20250514", "failure")
 
         return f"Key topics: {', '.join(extracted.key_concepts[:5])}. Refer to the detailed sections above for comprehensive information."
 

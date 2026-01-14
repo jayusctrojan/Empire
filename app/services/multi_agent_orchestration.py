@@ -32,6 +32,16 @@ import structlog
 from pydantic import BaseModel, Field
 
 from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+from app.services.agent_metrics import (
+    AgentMetricsContext,
+    AgentID,
+    track_agent_request,
+    track_agent_error,
+    track_llm_call,
+    track_quality_score,
+    track_workflow,
+    track_revision,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -415,40 +425,60 @@ class ResearchAgent:
         Returns:
             ResearchResult with gathered information
         """
-        start_time = time.time()
+        async with AgentMetricsContext(
+            AgentID.RESEARCH_AGENT,
+            "research",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            start_time = time.time()
 
-        result = ResearchResult(
-            task_id=task_id or hashlib.md5(query.encode()).hexdigest()[:12],
-            original_query=query
-        )
-
-        if not self.llm:
-            logger.warning("LLM not available for research")
-            result.processing_time_ms = (time.time() - start_time) * 1000
-            return result
-
-        try:
-            search_types = search_types or list(ResearchSourceType)
-            system_prompt = self._build_system_prompt(query, search_types, max_sources, context)
-
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                messages=[
-                    {"role": "user", "content": system_prompt}
-                ]
+            result = ResearchResult(
+                task_id=task_id or hashlib.md5(query.encode()).hexdigest()[:12],
+                original_query=query
             )
 
-            response_text = response.content[0].text
-            result = self._parse_research_response(response_text, result)
+            if not self.llm:
+                logger.warning("LLM not available for research")
+                result.processing_time_ms = (time.time() - start_time) * 1000
+                metrics_ctx.set_failure("llm_unavailable")
+                return result
 
-        except Exception as e:
-            logger.error("Research failed", error=str(e))
-            result.metadata["error"] = str(e)
+            try:
+                search_types = search_types or list(ResearchSourceType)
+                system_prompt = self._build_system_prompt(query, search_types, max_sources, context)
 
-        result.processing_time_ms = (time.time() - start_time) * 1000
-        return result
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=self.config["temperature"],
+                    messages=[
+                        {"role": "user", "content": system_prompt}
+                    ]
+                )
+
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                metrics_ctx.track_tokens(input_tokens=input_tokens, output_tokens=output_tokens)
+                track_llm_call(
+                    AgentID.RESEARCH_AGENT,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
+                response_text = response.content[0].text
+                result = self._parse_research_response(response_text, result)
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Research failed", error=str(e))
+                result.metadata["error"] = str(e)
+                metrics_ctx.set_failure(type(e).__name__)
+
+            result.processing_time_ms = (time.time() - start_time) * 1000
+            return result
 
     def _build_system_prompt(
         self,
@@ -633,46 +663,71 @@ class AnalysisAgent:
         Returns:
             AnalysisResult with patterns, statistics, and insights
         """
-        start_time = time.time()
+        async with AgentMetricsContext(
+            AgentID.ANALYSIS_AGENT,
+            "analyze",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            start_time = time.time()
 
-        result = AnalysisResult(
-            task_id=task_id or hashlib.md5(
-                (research_result.original_query if research_result else raw_data).encode()
-            ).hexdigest()[:12]
-        )
+            result = AnalysisResult(
+                task_id=task_id or hashlib.md5(
+                    (research_result.original_query if research_result else raw_data).encode()
+                ).hexdigest()[:12]
+            )
 
-        if not self.llm:
-            logger.warning("LLM not available for analysis")
+            if not self.llm:
+                logger.warning("LLM not available for analysis")
+                result.processing_time_ms = (time.time() - start_time) * 1000
+                metrics_ctx.set_failure("llm_unavailable")
+                return result
+
+            try:
+                # Prepare input data
+                input_data = self._prepare_input_data(research_result, raw_data)
+
+                system_prompt = self._build_system_prompt(
+                    input_data, analysis_focus, detect_patterns,
+                    compute_statistics, find_correlations
+                )
+
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=self.config["temperature"],
+                    messages=[
+                        {"role": "user", "content": system_prompt}
+                    ]
+                )
+
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                metrics_ctx.track_tokens(input_tokens=input_tokens, output_tokens=output_tokens)
+                track_llm_call(
+                    AgentID.ANALYSIS_AGENT,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
+                response_text = response.content[0].text
+                result = self._parse_analysis_response(response_text, result)
+
+                # Track data quality score
+                if result.data_quality_score:
+                    track_quality_score(AgentID.ANALYSIS_AGENT, "analyze", result.data_quality_score)
+
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Analysis failed", error=str(e))
+                result.metadata["error"] = str(e)
+                metrics_ctx.set_failure(type(e).__name__)
+
             result.processing_time_ms = (time.time() - start_time) * 1000
             return result
-
-        try:
-            # Prepare input data
-            input_data = self._prepare_input_data(research_result, raw_data)
-
-            system_prompt = self._build_system_prompt(
-                input_data, analysis_focus, detect_patterns,
-                compute_statistics, find_correlations
-            )
-
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                messages=[
-                    {"role": "user", "content": system_prompt}
-                ]
-            )
-
-            response_text = response.content[0].text
-            result = self._parse_analysis_response(response_text, result)
-
-        except Exception as e:
-            logger.error("Analysis failed", error=str(e))
-            result.metadata["error"] = str(e)
-
-        result.processing_time_ms = (time.time() - start_time) * 1000
-        return result
 
     def _prepare_input_data(
         self,
@@ -899,44 +954,69 @@ class WritingAgent:
         Returns:
             WritingResult with generated content
         """
-        start_time = time.time()
+        async with AgentMetricsContext(
+            AgentID.WRITING_AGENT,
+            "write",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            start_time = time.time()
 
-        result = WritingResult(
-            task_id=task_id or hashlib.md5(task.title.encode()).hexdigest()[:12],
-            format=output_format
-        )
+            result = WritingResult(
+                task_id=task_id or hashlib.md5(task.title.encode()).hexdigest()[:12],
+                format=output_format
+            )
 
-        if not self.llm:
-            logger.warning("LLM not available for writing")
+            if not self.llm:
+                logger.warning("LLM not available for writing")
+                result.processing_time_ms = (time.time() - start_time) * 1000
+                metrics_ctx.set_failure("llm_unavailable")
+                return result
+
+            try:
+                # Prepare context
+                context = self._prepare_context(task, research_result, analysis_result)
+
+                system_prompt = self._build_system_prompt(
+                    task, context, output_format, target_audience, max_length
+                )
+
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=self.config["temperature"],
+                    messages=[
+                        {"role": "user", "content": system_prompt}
+                    ]
+                )
+
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                metrics_ctx.track_tokens(input_tokens=input_tokens, output_tokens=output_tokens)
+                track_llm_call(
+                    AgentID.WRITING_AGENT,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
+                response_text = response.content[0].text
+                result = self._parse_writing_response(response_text, result, task.title)
+
+                # Track style compliance score
+                if result.style_guide_compliance:
+                    track_quality_score(AgentID.WRITING_AGENT, "write", result.style_guide_compliance)
+
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Writing failed", error=str(e))
+                result.metadata["error"] = str(e)
+                metrics_ctx.set_failure(type(e).__name__)
+
             result.processing_time_ms = (time.time() - start_time) * 1000
             return result
-
-        try:
-            # Prepare context
-            context = self._prepare_context(task, research_result, analysis_result)
-
-            system_prompt = self._build_system_prompt(
-                task, context, output_format, target_audience, max_length
-            )
-
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                messages=[
-                    {"role": "user", "content": system_prompt}
-                ]
-            )
-
-            response_text = response.content[0].text
-            result = self._parse_writing_response(response_text, result, task.title)
-
-        except Exception as e:
-            logger.error("Writing failed", error=str(e))
-            result.metadata["error"] = str(e)
-
-        result.processing_time_ms = (time.time() - start_time) * 1000
-        return result
 
     async def revise_content(
         self,
@@ -968,69 +1048,89 @@ class WritingAgent:
         Returns:
             WritingResult with revised content
         """
-        start_time = time.time()
+        async with AgentMetricsContext(
+            AgentID.WRITING_AGENT,
+            "revise",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            start_time = time.time()
 
-        result = WritingResult(
-            task_id=original_writing.task_id,
-            format=output_format
-        )
-        result.metadata["revision_number"] = revision_number
-        result.metadata["original_quality_score"] = review_feedback.overall_quality_score
+            result = WritingResult(
+                task_id=original_writing.task_id,
+                format=output_format
+            )
+            result.metadata["revision_number"] = revision_number
+            result.metadata["original_quality_score"] = review_feedback.overall_quality_score
 
-        if not self.llm:
-            logger.warning("LLM not available for revision")
+            if not self.llm:
+                logger.warning("LLM not available for revision")
+                result.processing_time_ms = (time.time() - start_time) * 1000
+                metrics_ctx.set_failure("llm_unavailable")
+                return result
+
+            try:
+                # Format the review feedback for the LLM
+                formatted_feedback = self._format_feedback_for_revision(review_feedback)
+
+                # Get original content
+                original_content = original_writing.raw_content
+                if not original_content and original_writing.report:
+                    original_content = "\n\n".join([
+                        f"## {s.title}\n{s.content}"
+                        for s in original_writing.report.sections
+                    ])
+
+                revision_prompt = self._build_revision_prompt(
+                    original_content=original_content,
+                    formatted_feedback=formatted_feedback,
+                    revision_number=revision_number,
+                    task=task,
+                    output_format=output_format,
+                    target_audience=target_audience
+                )
+
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=max(0.3, self.config["temperature"] - 0.1),  # Slightly lower temp for revisions
+                    messages=[
+                        {"role": "user", "content": revision_prompt}
+                    ]
+                )
+
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                metrics_ctx.track_tokens(input_tokens=input_tokens, output_tokens=output_tokens)
+                track_llm_call(
+                    AgentID.WRITING_AGENT,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
+                response_text = response.content[0].text
+                result = self._parse_writing_response(response_text, result, task.title)
+
+                logger.info(
+                    "Content revised",
+                    revision_number=revision_number,
+                    task_id=original_writing.task_id,
+                    original_quality=review_feedback.overall_quality_score
+                )
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Revision failed", error=str(e), revision_number=revision_number)
+                result.metadata["error"] = str(e)
+                # Fall back to original content on error
+                result.raw_content = original_writing.raw_content
+                result.report = original_writing.report
+                metrics_ctx.set_failure(type(e).__name__)
+
             result.processing_time_ms = (time.time() - start_time) * 1000
             return result
-
-        try:
-            # Format the review feedback for the LLM
-            formatted_feedback = self._format_feedback_for_revision(review_feedback)
-
-            # Get original content
-            original_content = original_writing.raw_content
-            if not original_content and original_writing.report:
-                original_content = "\n\n".join([
-                    f"## {s.title}\n{s.content}"
-                    for s in original_writing.report.sections
-                ])
-
-            revision_prompt = self._build_revision_prompt(
-                original_content=original_content,
-                formatted_feedback=formatted_feedback,
-                revision_number=revision_number,
-                task=task,
-                output_format=output_format,
-                target_audience=target_audience
-            )
-
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=max(0.3, self.config["temperature"] - 0.1),  # Slightly lower temp for revisions
-                messages=[
-                    {"role": "user", "content": revision_prompt}
-                ]
-            )
-
-            response_text = response.content[0].text
-            result = self._parse_writing_response(response_text, result, task.title)
-
-            logger.info(
-                "Content revised",
-                revision_number=revision_number,
-                task_id=original_writing.task_id,
-                original_quality=review_feedback.overall_quality_score
-            )
-
-        except Exception as e:
-            logger.error("Revision failed", error=str(e), revision_number=revision_number)
-            result.metadata["error"] = str(e)
-            # Fall back to original content on error
-            result.raw_content = original_writing.raw_content
-            result.report = original_writing.report
-
-        result.processing_time_ms = (time.time() - start_time) * 1000
-        return result
 
     def _format_feedback_for_revision(self, review: ReviewResult) -> str:
         """Format review feedback for the revision prompt"""
@@ -1380,47 +1480,73 @@ class ReviewAgent:
         Returns:
             ReviewResult with issues and recommendations
         """
-        start_time = time.time()
+        async with AgentMetricsContext(
+            AgentID.REVIEW_AGENT,
+            "review",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            start_time = time.time()
 
-        result = ReviewResult(
-            task_id=task_id or writing_result.task_id
-        )
+            result = ReviewResult(
+                task_id=task_id or writing_result.task_id
+            )
 
-        if not self.llm:
-            logger.warning("LLM not available for review")
+            if not self.llm:
+                logger.warning("LLM not available for review")
+                result.processing_time_ms = (time.time() - start_time) * 1000
+                metrics_ctx.set_failure("llm_unavailable")
+                return result
+
+            try:
+                # Prepare content for review
+                content = self._prepare_review_content(writing_result, research_result)
+
+                system_prompt = self._build_system_prompt(
+                    content, check_facts, check_consistency, check_grammar, strict_mode
+                )
+
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=self.config["temperature"],
+                    messages=[
+                        {"role": "user", "content": system_prompt}
+                    ]
+                )
+
+                # Track LLM call metrics
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                metrics_ctx.track_tokens(input_tokens=input_tokens, output_tokens=output_tokens)
+                track_llm_call(
+                    AgentID.REVIEW_AGENT,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+
+                response_text = response.content[0].text
+                result = self._parse_review_response(response_text, result)
+
+                # Determine overall status
+                result.status = self._determine_status(result)
+                result.approved_for_publication = result.status == ReviewStatus.APPROVED
+
+                # Track quality scores
+                if result.overall_quality_score:
+                    track_quality_score(AgentID.REVIEW_AGENT, "review", result.overall_quality_score)
+                    metrics_ctx.track_quality(result.overall_quality_score)
+
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Review failed", error=str(e))
+                result.metadata["error"] = str(e)
+                metrics_ctx.set_failure(type(e).__name__)
+
             result.processing_time_ms = (time.time() - start_time) * 1000
             return result
-
-        try:
-            # Prepare content for review
-            content = self._prepare_review_content(writing_result, research_result)
-
-            system_prompt = self._build_system_prompt(
-                content, check_facts, check_consistency, check_grammar, strict_mode
-            )
-
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                messages=[
-                    {"role": "user", "content": system_prompt}
-                ]
-            )
-
-            response_text = response.content[0].text
-            result = self._parse_review_response(response_text, result)
-
-            # Determine overall status
-            result.status = self._determine_status(result)
-            result.approved_for_publication = result.status == ReviewStatus.APPROVED
-
-        except Exception as e:
-            logger.error("Review failed", error=str(e))
-            result.metadata["error"] = str(e)
-
-        result.processing_time_ms = (time.time() - start_time) * 1000
-        return result
 
     def _prepare_review_content(
         self,
@@ -1800,16 +1926,19 @@ class MultiAgentOrchestrationService:
                         # Track success metrics
                         if revision_count == 0:
                             self._stats["successful_first_pass"] += 1
+                            track_revision(AgentID.REVIEW_AGENT, "approved")
                         else:
                             self._stats["successful_after_revision"] += 1
                             self._stats["revision_distribution"][revision_count] = \
                                 self._stats["revision_distribution"].get(revision_count, 0) + 1
+                            track_revision(AgentID.REVIEW_AGENT, "approved")
                         break
 
                     if revision_count >= min(max_revisions, self.MAX_REVISIONS):
                         # Max revisions reached without approval
                         result.requires_human_review = True
                         self._stats["failed_after_max_revisions"] += 1
+                        track_revision(AgentID.REVIEW_AGENT, "max_revisions")
                         logger.warning(
                             "Max revisions reached without approval",
                             workflow_id=workflow_id,
@@ -1823,6 +1952,7 @@ class MultiAgentOrchestrationService:
                         revision_count += 1
                         self._stats["total_revisions"] += 1
                         review_result.revision_requested = True
+                        track_revision(AgentID.REVIEW_AGENT, "rejected")
 
                         logger.info(
                             "Requesting revision",
@@ -1877,6 +2007,14 @@ class MultiAgentOrchestrationService:
         # Update statistics
         self._stats["workflows_completed"] += 1
         self._stats["total_processing_time_ms"] += result.total_processing_time_ms
+
+        # Track workflow metrics in Prometheus
+        workflow_status = "success" if result.workflow_completed and not result.errors else "failure"
+        track_workflow(
+            "multi_agent_orchestration",
+            workflow_status,
+            result.total_processing_time_ms / 1000.0  # Convert to seconds
+        )
 
         return result
 

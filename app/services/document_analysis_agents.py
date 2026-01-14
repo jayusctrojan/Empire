@@ -30,6 +30,15 @@ from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
 from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+from app.services.agent_metrics import (
+    AgentMetricsContext,
+    AgentID,
+    track_agent_request,
+    track_agent_error,
+    track_llm_call,
+    track_quality_score,
+    track_workflow,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -315,40 +324,70 @@ class ResearchAnalystAgent:
             result.processing_time_ms = (time.time() - start_time) * 1000
             return result
 
-        try:
-            # Build analysis prompt
-            analysis_tasks = []
-            if extract_topics:
-                analysis_tasks.append("TOPICS")
-            if extract_entities:
-                analysis_tasks.append("ENTITIES")
-            if extract_facts:
-                analysis_tasks.append("FACTS")
-            if assess_quality:
-                analysis_tasks.append("QUALITY")
+        # Use metrics context for comprehensive tracking (Task 132)
+        async with AgentMetricsContext(
+            AgentID.RESEARCH_ANALYST,
+            "analyze",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            try:
+                # Build analysis prompt
+                analysis_tasks = []
+                if extract_topics:
+                    analysis_tasks.append("TOPICS")
+                if extract_entities:
+                    analysis_tasks.append("ENTITIES")
+                if extract_facts:
+                    analysis_tasks.append("FACTS")
+                if assess_quality:
+                    analysis_tasks.append("QUALITY")
 
-            system_prompt = self._build_system_prompt(analysis_tasks)
+                system_prompt = self._build_system_prompt(analysis_tasks)
 
-            # Truncate content if too long
-            content_sample = content[:12000] if len(content) > 12000 else content
+                # Truncate content if too long
+                content_sample = content[:12000] if len(content) > 12000 else content
 
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                messages=[
-                    {"role": "user", "content": f"{system_prompt}\n\nDocument to analyze:\n\n{content_sample}"}
-                ]
-            )
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=self.config["temperature"],
+                    messages=[
+                        {"role": "user", "content": f"{system_prompt}\n\nDocument to analyze:\n\n{content_sample}"}
+                    ]
+                )
 
-            response_text = response.content[0].text
+                # Track LLM call metrics (Task 132)
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.RESEARCH_ANALYST,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+                metrics_ctx.track_tokens(input_tokens, output_tokens)
 
-            # Parse the structured response
-            result = self._parse_analysis_response(response_text, result)
+                response_text = response.content[0].text
 
-        except Exception as e:
-            logger.error("Research analysis failed", error=str(e))
-            result.metadata["error"] = str(e)
+                # Parse the structured response
+                result = self._parse_analysis_response(response_text, result)
+
+                # Track quality score if assessed (Task 132)
+                if result.quality_assessment:
+                    track_quality_score(
+                        AgentID.RESEARCH_ANALYST,
+                        "analyze",
+                        result.quality_assessment.quality_score
+                    )
+
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Research analysis failed", error=str(e))
+                result.metadata["error"] = str(e)
+                metrics_ctx.set_failure(type(e).__name__)
+                track_llm_call(AgentID.RESEARCH_ANALYST, self.config["model"], "failure")
 
         result.processing_time_ms = (time.time() - start_time) * 1000
         return result
@@ -541,40 +580,62 @@ class ContentStrategistAgent:
             result.processing_time_ms = (time.time() - start_time) * 1000
             return result
 
-        try:
-            system_prompt = self._build_system_prompt(
-                generate_summary, generate_findings, generate_recommendations,
-                target_audience, research_analysis
-            )
+        # Use metrics context for comprehensive tracking (Task 132)
+        async with AgentMetricsContext(
+            AgentID.CONTENT_STRATEGIST,
+            "strategize",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            try:
+                system_prompt = self._build_system_prompt(
+                    generate_summary, generate_findings, generate_recommendations,
+                    target_audience, research_analysis
+                )
 
-            # Include research analysis context if available
-            context = ""
-            if research_analysis:
-                context = f"\n\nPrior Research Analysis:\n"
-                if research_analysis.topics:
-                    context += f"Main Topics: {', '.join(t.name for t in research_analysis.topics[:5])}\n"
-                if research_analysis.facts:
-                    context += f"Key Facts: {len(research_analysis.facts)} extracted\n"
-                if research_analysis.quality_assessment:
-                    context += f"Quality: {research_analysis.quality_assessment.overall_quality.value}\n"
+                # Include research analysis context if available
+                context = ""
+                if research_analysis:
+                    context = f"\n\nPrior Research Analysis:\n"
+                    if research_analysis.topics:
+                        context += f"Main Topics: {', '.join(t.name for t in research_analysis.topics[:5])}\n"
+                    if research_analysis.facts:
+                        context += f"Key Facts: {len(research_analysis.facts)} extracted\n"
+                    if research_analysis.quality_assessment:
+                        context += f"Quality: {research_analysis.quality_assessment.overall_quality.value}\n"
 
-            content_sample = content[:10000] if len(content) > 10000 else content
+                content_sample = content[:10000] if len(content) > 10000 else content
 
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                messages=[
-                    {"role": "user", "content": f"{system_prompt}{context}\n\nDocument:\n\n{content_sample}"}
-                ]
-            )
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=self.config["temperature"],
+                    messages=[
+                        {"role": "user", "content": f"{system_prompt}{context}\n\nDocument:\n\n{content_sample}"}
+                    ]
+                )
 
-            response_text = response.content[0].text
-            result = self._parse_strategy_response(response_text, result)
+                # Track LLM call metrics (Task 132)
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.CONTENT_STRATEGIST,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+                metrics_ctx.track_tokens(input_tokens, output_tokens)
 
-        except Exception as e:
-            logger.error("Content strategy generation failed", error=str(e))
-            result.metadata["error"] = str(e)
+                response_text = response.content[0].text
+                result = self._parse_strategy_response(response_text, result)
+
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Content strategy generation failed", error=str(e))
+                result.metadata["error"] = str(e)
+                metrics_ctx.set_failure(type(e).__name__)
+                track_llm_call(AgentID.CONTENT_STRATEGIST, self.config["model"], "failure")
 
         result.processing_time_ms = (time.time() - start_time) * 1000
         return result
@@ -770,64 +831,93 @@ class FactCheckerAgent:
             result.processing_time_ms = (time.time() - start_time) * 1000
             return result
 
-        try:
-            # Get claims to verify
-            claims = claims_to_verify or []
+        # Use metrics context for comprehensive tracking (Task 132)
+        async with AgentMetricsContext(
+            AgentID.FACT_CHECKER,
+            "verify",
+            model=self.config["model"]
+        ) as metrics_ctx:
+            try:
+                # Get claims to verify
+                claims = claims_to_verify or []
 
-            # If no specific claims, use facts from research analysis or extract from content
-            if not claims and research_analysis and research_analysis.facts:
-                claims = [f.statement for f in research_analysis.facts[:max_claims]]
+                # If no specific claims, use facts from research analysis or extract from content
+                if not claims and research_analysis and research_analysis.facts:
+                    claims = [f.statement for f in research_analysis.facts[:max_claims]]
 
-            system_prompt = self._build_system_prompt(claims, max_claims)
+                system_prompt = self._build_system_prompt(claims, max_claims)
 
-            content_sample = content[:10000] if len(content) > 10000 else content
+                content_sample = content[:10000] if len(content) > 10000 else content
 
-            response = await self.llm.messages.create(
-                model=self.config["model"],
-                max_tokens=self.config["max_tokens"],
-                temperature=self.config["temperature"],
-                messages=[
-                    {"role": "user", "content": f"{system_prompt}\n\nDocument:\n\n{content_sample}"}
-                ]
-            )
-
-            response_text = response.content[0].text
-            result = self._parse_verification_response(response_text, result)
-
-            # Calculate summary statistics
-            result.claims_checked = len(result.verifications)
-            result.verified_claims = sum(
-                1 for v in result.verifications
-                if v.status in [VerificationStatus.VERIFIED, VerificationStatus.LIKELY_TRUE]
-            )
-            result.uncertain_claims = sum(
-                1 for v in result.verifications
-                if v.status in [VerificationStatus.UNCERTAIN, VerificationStatus.UNVERIFIABLE]
-            )
-            result.false_claims = sum(
-                1 for v in result.verifications
-                if v.status in [VerificationStatus.FALSE, VerificationStatus.LIKELY_FALSE]
-            )
-
-            # Calculate overall credibility
-            if result.claims_checked > 0:
-                credibility_weights = {
-                    VerificationStatus.VERIFIED: 1.0,
-                    VerificationStatus.LIKELY_TRUE: 0.8,
-                    VerificationStatus.UNCERTAIN: 0.5,
-                    VerificationStatus.UNVERIFIABLE: 0.5,
-                    VerificationStatus.LIKELY_FALSE: 0.2,
-                    VerificationStatus.FALSE: 0.0
-                }
-                total_credibility = sum(
-                    credibility_weights.get(v.status, 0.5) * v.confidence
-                    for v in result.verifications
+                response = await self.llm.messages.create(
+                    model=self.config["model"],
+                    max_tokens=self.config["max_tokens"],
+                    temperature=self.config["temperature"],
+                    messages=[
+                        {"role": "user", "content": f"{system_prompt}\n\nDocument:\n\n{content_sample}"}
+                    ]
                 )
-                result.overall_credibility_score = total_credibility / result.claims_checked
 
-        except Exception as e:
-            logger.error("Fact checking failed", error=str(e))
-            result.metadata["error"] = str(e)
+                # Track LLM call metrics (Task 132)
+                input_tokens = getattr(response.usage, 'input_tokens', 0) if hasattr(response, 'usage') else 0
+                output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
+                track_llm_call(
+                    AgentID.FACT_CHECKER,
+                    self.config["model"],
+                    "success",
+                    input_tokens,
+                    output_tokens
+                )
+                metrics_ctx.track_tokens(input_tokens, output_tokens)
+
+                response_text = response.content[0].text
+                result = self._parse_verification_response(response_text, result)
+
+                # Calculate summary statistics
+                result.claims_checked = len(result.verifications)
+                result.verified_claims = sum(
+                    1 for v in result.verifications
+                    if v.status in [VerificationStatus.VERIFIED, VerificationStatus.LIKELY_TRUE]
+                )
+                result.uncertain_claims = sum(
+                    1 for v in result.verifications
+                    if v.status in [VerificationStatus.UNCERTAIN, VerificationStatus.UNVERIFIABLE]
+                )
+                result.false_claims = sum(
+                    1 for v in result.verifications
+                    if v.status in [VerificationStatus.FALSE, VerificationStatus.LIKELY_FALSE]
+                )
+
+                # Calculate overall credibility
+                if result.claims_checked > 0:
+                    credibility_weights = {
+                        VerificationStatus.VERIFIED: 1.0,
+                        VerificationStatus.LIKELY_TRUE: 0.8,
+                        VerificationStatus.UNCERTAIN: 0.5,
+                        VerificationStatus.UNVERIFIABLE: 0.5,
+                        VerificationStatus.LIKELY_FALSE: 0.2,
+                        VerificationStatus.FALSE: 0.0
+                    }
+                    total_credibility = sum(
+                        credibility_weights.get(v.status, 0.5) * v.confidence
+                        for v in result.verifications
+                    )
+                    result.overall_credibility_score = total_credibility / result.claims_checked
+
+                # Track quality score for credibility (Task 132)
+                track_quality_score(
+                    AgentID.FACT_CHECKER,
+                    "verify",
+                    result.overall_credibility_score
+                )
+
+                metrics_ctx.set_success()
+
+            except Exception as e:
+                logger.error("Fact checking failed", error=str(e))
+                result.metadata["error"] = str(e)
+                metrics_ctx.set_failure(type(e).__name__)
+                track_llm_call(AgentID.FACT_CHECKER, self.config["model"], "failure")
 
         result.processing_time_ms = (time.time() - start_time) * 1000
         return result
