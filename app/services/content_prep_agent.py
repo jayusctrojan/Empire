@@ -17,7 +17,19 @@ from typing import Optional
 from uuid import uuid4
 
 import structlog
-from crewai import Agent, Task, Crew
+
+# CrewAI import with graceful fallback for version compatibility
+try:
+    from crewai import Agent, Task, Crew
+    CREWAI_AVAILABLE = True
+except ImportError as e:
+    # CrewAI 1.x may have different import structure or be unavailable
+    Agent = None
+    Task = None
+    Crew = None
+    CREWAI_AVAILABLE = False
+    import logging
+    logging.warning(f"CrewAI not available, LLM-based detection disabled: {e}")
 
 from app.services.b2_storage import B2StorageService
 from app.services.supabase_client import get_supabase_client
@@ -126,18 +138,24 @@ class ContentPrepAgent:
         self.supabase = get_supabase_client()
         self.logger = logger.bind(agent="AGENT-016")
 
-        # CrewAI agent for LLM-assisted ordering
-        self.crew_agent = Agent(
-            role="Content Preparation Specialist",
-            goal="Validate, order, and prepare content sets for optimal knowledge base ingestion",
-            backstory="""You are an expert in content organization and curriculum design.
-            You understand that learning materials must be processed in logical sequence
-            to maintain prerequisite relationships. You detect patterns in file naming,
-            identify content sets, and ensure completeness before processing begins.""",
-            llm="claude-3-5-haiku-20241022",
-            verbose=True,
-            allow_delegation=False,
-        )
+        # CrewAI agent for LLM-assisted ordering (optional)
+        self.crew_agent = None
+        if CREWAI_AVAILABLE and Agent is not None:
+            try:
+                self.crew_agent = Agent(
+                    role="Content Preparation Specialist",
+                    goal="Validate, order, and prepare content sets for optimal knowledge base ingestion",
+                    backstory="""You are an expert in content organization and curriculum design.
+                    You understand that learning materials must be processed in logical sequence
+                    to maintain prerequisite relationships. You detect patterns in file naming,
+                    identify content sets, and ensure completeness before processing begins.""",
+                    llm="claude-3-5-haiku-20241022",
+                    verbose=True,
+                    allow_delegation=False,
+                )
+            except Exception as e:
+                self.logger.warning("crewai_agent_init_failed", error=str(e))
+                self.crew_agent = None
 
     # ========================================================================
     # Public Methods
@@ -481,6 +499,11 @@ class ContentPrepAgent:
     async def _detect_by_llm(self, files: list[dict]) -> list[ContentSet]:
         """Use LLM to detect content sets from ambiguous files."""
         if not files:
+            return []
+
+        # Check if CrewAI is available
+        if not CREWAI_AVAILABLE or self.crew_agent is None or Task is None or Crew is None:
+            self.logger.info("llm_detection_skipped", reason="crewai_not_available")
             return []
 
         # Limit files for context
@@ -1261,5 +1284,5 @@ def get_agent_version() -> str:
 
 
 def is_llm_available() -> bool:
-    """Check if LLM is available (API key set)."""
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
+    """Check if LLM is available (CrewAI + API key)."""
+    return CREWAI_AVAILABLE and bool(os.getenv("ANTHROPIC_API_KEY"))
