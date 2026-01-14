@@ -1412,15 +1412,26 @@ def get_chunks_under_header(
     search_text = parent_header.lower()
 
     for chunk in chunks:
+        # Check if this chunk's section_header matches the parent (is the parent itself)
+        is_parent_chunk = (
+            chunk.metadata.section_header and
+            search_text in chunk.metadata.section_header.lower()
+        )
+
         # Check if this chunk's hierarchy contains the parent
+        has_parent_in_hierarchy = False
         if chunk.metadata.header_hierarchy:
             hierarchy_values = [v.lower() for v in chunk.metadata.header_hierarchy.values()]
-            if any(search_text in v for v in hierarchy_values):
+            has_parent_in_hierarchy = any(search_text in v for v in hierarchy_values)
+
+        # Include if:
+        # 1. It's under the parent (has parent in hierarchy) AND either we include parent or it's not the parent chunk
+        # 2. Or it's the parent chunk and we want to include parent
+        if has_parent_in_hierarchy:
+            if include_parent or not is_parent_chunk:
                 result.append(chunk)
-        # Also check if this is the parent header itself
-        elif include_parent and chunk.metadata.section_header:
-            if search_text in chunk.metadata.section_header.lower():
-                result.append(chunk)
+        elif include_parent and is_parent_chunk:
+            result.append(chunk)
 
     return result
 

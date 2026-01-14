@@ -297,7 +297,8 @@ class TestMigrationSyntax:
         names = list(all_migrations.keys())
         expected = ["001_customer360_schema.cypher",
                     "002_document_structure_schema.cypher",
-                    "003_entity_relationships.cypher"]
+                    "003_entity_relationships.cypher",
+                    "004_content_sets_constraints.cypher"]
         assert names == expected, f"Migration files should be ordered: {expected}"
 
 
