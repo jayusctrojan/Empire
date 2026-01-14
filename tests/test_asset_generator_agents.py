@@ -263,6 +263,8 @@ instructions: |
 tags:
   - test
 """)]
+        # Add usage attribute to avoid MagicMock comparison errors
+        mock_response.usage = MagicMock(input_tokens=100, output_tokens=200)
 
         skill_generator.llm = AsyncMock()
         skill_generator.llm.messages.create = AsyncMock(return_value=mock_response)
@@ -346,6 +348,8 @@ A test command for testing.
 /test-command
 ```
 """)]
+        # Add usage attribute to avoid MagicMock comparison errors
+        mock_response.usage = MagicMock(input_tokens=100, output_tokens=200)
 
         command_generator.llm = MagicMock()
         command_generator.llm.messages = MagicMock()
@@ -407,6 +411,8 @@ llm: claude-sonnet-4-5-20250514
 verbose: true
 allow_delegation: false
 """)]
+        # Add usage attribute to avoid MagicMock comparison errors
+        mock_response.usage = MagicMock(input_tokens=100, output_tokens=200)
 
         agent_generator.llm = AsyncMock()
         agent_generator.llm.messages.create = AsyncMock(return_value=mock_response)
@@ -560,6 +566,8 @@ class TestWorkflowGenerator:
             },
             "settings": {"executionOrder": "v1"}
         }))]
+        # Add usage attribute to avoid MagicMock comparison errors
+        mock_response.usage = MagicMock(input_tokens=100, output_tokens=200)
 
         workflow_generator.llm = AsyncMock()
         workflow_generator.llm.messages.create = AsyncMock(return_value=mock_response)
