@@ -80,7 +80,7 @@ class TestDetectContentSetsTask:
         })
 
         # Call the task directly (not through Celery)
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = detect_content_sets(
                 b2_folder="pending/courses/",
                 detection_mode="auto"
@@ -99,7 +99,7 @@ class TestDetectContentSetsTask:
             "analysis_time_ms": 50,
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = detect_content_sets(
                 b2_folder="pending/empty/",
                 detection_mode="auto"
@@ -114,7 +114,7 @@ class TestDetectContentSetsTask:
 
         mock_content_prep_agent.analyze_folder = AsyncMock(side_effect=Exception("B2 error"))
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             with pytest.raises(Exception, match="B2 error"):
                 detect_content_sets(b2_folder="pending/")
 
@@ -139,7 +139,7 @@ class TestValidateContentSetTask:
             "requires_acknowledgment": False,
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = validate_content_set(content_set_id="test-id")
 
             assert result["status"] == "success"
@@ -158,7 +158,7 @@ class TestValidateContentSetTask:
             "requires_acknowledgment": True,
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = validate_content_set(content_set_id="test-id")
 
             assert result["status"] == "success"
@@ -173,7 +173,7 @@ class TestValidateContentSetTask:
             side_effect=ValueError("Content set not found")
         )
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = validate_content_set(content_set_id="nonexistent")
 
             assert result["status"] == "error"
@@ -204,7 +204,7 @@ class TestGenerateManifestTask:
             "created_at": datetime.utcnow().isoformat(),
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = generate_manifest(content_set_id="test-id")
 
             assert result["status"] == "success"
@@ -219,7 +219,7 @@ class TestGenerateManifestTask:
             side_effect=ValueError("Content set is incomplete")
         )
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = generate_manifest(
                 content_set_id="test-id",
                 proceed_incomplete=False
@@ -243,7 +243,7 @@ class TestGenerateManifestTask:
             "created_at": datetime.utcnow().isoformat(),
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = generate_manifest(
                 content_set_id="test-id",
                 proceed_incomplete=True
@@ -277,7 +277,7 @@ class TestProcessContentSetTask:
             "context": {"set_name": "Test"},
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = process_content_set(content_set_id="test-id")
 
             assert result["status"] == "success"
@@ -292,7 +292,7 @@ class TestProcessContentSetTask:
             "missing_files": ["#3"],
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = process_content_set(
                 content_set_id="test-id",
                 proceed_incomplete=False
@@ -388,7 +388,7 @@ class TestClarifyOrderingAsyncTask:
             "ordered_files": [],
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = clarify_ordering_async(
                 content_set_id="test-id",
                 user_id="user-123",
@@ -411,7 +411,7 @@ class TestClarifyOrderingAsyncTask:
             "ordered_files": [],
         })
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = clarify_ordering_async(
                 content_set_id="test-id",
                 user_id="user-123",
@@ -429,7 +429,7 @@ class TestClarifyOrderingAsyncTask:
             side_effect=Exception("Agent error")
         )
 
-        with patch('app.tasks.content_prep_tasks.ContentPrepAgent', return_value=mock_content_prep_agent):
+        with patch('app.services.content_prep_agent.ContentPrepAgent', return_value=mock_content_prep_agent):
             result = clarify_ordering_async(
                 content_set_id="test-id",
                 user_id="user-123",
