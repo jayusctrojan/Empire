@@ -29,6 +29,8 @@ import structlog
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
+from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+
 # PDF Generation
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -909,9 +911,14 @@ class ContentSummarizerAgentService:
         self.diagram_creator = DiagramCreatorTool(output_base_path)
         self.chart_builder = ChartBuilderTool(output_base_path)
 
-        # Initialize LLM
+        # Initialize LLM with circuit breaker for resilience
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.llm = AsyncAnthropic(api_key=api_key) if api_key else None
+        self.llm = ResilientAnthropicClient(
+            api_key=api_key,
+            service_name="content_summarizer",
+            failure_threshold=5,
+            recovery_timeout=60.0,
+        ) if api_key else None
 
         # Statistics
         self.stats = {

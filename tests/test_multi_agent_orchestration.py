@@ -849,3 +849,516 @@ class TestContentAnalysis:
         critical_issues = [i for i in issues if i.severity == IssueSeverity.CRITICAL]
         assert len(critical_issues) == 1
         assert critical_issues[0].issue_type == IssueType.FACTUAL
+
+
+# =============================================================================
+# TASK 138: REVISION LOOP TESTS
+# =============================================================================
+
+class TestRevisionLoopModels:
+    """Test Task 138 revision loop model enhancements"""
+
+    def test_review_result_revision_fields(self):
+        """Test ReviewResult has revision tracking fields"""
+        review = ReviewResult(
+            status=ReviewStatus.NEEDS_REVISION,
+            overall_quality_score=0.65,
+            issues=[],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=[],
+            revision_count=1,
+            revision_requested=True,
+            quality_threshold=0.75
+        )
+        assert review.revision_count == 1
+        assert review.revision_requested is True
+        assert review.quality_threshold == 0.75
+
+    def test_review_result_default_revision_fields(self):
+        """Test ReviewResult has correct defaults for revision fields"""
+        review = ReviewResult(
+            status=ReviewStatus.APPROVED,
+            overall_quality_score=0.85,
+            issues=[],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=[]
+        )
+        assert review.revision_count == 0
+        assert review.revision_requested is False
+        assert review.quality_threshold == 0.75
+
+    def test_orchestration_result_revision_fields(self):
+        """Test OrchestrationResult has revision tracking fields"""
+        task = WorkflowTask(task_id="test-1", title="Test Task", description="Test task")
+        result = OrchestrationResult(
+            workflow_id="wf-1",
+            task=task,
+            requires_human_review=True,
+            quality_score_history=[0.6, 0.7, 0.75],
+            revision_history=[
+                {"revision_number": 0, "quality_score": 0.6},
+                {"revision_number": 1, "quality_score": 0.7},
+                {"revision_number": 2, "quality_score": 0.75}
+            ]
+        )
+        assert result.requires_human_review is True
+        assert len(result.quality_score_history) == 3
+        assert len(result.revision_history) == 3
+
+    def test_orchestration_result_default_revision_fields(self):
+        """Test OrchestrationResult has correct defaults for revision fields"""
+        task = WorkflowTask(task_id="test-1", title="Test Task", description="Test task")
+        result = OrchestrationResult(workflow_id="wf-1", task=task)
+        assert result.requires_human_review is False
+        assert result.quality_score_history == []
+        assert result.revision_history == []
+
+    def test_review_result_quality_threshold_bounds(self):
+        """Test quality threshold validation"""
+        # Valid threshold
+        review = ReviewResult(
+            status=ReviewStatus.APPROVED,
+            overall_quality_score=0.8,
+            issues=[],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=[],
+            quality_threshold=0.5
+        )
+        assert review.quality_threshold == 0.5
+
+        # Edge case: 0
+        review_zero = ReviewResult(
+            status=ReviewStatus.APPROVED,
+            overall_quality_score=0.8,
+            issues=[],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=[],
+            quality_threshold=0.0
+        )
+        assert review_zero.quality_threshold == 0.0
+
+        # Edge case: 1
+        review_one = ReviewResult(
+            status=ReviewStatus.APPROVED,
+            overall_quality_score=1.0,
+            issues=[],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=[],
+            quality_threshold=1.0
+        )
+        assert review_one.quality_threshold == 1.0
+
+
+class TestWritingAgentRevision:
+    """Test WritingAgent.revise_content method (Task 138)"""
+
+    @pytest.fixture
+    def mock_anthropic_client(self):
+        """Create mock Anthropic client"""
+        client = MagicMock()
+        client.messages = MagicMock()
+        client.messages.create = MagicMock()
+        return client
+
+    @pytest.fixture
+    def writing_agent(self, mock_anthropic_client):
+        """Create WritingAgent with mocked client"""
+        agent = WritingAgent(client=mock_anthropic_client)
+        return agent
+
+    @pytest.fixture
+    def sample_writing_result(self):
+        """Create sample writing result for revision"""
+        return WritingResult(
+            raw_content="Original content that needs improvement.",
+            word_count=6,
+            format=ReportFormat.MARKDOWN,
+            citations=[]
+        )
+
+    @pytest.fixture
+    def sample_review_feedback(self):
+        """Create sample review feedback"""
+        return ReviewResult(
+            status=ReviewStatus.NEEDS_REVISION,
+            overall_quality_score=0.65,
+            issues=[
+                ReviewIssue(
+                    issue_type=IssueType.CLARITY,
+                    severity=IssueSeverity.MAJOR,
+                    description="Content lacks clear structure",
+                    location="paragraph 1",
+                    suggested_fix="Add section headers and improve transitions"
+                )
+            ],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=["Add more detail", "Improve flow"],
+            revision_count=0,
+            revision_requested=True,
+            quality_threshold=0.75
+        )
+
+    @pytest.fixture
+    def sample_task(self):
+        """Create sample workflow task"""
+        return WorkflowTask(task_id="task-1", title="Write Report", description="Write a report")
+
+    @pytest.mark.asyncio
+    async def test_revise_content_called_with_feedback(
+        self, writing_agent, mock_anthropic_client,
+        sample_writing_result, sample_review_feedback, sample_task
+    ):
+        """Test revise_content uses feedback in prompt"""
+        # Setup mock response
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text="Revised content with improvements.")]
+        mock_anthropic_client.messages.create.return_value = mock_response
+
+        result = await writing_agent.revise_content(
+            original_writing=sample_writing_result,
+            review_feedback=sample_review_feedback,
+            task=sample_task,
+            revision_number=1
+        )
+
+        # Verify the method was called
+        mock_anthropic_client.messages.create.assert_called_once()
+
+        # Check the prompt contains revision context
+        call_args = mock_anthropic_client.messages.create.call_args
+        messages = call_args.kwargs.get("messages", [])
+        assert len(messages) > 0
+
+        # Verify result is a WritingResult
+        assert isinstance(result, WritingResult)
+
+    @pytest.mark.asyncio
+    async def test_revise_content_tracks_revision_number(
+        self, writing_agent, mock_anthropic_client,
+        sample_writing_result, sample_review_feedback, sample_task
+    ):
+        """Test revise_content increments revision number correctly"""
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text="Revised content.")]
+        mock_anthropic_client.messages.create.return_value = mock_response
+
+        # First revision
+        await writing_agent.revise_content(
+            original_writing=sample_writing_result,
+            review_feedback=sample_review_feedback,
+            task=sample_task,
+            revision_number=1
+        )
+
+        # Verify call was made
+        assert mock_anthropic_client.messages.create.called
+
+
+class TestRevisionLoopWorkflow:
+    """Test revision loop in execute_workflow (Task 138)"""
+
+    @pytest.fixture
+    def mock_service(self):
+        """Create service with mocked components"""
+        with patch('anthropic.Anthropic') as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.return_value = mock_client
+
+            service = MultiAgentOrchestrationService()
+            service.research_agent = MagicMock(spec=ResearchAgent)
+            service.analysis_agent = MagicMock(spec=AnalysisAgent)
+            service.writing_agent = MagicMock(spec=WritingAgent)
+            service.review_agent = MagicMock(spec=ReviewAgent)
+
+            return service
+
+    @pytest.fixture
+    def sample_writing_result(self):
+        """Create sample writing result"""
+        return WritingResult(
+            raw_content="Test content",
+            word_count=2,
+            format=ReportFormat.MARKDOWN,
+            citations=[]
+        )
+
+    def test_service_has_quality_threshold(self, mock_service):
+        """Test service has quality threshold constant"""
+        assert hasattr(mock_service, 'QUALITY_THRESHOLD')
+        assert mock_service.QUALITY_THRESHOLD == 0.75
+
+    def test_service_has_max_revisions(self, mock_service):
+        """Test service has max revisions constant"""
+        assert hasattr(mock_service, 'MAX_REVISIONS')
+        assert mock_service.MAX_REVISIONS == 3
+
+    @pytest.mark.asyncio
+    async def test_workflow_approved_first_pass(self, mock_service, sample_writing_result):
+        """Test workflow when content is approved on first pass"""
+        # Setup mocks
+        mock_service.research_agent.research = AsyncMock(return_value=ResearchResult(
+            query=ResearchQuery(original_query="test", expanded_queries=[], key_terms=[]),
+            sources=[],
+            findings=[],
+            summary=""
+        ))
+        mock_service.analysis_agent.analyze = AsyncMock(return_value=AnalysisResult(
+            patterns=[],
+            statistics=[],
+            correlations=[],
+            summary=""
+        ))
+        mock_service.writing_agent.write = AsyncMock(return_value=sample_writing_result)
+
+        # Review approves on first try
+        mock_service.review_agent.review = AsyncMock(return_value=ReviewResult(
+            status=ReviewStatus.APPROVED,
+            overall_quality_score=0.85,
+            issues=[],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=[],
+            approved_for_publication=True
+        ))
+
+        task = WorkflowTask(task_id="test-1", title="Test Task", description="Test task")
+        result = await mock_service.execute_workflow(task)
+
+        # Verify successful first pass metrics
+        stats = mock_service.get_stats()
+        assert stats["revision_metrics"]["successful_first_pass"] >= 1
+        assert result.revision_count == 0
+
+    @pytest.mark.asyncio
+    async def test_workflow_approved_after_revision(self, mock_service, sample_writing_result):
+        """Test workflow when content is approved after revision"""
+        mock_service.research_agent.research = AsyncMock(return_value=ResearchResult(
+            query=ResearchQuery(original_query="test", expanded_queries=[], key_terms=[]),
+            sources=[],
+            findings=[],
+            summary=""
+        ))
+        mock_service.analysis_agent.analyze = AsyncMock(return_value=AnalysisResult(
+            patterns=[],
+            statistics=[],
+            correlations=[],
+            summary=""
+        ))
+        mock_service.writing_agent.write = AsyncMock(return_value=sample_writing_result)
+        mock_service.writing_agent.revise_content = AsyncMock(return_value=sample_writing_result)
+
+        # First review: needs revision, second: approved
+        mock_service.review_agent.review = AsyncMock(side_effect=[
+            ReviewResult(
+                status=ReviewStatus.NEEDS_REVISION,
+                overall_quality_score=0.65,
+                issues=[ReviewIssue(issue_type=IssueType.CLARITY, severity=IssueSeverity.MAJOR, description="Unclear")],
+                fact_check_results=[],
+                consistency_checks=[],
+                suggestions=["Improve clarity"]
+            ),
+            ReviewResult(
+                status=ReviewStatus.APPROVED,
+                overall_quality_score=0.82,
+                issues=[],
+                fact_check_results=[],
+                consistency_checks=[],
+                suggestions=[],
+                approved_for_publication=True
+            )
+        ])
+
+        task = WorkflowTask(task_id="test-1", title="Test Task", description="Test task")
+        result = await mock_service.execute_workflow(task)
+
+        # Verify revision was requested and succeeded
+        mock_service.writing_agent.revise_content.assert_called()
+        assert result.revision_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_workflow_max_revisions_reached(self, mock_service, sample_writing_result):
+        """Test workflow when max revisions reached without approval"""
+        mock_service.research_agent.research = AsyncMock(return_value=ResearchResult(
+            query=ResearchQuery(original_query="test", expanded_queries=[], key_terms=[]),
+            sources=[],
+            findings=[],
+            summary=""
+        ))
+        mock_service.analysis_agent.analyze = AsyncMock(return_value=AnalysisResult(
+            patterns=[],
+            statistics=[],
+            correlations=[],
+            summary=""
+        ))
+        mock_service.writing_agent.write = AsyncMock(return_value=sample_writing_result)
+        mock_service.writing_agent.revise_content = AsyncMock(return_value=sample_writing_result)
+
+        # Always needs revision (never approved)
+        mock_service.review_agent.review = AsyncMock(return_value=ReviewResult(
+            status=ReviewStatus.NEEDS_REVISION,
+            overall_quality_score=0.65,
+            issues=[ReviewIssue(issue_type=IssueType.CLARITY, severity=IssueSeverity.MAJOR, description="Still unclear")],
+            fact_check_results=[],
+            consistency_checks=[],
+            suggestions=["Keep improving"]
+        ))
+
+        task = WorkflowTask(task_id="test-1", title="Test Task", description="Test task")
+        result = await mock_service.execute_workflow(task, max_revisions=3)
+
+        # Verify max revisions were attempted
+        assert result.requires_human_review is True
+        assert result.revision_count >= mock_service.MAX_REVISIONS
+
+    def test_quality_score_history_tracking(self, mock_service):
+        """Test that quality score history is properly structured"""
+        task = WorkflowTask(task_id="test-1", title="Test Task", description="Test task")
+        result = OrchestrationResult(
+            workflow_id="wf-1",
+            task=task,
+            quality_score_history=[0.55, 0.65, 0.75, 0.80]
+        )
+        assert len(result.quality_score_history) == 4
+        assert result.quality_score_history[0] < result.quality_score_history[-1]
+
+    def test_revision_history_structure(self, mock_service):
+        """Test revision history contains expected fields"""
+        task = WorkflowTask(task_id="test-1", title="Test Task", description="Test task")
+        revision_entry = {
+            "revision_number": 1,
+            "quality_score": 0.72,
+            "status": "needs_revision",
+            "issues_count": 3,
+            "critical_issues": 1,
+            "approved": False
+        }
+        result = OrchestrationResult(
+            workflow_id="wf-1",
+            task=task,
+            revision_history=[revision_entry]
+        )
+        assert result.revision_history[0]["revision_number"] == 1
+        assert result.revision_history[0]["quality_score"] == 0.72
+        assert result.revision_history[0]["critical_issues"] == 1
+
+
+class TestRevisionMetrics:
+    """Test revision metrics in get_stats (Task 138)"""
+
+    @pytest.fixture
+    def mock_service(self):
+        """Create service with mocked components"""
+        with patch('anthropic.Anthropic') as mock_anthropic:
+            mock_client = MagicMock()
+            mock_anthropic.return_value = mock_client
+            service = MultiAgentOrchestrationService()
+            return service
+
+    def test_get_stats_includes_revision_metrics(self, mock_service):
+        """Test get_stats returns revision metrics"""
+        stats = mock_service.get_stats()
+        assert "revision_metrics" in stats
+
+    def test_revision_metrics_fields(self, mock_service):
+        """Test revision_metrics contains expected fields"""
+        stats = mock_service.get_stats()
+        rm = stats["revision_metrics"]
+
+        assert "successful_first_pass" in rm
+        assert "successful_after_revision" in rm
+        assert "failed_after_max_revisions" in rm
+        assert "total_quality_improvement" in rm
+        assert "revision_distribution" in rm
+        assert "first_pass_success_rate" in rm
+        assert "revision_success_rate" in rm
+        assert "average_quality_improvement_per_revision" in rm
+        assert "quality_threshold" in rm
+        assert "max_revisions_allowed" in rm
+
+    def test_revision_distribution_structure(self, mock_service):
+        """Test revision distribution has correct structure"""
+        stats = mock_service.get_stats()
+        rd = stats["revision_metrics"]["revision_distribution"]
+
+        assert 1 in rd
+        assert 2 in rd
+        assert 3 in rd
+
+    def test_reset_stats_clears_revision_metrics(self, mock_service):
+        """Test reset_stats clears revision metrics"""
+        # Manually set some stats
+        mock_service._stats["successful_first_pass"] = 5
+        mock_service._stats["successful_after_revision"] = 3
+        mock_service._stats["failed_after_max_revisions"] = 1
+        mock_service._stats["total_quality_improvement"] = 0.45
+
+        # Reset
+        mock_service.reset_stats()
+
+        # Verify all revision metrics are cleared
+        assert mock_service._stats["successful_first_pass"] == 0
+        assert mock_service._stats["successful_after_revision"] == 0
+        assert mock_service._stats["failed_after_max_revisions"] == 0
+        assert mock_service._stats["total_quality_improvement"] == 0.0
+
+    def test_first_pass_success_rate_calculation(self, mock_service):
+        """Test first pass success rate is calculated correctly"""
+        mock_service._stats["successful_first_pass"] = 8
+        mock_service._stats["successful_after_revision"] = 2
+        mock_service._stats["failed_after_max_revisions"] = 0
+
+        stats = mock_service.get_stats()
+        rate = stats["revision_metrics"]["first_pass_success_rate"]
+
+        # 8 / (8+2+0) = 0.8
+        assert rate == 0.8
+
+    def test_revision_success_rate_calculation(self, mock_service):
+        """Test revision success rate is calculated correctly"""
+        mock_service._stats["successful_after_revision"] = 3
+        mock_service._stats["failed_after_max_revisions"] = 1
+
+        stats = mock_service.get_stats()
+        rate = stats["revision_metrics"]["revision_success_rate"]
+
+        # 3 / (3+1) = 0.75
+        assert rate == 0.75
+
+    def test_average_quality_improvement_calculation(self, mock_service):
+        """Test average quality improvement per revision is calculated correctly"""
+        mock_service._stats["total_quality_improvement"] = 0.30
+        mock_service._stats["total_revisions"] = 6
+
+        stats = mock_service.get_stats()
+        avg = stats["revision_metrics"]["average_quality_improvement_per_revision"]
+
+        # 0.30 / 6 = 0.05
+        assert avg == 0.05
+
+    def test_metrics_handle_zero_division(self, mock_service):
+        """Test metrics handle zero division gracefully"""
+        mock_service.reset_stats()  # All zeros
+
+        stats = mock_service.get_stats()
+        rm = stats["revision_metrics"]
+
+        # Should not raise and should use max(1, x) for division
+        assert rm["first_pass_success_rate"] == 0.0
+        assert rm["revision_success_rate"] == 0.0
+        assert rm["average_quality_improvement_per_revision"] == 0.0
+
+    def test_quality_threshold_in_metrics(self, mock_service):
+        """Test quality threshold is exposed in metrics"""
+        stats = mock_service.get_stats()
+        assert stats["revision_metrics"]["quality_threshold"] == 0.75
+
+    def test_max_revisions_in_metrics(self, mock_service):
+        """Test max revisions is exposed in metrics"""
+        stats = mock_service.get_stats()
+        assert stats["revision_metrics"]["max_revisions_allowed"] == 3

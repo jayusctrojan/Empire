@@ -1,0 +1,722 @@
+openapi: 3.0.3
+info:
+  title: Graph Agent API
+  description: |
+    Graph Agent endpoints for Empire CKO Chat.
+    Provides Customer 360 views, Document Structure navigation, and Graph-Enhanced RAG.
+  version: 1.0.0
+  contact:
+    name: Empire Development Team
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production
+  - url: http://localhost:8000
+    description: Local Development
+
+tags:
+  - name: Customer 360
+    description: Unified customer view endpoints
+  - name: Document Structure
+    description: Document hierarchy and cross-reference endpoints
+  - name: Graph-Enhanced RAG
+    description: Graph-augmented search endpoints
+  - name: Health
+    description: Service health checks
+
+paths:
+  # Customer 360 Endpoints
+  /api/graph/customer360/query:
+    post:
+      tags:
+        - Customer 360
+      summary: Query customer 360 view
+      description: Natural language query to retrieve unified customer view
+      operationId: customer360Query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Customer360Request'
+      responses:
+        '200':
+          description: Customer 360 view retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer360Response'
+        '404':
+          description: Customer not found
+        '401':
+          description: Unauthorized
+
+  /api/graph/customer360/{customer_id}:
+    get:
+      tags:
+        - Customer 360
+      summary: Get customer 360 by ID
+      operationId: getCustomer360
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: include_documents
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: include_tickets
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: include_orders
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: include_interactions
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: max_items
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Customer 360 view
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer360Response'
+        '404':
+          description: Customer not found
+
+  /api/graph/customer360/{customer_id}/similar:
+    get:
+      tags:
+        - Customer 360
+      summary: Find similar customers
+      operationId: findSimilarCustomers
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+      responses:
+        '200':
+          description: Similar customers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SimilarCustomer'
+
+  # Document Structure Endpoints
+  /api/graph/document-structure/extract:
+    post:
+      tags:
+        - Document Structure
+      summary: Extract document structure
+      description: Extract section hierarchy, cross-references, and definitions from a document
+      operationId: extractDocumentStructure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentStructureExtractRequest'
+      responses:
+        '200':
+          description: Structure extracted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStructureResponse'
+
+  /api/graph/document-structure/{document_id}:
+    get:
+      tags:
+        - Document Structure
+      summary: Get document structure
+      operationId: getDocumentStructure
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Document structure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStructureResponse'
+        '404':
+          description: Document not found or structure not extracted
+
+  /api/graph/document-structure/smart-retrieve:
+    post:
+      tags:
+        - Document Structure
+      summary: Smart retrieval with cross-references
+      description: Retrieve document sections with parent context, cross-references, and definitions
+      operationId: smartRetrieve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmartRetrievalRequest'
+      responses:
+        '200':
+          description: Smart retrieval results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmartRetrievalResponse'
+
+  # Graph-Enhanced RAG Endpoints
+  /api/graph/enhanced-rag/query:
+    post:
+      tags:
+        - Graph-Enhanced RAG
+      summary: Graph-enhanced RAG query
+      description: Vector search augmented with graph context expansion
+      operationId: graphEnhancedRagQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GraphEnhancedRAGRequest'
+      responses:
+        '200':
+          description: Enhanced RAG response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphEnhancedRAGResponse'
+
+  /api/graph/enhanced-rag/expand:
+    post:
+      tags:
+        - Graph-Enhanced RAG
+      summary: Expand chunks with graph context
+      operationId: expandWithGraph
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                chunk_ids:
+                  type: array
+                  items:
+                    type: string
+                expansion_depth:
+                  type: integer
+                  minimum: 1
+                  maximum: 3
+                  default: 1
+              required:
+                - chunk_ids
+      responses:
+        '200':
+          description: Expanded context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphExpansionResult'
+
+  # Health Check
+  /api/graph/health:
+    get:
+      tags:
+        - Health
+      summary: Graph service health check
+      operationId: graphHealth
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphHealthResponse'
+
+components:
+  schemas:
+    # Customer 360 Schemas
+    Customer360Request:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Natural language query (e.g., "Show me Acme Corp")
+        customer_id:
+          type: string
+          format: uuid
+          description: Direct customer ID (optional if using query)
+        include_documents:
+          type: boolean
+          default: true
+        include_tickets:
+          type: boolean
+          default: true
+        include_orders:
+          type: boolean
+          default: true
+        include_interactions:
+          type: boolean
+          default: true
+        max_items_per_category:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+
+    Customer360Response:
+      type: object
+      properties:
+        customer:
+          $ref: '#/components/schemas/CustomerNode'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        tickets:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketSummary'
+        orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+        interactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/InteractionSummary'
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSummary'
+        summary:
+          type: string
+          description: Natural language summary of customer
+        relationship_count:
+          type: integer
+
+    CustomerNode:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [enterprise, smb, individual]
+        industry:
+          type: string
+        status:
+          type: string
+        metadata:
+          type: object
+
+    SimilarCustomer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        industry:
+          type: string
+        shared_products:
+          type: integer
+        same_industry:
+          type: boolean
+        similarity_score:
+          type: number
+
+    DocumentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        type:
+          type: string
+        upload_date:
+          type: string
+          format: date-time
+
+    TicketSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        created_date:
+          type: string
+          format: date-time
+
+    OrderSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_number:
+          type: string
+        amount:
+          type: number
+        status:
+          type: string
+        order_date:
+          type: string
+          format: date-time
+
+    InteractionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        summary:
+          type: string
+        date:
+          type: string
+          format: date-time
+
+    ProductSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        category:
+          type: string
+
+    # Document Structure Schemas
+    DocumentStructureExtractRequest:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        document_content:
+          type: string
+          description: Full document text content
+        extract_cross_refs:
+          type: boolean
+          default: true
+        extract_definitions:
+          type: boolean
+          default: true
+      required:
+        - document_id
+        - document_content
+
+    DocumentStructureResponse:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionNode'
+        definitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DefinedTermNode'
+        cross_references:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrossReference'
+        structure_depth:
+          type: integer
+
+    SectionNode:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: string
+        title:
+          type: string
+        level:
+          type: integer
+        content_preview:
+          type: string
+        child_count:
+          type: integer
+        reference_count:
+          type: integer
+
+    DefinedTermNode:
+      type: object
+      properties:
+        term:
+          type: string
+        definition:
+          type: string
+        section_id:
+          type: string
+
+    CrossReference:
+      type: object
+      properties:
+        from_id:
+          type: string
+        from_number:
+          type: string
+        to_id:
+          type: string
+        to_number:
+          type: string
+        context:
+          type: string
+        reference_text:
+          type: string
+
+    SmartRetrievalRequest:
+      type: object
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        query:
+          type: string
+        include_parent_context:
+          type: boolean
+          default: true
+        include_cross_refs:
+          type: boolean
+          default: true
+        include_definitions:
+          type: boolean
+          default: true
+      required:
+        - document_id
+        - query
+
+    SmartRetrievalResponse:
+      type: object
+      properties:
+        primary_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionResult'
+        parent_context:
+          $ref: '#/components/schemas/SectionNode'
+        cross_references:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionNode'
+        definitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DefinedTermNode'
+        context_chain:
+          type: array
+          items:
+            type: string
+
+    SectionResult:
+      type: object
+      properties:
+        section:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        relevance_score:
+          type: number
+
+    # Graph-Enhanced RAG Schemas
+    GraphEnhancedRAGRequest:
+      type: object
+      properties:
+        query:
+          type: string
+        top_k:
+          type: integer
+          default: 10
+        expansion_depth:
+          type: integer
+          minimum: 1
+          maximum: 3
+          default: 1
+        include_entity_context:
+          type: boolean
+          default: true
+        include_related_documents:
+          type: boolean
+          default: true
+        min_relevance_score:
+          type: number
+          default: 0.5
+      required:
+        - query
+
+    GraphEnhancedRAGResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceChunk'
+        graph_context:
+          $ref: '#/components/schemas/GraphExpansionResult'
+        confidence_score:
+          type: number
+        total_chunks_considered:
+          type: integer
+
+    SourceChunk:
+      type: object
+      properties:
+        id:
+          type: string
+        document_id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        relevance_score:
+          type: number
+        expansion_type:
+          type: string
+          enum: [original, entity_link, related_document]
+
+    GraphExpansionResult:
+      type: object
+      properties:
+        original_chunks:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceChunk'
+        expanded_context:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceChunk'
+        entities_found:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityNode'
+        relationship_paths:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationshipPath'
+        expansion_stats:
+          type: object
+          properties:
+            chunks_before_expansion:
+              type: integer
+            chunks_after_expansion:
+              type: integer
+            entities_extracted:
+              type: integer
+            relationships_traversed:
+              type: integer
+
+    EntityNode:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        mention_count:
+          type: integer
+
+    RelationshipPath:
+      type: object
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        relationship:
+          type: string
+        target_document:
+          type: string
+
+    # Health Schemas
+    GraphHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, degraded]
+        neo4j_connected:
+          type: boolean
+        capabilities:
+          type: object
+          properties:
+            customer_360:
+              type: boolean
+            document_structure:
+              type: boolean
+            graph_enhanced_rag:
+              type: boolean
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

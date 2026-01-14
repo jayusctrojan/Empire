@@ -115,16 +115,144 @@ def sample_manifest():
 # ============================================================================
 
 class TestHealthCheck:
-    """Tests for health check endpoint."""
+    """Tests for health check endpoint (Task 140: Enhanced Health)."""
 
-    def test_health_check(self, client):
-        """Test /api/content-prep/health endpoint."""
+    def test_health_check_returns_comprehensive_status(self, client, mock_content_prep_agent):
+        """Test /api/content-prep/health returns comprehensive status."""
+        # Mock the get_health_status method
+        from app.models.content_sets import (
+            HealthResponse,
+            AgentInfo,
+            ProcessingMetrics,
+            ConnectivityStatus,
+        )
+
+        mock_health_response = HealthResponse(
+            status="healthy",
+            agent=AgentInfo(
+                agent_id="AGENT-016",
+                name="Content Prep Agent",
+                version="1.0.0",
+                uptime_seconds=3600,
+                llm_available=True,
+            ),
+            metrics=ProcessingMetrics(
+                recent_error_count=2,
+                pending_content_sets=5,
+                active_processing_count=1,
+                total_processed_24h=15,
+            ),
+            connectivity=ConnectivityStatus(
+                supabase=True,
+                neo4j=True,
+                b2_storage=True,
+            ),
+            capabilities={
+                "content_set_detection": True,
+                "ordering_analysis": True,
+                "ordering_clarification": True,
+                "manifest_generation": True,
+                "llm_powered": True,
+            },
+        )
+
+        mock_content_prep_agent.get_health_status = AsyncMock(return_value=mock_health_response)
+
         response = client.get("/api/content-prep/health")
 
         assert response.status_code == 200
         data = response.json()
+
+        # Check overall status
         assert data["status"] == "healthy"
-        assert data["agent"] == "AGENT-016"
+
+        # Check agent info
+        assert "agent" in data
+        assert data["agent"]["agent_id"] == "AGENT-016"
+        assert data["agent"]["name"] == "Content Prep Agent"
+        assert data["agent"]["version"] == "1.0.0"
+        assert "uptime_seconds" in data["agent"]
+        assert data["agent"]["llm_available"] is True
+
+        # Check metrics
+        assert "metrics" in data
+        assert data["metrics"]["recent_error_count"] == 2
+        assert data["metrics"]["pending_content_sets"] == 5
+        assert data["metrics"]["active_processing_count"] == 1
+        assert data["metrics"]["total_processed_24h"] == 15
+
+        # Check connectivity
+        assert "connectivity" in data
+        assert data["connectivity"]["supabase"] is True
+        assert data["connectivity"]["neo4j"] is True
+        assert data["connectivity"]["b2_storage"] is True
+
+        # Check capabilities
+        assert "capabilities" in data
+        assert data["capabilities"]["content_set_detection"] is True
+        assert data["capabilities"]["llm_powered"] is True
+
+    def test_health_check_degraded_status(self, client, mock_content_prep_agent):
+        """Test health endpoint returns degraded status when Neo4j is down."""
+        from app.models.content_sets import (
+            HealthResponse,
+            AgentInfo,
+            ProcessingMetrics,
+            ConnectivityStatus,
+        )
+
+        mock_health_response = HealthResponse(
+            status="degraded",
+            agent=AgentInfo(),
+            metrics=ProcessingMetrics(),
+            connectivity=ConnectivityStatus(supabase=True, neo4j=False, b2_storage=True),
+        )
+
+        mock_content_prep_agent.get_health_status = AsyncMock(return_value=mock_health_response)
+
+        response = client.get("/api/content-prep/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "degraded"
+        assert data["connectivity"]["neo4j"] is False
+
+    def test_health_check_unhealthy_status(self, client, mock_content_prep_agent):
+        """Test health endpoint returns unhealthy status when critical services are down."""
+        from app.models.content_sets import (
+            HealthResponse,
+            AgentInfo,
+            ProcessingMetrics,
+            ConnectivityStatus,
+        )
+
+        mock_health_response = HealthResponse(
+            status="unhealthy",
+            agent=AgentInfo(),
+            metrics=ProcessingMetrics(recent_error_count=-1),
+            connectivity=ConnectivityStatus(supabase=False, neo4j=False, b2_storage=False),
+        )
+
+        mock_content_prep_agent.get_health_status = AsyncMock(return_value=mock_health_response)
+
+        response = client.get("/api/content-prep/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "unhealthy"
+        assert data["connectivity"]["supabase"] is False
+
+    def test_health_check_exception_handling(self, client, mock_content_prep_agent):
+        """Test health endpoint handles exceptions gracefully."""
+        mock_content_prep_agent.get_health_status = AsyncMock(side_effect=Exception("Database error"))
+
+        response = client.get("/api/content-prep/health")
+
+        # Should still return 200 with unhealthy status
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "unhealthy"
+        assert data["connectivity"]["supabase"] is False
 
 
 # ============================================================================

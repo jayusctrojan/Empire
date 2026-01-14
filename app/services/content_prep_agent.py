@@ -8,7 +8,9 @@ processed in correct logical/chronological order.
 Feature: 007-content-prep-agent
 """
 
+import os
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
@@ -21,6 +23,10 @@ from app.services.b2_storage import B2StorageService
 from app.services.supabase_client import get_supabase_client
 
 logger = structlog.get_logger(__name__)
+
+# Module-level startup time for uptime tracking
+_AGENT_START_TIME = time.time()
+_AGENT_VERSION = "1.0.0"
 
 
 # ============================================================================
@@ -1101,3 +1107,159 @@ class ContentPrepAgent:
             "files_reordered": 0,
             "message": "Could not parse user response",
         }
+
+    # ========================================================================
+    # Health & Status Methods (Task 140)
+    # ========================================================================
+
+    async def get_health_status(self) -> dict:
+        """
+        Get comprehensive health status for AGENT-016.
+
+        Returns:
+            Dict with agent info, metrics, connectivity, and capabilities
+        """
+        from app.models.content_sets import (
+            HealthResponse,
+            AgentInfo,
+            ProcessingMetrics,
+            ConnectivityStatus,
+        )
+
+        # Get agent info
+        agent_info = AgentInfo(
+            agent_id="AGENT-016",
+            name="Content Prep Agent",
+            version=_AGENT_VERSION,
+            uptime_seconds=int(time.time() - _AGENT_START_TIME),
+            llm_available=bool(os.getenv("ANTHROPIC_API_KEY")),
+        )
+
+        # Get processing metrics
+        metrics = await self._get_processing_metrics()
+
+        # Check connectivity
+        connectivity = await self._check_connectivity()
+
+        # Determine overall status
+        status = "healthy"
+        if not connectivity.supabase or not connectivity.b2_storage:
+            status = "unhealthy"
+        elif not connectivity.neo4j:
+            status = "degraded"
+
+        # Build capabilities
+        capabilities = {
+            "content_set_detection": True,
+            "ordering_analysis": True,
+            "ordering_clarification": True,
+            "manifest_generation": True,
+            "llm_powered": agent_info.llm_available,
+        }
+
+        return HealthResponse(
+            status=status,
+            agent=agent_info,
+            metrics=metrics,
+            connectivity=connectivity,
+            capabilities=capabilities,
+        )
+
+    async def _get_processing_metrics(self):
+        """Get processing metrics from database."""
+        from app.models.content_sets import ProcessingMetrics
+        from datetime import timedelta
+
+        metrics = ProcessingMetrics()
+
+        try:
+            # Get pending content sets count
+            result = self.supabase.table("content_sets").select(
+                "id", count="exact"
+            ).eq("status", "pending").execute()
+            metrics.pending_content_sets = result.count or 0
+
+            # Get active processing count
+            result = self.supabase.table("content_sets").select(
+                "id", count="exact"
+            ).eq("status", "processing").execute()
+            metrics.active_processing_count = result.count or 0
+
+            # Get completed in last 24 hours
+            yesterday = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+            result = self.supabase.table("content_sets").select(
+                "id", count="exact"
+            ).eq("status", "complete").gte("updated_at", yesterday).execute()
+            metrics.total_processed_24h = result.count or 0
+
+            # Get recent error count (last 24 hours)
+            result = self.supabase.table("content_sets").select(
+                "id", count="exact"
+            ).eq("status", "failed").gte("updated_at", yesterday).execute()
+            metrics.recent_error_count = result.count or 0
+
+        except Exception as e:
+            self.logger.warning(
+                "failed_to_get_processing_metrics",
+                error=str(e),
+            )
+            # Return defaults on error
+            metrics.recent_error_count = -1
+
+        return metrics
+
+    async def _check_connectivity(self):
+        """Check connectivity to external services."""
+        from app.models.content_sets import ConnectivityStatus
+
+        connectivity = ConnectivityStatus(
+            supabase=True,
+            neo4j=True,
+            b2_storage=True,
+        )
+
+        # Check Supabase
+        try:
+            self.supabase.table("content_sets").select("id").limit(1).execute()
+        except Exception as e:
+            self.logger.warning("supabase_connectivity_check_failed", error=str(e))
+            connectivity.supabase = False
+
+        # Check Neo4j (if available)
+        try:
+            from app.services.neo4j_http_client import Neo4jHTTPClient
+            client = Neo4jHTTPClient()
+            await client.health_check()
+        except Exception as e:
+            self.logger.warning("neo4j_connectivity_check_failed", error=str(e))
+            connectivity.neo4j = False
+
+        # Check B2 Storage
+        try:
+            # Simple bucket check
+            self.b2_service.bucket is not None
+        except Exception as e:
+            self.logger.warning("b2_connectivity_check_failed", error=str(e))
+            connectivity.b2_storage = False
+
+        return connectivity
+
+
+# =============================================================================
+# Module-Level Utility Functions (Task 140)
+# =============================================================================
+
+
+def get_agent_uptime() -> int:
+    """Get agent uptime in seconds."""
+    return int(time.time() - _AGENT_START_TIME)
+
+
+def get_agent_version() -> str:
+    """Get agent version."""
+    return _AGENT_VERSION
+
+
+def is_llm_available() -> bool:
+    """Check if LLM is available (API key set)."""
+    return bool(os.getenv("ANTHROPIC_API_KEY"))

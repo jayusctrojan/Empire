@@ -6,7 +6,7 @@ Purpose: API request/response models for content set detection and processing ma
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -292,9 +292,82 @@ class ValidateResponse(BaseModel):
 # ============================================================================
 
 
-class HealthResponse(BaseModel):
-    """Health check response."""
+class AgentInfo(BaseModel):
+    """Agent identification and status information."""
 
-    status: str = "healthy"
-    agent: str = "AGENT-016"
+    agent_id: str = "AGENT-016"
+    name: str = "Content Prep Agent"
     version: str = "1.0.0"
+    uptime_seconds: int = 0
+    llm_available: bool = False
+
+
+class ProcessingMetrics(BaseModel):
+    """Processing metrics for the agent."""
+
+    recent_error_count: int = 0
+    pending_content_sets: int = 0
+    active_processing_count: int = 0
+    total_processed_24h: int = 0
+
+
+class ConnectivityStatus(BaseModel):
+    """Connectivity status for external services."""
+
+    supabase: bool = True
+    neo4j: bool = True
+    b2_storage: bool = True
+
+
+class HealthResponse(BaseModel):
+    """Comprehensive health check response for Content Prep Agent."""
+
+    status: str = Field(
+        default="healthy",
+        description="Overall health status: healthy, degraded, or unhealthy"
+    )
+    agent: AgentInfo = Field(default_factory=AgentInfo)
+    metrics: ProcessingMetrics = Field(default_factory=ProcessingMetrics)
+    connectivity: ConnectivityStatus = Field(default_factory=ConnectivityStatus)
+    capabilities: Dict[str, bool] = Field(
+        default_factory=lambda: {
+            "content_set_detection": True,
+            "ordering_analysis": True,
+            "ordering_clarification": True,
+            "manifest_generation": True,
+            "llm_powered": False,
+        }
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "status": "healthy",
+                "agent": {
+                    "agent_id": "AGENT-016",
+                    "name": "Content Prep Agent",
+                    "version": "1.0.0",
+                    "uptime_seconds": 3600,
+                    "llm_available": True
+                },
+                "metrics": {
+                    "recent_error_count": 2,
+                    "pending_content_sets": 5,
+                    "active_processing_count": 1,
+                    "total_processed_24h": 15
+                },
+                "connectivity": {
+                    "supabase": True,
+                    "neo4j": True,
+                    "b2_storage": True
+                },
+                "capabilities": {
+                    "content_set_detection": True,
+                    "ordering_analysis": True,
+                    "ordering_clarification": True,
+                    "manifest_generation": True,
+                    "llm_powered": True
+                }
+            }
+        }
+    }

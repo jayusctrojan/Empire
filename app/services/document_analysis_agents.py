@@ -29,6 +29,8 @@ import structlog
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
+from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+
 logger = structlog.get_logger(__name__)
 
 
@@ -268,7 +270,12 @@ class ResearchAnalystAgent:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if api_key:
-            self.llm = AsyncAnthropic(api_key=api_key)
+            self.llm = ResilientAnthropicClient(
+                api_key=api_key,
+                service_name="research_analyst",
+                failure_threshold=5,
+                recovery_timeout=60.0,
+            )
 
         logger.info(f"{self.AGENT_ID} initialized", llm_available=self.llm is not None)
 
@@ -488,7 +495,12 @@ class ContentStrategistAgent:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if api_key:
-            self.llm = AsyncAnthropic(api_key=api_key)
+            self.llm = ResilientAnthropicClient(
+                api_key=api_key,
+                service_name="content_strategist",
+                failure_threshold=5,
+                recovery_timeout=60.0,
+            )
 
         logger.info(f"{self.AGENT_ID} initialized", llm_available=self.llm is not None)
 
@@ -716,7 +728,12 @@ class FactCheckerAgent:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if api_key:
-            self.llm = AsyncAnthropic(api_key=api_key)
+            self.llm = ResilientAnthropicClient(
+                api_key=api_key,
+                service_name="fact_checker",
+                failure_threshold=5,
+                recovery_timeout=60.0,
+            )
 
         logger.info(f"{self.AGENT_ID} initialized", llm_available=self.llm is not None)
 

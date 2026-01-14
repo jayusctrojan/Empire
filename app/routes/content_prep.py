@@ -231,15 +231,34 @@ async def generate_manifest(request: ManifestRequest) -> ManifestResponse:
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> HealthResponse:
     """
-    Service health check for Content Prep Agent.
+    Comprehensive health check for Content Prep Agent (AGENT-016).
 
-    Returns agent status and version.
+    Returns:
+        HealthResponse: Detailed health status including:
+        - Agent info (ID, name, version, uptime, LLM availability)
+        - Processing metrics (pending sets, active processing, error count)
+        - Connectivity status (Supabase, Neo4j, B2 Storage)
+        - Capabilities (content detection, ordering, clarification, manifests)
     """
-    return HealthResponse(
-        status="healthy",
-        agent="AGENT-016",
-        version="1.0.0",
-    )
+    try:
+        agent = ContentPrepAgent()
+        return await agent.get_health_status()
+    except Exception as e:
+        # Return degraded status on error
+        from app.models.content_sets import AgentInfo, ProcessingMetrics, ConnectivityStatus
+        return HealthResponse(
+            status="unhealthy",
+            agent=AgentInfo(),
+            metrics=ProcessingMetrics(recent_error_count=-1),
+            connectivity=ConnectivityStatus(supabase=False, neo4j=False, b2_storage=False),
+            capabilities={
+                "content_set_detection": False,
+                "ordering_analysis": False,
+                "ordering_clarification": False,
+                "manifest_generation": False,
+                "llm_powered": False,
+            }
+        )
 
 
 # ============================================================================

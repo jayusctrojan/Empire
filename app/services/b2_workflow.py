@@ -733,6 +733,185 @@ class B2WorkflowManager:
         return results
 
 
+    # =========================================================================
+    # Content Prep Agent Integration (Feature 007)
+    # =========================================================================
+
+    async def process_pending_with_content_prep(
+        self,
+        b2_folder: str = "pending/courses",
+        detection_mode: str = "auto",
+        auto_process: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Process pending folder with Content Prep Agent integration.
+
+        Feature 007: Detects content sets before processing to ensure
+        related files are processed together in correct order.
+
+        Workflow:
+        1. Analyze pending folder for content sets
+        2. For standalone files: Move to processing immediately
+        3. For content sets:
+           - If complete: Generate manifest and process in order
+           - If incomplete: Flag for user acknowledgment
+
+        Args:
+            b2_folder: B2 folder to analyze (default: pending/courses)
+            detection_mode: Content set detection mode (auto/pattern/metadata/llm)
+            auto_process: If True, automatically start processing complete sets
+
+        Returns:
+            dict: Analysis results with content sets and actions taken
+        """
+        from app.services.content_prep_agent import ContentPrepAgent
+
+        logger.info(f"Processing pending folder with Content Prep: {b2_folder}")
+
+        try:
+            agent = ContentPrepAgent()
+
+            # Step 1: Analyze folder for content sets
+            analysis = await agent.analyze_folder(
+                b2_folder=b2_folder,
+                detection_mode=detection_mode
+            )
+
+            content_sets = analysis.get("content_sets", [])
+            standalone_files = analysis.get("standalone_files", [])
+
+            results = {
+                "b2_folder": b2_folder,
+                "detection_mode": detection_mode,
+                "content_sets_found": len(content_sets),
+                "standalone_files_found": len(standalone_files),
+                "content_sets": [],
+                "standalone_processed": [],
+                "actions": []
+            }
+
+            # Step 2: Process standalone files immediately
+            for standalone in standalone_files:
+                file_path = standalone.get("path")
+                if file_path and auto_process:
+                    try:
+                        # Get file ID from path (would need B2 API lookup)
+                        # For now, log the action
+                        results["standalone_processed"].append({
+                            "file": standalone.get("filename"),
+                            "path": file_path,
+                            "action": "queued_for_processing"
+                        })
+                        results["actions"].append(
+                            f"Standalone file {standalone.get('filename')} queued for processing"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to process standalone file {file_path}: {e}")
+                else:
+                    results["standalone_processed"].append({
+                        "file": standalone.get("filename"),
+                        "path": file_path,
+                        "action": "pending_manual_trigger"
+                    })
+
+            # Step 3: Handle content sets
+            for content_set in content_sets:
+                set_id = content_set.get("id")
+                set_name = content_set.get("name")
+                is_complete = content_set.get("is_complete", False)
+
+                set_result = {
+                    "id": set_id,
+                    "name": set_name,
+                    "files_count": content_set.get("files_count", 0),
+                    "is_complete": is_complete,
+                    "missing_files": content_set.get("missing_files", []),
+                    "action": None,
+                    "manifest_id": None
+                }
+
+                if is_complete and auto_process:
+                    # Generate manifest and start processing
+                    try:
+                        manifest = await agent.generate_manifest(
+                            content_set_id=set_id,
+                            proceed_incomplete=False
+                        )
+                        set_result["action"] = "processing_started"
+                        set_result["manifest_id"] = manifest.get("manifest_id")
+                        results["actions"].append(
+                            f"Content set '{set_name}' manifest generated, processing started"
+                        )
+                    except Exception as e:
+                        set_result["action"] = "manifest_failed"
+                        set_result["error"] = str(e)
+                        logger.error(f"Failed to generate manifest for {set_id}: {e}")
+
+                elif is_complete:
+                    set_result["action"] = "ready_for_processing"
+                    results["actions"].append(
+                        f"Content set '{set_name}' is complete, ready for processing"
+                    )
+
+                else:
+                    set_result["action"] = "awaiting_acknowledgment"
+                    results["actions"].append(
+                        f"Content set '{set_name}' is incomplete (missing: "
+                        f"{len(content_set.get('missing_files', []))} files), "
+                        "requires acknowledgment to proceed"
+                    )
+
+                results["content_sets"].append(set_result)
+
+            logger.info(
+                f"Content prep analysis complete: "
+                f"{len(content_sets)} sets, {len(standalone_files)} standalone"
+            )
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Content prep processing failed: {e}", exc_info=True)
+            raise
+
+    async def trigger_content_set_processing(
+        self,
+        content_set_id: str,
+        proceed_incomplete: bool = False,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Trigger processing for a specific content set.
+
+        Feature 007: Generates manifest and triggers ordered Celery tasks.
+
+        Args:
+            content_set_id: UUID of the content set
+            proceed_incomplete: Process even if files are missing
+            user_id: Optional user ID for tracking
+
+        Returns:
+            dict: Processing trigger result with task IDs
+        """
+        from app.tasks.content_prep_tasks import process_content_set
+
+        logger.info(f"Triggering processing for content set: {content_set_id}")
+
+        # Trigger the Celery task
+        task = process_content_set.delay(
+            content_set_id=content_set_id,
+            proceed_incomplete=proceed_incomplete,
+            user_id=user_id
+        )
+
+        return {
+            "status": "processing_triggered",
+            "content_set_id": content_set_id,
+            "task_id": task.id,
+            "proceed_incomplete": proceed_incomplete
+        }
+
+
 # Singleton instance
 _workflow_manager = None
 

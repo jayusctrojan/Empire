@@ -29,6 +29,8 @@ import structlog
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
+from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+
 logger = structlog.get_logger(__name__)
 
 
@@ -392,7 +394,12 @@ class DepartmentClassifierTool:
         if use_llm_enhancement:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if api_key:
-                self.llm = AsyncAnthropic(api_key=api_key)
+                self.llm = ResilientAnthropicClient(
+                    api_key=api_key,
+                    service_name="department_classifier",
+                    failure_threshold=5,
+                    recovery_timeout=60.0,
+                )
 
         logger.info(
             "DepartmentClassifierTool initialized",

@@ -23,7 +23,7 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness)
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001)
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -40,6 +40,10 @@ from app.middleware.rls_context import configure_rls_context
 from app.middleware.input_validation import configure_input_validation
 from app.middleware.audit import configure_audit_logging
 
+# Task 136: Request tracing middleware for X-Request-ID propagation
+from app.middleware.request_tracing import RequestTracingMiddleware
+from app.core.logging_config import configure_logging
+
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
 REQUEST_LATENCY = Histogram('empire_request_duration_seconds', 'HTTP request latency', ['method', 'endpoint'])
@@ -53,6 +57,13 @@ async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events
     """
+    # Task 136: Configure logging with request ID support (before other startup messages)
+    configure_logging(
+        log_level=os.getenv("LOG_LEVEL", "INFO"),
+        json_output=os.getenv("ENVIRONMENT") == "production",
+        include_timestamps=True
+    )
+
     # Startup: Initialize connections
     print("🚀 Empire v7.3 FastAPI starting...")
     print(f"📊 Supabase: {os.getenv('SUPABASE_URL')}")
@@ -206,6 +217,16 @@ print("🛡️ Input validation middleware enabled (max body size: 100MB)")
 # Task 41.5: Audit Logging - Track security events
 configure_audit_logging(app)
 print("📝 Audit logging middleware enabled")
+
+# Task 136: Request Tracing - X-Request-ID propagation for agent chains
+app.add_middleware(
+    RequestTracingMiddleware,
+    header_name="X-Request-ID",
+    log_requests=os.getenv("ENVIRONMENT") != "production",  # Verbose logging in dev only
+    include_path=True,
+    include_timing=True
+)
+print("🔗 Request tracing middleware enabled (X-Request-ID)")
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"
@@ -473,6 +494,12 @@ app.include_router(conversations.router)  # Conversations router has /api/conver
 
 # Research Projects API (Task 91-100: Agent Harness)
 app.include_router(research_projects.router)  # Research Projects router has /api/research-projects prefix
+
+# Task 47: Content Prep Agent (AGENT-016) - Content Set Detection and Ordering
+app.include_router(content_prep.router)  # Content Prep router has /api/content-prep prefix
+
+# Task 133: Master Orchestrator API (AGENT-001) - Content Classification and Asset Orchestration
+app.include_router(orchestrator.router)  # Orchestrator router has /api/orchestrator prefix
 
 # TODO: Additional routers
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])

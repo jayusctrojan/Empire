@@ -86,12 +86,14 @@ def process_source(
     self,
     source_id: str,
     user_id: str,
-    queue_start_time: Optional[float] = None  # Task 69: For queue time tracking
+    queue_start_time: Optional[float] = None,  # Task 69: For queue time tracking
+    content_set_context: Optional[Dict[str, Any]] = None  # Feature 007: Content set context
 ) -> Dict[str, Any]:
     """
     Process a project source: extract content, generate summary, create embeddings.
 
     Task 69: Enhanced with performance profiling and content caching.
+    Feature 007: Enhanced with content set context support.
 
     Handles all source types:
     - Documents: PDF, DOCX, XLSX, PPTX, TXT, MD, CSV, RTF
@@ -103,6 +105,12 @@ def process_source(
         source_id: UUID of the source to process
         user_id: User ID for access control
         queue_start_time: Timestamp when task was queued (for latency tracking)
+        content_set_context: Optional context from Content Prep Agent containing:
+            - content_set_id: UUID of the parent content set
+            - content_set_name: Name of the content set
+            - sequence_number: Position in the set (1-based)
+            - is_sequential: Whether set has defined order
+            - total_files: Total files in the set
 
     Returns:
         Processing result with status and metadata
@@ -352,6 +360,7 @@ def process_source(
         )
 
         # Task 69: Store embeddings with profiling
+        # Feature 007: Pass content set context for relationship creation
         async def store_with_profiling():
             async with profiler.profile_stage(source_id, "embedding_storage"):
                 _store_embeddings(
@@ -360,12 +369,22 @@ def process_source(
                     project_id=project_id,
                     user_id=user_id,
                     chunks=chunks,
-                    embeddings=embeddings
+                    embeddings=embeddings,
+                    content_set_context=content_set_context  # Feature 007
                 )
 
         run_async(store_with_profiling())
 
         # Update source with content, summary, and metadata
+        # Feature 007: Include content set context in metadata
+        if content_set_context:
+            metadata["content_set"] = {
+                "id": content_set_context.get("content_set_id"),
+                "name": content_set_context.get("content_set_name"),
+                "sequence": content_set_context.get("sequence_number"),
+                "is_sequential": content_set_context.get("is_sequential", True)
+            }
+
         update_data = {
             "content": content[:50000],  # Limit stored content
             "summary": summary,
@@ -406,13 +425,24 @@ def process_source(
         )
 
         logger.info(f"Source processing completed: {source_id}")
-        return {
+
+        # Feature 007: Include content set info in result
+        result = {
             "status": "success",
             "source_id": source_id,
             "chunks_created": len(chunks),
             "content_length": len(content),
             "has_summary": bool(summary)
         }
+
+        if content_set_context:
+            result["content_set"] = {
+                "id": content_set_context.get("content_set_id"),
+                "name": content_set_context.get("content_set_name"),
+                "sequence": content_set_context.get("sequence_number")
+            }
+
+        return result
 
     except Exception as e:
         logger.error(f"Source processing failed: {source_id}", exc_info=True)
@@ -1144,9 +1174,14 @@ def _store_embeddings(
     project_id: str,
     user_id: str,
     chunks: List[str],
-    embeddings: List[List[float]]
+    embeddings: List[List[float]],
+    content_set_context: Optional[Dict[str, Any]] = None  # Feature 007
 ):
-    """Store embeddings in source_embeddings table"""
+    """
+    Store embeddings in source_embeddings table.
+
+    Feature 007: Enhanced with content set context metadata.
+    """
     try:
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             embedding_id = str(uuid4())
@@ -1164,13 +1199,118 @@ def _store_embeddings(
                 "created_at": datetime.utcnow().isoformat(),
             }
 
+            # Feature 007: Add content set metadata if available
+            if content_set_context:
+                embedding_data["metadata"] = {
+                    "content_set_id": content_set_context.get("content_set_id"),
+                    "content_set_name": content_set_context.get("content_set_name"),
+                    "sequence_number": content_set_context.get("sequence_number"),
+                    "is_part_of_sequence": True
+                }
+
             supabase.table("source_embeddings").insert(embedding_data).execute()
 
         logger.info(f"Stored {len(embeddings)} embeddings for source {source_id}")
 
+        # Feature 007: Create Neo4j relationships if content set context provided
+        if content_set_context:
+            _create_content_set_relationships(
+                source_id=source_id,
+                content_set_context=content_set_context
+            )
+
     except Exception as e:
         logger.error(f"Failed to store embeddings: {e}")
         raise
+
+
+def _create_content_set_relationships(
+    source_id: str,
+    content_set_context: Dict[str, Any]
+):
+    """
+    Create Neo4j relationships for content set membership.
+
+    Feature 007: Links documents to their parent content set
+    and establishes sequence relationships.
+
+    Args:
+        source_id: UUID of the processed source/document
+        content_set_context: Content set context with set_id and sequence
+    """
+    try:
+        from app.services.graph_service import get_graph_service
+
+        graph_service = get_graph_service()
+
+        content_set_id = content_set_context.get("content_set_id")
+        content_set_name = content_set_context.get("content_set_name")
+        sequence_number = content_set_context.get("sequence_number", 0)
+        is_sequential = content_set_context.get("is_sequential", True)
+
+        if not content_set_id:
+            logger.warning("No content_set_id in context, skipping relationship creation")
+            return
+
+        # Create or merge ContentSet node
+        graph_service.run_query(
+            """
+            MERGE (cs:ContentSet {id: $content_set_id})
+            ON CREATE SET
+                cs.name = $content_set_name,
+                cs.created_at = datetime(),
+                cs.is_sequential = $is_sequential
+            ON MATCH SET
+                cs.updated_at = datetime()
+            """,
+            {
+                "content_set_id": content_set_id,
+                "content_set_name": content_set_name or "Unknown",
+                "is_sequential": is_sequential
+            }
+        )
+
+        # Create PART_OF relationship with sequence number
+        graph_service.run_query(
+            """
+            MATCH (d:Document {id: $document_id})
+            MATCH (cs:ContentSet {id: $content_set_id})
+            MERGE (d)-[r:PART_OF]->(cs)
+            SET r.sequence = $sequence_number,
+                r.created_at = datetime()
+            """,
+            {
+                "document_id": source_id,
+                "content_set_id": content_set_id,
+                "sequence_number": sequence_number
+            }
+        )
+
+        # Create PRECEDES relationship to previous document in sequence (if exists)
+        if sequence_number > 1:
+            graph_service.run_query(
+                """
+                MATCH (current:Document {id: $document_id})-[:PART_OF]->(cs:ContentSet {id: $content_set_id})
+                MATCH (prev:Document)-[r:PART_OF]->(cs)
+                WHERE r.sequence = $prev_sequence
+                MERGE (prev)-[:PRECEDES]->(current)
+                MERGE (current)-[:FOLLOWS]->(prev)
+                """,
+                {
+                    "document_id": source_id,
+                    "content_set_id": content_set_id,
+                    "prev_sequence": sequence_number - 1
+                }
+            )
+
+        logger.info(
+            f"Created content set relationships for document {source_id} "
+            f"in set {content_set_id} (sequence: {sequence_number})"
+        )
+
+    except Exception as e:
+        # Log but don't fail the main task
+        logger.warning(f"Failed to create content set relationships: {e}")
 
 
 # ============================================================================

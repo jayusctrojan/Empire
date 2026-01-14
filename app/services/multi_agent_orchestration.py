@@ -29,8 +29,9 @@ import asyncio
 import time
 
 import structlog
-from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
+
+from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
 
 logger = structlog.get_logger(__name__)
 
@@ -323,6 +324,10 @@ class ReviewResult(BaseModel):
     approved_for_publication: bool = False
     processing_time_ms: float = 0.0
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    # Task 138: Revision loop enhancements
+    revision_count: int = 0  # Track number of revisions
+    revision_requested: bool = False  # Flag indicating revision needed
+    quality_threshold: float = Field(ge=0.0, le=1.0, default=0.75)  # Minimum acceptable quality
 
 
 # =============================================================================
@@ -353,6 +358,10 @@ class OrchestrationResult(BaseModel):
     total_processing_time_ms: float = 0.0
     revision_count: int = 0
     errors: List[str] = Field(default_factory=list)
+    # Task 138: Revision loop enhancements
+    requires_human_review: bool = False  # Flag when max revisions reached without approval
+    quality_score_history: List[float] = Field(default_factory=list)  # Track quality improvement
+    revision_history: List[Dict[str, Any]] = Field(default_factory=list)  # Store revision details
 
 
 # =============================================================================
@@ -376,7 +385,12 @@ class ResearchAgent:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if api_key:
-            self.llm = AsyncAnthropic(api_key=api_key)
+            self.llm = ResilientAnthropicClient(
+                api_key=api_key,
+                service_name="research_agent",
+                failure_threshold=5,
+                recovery_timeout=60.0,
+            )
 
         logger.info(f"{self.AGENT_ID} initialized", llm_available=self.llm is not None)
 
@@ -585,7 +599,12 @@ class AnalysisAgent:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if api_key:
-            self.llm = AsyncAnthropic(api_key=api_key)
+            self.llm = ResilientAnthropicClient(
+                api_key=api_key,
+                service_name="analysis_agent",
+                failure_threshold=5,
+                recovery_timeout=60.0,
+            )
 
         logger.info(f"{self.AGENT_ID} initialized", llm_available=self.llm is not None)
 
@@ -846,7 +865,12 @@ class WritingAgent:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if api_key:
-            self.llm = AsyncAnthropic(api_key=api_key)
+            self.llm = ResilientAnthropicClient(
+                api_key=api_key,
+                service_name="writing_agent",
+                failure_threshold=5,
+                recovery_timeout=60.0,
+            )
 
         logger.info(f"{self.AGENT_ID} initialized", llm_available=self.llm is not None)
 
@@ -913,6 +937,205 @@ class WritingAgent:
 
         result.processing_time_ms = (time.time() - start_time) * 1000
         return result
+
+    async def revise_content(
+        self,
+        original_writing: WritingResult,
+        review_feedback: ReviewResult,
+        task: WorkflowTask,
+        revision_number: int,
+        research_result: Optional[ResearchResult] = None,
+        analysis_result: Optional[AnalysisResult] = None,
+        output_format: ReportFormat = ReportFormat.MARKDOWN,
+        target_audience: str = "business professionals"
+    ) -> WritingResult:
+        """
+        Revise content based on review feedback (Task 138).
+
+        This method specifically addresses review feedback to improve
+        the quality of the generated content.
+
+        Args:
+            original_writing: The original writing result to revise
+            review_feedback: Review result with issues and suggestions
+            task: The original workflow task
+            revision_number: Current revision iteration (1, 2, or 3)
+            research_result: Optional research for reference
+            analysis_result: Optional analysis for reference
+            output_format: Output format
+            target_audience: Target audience
+
+        Returns:
+            WritingResult with revised content
+        """
+        start_time = time.time()
+
+        result = WritingResult(
+            task_id=original_writing.task_id,
+            format=output_format
+        )
+        result.metadata["revision_number"] = revision_number
+        result.metadata["original_quality_score"] = review_feedback.overall_quality_score
+
+        if not self.llm:
+            logger.warning("LLM not available for revision")
+            result.processing_time_ms = (time.time() - start_time) * 1000
+            return result
+
+        try:
+            # Format the review feedback for the LLM
+            formatted_feedback = self._format_feedback_for_revision(review_feedback)
+
+            # Get original content
+            original_content = original_writing.raw_content
+            if not original_content and original_writing.report:
+                original_content = "\n\n".join([
+                    f"## {s.title}\n{s.content}"
+                    for s in original_writing.report.sections
+                ])
+
+            revision_prompt = self._build_revision_prompt(
+                original_content=original_content,
+                formatted_feedback=formatted_feedback,
+                revision_number=revision_number,
+                task=task,
+                output_format=output_format,
+                target_audience=target_audience
+            )
+
+            response = await self.llm.messages.create(
+                model=self.config["model"],
+                max_tokens=self.config["max_tokens"],
+                temperature=max(0.3, self.config["temperature"] - 0.1),  # Slightly lower temp for revisions
+                messages=[
+                    {"role": "user", "content": revision_prompt}
+                ]
+            )
+
+            response_text = response.content[0].text
+            result = self._parse_writing_response(response_text, result, task.title)
+
+            logger.info(
+                "Content revised",
+                revision_number=revision_number,
+                task_id=original_writing.task_id,
+                original_quality=review_feedback.overall_quality_score
+            )
+
+        except Exception as e:
+            logger.error("Revision failed", error=str(e), revision_number=revision_number)
+            result.metadata["error"] = str(e)
+            # Fall back to original content on error
+            result.raw_content = original_writing.raw_content
+            result.report = original_writing.report
+
+        result.processing_time_ms = (time.time() - start_time) * 1000
+        return result
+
+    def _format_feedback_for_revision(self, review: ReviewResult) -> str:
+        """Format review feedback for the revision prompt"""
+        feedback_parts = []
+
+        # Overall assessment
+        feedback_parts.append(f"Overall Quality Score: {review.overall_quality_score:.2f}")
+        feedback_parts.append(f"Grammar Score: {review.grammar_score:.2f}")
+        feedback_parts.append(f"Clarity Score: {review.clarity_score:.2f}")
+        feedback_parts.append(f"Completeness Score: {review.completeness_score:.2f}")
+
+        # Issues by severity
+        if review.issues:
+            critical_issues = [i for i in review.issues if i.severity == IssueSeverity.CRITICAL]
+            major_issues = [i for i in review.issues if i.severity == IssueSeverity.MAJOR]
+            minor_issues = [i for i in review.issues if i.severity == IssueSeverity.MINOR]
+
+            if critical_issues:
+                feedback_parts.append("\n**CRITICAL ISSUES (Must Fix):**")
+                for issue in critical_issues:
+                    feedback_parts.append(f"- [{issue.issue_type.value}] {issue.description}")
+                    if issue.suggestion:
+                        feedback_parts.append(f"  Suggestion: {issue.suggestion}")
+
+            if major_issues:
+                feedback_parts.append("\n**MAJOR ISSUES (Should Fix):**")
+                for issue in major_issues:
+                    feedback_parts.append(f"- [{issue.issue_type.value}] {issue.description}")
+                    if issue.suggestion:
+                        feedback_parts.append(f"  Suggestion: {issue.suggestion}")
+
+            if minor_issues:
+                feedback_parts.append("\n**MINOR ISSUES (Nice to Fix):**")
+                for issue in minor_issues[:5]:  # Limit to top 5 minor issues
+                    feedback_parts.append(f"- [{issue.issue_type.value}] {issue.description}")
+
+        # Consistency issues
+        inconsistent_checks = [c for c in review.consistency_checks if not c.is_consistent]
+        if inconsistent_checks:
+            feedback_parts.append("\n**CONSISTENCY ISSUES:**")
+            for check in inconsistent_checks:
+                feedback_parts.append(f"- {check.aspect}: {', '.join(check.inconsistencies)}")
+                if check.recommendations:
+                    feedback_parts.append(f"  Recommendations: {', '.join(check.recommendations)}")
+
+        # Improvement summary
+        if review.improvement_summary:
+            feedback_parts.append(f"\n**IMPROVEMENT SUMMARY:**\n{review.improvement_summary}")
+
+        return "\n".join(feedback_parts)
+
+    def _build_revision_prompt(
+        self,
+        original_content: str,
+        formatted_feedback: str,
+        revision_number: int,
+        task: WorkflowTask,
+        output_format: ReportFormat,
+        target_audience: str
+    ) -> str:
+        """Build the revision prompt"""
+        return f"""You are a Writing Agent (AGENT-014) revising content based on review feedback.
+This is REVISION #{revision_number}. Focus on addressing all feedback points.
+
+TARGET AUDIENCE: {target_audience}
+OUTPUT FORMAT: {output_format.value}
+
+=== ORIGINAL CONTENT ===
+{original_content[:10000]}
+
+=== REVIEW FEEDBACK ===
+{formatted_feedback}
+
+=== REVISION INSTRUCTIONS ===
+1. Address ALL critical issues first - these MUST be fixed
+2. Fix all major issues to improve quality
+3. Address minor issues where practical
+4. Maintain the original purpose and key messages
+5. Keep the same overall structure unless feedback specifically requests changes
+6. Ensure terminology consistency throughout
+7. Verify all cited sources remain accurate
+
+Respond ONLY with valid JSON in the following format:
+{{
+  "report": {{
+    "title": "Report Title",
+    "sections": [
+      {{
+        "title": "Section Title",
+        "content": "Revised section content...",
+        "section_type": "executive_summary|introduction|body|conclusion",
+        "order": 1
+      }}
+    ],
+    "citations": [
+      {{"id": "1", "text": "Citation text", "source": "Source name", "url": "https://..."}}
+    ]
+  }},
+  "raw_content": "Complete revised document in {output_format.value} format...",
+  "style_guide_compliance": 0.9,
+  "terminology_consistency": ["term1", "term2"],
+  "changes_made": ["Description of change 1", "Description of change 2"]
+}}
+
+Focus on quality improvement. The goal is to reach a quality score of 0.85 or higher."""
 
     def _prepare_context(
         self,
@@ -1123,7 +1346,12 @@ class ReviewAgent:
 
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if api_key:
-            self.llm = AsyncAnthropic(api_key=api_key)
+            self.llm = ResilientAnthropicClient(
+                api_key=api_key,
+                service_name="review_agent",
+                failure_threshold=5,
+                recovery_timeout=60.0,
+            )
 
         logger.info(f"{self.AGENT_ID} initialized", llm_available=self.llm is not None)
 
@@ -1408,13 +1636,17 @@ class MultiAgentOrchestrationService:
     Supports revision loops where Review Agent can send back to Writing Agent.
     """
 
+    # Task 138: Quality threshold for approval
+    QUALITY_THRESHOLD = 0.75
+    MAX_REVISIONS = 3
+
     def __init__(self):
         self.research_agent = ResearchAgent()
         self.analysis_agent = AnalysisAgent()
         self.writing_agent = WritingAgent()
         self.review_agent = ReviewAgent()
 
-        # Statistics
+        # Statistics (Task 138: Enhanced metrics)
         self._stats = {
             "workflows_completed": 0,
             "total_processing_time_ms": 0.0,
@@ -1424,7 +1656,13 @@ class MultiAgentOrchestrationService:
                 "AGENT-013": 0,
                 "AGENT-014": 0,
                 "AGENT-015": 0
-            }
+            },
+            # Task 138: Revision-specific metrics
+            "successful_first_pass": 0,  # Content approved without revisions
+            "successful_after_revision": 0,  # Content approved after 1+ revisions
+            "failed_after_max_revisions": 0,  # Content not approved after max revisions
+            "total_quality_improvement": 0.0,  # Sum of quality score improvements
+            "revision_distribution": {1: 0, 2: 0, 3: 0},  # How many times each revision count occurred
         }
 
         logger.info("MultiAgentOrchestrationService initialized")
@@ -1511,11 +1749,12 @@ class MultiAgentOrchestrationService:
                 result.agents_used.append("AGENT-014")
                 self._stats["agents_invoked"]["AGENT-014"] += 1
 
-            # Step 4: Review (AGENT-015) with revision loop
+            # Step 4: Review (AGENT-015) with enhanced revision loop (Task 138)
             if run_review and writing_result:
                 revision_count = 0
+                initial_quality_score = None
 
-                while revision_count <= max_revisions:
+                while revision_count <= min(max_revisions, self.MAX_REVISIONS):
                     logger.info(
                         "Starting review phase",
                         workflow_id=workflow_id,
@@ -1527,46 +1766,80 @@ class MultiAgentOrchestrationService:
                         research_result=research_result,
                         task_id=task.task_id
                     )
+
+                    # Track quality score history
+                    result.quality_score_history.append(review_result.overall_quality_score)
+                    if initial_quality_score is None:
+                        initial_quality_score = review_result.overall_quality_score
+
+                    # Update review result with revision tracking
+                    review_result.revision_count = revision_count
+                    review_result.quality_threshold = self.QUALITY_THRESHOLD
                     result.review_result = review_result
                     self._stats["agents_invoked"]["AGENT-015"] += 1
 
                     if "AGENT-015" not in result.agents_used:
                         result.agents_used.append("AGENT-015")
 
+                    # Check if approved based on quality threshold
+                    meets_threshold = review_result.overall_quality_score >= self.QUALITY_THRESHOLD
+                    review_result.approved_for_publication = meets_threshold and review_result.status == ReviewStatus.APPROVED
+
+                    # Record revision history entry
+                    result.revision_history.append({
+                        "revision_number": revision_count,
+                        "quality_score": review_result.overall_quality_score,
+                        "status": review_result.status.value,
+                        "issues_count": len(review_result.issues),
+                        "critical_issues": sum(1 for i in review_result.issues if i.severity == IssueSeverity.CRITICAL),
+                        "approved": review_result.approved_for_publication
+                    })
+
                     # Check if approved or max revisions reached
-                    if review_result.approved_for_publication or revision_count >= max_revisions:
+                    if review_result.approved_for_publication:
+                        # Track success metrics
+                        if revision_count == 0:
+                            self._stats["successful_first_pass"] += 1
+                        else:
+                            self._stats["successful_after_revision"] += 1
+                            self._stats["revision_distribution"][revision_count] = \
+                                self._stats["revision_distribution"].get(revision_count, 0) + 1
                         break
 
-                    # If needs revision and not at max, send back to writing
+                    if revision_count >= min(max_revisions, self.MAX_REVISIONS):
+                        # Max revisions reached without approval
+                        result.requires_human_review = True
+                        self._stats["failed_after_max_revisions"] += 1
+                        logger.warning(
+                            "Max revisions reached without approval",
+                            workflow_id=workflow_id,
+                            final_quality=review_result.overall_quality_score,
+                            threshold=self.QUALITY_THRESHOLD
+                        )
+                        break
+
+                    # If needs revision and not at max, use dedicated revise_content method
                     if review_result.status in [ReviewStatus.NEEDS_REVISION, ReviewStatus.MAJOR_ISSUES]:
                         revision_count += 1
                         self._stats["total_revisions"] += 1
+                        review_result.revision_requested = True
 
-                        # Add review feedback to task context
-                        revision_context = f"\n\nREVISION FEEDBACK (Round {revision_count}):\n"
-                        revision_context += review_result.improvement_summary
-                        if review_result.issues:
-                            issues_str = "\n".join([
-                                f"- [{i.severity.value}] {i.description}" for i in review_result.issues[:5]
-                            ])
-                            revision_context += f"\n\nSpecific Issues:\n{issues_str}"
-
-                        revised_task = WorkflowTask(
-                            task_id=task.task_id,
-                            title=task.title,
-                            description=task.description,
-                            context=task.context + revision_context,
-                            constraints=task.constraints,
-                            expected_output=task.expected_output
+                        logger.info(
+                            "Requesting revision",
+                            workflow_id=workflow_id,
+                            revision=revision_count,
+                            current_quality=review_result.overall_quality_score,
+                            threshold=self.QUALITY_THRESHOLD
                         )
 
-                        logger.info("Requesting revision", workflow_id=workflow_id, revision=revision_count)
-
-                        writing_result = await self.writing_agent.write(
-                            task=revised_task,
+                        # Use the new revise_content method (Task 138)
+                        writing_result = await self.writing_agent.revise_content(
+                            original_writing=writing_result,
+                            review_feedback=review_result,
+                            task=task,
+                            revision_number=revision_count,
                             research_result=research_result,
                             analysis_result=analysis_result,
-                            task_id=task.task_id,
                             output_format=output_format,
                             target_audience=target_audience
                         )
@@ -1574,6 +1847,13 @@ class MultiAgentOrchestrationService:
                         self._stats["agents_invoked"]["AGENT-014"] += 1
 
                 result.revision_count = revision_count
+
+                # Track quality improvement
+                if initial_quality_score is not None and result.quality_score_history:
+                    final_quality = result.quality_score_history[-1]
+                    quality_improvement = final_quality - initial_quality_score
+                    if quality_improvement > 0:
+                        self._stats["total_quality_improvement"] += quality_improvement
 
             # Set final output
             if result.writing_result:
@@ -1646,17 +1926,49 @@ class MultiAgentOrchestrationService:
         )
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get workflow statistics"""
+        """Get workflow statistics including Task 138 revision metrics"""
+        total_workflows = self._stats["workflows_completed"]
+        total_with_review = (
+            self._stats["successful_first_pass"]
+            + self._stats["successful_after_revision"]
+            + self._stats["failed_after_max_revisions"]
+        )
+
+        # Calculate revision metrics
+        revision_metrics = {
+            "successful_first_pass": self._stats["successful_first_pass"],
+            "successful_after_revision": self._stats["successful_after_revision"],
+            "failed_after_max_revisions": self._stats["failed_after_max_revisions"],
+            "total_quality_improvement": round(self._stats["total_quality_improvement"], 4),
+            "revision_distribution": self._stats["revision_distribution"],
+            # Derived metrics
+            "first_pass_success_rate": round(
+                self._stats["successful_first_pass"] / max(1, total_with_review), 4
+            ),
+            "revision_success_rate": round(
+                self._stats["successful_after_revision"]
+                / max(1, self._stats["successful_after_revision"] + self._stats["failed_after_max_revisions"]),
+                4
+            ),
+            "average_quality_improvement_per_revision": round(
+                self._stats["total_quality_improvement"] / max(1, self._stats["total_revisions"]), 4
+            ),
+            "quality_threshold": self.QUALITY_THRESHOLD,
+            "max_revisions_allowed": self.MAX_REVISIONS,
+        }
+
         return {
-            "total_workflows": self._stats["workflows_completed"],
+            "total_workflows": total_workflows,
             "total_revisions": self._stats["total_revisions"],
             "research_invocations": self._stats["agents_invoked"]["AGENT-012"],
             "analysis_invocations": self._stats["agents_invoked"]["AGENT-013"],
             "writing_invocations": self._stats["agents_invoked"]["AGENT-014"],
             "review_invocations": self._stats["agents_invoked"]["AGENT-015"],
             "average_processing_time_ms": (
-                self._stats["total_processing_time_ms"] / max(1, self._stats["workflows_completed"])
+                self._stats["total_processing_time_ms"] / max(1, total_workflows)
             ),
+            # Task 138: Revision loop metrics
+            "revision_metrics": revision_metrics,
             "agents": {
                 "AGENT-012": {
                     "name": self.research_agent.AGENT_NAME,
@@ -1688,7 +2000,13 @@ class MultiAgentOrchestrationService:
                 "AGENT-013": 0,
                 "AGENT-014": 0,
                 "AGENT-015": 0
-            }
+            },
+            # Task 138: Revision-specific metrics
+            "successful_first_pass": 0,
+            "successful_after_revision": 0,
+            "failed_after_max_revisions": 0,
+            "total_quality_improvement": 0.0,
+            "revision_distribution": {1: 0, 2: 0, 3: 0},
         }
 
     def get_agent_info(self) -> List[Dict[str, Any]]:

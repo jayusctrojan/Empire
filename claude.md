@@ -1976,6 +1976,10 @@ If you're unsure which tool to use:
 ## Active Technologies
 - Python 3.11 + FastAPI, Celery, Anthropic SDK, Pydantic v2, structlog (004-agent-harness)
 - Supabase PostgreSQL (pgvector), Neo4j (knowledge graph), Backblaze B2 (reports), Upstash Redis (cache/broker) (004-agent-harness)
+- Python 3.11 + FastAPI, httpx (for Neo4j HTTP), Anthropic SDK, Pydantic v2, structlog, redis (005-graph-agent)
+- Neo4j (graph), Supabase PostgreSQL (vectors), Upstash Redis (cache) (005-graph-agent)
+- Python 3.11 + FastAPI, LlamaIndex (core), Pydantic v2, structlog (006-markdown-chunking)
+- Supabase PostgreSQL (pgvector for embeddings), existing vector store (006-markdown-chunking)
 
 ## Recent Changes
 - 004-agent-harness: Added Python 3.11 + FastAPI, Celery, Anthropic SDK, Pydantic v2, structlog

@@ -30,6 +30,8 @@ import structlog
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel, Field
 
+from app.services.api_resilience import ResilientAnthropicClient, CircuitOpenError
+
 logger = structlog.get_logger(__name__)
 
 
@@ -154,7 +156,12 @@ class BaseAssetGenerator(ABC):
 
         # Initialize LLM
         api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.llm = AsyncAnthropic(api_key=api_key) if api_key else None
+        self.llm = ResilientAnthropicClient(
+            api_key=api_key,
+            service_name="asset_generator",
+            failure_threshold=5,
+            recovery_timeout=60.0,
+        ) if api_key else None
 
         logger.info(
             f"{self.agent_id} initialized",
