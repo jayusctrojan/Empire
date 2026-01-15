@@ -1,6 +1,7 @@
 """
 Empire v7.3 - Error Handler Middleware
 Task 135: Implement Standardized Error Response Model and Handling
+Task 154: Standardized Exception Handling Framework
 
 Centralized error handling middleware that provides consistent error responses
 across all agent services.
@@ -37,6 +38,8 @@ from app.constants.error_codes import (
     get_http_status,
     is_retriable,
 )
+# Task 154: Import the new exception hierarchy
+from app.exceptions.base import BaseAppException
 
 logger = structlog.get_logger(__name__)
 
@@ -247,6 +250,22 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 details=e.details,
                 request_id=request_id,
                 severity=e.severity,
+                retry_after=e.retry_after
+            )
+
+        except BaseAppException as e:
+            # Task 154: Handle the new exception hierarchy
+            agent_id = e.details.get("agent_id", self._extract_agent_id(request.url.path))
+            error_type = ErrorType.RETRIABLE if e.retriable else ErrorType.PERMANENT
+
+            return self._create_error_response(
+                error_code=e.error_code,
+                message=e.message,
+                agent_id=agent_id,
+                error_type=error_type,
+                details=e.details,
+                request_id=request_id,
+                severity=ErrorSeverity(e.severity) if e.severity in [s.value for s in ErrorSeverity] else ErrorSeverity.ERROR,
                 retry_after=e.retry_after
             )
 
@@ -475,6 +494,50 @@ async def validation_error_handler(
 
 
 # =============================================================================
+# EXCEPTION HANDLER FOR NEW HIERARCHY
+# =============================================================================
+
+async def base_app_exception_handler(request: Request, exc: BaseAppException) -> JSONResponse:
+    """
+    Handle BaseAppException from the new exception hierarchy (Task 154).
+    """
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+
+    # Determine agent_id from exception details or URL path
+    middleware = ErrorHandlerMiddleware(app=None)
+    agent_id = exc.details.get("agent_id", middleware._extract_agent_id(request.url.path))
+
+    # Map retriable to error type
+    error_type = ErrorType.RETRIABLE if exc.retriable else ErrorType.PERMANENT
+
+    # Map severity string to ErrorSeverity enum
+    severity_map = {s.value: s for s in ErrorSeverity}
+    severity = severity_map.get(exc.severity, ErrorSeverity.ERROR)
+
+    error_response = AgentErrorResponse(
+        error_code=exc.error_code,
+        error_type=error_type,
+        agent_id=agent_id,
+        message=exc.message,
+        details=exc.details,
+        request_id=request_id,
+        timestamp=exc.timestamp,
+        severity=severity,
+        retry_after=exc.retry_after
+    )
+
+    headers = {"X-Request-ID": request_id}
+    if exc.retry_after:
+        headers["Retry-After"] = str(exc.retry_after)
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response.model_dump(mode="json"),
+        headers=headers
+    )
+
+
+# =============================================================================
 # SETUP FUNCTION
 # =============================================================================
 
@@ -497,4 +560,5 @@ def setup_error_handling(app):
 
     # Add exception handlers
     app.add_exception_handler(AgentError, agent_error_handler)
+    app.add_exception_handler(BaseAppException, base_app_exception_handler)  # Task 154
     app.add_exception_handler(RequestValidationError, validation_error_handler)

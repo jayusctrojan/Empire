@@ -44,6 +44,9 @@ from app.middleware.audit import configure_audit_logging
 from app.middleware.request_tracing import RequestTracingMiddleware
 from app.core.logging_config import configure_logging
 
+# Task 154: Standardized Exception Handling Framework
+from app.middleware.error_handler import setup_error_handling
+
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
 REQUEST_LATENCY = Histogram('empire_request_duration_seconds', 'HTTP request latency', ['method', 'endpoint'])
@@ -190,6 +193,11 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit methods
     allow_headers=["*"],  # TODO: Restrict to specific headers in future
 )
+
+# Task 154: Standardized Exception Handling Framework
+# Registers error handler middleware and exception handlers for BaseAppException
+setup_error_handling(app)
+print("🛡️ Exception handling framework enabled (Task 154)")
 
 # Task 41.1: Security Headers Middleware
 # Adds HSTS, X-Frame-Options, CSP, and other security headers
