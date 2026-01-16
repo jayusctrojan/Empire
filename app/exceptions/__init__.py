@@ -84,6 +84,10 @@ from .server_errors import (
     B2StorageException,
     FileUploadException,
     FileDownloadException,
+    # Task 157: B2 Storage Error Handling
+    ChecksumMismatchException,
+    DeadLetterQueueException,
+    B2RetryExhaustedException,
     # 502 Bad Gateway
     BadGatewayException,
     ExternalAPIException,
@@ -128,6 +132,11 @@ from .agent_errors import (
     GraphAgentException,
     GraphQueryException,
     GraphTraversalException,
+    # Entity extraction exceptions (Task 155)
+    EntityExtractionException,
+    InvalidExtractionResultException,
+    EntityGraphStorageException,
+    EntityExtractionTimeoutException,
 )
 
 # Export all exceptions
@@ -175,6 +184,10 @@ __all__ = [
     "B2StorageException",
     "FileUploadException",
     "FileDownloadException",
+    # Task 157: B2 Storage Error Handling
+    "ChecksumMismatchException",
+    "DeadLetterQueueException",
+    "B2RetryExhaustedException",
     # 502
     "BadGatewayException",
     "ExternalAPIException",
@@ -214,4 +227,9 @@ __all__ = [
     "GraphAgentException",
     "GraphQueryException",
     "GraphTraversalException",
+    # Entity extraction (Task 155)
+    "EntityExtractionException",
+    "InvalidExtractionResultException",
+    "EntityGraphStorageException",
+    "EntityExtractionTimeoutException",
 ]

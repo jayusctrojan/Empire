@@ -223,6 +223,97 @@ class FileDownloadException(StorageException):
         self.error_code = "FILE_DOWNLOAD_FAILED"
 
 
+class ChecksumMismatchException(StorageException):
+    """
+    Exception for checksum verification failures (500).
+    Task 157: B2 Storage Error Handling
+
+    Raised when uploaded/downloaded file checksum doesn't match expected value.
+    """
+
+    def __init__(
+        self,
+        message: str = "Checksum verification failed",
+        file_path: Optional[str] = None,
+        expected_checksum: Optional[str] = None,
+        actual_checksum: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        details = details or {}
+        if expected_checksum:
+            details["expected_checksum"] = expected_checksum
+        if actual_checksum:
+            details["actual_checksum"] = actual_checksum
+
+        super().__init__(
+            message=message,
+            operation="checksum_verification",
+            file_path=file_path,
+            details=details
+        )
+        self.error_code = "CHECKSUM_MISMATCH"
+        self.retriable = False  # Data integrity issue, don't retry same file
+
+
+class DeadLetterQueueException(StorageException):
+    """
+    Exception for dead letter queue operations (500).
+    Task 157: B2 Storage Error Handling
+
+    Raised when dead letter queue operations fail.
+    """
+
+    def __init__(
+        self,
+        message: str = "Dead letter queue operation failed",
+        operation_type: Optional[str] = None,
+        queue_name: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        details = details or {}
+        if operation_type:
+            details["dlq_operation"] = operation_type
+        if queue_name:
+            details["queue_name"] = queue_name
+
+        super().__init__(
+            message=message,
+            operation="dead_letter_queue",
+            details=details
+        )
+        self.error_code = "DEAD_LETTER_QUEUE_ERROR"
+
+
+class B2RetryExhaustedException(B2StorageException):
+    """
+    Exception when all retry attempts for B2 operation are exhausted (500).
+    Task 157: B2 Storage Error Handling
+    """
+
+    def __init__(
+        self,
+        message: str = "B2 operation failed after all retry attempts",
+        operation: Optional[str] = None,
+        file_path: Optional[str] = None,
+        retry_count: int = 0,
+        last_error: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        details = details or {}
+        details["retry_count"] = retry_count
+        if last_error:
+            details["last_error"] = last_error
+
+        super().__init__(
+            message=message,
+            operation=operation,
+            file_path=file_path,
+            details=details
+        )
+        self.error_code = "B2_RETRY_EXHAUSTED"
+        self.retriable = False  # Already exhausted retries
+
+
 # =============================================================================
 # 502 BAD GATEWAY EXCEPTIONS
 # =============================================================================

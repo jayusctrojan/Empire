@@ -604,3 +604,108 @@ class GraphTraversalException(GraphAgentException):
             details=details,
             error_code="GRAPH_TRAVERSAL_ERROR"
         )
+
+
+# =============================================================================
+# ENTITY EXTRACTION EXCEPTIONS (Task 155)
+# =============================================================================
+
+class EntityExtractionException(AgentException):
+    """
+    Base exception for entity extraction errors.
+
+    Raised when entity extraction operations fail.
+    """
+
+    def __init__(
+        self,
+        message: str = "Entity extraction failed",
+        agent_id: str = "AGENT-ENTITY-EXTRACTOR",
+        task_id: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        error_code: str = "ENTITY_EXTRACTION_ERROR",
+        status_code: int = 500
+    ):
+        details = details or {}
+        if task_id:
+            details["task_id"] = task_id
+
+        super().__init__(
+            message=message,
+            error_code=error_code,
+            agent_id=agent_id,
+            status_code=status_code,
+            details=details,
+            retriable=True
+        )
+
+
+class InvalidExtractionResultException(EntityExtractionException):
+    """Exception for invalid extraction results from LLM."""
+
+    def __init__(
+        self,
+        message: str = "Invalid extraction result",
+        task_id: Optional[str] = None,
+        validation_errors: Optional[List[str]] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        details = details or {}
+        if validation_errors:
+            details["validation_errors"] = validation_errors
+
+        super().__init__(
+            message=message,
+            task_id=task_id,
+            details=details,
+            error_code="INVALID_EXTRACTION_RESULT",
+            status_code=422
+        )
+        self.retriable = False
+
+
+class EntityGraphStorageException(EntityExtractionException):
+    """Exception for errors storing entities in Neo4j."""
+
+    def __init__(
+        self,
+        message: str = "Failed to store entities in graph",
+        task_id: Optional[str] = None,
+        entity_count: Optional[int] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        details = details or {}
+        if entity_count is not None:
+            details["entity_count"] = entity_count
+
+        super().__init__(
+            message=message,
+            task_id=task_id,
+            details=details,
+            error_code="ENTITY_GRAPH_STORAGE_ERROR",
+            status_code=500
+        )
+
+
+class EntityExtractionTimeoutException(EntityExtractionException):
+    """Exception for entity extraction timeout."""
+
+    def __init__(
+        self,
+        message: str = "Entity extraction timed out",
+        task_id: Optional[str] = None,
+        timeout_seconds: Optional[float] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        details = details or {}
+        if timeout_seconds is not None:
+            details["timeout_seconds"] = timeout_seconds
+
+        super().__init__(
+            message=message,
+            task_id=task_id,
+            details=details,
+            error_code="ENTITY_EXTRACTION_TIMEOUT",
+            status_code=504
+        )
+        self.retry_after = 30
