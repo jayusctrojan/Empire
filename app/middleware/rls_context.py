@@ -1,13 +1,13 @@
 """
 Empire v7.3 - Row-Level Security (RLS) Context Middleware
-Task 41.2: Database-Level Data Isolation
+Task 41.2 + Task 151: Database-Level Data Isolation
 
 Sets PostgreSQL session variables for RLS policy enforcement.
 This ensures that database-level policies can enforce user data isolation.
 
 How it works:
 1. After authentication succeeds, this middleware extracts user_id and role
-2. Sets PostgreSQL session variables: app.current_user_id, app.user_role
+2. Calls set_rls_context RPC to set PostgreSQL session variables
 3. RLS policies in the database use these variables to filter queries
 4. Ensures data isolation even if application-level security is bypassed
 
@@ -22,9 +22,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Callable
 import structlog
 import os
+import uuid
 
 from app.services.rbac_service import get_rbac_service
-from app.services.supabase_storage import get_supabase_storage
+from app.core.database import db_manager
 
 logger = structlog.get_logger(__name__)
 
@@ -102,39 +103,28 @@ class RLSContextMiddleware(BaseHTTPMiddleware):
                         path=request.url.path
                     )
 
+        # Generate request ID for tracing
+        request_id = str(uuid.uuid4())
+        request.state.request_id = request_id
+
         # Set PostgreSQL session variables if user is authenticated
         if user_id:
-            try:
-                await self._set_rls_context(user_id, user_role)
-
-                logger.debug(
-                    "rls_context_set",
-                    user_id=user_id,
-                    role=user_role,
-                    path=request.url.path
-                )
-            except Exception as e:
-                logger.error(
-                    "rls_context_set_failed",
-                    error=str(e),
-                    user_id=user_id,
-                    path=request.url.path
-                )
-                # Continue even if RLS context fails - application security still applies
+            await self._set_rls_context(user_id, user_role, request_id)
+            logger.debug(
+                "rls_context_set",
+                user_id=user_id,
+                role=user_role,
+                request_id=request_id,
+                path=request.url.path
+            )
         else:
             # For unauthenticated requests, set guest context
-            try:
-                await self._set_rls_context("anonymous", "guest")
-                logger.debug(
-                    "rls_context_set_anonymous",
-                    path=request.url.path
-                )
-            except Exception as e:
-                logger.debug(
-                    "rls_context_set_anonymous_failed",
-                    error=str(e),
-                    path=request.url.path
-                )
+            await self._set_rls_context("anonymous", "guest", request_id)
+            logger.debug(
+                "rls_context_set_anonymous",
+                request_id=request_id,
+                path=request.url.path
+            )
 
         # Process the request
         response = await call_next(request)
@@ -200,35 +190,55 @@ class RLSContextMiddleware(BaseHTTPMiddleware):
             logger.warning("get_user_role_failed", error=str(e), user_id=user_id)
             return "guest"
 
-    async def _set_rls_context(self, user_id: str, role: str):
+    async def _set_rls_context(self, user_id: str, role: str, request_id: str = None):
         """
         Set PostgreSQL session variables for RLS enforcement
 
-        This sets two session variables:
+        Calls the set_rls_context RPC function to set session variables:
         - app.current_user_id: Current user's ID
         - app.user_role: Current user's role (admin, editor, viewer, guest)
+        - app.request_id: Unique request identifier for tracing
 
         These variables are used by RLS policies to filter data.
 
         Args:
             user_id: User ID to set
             role: User role to set
+            request_id: Optional request ID for tracing
         """
-        # For now, store in request state
-        # Full PostgreSQL session variable implementation requires direct DB connection
-        # This will be implemented when applying the RLS migration
+        if not request_id:
+            request_id = str(uuid.uuid4())
 
-        # TODO: Implement actual PostgreSQL session variable setting
-        # Once RLS migration is applied, use:
-        # SELECT set_config('app.current_user_id', user_id, false);
-        # SELECT set_config('app.user_role', role, false);
+        try:
+            # Get Supabase client and call the RPC function
+            supabase = db_manager.get_supabase()
 
-        logger.debug(
-            "rls_context_prepared",
-            user_id=user_id,
-            role=role,
-            note="RLS context middleware ready - apply migration to enable database-level enforcement"
-        )
+            result = supabase.rpc(
+                "set_rls_context",
+                {
+                    "p_user_id": user_id,
+                    "p_role": role,
+                    "p_request_id": request_id
+                }
+            ).execute()
+
+            logger.debug(
+                "rls_context_set_success",
+                user_id=user_id,
+                role=role,
+                request_id=request_id
+            )
+
+        except Exception as e:
+            # Log but don't fail - graceful degradation
+            logger.warning(
+                "rls_context_rpc_failed",
+                user_id=user_id,
+                role=role,
+                request_id=request_id,
+                error=str(e),
+                note="Continuing without database-level RLS context"
+            )
 
     async def _clear_rls_context(self):
         """
@@ -237,9 +247,11 @@ class RLSContextMiddleware(BaseHTTPMiddleware):
         Note: This is usually not necessary as connection pooling
         will reset the session variables automatically.
         """
-        # TODO: Implement when RLS migration is applied
-        # Connection pooling will handle cleanup automatically
-        pass
+        try:
+            supabase = db_manager.get_supabase()
+            supabase.rpc("clear_rls_context", {}).execute()
+        except Exception as e:
+            logger.debug("rls_context_clear_failed", error=str(e))
 
 
 def configure_rls_context(app):

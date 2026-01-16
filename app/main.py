@@ -23,7 +23,7 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001)
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator, entity_extraction, llama_index, circuit_breakers, workflow_management  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001), Task 155: Entity Extraction, Task 156: LlamaIndex Integration Hardening, Task 159: Circuit Breaker Management, Task 158: Workflow Management
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -43,6 +43,9 @@ from app.middleware.audit import configure_audit_logging
 # Task 136: Request tracing middleware for X-Request-ID propagation
 from app.middleware.request_tracing import RequestTracingMiddleware
 from app.core.logging_config import configure_logging
+
+# Task 154: Standardized Exception Handling Framework
+from app.middleware.error_handler import setup_error_handling
 
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
@@ -190,6 +193,11 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit methods
     allow_headers=["*"],  # TODO: Restrict to specific headers in future
 )
+
+# Task 154: Standardized Exception Handling Framework
+# Registers error handler middleware and exception handlers for BaseAppException
+setup_error_handling(app)
+print("🛡️ Exception handling framework enabled (Task 154)")
 
 # Task 41.1: Security Headers Middleware
 # Adds HSTS, X-Frame-Options, CSP, and other security headers
@@ -500,6 +508,18 @@ app.include_router(content_prep.router)  # Content Prep router has /api/content-
 
 # Task 133: Master Orchestrator API (AGENT-001) - Content Classification and Asset Orchestration
 app.include_router(orchestrator.router)  # Orchestrator router has /api/orchestrator prefix
+
+# Task 155: Entity Extraction API - Claude Haiku-based entity extraction for research tasks
+app.include_router(entity_extraction.router)  # Entity Extraction router has /api/entity-extraction prefix
+
+# Task 156: LlamaIndex Integration Hardening - Resilient HTTP client with pooling, retry, and health checks
+app.include_router(llama_index.router)  # LlamaIndex router has /api/llama-index prefix
+
+# Task 159: Circuit Breaker Management - System-wide circuit breaker monitoring and control
+app.include_router(circuit_breakers.router)  # Circuit Breakers router has /api/system/circuit-breakers prefix
+
+# Task 158: Workflow Management - State persistence, graceful shutdown, cancellation, metrics
+app.include_router(workflow_management.router)  # Workflow Management router has /api/workflows prefix
 
 # TODO: Additional routers
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
