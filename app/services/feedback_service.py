@@ -1,404 +1,601 @@
 """
-Empire v7.3 - Agent Feedback Service
-Task 188: Agent Feedback System
+Empire v7.3 - AI Studio Feedback Service
+Task 79: Implement Feedback Collection and Dashboard
 
-Centralized service for managing feedback on AI agent outputs.
-Supports feedback collection, retrieval, and statistics for:
-- Classification agents
-- Generation agents (content, code, charts)
-- Retrieval agents
-- Orchestration agents
+This service handles collecting, listing, and analyzing user feedback
+on AI responses, classifications, and asset reclassifications.
+
+Features:
+- List feedback with filtering by type, rating, date range
+- Submit new feedback (KB chat ratings, corrections, etc.)
+- Get feedback statistics
+- Track feedback impact on response quality
 """
 
-import os
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Dict, Any
+from dataclasses import dataclass, field
 from enum import Enum
-from uuid import UUID
-
-from supabase import create_client, Client
 import structlog
+
+from app.services.supabase_storage import get_supabase_storage
 
 logger = structlog.get_logger(__name__)
 
 
+# ============================================================================
+# Enums and Data Models
+# ============================================================================
+
 class FeedbackType(str, Enum):
-    """Types of feedback for different agent operations"""
-    CLASSIFICATION = "classification"
-    GENERATION = "generation"
-    RETRIEVAL = "retrieval"
-    ORCHESTRATION = "orchestration"
-    RESEARCH = "research"
-    ANALYSIS = "analysis"
+    """Types of feedback that can be collected"""
+    KB_CHAT_RATING = "kb_chat_rating"
+    CLASSIFICATION_CORRECTION = "classification_correction"
+    ASSET_RECLASSIFICATION = "asset_reclassification"
+    RESPONSE_CORRECTION = "response_correction"
+    GENERAL_FEEDBACK = "general_feedback"
 
 
-class AgentId(str, Enum):
-    """Known agent identifiers for feedback tracking"""
-    CLASSIFICATION_AGENT = "classification_agent"
-    CONTENT_SUMMARIZER = "content_summarizer"
-    DEPARTMENT_CLASSIFIER = "department_classifier"
-    DOCUMENT_ANALYST = "document_analyst"
-    CONTENT_STRATEGIST = "content_strategist"
-    FACT_CHECKER = "fact_checker"
-    RESEARCH_AGENT = "research_agent"
-    ANALYSIS_AGENT = "analysis_agent"
-    WRITING_AGENT = "writing_agent"
-    REVIEW_AGENT = "review_agent"
-    ORCHESTRATOR = "orchestrator"
-    GRAPH_AGENT = "graph_agent"
-    CODE_GENERATOR = "code_generator"
-    CHART_GENERATOR = "chart_generator"
+@dataclass
+class Feedback:
+    """Represents a feedback entry"""
+    id: str
+    user_id: str
+    feedback_type: str
+    rating: Optional[int] = None
 
+    # References
+    session_id: Optional[str] = None
+    message_id: Optional[str] = None
+    classification_id: Optional[str] = None
+    asset_id: Optional[str] = None
 
-class FeedbackService:
-    """
-    Service for managing agent feedback.
+    # Content
+    query_text: Optional[str] = None
+    response_text: Optional[str] = None
+    feedback_text: Optional[str] = None
+    improvement_suggestions: Optional[str] = None
 
-    Provides centralized feedback collection, retrieval, and statistics
-    for all AI agents in the Empire system.
-    """
+    # Corrections
+    previous_value: Optional[Dict[str, Any]] = None
+    new_value: Optional[Dict[str, Any]] = None
+    was_routing_correct: Optional[bool] = None
 
-    def __init__(self):
-        """Initialize FeedbackService with Supabase client."""
-        self._supabase: Optional[Client] = None
+    # Metadata
+    agent_id: Optional[str] = None
+    department: Optional[str] = None
+    confidence_before: Optional[float] = None
+    keywords_before: List[str] = field(default_factory=list)
 
-    def _get_supabase(self) -> Client:
-        """Get or create Supabase client."""
-        if self._supabase is None:
-            url = os.getenv("SUPABASE_URL")
-            key = os.getenv("SUPABASE_SERVICE_KEY")
+    # Timestamps
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-            if not url or not key:
-                raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set")
-
-            self._supabase = create_client(url, key)
-            logger.debug("FeedbackService initialized with Supabase client")
-
-        return self._supabase
-
-    def store_feedback(
-        self,
-        agent_id: str,
-        feedback_type: str,
-        rating: int,
-        input_summary: Optional[str] = None,
-        output_summary: Optional[str] = None,
-        feedback_text: Optional[str] = None,
-        task_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        user_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Store feedback for any agent.
-
-        Args:
-            agent_id: Identifier of the agent (e.g., 'classification_agent')
-            feedback_type: Type of feedback ('classification', 'generation', etc.)
-            rating: User rating from 1 to 5
-            input_summary: Summary of input provided to agent (max 500 chars)
-            output_summary: Summary of agent output (max 500 chars)
-            feedback_text: Optional free-text feedback
-            task_id: Optional reference to related task
-            metadata: Additional context-specific metadata
-            user_id: User who provided the feedback
-
-        Returns:
-            Dict with success status and feedback_id
-
-        Raises:
-            ValueError: If rating is not between 1 and 5
-        """
-        # Validate rating
-        if not isinstance(rating, int) or rating < 1 or rating > 5:
-            raise ValueError("Rating must be an integer between 1 and 5")
-
-        # Truncate summaries to 500 characters
-        truncated_input = input_summary[:500] if input_summary else None
-        truncated_output = output_summary[:500] if output_summary else None
-
-        # Build feedback record
-        feedback = {
-            "agent_id": agent_id,
-            "feedback_type": feedback_type,
-            "rating": rating,
-            "input_summary": truncated_input,
-            "output_summary": truncated_output,
-            "feedback_text": feedback_text,
-            "metadata": metadata or {},
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "userId": self.user_id,
+            "feedbackType": self.feedback_type,
+            "rating": self.rating,
+            "sessionId": self.session_id,
+            "messageId": self.message_id,
+            "classificationId": self.classification_id,
+            "assetId": self.asset_id,
+            "queryText": self.query_text,
+            "responseText": self.response_text,
+            "feedbackText": self.feedback_text,
+            "improvementSuggestions": self.improvement_suggestions,
+            "previousValue": self.previous_value,
+            "newValue": self.new_value,
+            "wasRoutingCorrect": self.was_routing_correct,
+            "agentId": self.agent_id,
+            "department": self.department,
+            "confidenceBefore": self.confidence_before,
+            "keywordsBefore": self.keywords_before,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
 
-        # Add optional fields
-        if task_id:
-            feedback["task_id"] = task_id
-        if user_id:
-            feedback["created_by"] = user_id
 
+@dataclass
+class FeedbackFilters:
+    """Filters for listing feedback"""
+    feedback_type: Optional[str] = None
+    rating: Optional[int] = None
+    department: Optional[str] = None
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+    search_query: Optional[str] = None
+
+
+@dataclass
+class FeedbackStats:
+    """Statistics about feedback"""
+    total: int
+    by_type: Dict[str, int]
+    by_rating: Dict[str, int]
+    by_department: Dict[str, int]
+    avg_rating: float
+    recent_trend: str  # "improving", "declining", "stable"
+
+
+@dataclass
+class FeedbackImpact:
+    """Shows how feedback improved responses"""
+    feedback_id: str
+    query_text: str
+    feedback_type: str
+    before_quality: float
+    after_quality: float
+    improvement: float
+    created_at: datetime
+
+
+# ============================================================================
+# Exceptions
+# ============================================================================
+
+class FeedbackNotFoundError(Exception):
+    """Raised when feedback is not found"""
+    pass
+
+
+class FeedbackSubmitError(Exception):
+    """Raised when feedback submission fails"""
+    pass
+
+
+# ============================================================================
+# Feedback Service
+# ============================================================================
+
+class FeedbackService:
+    """Service for managing AI Studio feedback"""
+
+    def __init__(self):
+        self._supabase = None
+
+    @property
+    def supabase(self):
+        """Lazy load Supabase client"""
+        if self._supabase is None:
+            self._supabase = get_supabase_storage()
+        return self._supabase
+
+    def _parse_datetime(self, value: Any) -> Optional[datetime]:
+        """Parse datetime from string or return as-is if already datetime"""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                if value.endswith('Z'):
+                    value = value[:-1] + '+00:00'
+                return datetime.fromisoformat(value)
+            except ValueError:
+                return None
+        return None
+
+    def _row_to_feedback(self, row: Dict[str, Any]) -> Feedback:
+        """Convert a database row to a Feedback object"""
+        keywords = row.get("keywords_before", [])
+        if isinstance(keywords, str):
+            import json
+            try:
+                keywords = json.loads(keywords)
+            except:
+                keywords = []
+
+        return Feedback(
+            id=row["id"],
+            user_id=row["user_id"],
+            feedback_type=row.get("feedback_type", ""),
+            rating=row.get("rating"),
+            session_id=row.get("session_id"),
+            message_id=row.get("message_id"),
+            classification_id=row.get("classification_id"),
+            asset_id=row.get("asset_id"),
+            query_text=row.get("query_text"),
+            response_text=row.get("response_text"),
+            feedback_text=row.get("feedback_text"),
+            improvement_suggestions=row.get("improvement_suggestions"),
+            previous_value=row.get("previous_value"),
+            new_value=row.get("new_value"),
+            was_routing_correct=row.get("was_routing_correct"),
+            agent_id=row.get("agent_id"),
+            department=row.get("department"),
+            confidence_before=float(row["confidence_before"]) if row.get("confidence_before") else None,
+            keywords_before=keywords if keywords else [],
+            created_at=self._parse_datetime(row.get("created_at")),
+            updated_at=self._parse_datetime(row.get("updated_at")),
+        )
+
+    async def list_feedback(
+        self,
+        user_id: str,
+        filters: Optional[FeedbackFilters] = None,
+        skip: int = 0,
+        limit: int = 50
+    ) -> List[Feedback]:
+        """
+        List feedback with optional filtering.
+
+        Args:
+            user_id: The user ID to filter by
+            filters: Optional filters for type, rating, date range
+            skip: Number of records to skip (pagination)
+            limit: Maximum number of records to return
+
+        Returns:
+            List of Feedback objects
+        """
         try:
-            # Insert into Supabase
-            supabase = self._get_supabase()
-            result = supabase.table("agent_feedback").insert(feedback).execute()
+            query = self.supabase.client.table("studio_agent_feedback").select("*")
+            query = query.eq("user_id", user_id)
 
-            if result.data and len(result.data) > 0:
-                feedback_id = result.data[0].get("id")
-                logger.info(
-                    "Feedback stored successfully",
-                    feedback_id=feedback_id,
-                    agent_id=agent_id,
-                    feedback_type=feedback_type,
-                    rating=rating
-                )
-                return {"success": True, "feedback_id": feedback_id}
-            else:
-                logger.error("Failed to store feedback - no data returned")
-                return {"success": False, "error": "No data returned from insert"}
+            if filters:
+                if filters.feedback_type:
+                    query = query.eq("feedback_type", filters.feedback_type)
+                if filters.rating is not None:
+                    query = query.eq("rating", filters.rating)
+                if filters.department:
+                    query = query.eq("department", filters.department)
+                if filters.date_from:
+                    query = query.gte("created_at", filters.date_from.isoformat())
+                if filters.date_to:
+                    query = query.lte("created_at", filters.date_to.isoformat())
+                if filters.search_query:
+                    search_term = f"%{filters.search_query}%"
+                    query = query.or_(
+                        f"query_text.ilike.{search_term},"
+                        f"feedback_text.ilike.{search_term},"
+                        f"improvement_suggestions.ilike.{search_term}"
+                    )
+
+            query = query.order("created_at", desc=True)
+            query = query.range(skip, skip + limit - 1)
+
+            result = query.execute()
+
+            if not result.data:
+                return []
+
+            return [self._row_to_feedback(row) for row in result.data]
 
         except Exception as e:
-            logger.error("Failed to store feedback", error=str(e), agent_id=agent_id)
+            logger.error("Failed to list feedback", error=str(e), user_id=user_id)
             raise
 
-    def get_feedback(self, feedback_id: str) -> Optional[Dict[str, Any]]:
+    async def get_feedback(self, feedback_id: str, user_id: str) -> Feedback:
         """
         Get feedback by ID.
 
         Args:
-            feedback_id: UUID of the feedback record
+            feedback_id: The feedback ID
+            user_id: The user ID (for authorization)
 
         Returns:
-            Feedback record or None if not found
+            Feedback object
+
+        Raises:
+            FeedbackNotFoundError: If feedback not found
         """
         try:
-            supabase = self._get_supabase()
-            result = supabase.table("agent_feedback").select("*").eq("id", feedback_id).execute()
+            result = self.supabase.client.table("studio_agent_feedback") \
+                .select("*") \
+                .eq("id", feedback_id) \
+                .eq("user_id", user_id) \
+                .execute()
 
-            if result.data and len(result.data) > 0:
-                return result.data[0]
-            return None
+            if not result.data:
+                raise FeedbackNotFoundError(f"Feedback {feedback_id} not found")
 
+            return self._row_to_feedback(result.data[0])
+
+        except FeedbackNotFoundError:
+            raise
         except Exception as e:
             logger.error("Failed to get feedback", error=str(e), feedback_id=feedback_id)
             raise
 
-    def get_agent_feedback(
+    async def submit_feedback(
         self,
-        agent_id: str,
-        limit: int = 100,
-        offset: int = 0,
-        feedback_type: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Get feedback for a specific agent.
-
-        Args:
-            agent_id: Agent identifier
-            limit: Maximum number of records to return
-            offset: Number of records to skip
-            feedback_type: Optional filter by feedback type
-
-        Returns:
-            List of feedback records
-        """
-        try:
-            supabase = self._get_supabase()
-            query = supabase.table("agent_feedback").select("*").eq("agent_id", agent_id)
-
-            if feedback_type:
-                query = query.eq("feedback_type", feedback_type)
-
-            result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
-
-            return result.data or []
-
-        except Exception as e:
-            logger.error("Failed to get agent feedback", error=str(e), agent_id=agent_id)
-            raise
-
-    def get_feedback_by_type(
-        self,
+        user_id: str,
         feedback_type: str,
-        limit: int = 100,
-        offset: int = 0
-    ) -> List[Dict[str, Any]]:
+        rating: Optional[int] = None,
+        session_id: Optional[str] = None,
+        message_id: Optional[str] = None,
+        classification_id: Optional[str] = None,
+        asset_id: Optional[str] = None,
+        query_text: Optional[str] = None,
+        response_text: Optional[str] = None,
+        feedback_text: Optional[str] = None,
+        improvement_suggestions: Optional[str] = None,
+        previous_value: Optional[Dict[str, Any]] = None,
+        new_value: Optional[Dict[str, Any]] = None,
+        was_routing_correct: Optional[bool] = None,
+        agent_id: Optional[str] = None,
+        department: Optional[str] = None,
+        confidence_before: Optional[float] = None,
+        keywords_before: Optional[List[str]] = None
+    ) -> Feedback:
         """
-        Get feedback by type.
-
-        Args:
-            feedback_type: Type of feedback to retrieve
-            limit: Maximum number of records to return
-            offset: Number of records to skip
+        Submit new feedback.
 
         Returns:
-            List of feedback records
+            Created Feedback object
         """
         try:
-            supabase = self._get_supabase()
-            result = (
-                supabase.table("agent_feedback")
-                .select("*")
-                .eq("feedback_type", feedback_type)
-                .order("created_at", desc=True)
-                .range(offset, offset + limit - 1)
+            # Validate feedback type
+            valid_types = [t.value for t in FeedbackType]
+            if feedback_type not in valid_types:
+                raise FeedbackSubmitError(f"Invalid feedback type: {feedback_type}")
+
+            insert_data = {
+                "user_id": user_id,
+                "feedback_type": feedback_type,
+                "rating": rating,
+                "session_id": session_id,
+                "message_id": message_id,
+                "classification_id": classification_id,
+                "asset_id": asset_id,
+                "query_text": query_text,
+                "response_text": response_text,
+                "feedback_text": feedback_text,
+                "improvement_suggestions": improvement_suggestions,
+                "previous_value": previous_value,
+                "new_value": new_value,
+                "was_routing_correct": was_routing_correct,
+                "agent_id": agent_id,
+                "department": department,
+                "confidence_before": confidence_before,
+                "keywords_before": keywords_before,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+            # Remove None values
+            insert_data = {k: v for k, v in insert_data.items() if v is not None}
+
+            result = self.supabase.client.table("studio_agent_feedback") \
+                .insert(insert_data) \
                 .execute()
+
+            if not result.data:
+                raise FeedbackSubmitError("Failed to insert feedback")
+
+            logger.info(
+                "Feedback submitted",
+                feedback_id=result.data[0]["id"],
+                user_id=user_id,
+                feedback_type=feedback_type
             )
 
-            return result.data or []
+            return self._row_to_feedback(result.data[0])
 
-        except Exception as e:
-            logger.error("Failed to get feedback by type", error=str(e), feedback_type=feedback_type)
+        except FeedbackSubmitError:
             raise
+        except Exception as e:
+            logger.error("Failed to submit feedback", error=str(e), user_id=user_id)
+            raise FeedbackSubmitError(f"Failed to submit feedback: {str(e)}")
 
-    def get_feedback_stats(
-        self,
-        agent_id: Optional[str] = None,
-        feedback_type: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def get_feedback_stats(self, user_id: str) -> FeedbackStats:
         """
-        Get feedback statistics.
+        Get statistics about user's feedback.
 
         Args:
-            agent_id: Optional filter by agent
-            feedback_type: Optional filter by feedback type
+            user_id: The user ID
 
         Returns:
-            Dict with count, average_rating, and rating_distribution
+            FeedbackStats object
         """
         try:
-            supabase = self._get_supabase()
-            query = supabase.table("agent_feedback").select("rating")
+            result = self.supabase.client.table("studio_agent_feedback") \
+                .select("feedback_type, rating, department, created_at") \
+                .eq("user_id", user_id) \
+                .execute()
 
-            if agent_id:
-                query = query.eq("agent_id", agent_id)
-            if feedback_type:
-                query = query.eq("feedback_type", feedback_type)
+            if not result.data:
+                return FeedbackStats(
+                    total=0,
+                    by_type={},
+                    by_rating={"positive": 0, "neutral": 0, "negative": 0},
+                    by_department={},
+                    avg_rating=0.0,
+                    recent_trend="stable"
+                )
 
-            result = query.execute()
-            feedback_list = result.data or []
+            by_type = {}
+            by_rating = {"positive": 0, "neutral": 0, "negative": 0}
+            by_department = {}
+            ratings = []
+            recent_ratings = []
+            now = datetime.now(timezone.utc)
 
-            if not feedback_list:
+            for row in result.data:
+                # Count by type
+                ftype = row.get("feedback_type", "unknown")
+                by_type[ftype] = by_type.get(ftype, 0) + 1
+
+                # Count by rating
+                rating = row.get("rating")
+                if rating is not None:
+                    ratings.append(rating)
+                    if rating > 0:
+                        by_rating["positive"] += 1
+                    elif rating < 0:
+                        by_rating["negative"] += 1
+                    else:
+                        by_rating["neutral"] += 1
+
+                    # Track recent ratings (last 7 days)
+                    created_at = self._parse_datetime(row.get("created_at"))
+                    if created_at and (now - created_at).days <= 7:
+                        recent_ratings.append(rating)
+
+                # Count by department
+                dept = row.get("department")
+                if dept:
+                    by_department[dept] = by_department.get(dept, 0) + 1
+
+            # Calculate average rating
+            avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
+
+            # Determine trend
+            if len(recent_ratings) >= 3:
+                recent_avg = sum(recent_ratings) / len(recent_ratings)
+                if recent_avg > avg_rating + 0.1:
+                    recent_trend = "improving"
+                elif recent_avg < avg_rating - 0.1:
+                    recent_trend = "declining"
+                else:
+                    recent_trend = "stable"
+            else:
+                recent_trend = "stable"
+
+            return FeedbackStats(
+                total=len(result.data),
+                by_type=by_type,
+                by_rating=by_rating,
+                by_department=by_department,
+                avg_rating=round(avg_rating, 2),
+                recent_trend=recent_trend
+            )
+
+        except Exception as e:
+            logger.error("Failed to get feedback stats", error=str(e), user_id=user_id)
+            raise
+
+    async def get_feedback_impact(self, user_id: str, limit: int = 10) -> List[FeedbackImpact]:
+        """
+        Show how feedback has improved responses.
+        This compares responses before and after corrections were made.
+
+        Args:
+            user_id: The user ID
+            limit: Maximum number of impact records to return
+
+        Returns:
+            List of FeedbackImpact objects showing improvement metrics
+        """
+        try:
+            # Get feedback with corrections (classification or response corrections)
+            result = self.supabase.client.table("studio_agent_feedback") \
+                .select("*") \
+                .eq("user_id", user_id) \
+                .in_("feedback_type", ["classification_correction", "response_correction", "asset_reclassification"]) \
+                .not_.is_("new_value", "null") \
+                .order("created_at", desc=True) \
+                .limit(limit) \
+                .execute()
+
+            if not result.data:
+                return []
+
+            impact_data = []
+            for row in result.data:
+                # Calculate quality scores based on the correction
+                # Higher confidence before correction = larger improvement when corrected
+                confidence_before = float(row.get("confidence_before", 0.5))
+
+                # Simple heuristic: if user corrected, the "before" quality was wrong
+                # and the "after" quality is assumed correct (1.0)
+                before_quality = confidence_before
+                after_quality = 1.0  # User correction is assumed correct
+                improvement = after_quality - before_quality
+
+                impact_data.append(FeedbackImpact(
+                    feedback_id=row["id"],
+                    query_text=row.get("query_text") or "N/A",
+                    feedback_type=row.get("feedback_type", ""),
+                    before_quality=round(before_quality, 2),
+                    after_quality=round(after_quality, 2),
+                    improvement=round(improvement, 2),
+                    created_at=self._parse_datetime(row.get("created_at")) or datetime.now(timezone.utc)
+                ))
+
+            return impact_data
+
+        except Exception as e:
+            logger.error("Failed to get feedback impact", error=str(e), user_id=user_id)
+            raise
+
+    async def get_recent_feedback_summary(self, user_id: str, days: int = 7) -> Dict[str, Any]:
+        """
+        Get a summary of recent feedback activity.
+
+        Args:
+            user_id: The user ID
+            days: Number of days to look back
+
+        Returns:
+            Summary dictionary with recent activity
+        """
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+            result = self.supabase.client.table("studio_agent_feedback") \
+                .select("feedback_type, rating, created_at") \
+                .eq("user_id", user_id) \
+                .gte("created_at", cutoff.isoformat()) \
+                .order("created_at", desc=True) \
+                .execute()
+
+            if not result.data:
                 return {
-                    "count": 0,
-                    "average_rating": 0,
-                    "rating_distribution": {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
+                    "period_days": days,
+                    "total_feedback": 0,
+                    "positive_count": 0,
+                    "negative_count": 0,
+                    "corrections_count": 0,
+                    "most_common_type": None
                 }
 
-            # Calculate statistics
-            ratings = [f.get("rating") for f in feedback_list if f.get("rating")]
-            total_rating = sum(ratings)
-            avg_rating = total_rating / len(ratings) if ratings else 0
+            positive_count = 0
+            negative_count = 0
+            corrections_count = 0
+            type_counts = {}
 
-            # Calculate rating distribution
-            distribution = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
-            for rating in ratings:
-                if rating and 1 <= rating <= 5:
-                    distribution[str(rating)] += 1
+            for row in result.data:
+                rating = row.get("rating")
+                if rating is not None:
+                    if rating > 0:
+                        positive_count += 1
+                    elif rating < 0:
+                        negative_count += 1
+
+                ftype = row.get("feedback_type", "unknown")
+                type_counts[ftype] = type_counts.get(ftype, 0) + 1
+
+                if "correction" in ftype:
+                    corrections_count += 1
+
+            most_common_type = max(type_counts, key=type_counts.get) if type_counts else None
 
             return {
-                "count": len(feedback_list),
-                "average_rating": round(avg_rating, 2),
-                "rating_distribution": distribution
+                "period_days": days,
+                "total_feedback": len(result.data),
+                "positive_count": positive_count,
+                "negative_count": negative_count,
+                "corrections_count": corrections_count,
+                "most_common_type": most_common_type
             }
 
         except Exception as e:
-            logger.error(
-                "Failed to get feedback stats",
-                error=str(e),
-                agent_id=agent_id,
-                feedback_type=feedback_type
-            )
-            raise
-
-    def get_all_agent_stats(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Get feedback statistics for all agents.
-
-        Returns:
-            Dict mapping agent_id to their statistics
-        """
-        try:
-            supabase = self._get_supabase()
-            result = supabase.table("agent_feedback").select("agent_id, rating").execute()
-            feedback_list = result.data or []
-
-            # Group by agent
-            agent_feedback = {}
-            for f in feedback_list:
-                agent_id = f.get("agent_id")
-                rating = f.get("rating")
-                if agent_id:
-                    if agent_id not in agent_feedback:
-                        agent_feedback[agent_id] = []
-                    if rating:
-                        agent_feedback[agent_id].append(rating)
-
-            # Calculate stats per agent
-            stats = {}
-            for agent_id, ratings in agent_feedback.items():
-                if ratings:
-                    avg_rating = sum(ratings) / len(ratings)
-                    distribution = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
-                    for r in ratings:
-                        if 1 <= r <= 5:
-                            distribution[str(r)] += 1
-
-                    stats[agent_id] = {
-                        "count": len(ratings),
-                        "average_rating": round(avg_rating, 2),
-                        "rating_distribution": distribution
-                    }
-                else:
-                    stats[agent_id] = {
-                        "count": 0,
-                        "average_rating": 0,
-                        "rating_distribution": {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
-                    }
-
-            return stats
-
-        except Exception as e:
-            logger.error("Failed to get all agent stats", error=str(e))
-            raise
-
-    def get_recent_low_ratings(
-        self,
-        threshold: int = 2,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]:
-        """
-        Get recent feedback with low ratings for review.
-
-        Args:
-            threshold: Maximum rating to include (default: 2)
-            limit: Maximum number of records
-
-        Returns:
-            List of low-rated feedback records
-        """
-        try:
-            supabase = self._get_supabase()
-            result = (
-                supabase.table("agent_feedback")
-                .select("*")
-                .lte("rating", threshold)
-                .order("created_at", desc=True)
-                .limit(limit)
-                .execute()
-            )
-
-            return result.data or []
-
-        except Exception as e:
-            logger.error("Failed to get low ratings", error=str(e))
+            logger.error("Failed to get recent feedback summary", error=str(e), user_id=user_id)
             raise
 
 
-# =============================================================================
-# Singleton instance
-# =============================================================================
+# ============================================================================
+# Service Instance
+# ============================================================================
 
 _feedback_service: Optional[FeedbackService] = None
 
 
 def get_feedback_service() -> FeedbackService:
-    """Get or create FeedbackService singleton."""
+    """Get or create the feedback service singleton."""
     global _feedback_service
     if _feedback_service is None:
         _feedback_service = FeedbackService()

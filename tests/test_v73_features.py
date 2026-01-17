@@ -123,40 +123,40 @@ class TestFeedbackModels:
     """Test feedback Pydantic models."""
 
     def test_feedback_type_enum(self):
-        """Test FeedbackType enum values."""
-        from app.services.feedback_service import FeedbackType
+        """Test AgentFeedbackType enum values."""
+        from app.services.agent_feedback_service import AgentFeedbackType
 
-        assert FeedbackType.CLASSIFICATION.value == "classification"
-        assert FeedbackType.GENERATION.value == "generation"
-        assert FeedbackType.RETRIEVAL.value == "retrieval"
-        assert FeedbackType.ORCHESTRATION.value == "orchestration"
+        assert AgentFeedbackType.CLASSIFICATION.value == "classification"
+        assert AgentFeedbackType.GENERATION.value == "generation"
+        assert AgentFeedbackType.RETRIEVAL.value == "retrieval"
+        assert AgentFeedbackType.ORCHESTRATION.value == "orchestration"
 
     def test_agent_id_enum(self):
         """Test AgentId enum values."""
-        from app.services.feedback_service import AgentId
+        from app.services.agent_feedback_service import AgentId
 
         assert AgentId.CLASSIFICATION_AGENT.value == "classification_agent"
         assert AgentId.CONTENT_SUMMARIZER.value == "content_summarizer"
         assert AgentId.ORCHESTRATOR.value == "orchestrator"
 
 
-class TestFeedbackService:
-    """Test FeedbackService functionality."""
+class TestAgentFeedbackService:
+    """Test AgentFeedbackService functionality."""
 
     def test_feedback_service_singleton(self):
-        """Test get_feedback_service returns same instance."""
-        from app.services.feedback_service import get_feedback_service
+        """Test get_agent_feedback_service returns same instance."""
+        from app.services.agent_feedback_service import get_agent_feedback_service
 
-        service1 = get_feedback_service()
-        service2 = get_feedback_service()
+        service1 = get_agent_feedback_service()
+        service2 = get_agent_feedback_service()
 
         assert service1 is service2
 
     def test_feedback_rating_validation(self):
         """Test rating validation in store_feedback."""
-        from app.services.feedback_service import FeedbackService
+        from app.services.agent_feedback_service import AgentFeedbackService
 
-        service = FeedbackService()
+        service = AgentFeedbackService()
 
         # Test invalid rating (too low)
         with pytest.raises(ValueError) as exc_info:
@@ -179,9 +179,9 @@ class TestFeedbackService:
     @patch.dict(os.environ, {"SUPABASE_URL": "https://test.supabase.co", "SUPABASE_SERVICE_KEY": "test-key"})
     def test_store_feedback_success(self):
         """Test successful feedback storage."""
-        from app.services.feedback_service import FeedbackService
+        from app.services.agent_feedback_service import AgentFeedbackService
 
-        with patch('app.services.feedback_service.create_client') as mock_create:
+        with patch('app.services.agent_feedback_service.create_client') as mock_create:
             mock_client = MagicMock()
             mock_table = MagicMock()
             mock_insert = MagicMock()
@@ -192,7 +192,7 @@ class TestFeedbackService:
             mock_table.table.return_value = mock_insert
             mock_create.return_value = mock_table
 
-            service = FeedbackService()
+            service = AgentFeedbackService()
             result = service.store_feedback(
                 agent_id="content_summarizer",
                 feedback_type="generation",
@@ -205,9 +205,9 @@ class TestFeedbackService:
 
     def test_truncate_summaries(self):
         """Test that summaries are truncated to 500 chars."""
-        from app.services.feedback_service import FeedbackService
+        from app.services.agent_feedback_service import AgentFeedbackService
 
-        service = FeedbackService()
+        service = AgentFeedbackService()
 
         # Create a string longer than 500 chars
         long_input = "x" * 600

@@ -11,9 +11,9 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field, validator
 import structlog
 
-from app.services.feedback_service import (
-    get_feedback_service,
-    FeedbackType,
+from app.services.agent_feedback_service import (
+    get_agent_feedback_service,
+    AgentFeedbackType,
     AgentId,
 )
 
@@ -41,7 +41,7 @@ class FeedbackCreate(BaseModel):
 
     @validator('feedback_type')
     def validate_feedback_type(cls, v):
-        valid_types = [t.value for t in FeedbackType]
+        valid_types = [t.value for t in AgentFeedbackType]
         if v not in valid_types:
             # Allow custom types but log warning
             logger.warning("Non-standard feedback type used", feedback_type=v)
@@ -97,7 +97,7 @@ async def create_feedback(feedback: FeedbackCreate):
     AI agent outputs for quality monitoring and improvement.
     """
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         result = service.store_feedback(
             agent_id=feedback.agent_id,
             feedback_type=feedback.feedback_type,
@@ -131,7 +131,7 @@ async def create_feedback(feedback: FeedbackCreate):
 async def get_feedback(feedback_id: str):
     """Get a specific feedback record by its ID."""
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         feedback = service.get_feedback(feedback_id)
 
         if not feedback:
@@ -160,7 +160,7 @@ async def get_agent_feedback(
 ):
     """Get feedback for a specific agent with optional filtering."""
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         feedback_list = service.get_agent_feedback(
             agent_id=agent_id,
             limit=limit,
@@ -188,7 +188,7 @@ async def get_feedback_by_type(
 ):
     """Get feedback filtered by feedback type."""
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         feedback_list = service.get_feedback_by_type(
             feedback_type=feedback_type,
             limit=limit,
@@ -214,7 +214,7 @@ async def get_feedback_stats(
 ):
     """Get aggregated feedback statistics with optional filtering."""
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         stats = service.get_feedback_stats(
             agent_id=agent_id,
             feedback_type=feedback_type
@@ -236,7 +236,7 @@ async def get_feedback_stats(
 async def get_all_agent_stats():
     """Get feedback statistics for all agents."""
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         stats = service.get_all_agent_stats()
 
         return stats
@@ -258,7 +258,7 @@ async def get_low_ratings(
 ):
     """Get recent feedback with low ratings for quality review."""
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         feedback_list = service.get_recent_low_ratings(
             threshold=threshold,
             limit=limit
@@ -280,7 +280,7 @@ async def list_agents():
     """List all known agent identifiers that can receive feedback."""
     return {
         "agents": [a.value for a in AgentId],
-        "feedback_types": [t.value for t in FeedbackType]
+        "feedback_types": [t.value for t in AgentFeedbackType]
     }
 
 
@@ -292,7 +292,7 @@ async def list_agents():
 async def health_check():
     """Health check for the feedback service."""
     try:
-        service = get_feedback_service()
+        service = get_agent_feedback_service()
         # Simple check - just verify we can initialize
         service._get_supabase()
 
