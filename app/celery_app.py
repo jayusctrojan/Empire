@@ -34,6 +34,21 @@ from app.services.status_broadcaster import (
 )
 from app.models.task_status import TaskType
 
+# Task 189: OpenTelemetry distributed tracing for Celery tasks
+from app.core.tracing import (
+    get_tracer,
+    extract_trace_context,
+    get_current_trace_id,
+    get_current_span_id,
+    create_span,
+    TRACING_ENABLED,
+)
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode, Status
+
+# Task 189: Store active spans for tasks
+_task_spans = {}
+
 # Initialize monitoring service
 _supabase_storage = get_supabase_storage()
 _monitoring_service = get_monitoring_service(_supabase_storage)
@@ -72,7 +87,8 @@ celery_app = Celery(
         'app.tasks.graph_sync',
         'app.tasks.crewai_workflows',
         'app.tasks.source_processing',  # Task 61: Project source processing
-        'app.tasks.content_prep_tasks'  # Feature 007: Content Prep Agent
+        'app.tasks.content_prep_tasks',  # Feature 007: Content Prep Agent
+        'app.tasks.research_tasks'  # Task 187: Research project tasks
     ]
 )
 
@@ -108,6 +124,7 @@ celery_app.conf.update(
         'app.tasks.crewai_workflows.*': {'queue': 'crewai'},
         'app.tasks.source_processing.*': {'queue': 'project_sources'},  # Task 69: Dedicated queue
         'app.tasks.content_prep_tasks.*': {'queue': 'content_prep'},  # Feature 007: Content Prep Agent
+        'app.tasks.research_tasks.*': {'queue': 'research'},  # Task 187: Research project tasks
         'app.tasks.send_to_dead_letter_queue': {'queue': 'dead_letter'},
         'app.tasks.inspect_dead_letter_queue': {'queue': 'dead_letter'},
         'app.tasks.retry_from_dead_letter_queue': {'queue': 'dead_letter'}
@@ -264,6 +281,51 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
         # Don't let broadcast errors break task execution
         print(f"⚠️  Status broadcast failed for task start: {e}")
 
+    # Task 189: Create OpenTelemetry span for task execution
+    if TRACING_ENABLED:
+        try:
+            tracer = get_tracer()
+            task_kwargs = kwargs.get('kwargs', {})
+
+            # Extract trace context from task headers if available
+            headers = kwargs.get('headers', {}) or {}
+            parent_context = None
+            if 'traceparent' in headers:
+                parent_context = extract_trace_context(headers)
+
+            # Create span attributes
+            span_attributes = {
+                "celery.task_id": task_id,
+                "celery.task_name": task.name,
+                "celery.task_type": str(get_task_type_from_name(task.name)),
+            }
+
+            if task_kwargs.get('document_id'):
+                span_attributes["document.id"] = task_kwargs['document_id']
+            if task_kwargs.get('user_id'):
+                span_attributes["user.id"] = task_kwargs['user_id']
+            if task_kwargs.get('job_id'):
+                span_attributes["job.id"] = str(task_kwargs['job_id'])
+
+            # Start span (will be ended in postrun or failure handler)
+            if parent_context:
+                span = tracer.start_span(
+                    f"celery.task.{task.name}",
+                    context=parent_context,
+                    kind=trace.SpanKind.CONSUMER,
+                    attributes=span_attributes
+                )
+            else:
+                span = tracer.start_span(
+                    f"celery.task.{task.name}",
+                    kind=trace.SpanKind.CONSUMER,
+                    attributes=span_attributes
+                )
+
+            _task_spans[task_id] = span
+        except Exception as e:
+            print(f"⚠️  OpenTelemetry span creation failed: {e}")
+
 
 @task_postrun.connect
 def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, state=None, **kwargs):
@@ -320,6 +382,17 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, stat
     except Exception as e:
         # Don't let broadcast errors break task execution
         print(f"⚠️  Status broadcast failed for task completion: {e}")
+
+    # Task 189: Close OpenTelemetry span on success
+    if TRACING_ENABLED and task_id in _task_spans:
+        try:
+            span = _task_spans.pop(task_id)
+            if duration is not None:
+                span.set_attribute("celery.duration_seconds", round(duration, 2))
+            span.set_status(Status(StatusCode.OK))
+            span.end()
+        except Exception as e:
+            print(f"⚠️  OpenTelemetry span close failed: {e}")
 
 
 @task_success.connect
@@ -408,6 +481,21 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
             queue='dead_letter'
         )
 
+    # Task 189: Close OpenTelemetry span on failure
+    if TRACING_ENABLED and task_id in _task_spans:
+        try:
+            span = _task_spans.pop(task_id)
+            if duration is not None:
+                span.set_attribute("celery.duration_seconds", round(duration, 2))
+            span.set_attribute("error.type", type(exception).__name__)
+            span.set_attribute("error.message", str(exception)[:500])
+            span.set_attribute("celery.retry_count", retry_count)
+            span.set_status(Status(StatusCode.ERROR, str(exception)))
+            span.record_exception(exception)
+            span.end()
+        except Exception as e:
+            print(f"⚠️  OpenTelemetry span close failed on error: {e}")
+
 
 @task_retry.connect
 def task_retry_handler(sender=None, request=None, reason=None, einfo=None, **kwargs):
@@ -472,7 +560,7 @@ def health_check():
 @celery_app.task(name='app.tasks.send_to_dead_letter_queue', queue='dead_letter')
 def send_to_dead_letter_queue(failed_task_info: dict):
     """
-    Store failed task information in the Dead Letter Queue
+    Store failed task information in the Dead Letter Queue database table.
 
     This task runs in the 'dead_letter' queue and stores information about
     tasks that have exhausted all retry attempts for manual inspection.
@@ -485,47 +573,104 @@ def send_to_dead_letter_queue(failed_task_info: dict):
 
     print(f"💀 Dead Letter Queue: Processing failed task {failed_task_info.get('task_name')}")
 
-    # Log to console (in production, this would go to a database or monitoring system)
     dlq_entry = {
         'task_id': failed_task_info.get('task_id'),
         'task_name': failed_task_info.get('task_name'),
-        'exception': failed_task_info.get('exception'),
-        'args': failed_task_info.get('args'),
-        'kwargs': failed_task_info.get('kwargs'),
-        'retries': failed_task_info.get('retries'),
-        'max_retries': failed_task_info.get('max_retries'),
-        'timestamp': datetime.utcnow().isoformat(),
-        'status': 'dead_letter'
+        'exception': str(failed_task_info.get('exception', ''))[:2000],  # Limit exception text
+        'task_args': json.dumps(failed_task_info.get('args', [])),
+        'task_kwargs': json.dumps(failed_task_info.get('kwargs', {})),
+        'retries': failed_task_info.get('retries', 0),
+        'max_retries': failed_task_info.get('max_retries', 3),
+        'created_at': datetime.utcnow().isoformat(),
+        'status': 'pending_review'  # pending_review, retried, resolved, ignored
     }
 
-    # TODO: Store in database for permanent tracking
-    # For now, log to console
-    print(f"💀 DLQ Entry: {json.dumps(dlq_entry, indent=2)}")
+    # Store in Supabase database for permanent tracking
+    try:
+        from app.services.supabase_storage import get_supabase_storage
+        supabase_storage = get_supabase_storage()
+
+        result = supabase_storage.client.table("dead_letter_queue").insert(dlq_entry).execute()
+
+        if result.data:
+            print(f"💾 DLQ entry stored in database: {dlq_entry['task_id']}")
+            dlq_entry['db_id'] = result.data[0].get('id')
+        else:
+            print(f"⚠️ Failed to store DLQ entry in database")
+
+    except Exception as db_error:
+        # Log error but don't fail - also log to console as backup
+        print(f"⚠️ Database storage failed: {db_error}")
+        print(f"💀 DLQ Entry (console backup): {json.dumps(dlq_entry, indent=2)}")
 
     return dlq_entry
 
 
 # Task to inspect Dead Letter Queue
 @celery_app.task(name='app.tasks.inspect_dead_letter_queue')
-def inspect_dead_letter_queue():
+def inspect_dead_letter_queue(status: str = None, limit: int = 50, offset: int = 0):
     """
-    Inspect and return Dead Letter Queue entries
+    Inspect and return Dead Letter Queue entries from database.
+
+    Args:
+        status: Filter by status (pending_review, retried, resolved, ignored)
+        limit: Maximum entries to return (default 50)
+        offset: Pagination offset (default 0)
 
     Returns:
-        List of failed task entries (currently from logs, should be from DB)
+        List of failed task entries from database
     """
-    # TODO: Query database for DLQ entries
-    # For now, return placeholder
-    return {
-        'status': 'success',
-        'message': 'Dead Letter Queue inspection placeholder',
-        'note': 'In production, this would query a database for failed tasks'
-    }
+    try:
+        from app.services.supabase_storage import get_supabase_storage
+        supabase_storage = get_supabase_storage()
+
+        # Build query
+        query = supabase_storage.client.table("dead_letter_queue").select("*")
+
+        if status:
+            query = query.eq("status", status)
+
+        query = query.order("created_at", desc=True)
+        query = query.range(offset, offset + limit - 1)
+
+        result = query.execute()
+
+        entries = result.data if result.data else []
+
+        # Count totals by status
+        count_result = supabase_storage.client.table("dead_letter_queue") \
+            .select("status", count="exact") \
+            .execute()
+
+        status_counts = {}
+        if count_result.data:
+            for row in count_result.data:
+                s = row.get('status', 'unknown')
+                status_counts[s] = status_counts.get(s, 0) + 1
+
+        return {
+            'status': 'success',
+            'entries': entries,
+            'total_count': len(entries),
+            'status_counts': status_counts,
+            'pagination': {
+                'offset': offset,
+                'limit': limit
+            }
+        }
+
+    except Exception as e:
+        print(f"❌ Failed to query DLQ: {e}")
+        return {
+            'status': 'error',
+            'message': f'Database query failed: {str(e)}',
+            'entries': []
+        }
 
 
 # Task to retry a failed task from DLQ
 @celery_app.task(name='app.tasks.retry_from_dead_letter_queue')
-def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwargs: dict):
+def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwargs: dict, dlq_db_id: str = None):
     """
     Retry a failed task from the Dead Letter Queue
 
@@ -534,10 +679,13 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
         task_name: Task name to retry
         args: Original task arguments
         kwargs: Original task keyword arguments
+        dlq_db_id: Database ID of the DLQ entry (to update status)
 
     Returns:
-        New task ID
+        New task ID and retry status
     """
+    from datetime import datetime
+
     print(f"🔄 Retrying task from DLQ: {task_name} (original ID: {task_id})")
 
     # Get the task by name
@@ -547,11 +695,32 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
         # Re-submit the task with original arguments
         result = task.apply_async(args=args, kwargs=kwargs)
         print(f"✅ Task resubmitted with new ID: {result.id}")
+
+        # Update DLQ entry status in database
+        if dlq_db_id:
+            try:
+                from app.services.supabase_storage import get_supabase_storage
+                supabase_storage = get_supabase_storage()
+
+                supabase_storage.client.table("dead_letter_queue") \
+                    .update({
+                        'status': 'retried',
+                        'retried_at': datetime.utcnow().isoformat(),
+                        'new_task_id': result.id
+                    }) \
+                    .eq('id', dlq_db_id) \
+                    .execute()
+
+                print(f"💾 Updated DLQ entry status to 'retried'")
+            except Exception as db_error:
+                print(f"⚠️ Failed to update DLQ status: {db_error}")
+
         return {
             'status': 'success',
             'original_task_id': task_id,
             'new_task_id': result.id,
-            'task_name': task_name
+            'task_name': task_name,
+            'dlq_db_id': dlq_db_id
         }
     else:
         print(f"❌ Task {task_name} not found")
@@ -559,6 +728,70 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
             'status': 'error',
             'message': f'Task {task_name} not found',
             'task_id': task_id
+        }
+
+
+# Task to update DLQ entry status
+@celery_app.task(name='app.tasks.update_dlq_status')
+def update_dlq_status(dlq_db_id: str, new_status: str, notes: str = None):
+    """
+    Update the status of a Dead Letter Queue entry.
+
+    Args:
+        dlq_db_id: Database ID of the DLQ entry
+        new_status: New status (pending_review, retried, resolved, ignored)
+        notes: Optional notes about the resolution
+
+    Returns:
+        Updated entry
+    """
+    from datetime import datetime
+
+    valid_statuses = {'pending_review', 'retried', 'resolved', 'ignored'}
+    if new_status not in valid_statuses:
+        return {
+            'status': 'error',
+            'message': f'Invalid status. Must be one of: {valid_statuses}'
+        }
+
+    try:
+        from app.services.supabase_storage import get_supabase_storage
+        supabase_storage = get_supabase_storage()
+
+        update_data = {
+            'status': new_status,
+            'updated_at': datetime.utcnow().isoformat()
+        }
+
+        if notes:
+            update_data['resolution_notes'] = notes
+
+        if new_status == 'resolved':
+            update_data['resolved_at'] = datetime.utcnow().isoformat()
+
+        result = supabase_storage.client.table("dead_letter_queue") \
+            .update(update_data) \
+            .eq('id', dlq_db_id) \
+            .execute()
+
+        if result.data:
+            return {
+                'status': 'success',
+                'dlq_db_id': dlq_db_id,
+                'new_status': new_status,
+                'entry': result.data[0]
+            }
+        else:
+            return {
+                'status': 'error',
+                'message': 'Entry not found'
+            }
+
+    except Exception as e:
+        print(f"❌ Failed to update DLQ status: {e}")
+        return {
+            'status': 'error',
+            'message': str(e)
         }
 
 

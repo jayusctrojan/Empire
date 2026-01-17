@@ -361,73 +361,63 @@ class TaskHarnessService:
             return await self._execute_generic_task(task)
 
     # ==========================================================================
-    # Default Task Handlers (Placeholders for Task 95-98)
+    # Task Handlers - Integrated with Task 95-98 Executors
     # ==========================================================================
 
     async def _execute_retrieval_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute retrieval task (RAG, NLQ, Graph, API).
-        TODO: Implement in Task 95 (Retrieval Executor)
+        Execute retrieval task (RAG, NLQ, Graph, API) using RetrievalExecutor.
+        Implemented in Task 95.
         """
+        from app.services.task_executors.retrieval_executor import RetrievalExecutor
+
         logger.info("Executing retrieval task", task_type=task["task_type"])
-        return {
-            "success": True,
-            "summary": f"Retrieved data for: {task['task_title']}",
-            "data": {"placeholder": True, "task_type": task["task_type"]},
-            "artifacts": []
-        }
+        executor = RetrievalExecutor()
+        return await executor.execute(task)
 
     async def _execute_synthesis_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute synthesis task - combine findings.
-        TODO: Implement in Task 97 (Synthesis Executor)
+        Execute synthesis task - combine findings using SynthesisExecutor.
+        Implemented in Task 97.
         """
+        from app.services.task_executors.synthesis_executor import SynthesisExecutor
+
         logger.info("Executing synthesis task", task_key=task["task_key"])
-        return {
-            "success": True,
-            "summary": f"Synthesized findings for: {task['task_title']}",
-            "data": {"placeholder": True},
-            "artifacts": []
-        }
+        executor = SynthesisExecutor()
+        return await executor.execute(task)
 
     async def _execute_fact_check_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute fact checking task.
-        TODO: Implement in Task 97 (Synthesis Executor)
+        Execute fact checking task using SynthesisExecutor.
+        Implemented in Task 97.
         """
+        from app.services.task_executors.synthesis_executor import SynthesisExecutor
+
         logger.info("Executing fact check task", task_key=task["task_key"])
-        return {
-            "success": True,
-            "summary": f"Fact checked: {task['task_title']}",
-            "data": {"placeholder": True, "confidence": 0.9},
-            "artifacts": []
-        }
+        executor = SynthesisExecutor()
+        return await executor.execute(task)
 
     async def _execute_write_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute writing task (section or full report).
-        TODO: Implement in Task 98 (Report Generation)
+        Execute writing task (section or full report) using ReportExecutor.
+        Implemented in Task 98.
         """
+        from app.services.task_executors.report_executor import ReportExecutor
+
         logger.info("Executing write task", task_type=task["task_type"])
-        return {
-            "success": True,
-            "summary": f"Generated content for: {task['task_title']}",
-            "data": {"placeholder": True, "content": ""},
-            "artifacts": []
-        }
+        executor = ReportExecutor()
+        return await executor.execute(task)
 
     async def _execute_review_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute review/QA task.
-        TODO: Implement in Task 98 (Report Generation)
+        Execute review/QA task using ReportExecutor.
+        Implemented in Task 98.
         """
+        from app.services.task_executors.report_executor import ReportExecutor
+
         logger.info("Executing review task", task_key=task["task_key"])
-        return {
-            "success": True,
-            "summary": f"Reviewed: {task['task_title']}",
-            "data": {"placeholder": True, "approved": True},
-            "artifacts": []
-        }
+        executor = ReportExecutor()
+        return await executor.execute(task)
 
     async def _execute_generic_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Execute generic task with basic handling"""
