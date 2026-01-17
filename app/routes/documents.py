@@ -1,13 +1,70 @@
 """
 Document Management API Routes - Bulk Operations
+
+T186: Admin authorization check implemented for approval listings.
 """
 
 import uuid
+import hashlib
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
 import structlog
+
+from app.services.rbac_service import RBACService, get_rbac_service
+
+
+async def check_is_admin(user_id: str, rbac_service: RBACService) -> bool:
+    """
+    Check if a user has admin role.
+
+    T186: Admin authorization check helper.
+
+    Args:
+        user_id: The user ID to check
+        rbac_service: RBAC service instance
+
+    Returns:
+        True if user has admin role, False otherwise
+    """
+    try:
+        roles = await rbac_service.get_user_roles(user_id)
+        return any(
+            r.get("role", {}).get("role_name") == "admin"
+            for r in roles
+            if r.get("role")
+        )
+    except Exception as e:
+        # Log and fail closed - if we can't check, deny admin access
+        logger = structlog.get_logger(__name__)
+        logger.error("Failed to check admin status", error=str(e), user_id=user_id)
+        return False
+
+
+def calculate_file_hash(file_path: str) -> str:
+    """
+    Calculate SHA-256 hash of a file.
+
+    Args:
+        file_path: Path to the file
+
+    Returns:
+        SHA-256 hash as hexadecimal string
+    """
+    sha256_hash = hashlib.sha256()
+
+    if not os.path.exists(file_path):
+        # For remote/B2 files, return a placeholder indicating remote storage
+        return f"remote:{hashlib.sha256(file_path.encode()).hexdigest()[:32]}"
+
+    with open(file_path, "rb") as f:
+        # Read file in chunks for memory efficiency
+        for byte_block in iter(lambda: f.read(65536), b""):
+            sha256_hash.update(byte_block)
+
+    return sha256_hash.hexdigest()
 
 from app.models.documents import (
     BulkUploadRequest,
@@ -529,9 +586,8 @@ async def create_document_version(
     try:
         versioning_service = VersioningService()
 
-        # TODO: Calculate file hash from file_path
-        # For now, using a placeholder hash
-        file_hash = "placeholder_hash"
+        # Calculate file hash from file_path
+        file_hash = calculate_file_hash(request.file_path)
 
         version = await versioning_service.create_version(
             document_id=request.document_id,
@@ -697,7 +753,7 @@ async def bulk_create_versions(
                 "document_id": update.document_id,
                 "file_path": update.file_path,
                 "change_description": update.change_description,
-                "file_hash": "placeholder_hash"  # TODO: Calculate actual hash
+                "file_hash": calculate_file_hash(update.file_path)
             }
             for update in request.updates
         ]
@@ -835,21 +891,39 @@ async def submit_for_approval(
 @router.post("/approvals/approve", response_model=ApprovalActionResponse)
 async def approve_document(
     request: ApproveDocumentRequest,
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    rbac_service: RBACService = Depends(get_rbac_service)
 ):
     """
     Approve a document
 
-    Requires: documents:approve permission (or admin role)
+    T186: Admin authorization check implemented.
+    Only administrators can approve documents.
+
+    Requires: admin role
 
     Args:
         request: Approve document request
         user: Current authenticated user
+        rbac_service: RBAC service for admin check
 
     Returns:
         ApprovalActionResponse with approval details
     """
     try:
+        # T186: Check if user is admin
+        is_admin = await check_is_admin(user, rbac_service)
+        if not is_admin:
+            logger.warning(
+                "Non-admin user attempted to approve document",
+                user_id=user,
+                approval_id=request.approval_id
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can approve documents"
+            )
+
         workflow_service = ApprovalWorkflowService()
 
         success, message, approval = await workflow_service.transition_status(
@@ -892,21 +966,39 @@ async def approve_document(
 @router.post("/approvals/reject", response_model=ApprovalActionResponse)
 async def reject_document(
     request: RejectDocumentRequest,
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    rbac_service: RBACService = Depends(get_rbac_service)
 ):
     """
     Reject a document
 
-    Requires: documents:approve permission (or admin role)
+    T186: Admin authorization check implemented.
+    Only administrators can reject documents.
+
+    Requires: admin role
 
     Args:
         request: Reject document request
         user: Current authenticated user
+        rbac_service: RBAC service for admin check
 
     Returns:
         ApprovalActionResponse with rejection details
     """
     try:
+        # T186: Check if user is admin
+        is_admin = await check_is_admin(user, rbac_service)
+        if not is_admin:
+            logger.warning(
+                "Non-admin user attempted to reject document",
+                user_id=user,
+                approval_id=request.approval_id
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can reject documents"
+            )
+
         workflow_service = ApprovalWorkflowService()
 
         success, message, approval = await workflow_service.transition_status(
@@ -1014,10 +1106,15 @@ async def list_approvals(
     user=Depends(get_current_user),
     status_filter: Optional[ApprovalStatus] = None,
     limit: int = 50,
-    offset: int = 0
+    offset: int = 0,
+    rbac_service: RBACService = Depends(get_rbac_service)
 ):
     """
     List approvals for the current user (or all if admin)
+
+    T186: Admin authorization check implemented.
+    - Admins see all approvals
+    - Non-admins see only their own submitted approvals
 
     Requires: Authentication
 
@@ -1026,12 +1123,16 @@ async def list_approvals(
         status_filter: Optional filter by approval status
         limit: Maximum number of approvals to return
         offset: Number of approvals to skip
+        rbac_service: RBAC service for admin check
 
     Returns:
         ListApprovalsResponse with list of approvals
     """
     try:
         supabase = get_supabase_client()
+
+        # T186: Check if user is admin
+        is_admin = await check_is_admin(user, rbac_service)
 
         # Build query
         query = supabase.table("document_approvals").select("*")
@@ -1040,21 +1141,37 @@ async def list_approvals(
         if status_filter:
             query = query.eq("approval_status", status_filter)
 
-        # TODO: Check if user is admin, if not filter by user_id
-        # For now, show all approvals for the user
+        # T186: Non-admins only see their own submitted approvals
+        if not is_admin:
+            query = query.eq("submitted_by", user)
+            logger.debug(
+                "Non-admin user filtering approvals",
+                user_id=user,
+                status_filter=status_filter
+            )
 
         # Execute query with pagination
         result = query.order("updated_at", desc=True).range(offset, offset + limit - 1).execute()
 
         approvals = [DocumentApproval(**approval) for approval in result.data]
 
-        # Get total count
+        # Get total count with same filters
         count_query = supabase.table("document_approvals").select("id", count="exact")
         if status_filter:
             count_query = count_query.eq("approval_status", status_filter)
+        if not is_admin:
+            count_query = count_query.eq("submitted_by", user)
 
         count_result = count_query.execute()
         total_count = count_result.count if count_result.count else 0
+
+        logger.info(
+            "Listed approvals",
+            user_id=user,
+            is_admin=is_admin,
+            total_count=total_count,
+            status_filter=status_filter
+        )
 
         return ListApprovalsResponse(
             approvals=approvals,
@@ -1074,21 +1191,40 @@ async def list_approvals(
 @router.post("/approvals/bulk-action", response_model=BatchOperationResponse)
 async def bulk_approval_action(
     request: BulkApprovalActionRequest,
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    rbac_service: RBACService = Depends(get_rbac_service)
 ):
     """
     Perform bulk approval/rejection actions
 
-    Requires: documents:approve permission (or admin role)
+    T186: Admin authorization check implemented.
+    Only administrators can perform bulk approval/rejection actions.
+
+    Requires: admin role
 
     Args:
         request: Bulk approval action request
         user: Current authenticated user
+        rbac_service: RBAC service for admin check
 
     Returns:
         BatchOperationResponse with results
     """
     try:
+        # T186: Check if user is admin
+        is_admin = await check_is_admin(user, rbac_service)
+        if not is_admin:
+            logger.warning(
+                "Non-admin user attempted bulk approval action",
+                user_id=user,
+                action=request.action,
+                approval_count=len(request.approval_ids)
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only administrators can perform bulk approval actions"
+            )
+
         workflow_service = ApprovalWorkflowService()
 
         # Validate action
