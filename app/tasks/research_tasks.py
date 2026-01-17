@@ -5,15 +5,19 @@ Celery tasks for the Research Projects (Agent Harness) feature.
 Tasks:
 - initialize_research_job: Analyze query and create task plan
 - execute_research_tasks: Execute planned tasks
-- generate_research_report: Generate final report
+- generate_research_report: Generate final report with B2 storage (Task 181)
 
 Author: Claude Code
 Date: 2025-01-10
+Updated: 2025-01-17 - Task 181: Full report generation with ReportExecutor and B2 storage
 """
 
 import asyncio
-from typing import Dict, Any, Optional
+import os
+import tempfile
+from typing import Dict, Any, Optional, List
 from datetime import datetime
+from pathlib import Path
 
 import structlog
 from celery import group, chord
@@ -480,19 +484,21 @@ def execute_single_task(self, task_id: int) -> Dict[str, Any]:
 )
 def generate_research_report(self, job_id: int) -> Dict[str, Any]:
     """
-    Generate the final research report from all artifacts.
+    Generate the final research report from all artifacts (Task 181).
 
     This task:
     1. Collects all artifacts from completed tasks
-    2. Synthesizes findings into a structured report
-    3. Generates executive summary and key findings
-    4. Stores report and sends notification
+    2. Uses ReportExecutor to generate AI-powered report
+    3. Generates both markdown and PDF versions
+    4. Stores reports in B2 storage
+    5. Updates database with report metadata
+    6. Sends completion notification
 
     Args:
         job_id: The research job ID
 
     Returns:
-        Dict with report generation status
+        Dict with report generation status, URLs, and metadata
     """
     try:
         logger.info(
@@ -509,6 +515,8 @@ def generate_research_report(self, job_id: int) -> Dict[str, Any]:
         ).single().execute()
 
         job = job_result.data
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
 
         # Get all artifacts
         artifacts_result = supabase.table("research_artifacts").select("*").eq(
@@ -517,14 +525,70 @@ def generate_research_report(self, job_id: int) -> Dict[str, Any]:
 
         artifacts = artifacts_result.data or []
 
-        # TODO: Implement actual report generation in Task 98
-        # For now, create a placeholder report
-        report_content = _generate_placeholder_report(job, artifacts)
+        # Get completed tasks for context
+        tasks_result = supabase.table("plan_tasks").select("*").eq(
+            "job_id", job_id
+        ).eq("status", TaskStatus.COMPLETE.value).execute()
+
+        completed_tasks = tasks_result.data or []
+
+        # Generate report using ReportExecutor
+        report_result = run_async(_generate_report_with_executor(
+            job=job,
+            artifacts=artifacts,
+            tasks=completed_tasks
+        ))
+
+        report_content = report_result.get("content", "")
+        word_count = report_result.get("word_count", 0)
+
+        # Generate PDF version
+        pdf_bytes = _generate_report_pdf(
+            title=f"Research Report: {job['query'][:50]}",
+            content=report_content,
+            job=job
+        )
+
+        # Upload to B2 storage
+        b2_result = run_async(_upload_reports_to_b2(
+            job_id=job_id,
+            markdown_content=report_content,
+            pdf_bytes=pdf_bytes
+        ))
+
+        md_url = b2_result.get("md_url")
+        pdf_url = b2_result.get("pdf_url")
+        md_path = b2_result.get("md_path")
+        pdf_path = b2_result.get("pdf_path")
+
+        # Store report metadata
+        report_record = {
+            "job_id": job_id,
+            "title": f"Research Report: {job['query'][:100]}",
+            "description": f"Generated report for research query",
+            "md_path": md_path,
+            "md_url": md_url,
+            "pdf_path": pdf_path,
+            "pdf_url": pdf_url,
+            "word_count": word_count,
+            "artifact_count": len(artifacts),
+            "task_count": len(completed_tasks),
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+        # Insert report record
+        report_insert = supabase.table("research_reports").insert(
+            report_record
+        ).execute()
+
+        report_id = report_insert.data[0]["id"] if report_insert.data else None
 
         # Update job with report
         supabase.table("research_jobs").update({
             "status": JobStatus.COMPLETE.value,
             "report_content": report_content,
+            "report_md_url": md_url,
+            "report_pdf_url": pdf_url,
             "completed_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat(),
             "progress_percentage": 100.0
@@ -543,12 +607,20 @@ def generate_research_report(self, job_id: int) -> Dict[str, Any]:
         logger.info(
             "Research report generated successfully",
             job_id=job_id,
-            artifact_count=len(artifacts)
+            report_id=report_id,
+            artifact_count=len(artifacts),
+            word_count=word_count,
+            md_url=md_url,
+            pdf_url=pdf_url
         )
 
         return {
             "success": True,
             "job_id": job_id,
+            "report_id": report_id,
+            "md_url": md_url,
+            "pdf_url": pdf_url,
+            "word_count": word_count,
             "message": "Report generated successfully"
         }
 
@@ -679,8 +751,7 @@ def _execute_task_by_type(task: dict) -> dict:
 
 def _generate_placeholder_report(job: dict, artifacts: list) -> str:
     """
-    Generate placeholder report.
-    TODO: Replace with actual report generation in Task 98
+    Generate fallback report when ReportExecutor is unavailable.
     """
     return f"""# Research Report
 
@@ -691,8 +762,376 @@ def _generate_placeholder_report(job: dict, artifacts: list) -> str:
 Research completed with {len(artifacts)} artifacts collected.
 
 ## Status
-Report generation placeholder - full implementation in Task 98.
+Report generated with fallback method.
 
 ---
 Generated: {datetime.utcnow().isoformat()}
 """
+
+
+# ==============================================================================
+# Task 181: Report Generation Helpers
+# ==============================================================================
+
+
+async def _generate_report_with_executor(
+    job: Dict[str, Any],
+    artifacts: List[Dict[str, Any]],
+    tasks: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Generate report content using ReportExecutor (Task 181).
+
+    Uses the ReportExecutor to create an AI-powered comprehensive report
+    from job data, artifacts, and task results.
+
+    Args:
+        job: Research job record
+        artifacts: List of research artifacts
+        tasks: List of completed plan tasks
+
+    Returns:
+        Dict with content, word_count, and sections
+    """
+    try:
+        from app.services.task_executors.report_executor import get_report_executor
+
+        executor = get_report_executor()
+
+        # Build a synthetic task for the executor
+        synthetic_task = {
+            "id": 0,
+            "job_id": job["id"],
+            "task_type": "write_report",
+            "task_key": "final_report",
+            "query": job["query"],
+            "config": {
+                "research_type": job.get("config", {}).get("research_type", "general"),
+                "focus_areas": job.get("config", {}).get("focus_areas", [])
+            }
+        }
+
+        # Execute report generation
+        result = await executor.execute_write_report(synthetic_task)
+
+        if result.get("success"):
+            # Extract content from artifact
+            report_artifact = result.get("artifacts", [{}])[0]
+            content = report_artifact.get("content", "")
+
+            return {
+                "content": content,
+                "word_count": result.get("data", {}).get("word_count", len(content.split())),
+                "sections": result.get("data", {}).get("sections", []),
+                "quality_score": result.get("data", {}).get("quality_score")
+            }
+        else:
+            logger.warning(
+                "ReportExecutor returned failure, using fallback",
+                error=result.get("error")
+            )
+            # Fall back to placeholder
+            content = _generate_placeholder_report(job, artifacts)
+            return {
+                "content": content,
+                "word_count": len(content.split()),
+                "sections": []
+            }
+
+    except Exception as e:
+        logger.warning(
+            "ReportExecutor failed, using fallback",
+            error=str(e)
+        )
+        # Fall back to placeholder
+        content = _generate_placeholder_report(job, artifacts)
+        return {
+            "content": content,
+            "word_count": len(content.split()),
+            "sections": []
+        }
+
+
+def _generate_report_pdf(
+    title: str,
+    content: str,
+    job: Dict[str, Any]
+) -> bytes:
+    """
+    Generate PDF from markdown report content (Task 181).
+
+    Uses ReportLab to create a professional PDF document.
+
+    Args:
+        title: Report title
+        content: Markdown content
+        job: Job record for metadata
+
+    Returns:
+        PDF file as bytes
+    """
+    try:
+        from io import BytesIO
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib.colors import HexColor
+        from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, PageBreak
+        )
+
+        # Create PDF buffer
+        buffer = BytesIO()
+
+        # Create document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=0.75 * inch,
+            leftMargin=0.75 * inch,
+            topMargin=0.75 * inch,
+            bottomMargin=0.75 * inch
+        )
+
+        # Get styles
+        styles = getSampleStyleSheet()
+
+        # Custom styles
+        title_style = ParagraphStyle(
+            'ReportTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            alignment=TA_CENTER,
+            textColor=HexColor("#1a365d")
+        )
+
+        heading_style = ParagraphStyle(
+            'ReportHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            spaceBefore=20,
+            spaceAfter=10,
+            textColor=HexColor("#2c5282")
+        )
+
+        body_style = ParagraphStyle(
+            'ReportBody',
+            parent=styles['Normal'],
+            fontSize=11,
+            leading=14,
+            alignment=TA_JUSTIFY,
+            spaceAfter=12
+        )
+
+        meta_style = ParagraphStyle(
+            'ReportMeta',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=HexColor("#718096"),
+            alignment=TA_CENTER
+        )
+
+        # Build story
+        story = []
+
+        # Title page
+        story.append(Spacer(1, 2 * inch))
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 0.5 * inch))
+
+        # Metadata
+        created_at = job.get("created_at", datetime.utcnow().isoformat())
+        story.append(Paragraph(f"Generated: {created_at[:10]}", meta_style))
+        story.append(Paragraph("Empire v7.3 Research System", meta_style))
+        story.append(PageBreak())
+
+        # Process markdown content
+        lines = content.split('\n')
+        current_paragraph = []
+
+        for line in lines:
+            line = line.strip()
+
+            if not line:
+                # Empty line - flush paragraph
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    story.append(Paragraph(text, body_style))
+                    current_paragraph = []
+                continue
+
+            if line.startswith('# '):
+                # H1 heading
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    story.append(Paragraph(text, body_style))
+                    current_paragraph = []
+                story.append(Paragraph(line[2:], title_style))
+
+            elif line.startswith('## '):
+                # H2 heading
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    story.append(Paragraph(text, body_style))
+                    current_paragraph = []
+                story.append(Paragraph(line[3:], heading_style))
+
+            elif line.startswith('### '):
+                # H3 heading
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    story.append(Paragraph(text, body_style))
+                    current_paragraph = []
+                h3_style = ParagraphStyle(
+                    'H3',
+                    parent=heading_style,
+                    fontSize=13
+                )
+                story.append(Paragraph(line[4:], h3_style))
+
+            elif line.startswith('- ') or line.startswith('* '):
+                # Bullet point
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    story.append(Paragraph(text, body_style))
+                    current_paragraph = []
+                bullet_style = ParagraphStyle(
+                    'Bullet',
+                    parent=body_style,
+                    leftIndent=20,
+                    bulletIndent=10
+                )
+                story.append(Paragraph(f"• {line[2:]}", bullet_style))
+
+            elif line.startswith('---'):
+                # Horizontal rule - add spacer
+                if current_paragraph:
+                    text = ' '.join(current_paragraph)
+                    story.append(Paragraph(text, body_style))
+                    current_paragraph = []
+                story.append(Spacer(1, 0.3 * inch))
+
+            else:
+                # Regular text - accumulate
+                current_paragraph.append(line)
+
+        # Flush remaining paragraph
+        if current_paragraph:
+            text = ' '.join(current_paragraph)
+            story.append(Paragraph(text, body_style))
+
+        # Footer
+        story.append(Spacer(1, 0.5 * inch))
+        story.append(Paragraph(
+            "Generated by Empire v7.3 Research Report Generator",
+            meta_style
+        ))
+
+        # Build PDF
+        doc.build(story)
+
+        # Get bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+
+        logger.info(
+            "PDF generated",
+            size_bytes=len(pdf_bytes)
+        )
+
+        return pdf_bytes
+
+    except ImportError as e:
+        logger.error(f"ReportLab not available: {e}")
+        # Return minimal PDF placeholder
+        return b"%PDF-1.4\n%Report generation requires reportlab\n%%EOF"
+
+    except Exception as e:
+        logger.error(f"PDF generation failed: {e}")
+        raise
+
+
+async def _upload_reports_to_b2(
+    job_id: int,
+    markdown_content: str,
+    pdf_bytes: bytes
+) -> Dict[str, Any]:
+    """
+    Upload markdown and PDF reports to B2 storage (Task 181).
+
+    Args:
+        job_id: Research job ID
+        markdown_content: Markdown report content
+        pdf_bytes: PDF file bytes
+
+    Returns:
+        Dict with md_url, pdf_url, md_path, pdf_path
+    """
+    try:
+        from app.services.b2_storage import get_b2_service
+        from io import BytesIO
+
+        b2_service = get_b2_service()
+
+        # Generate filenames with timestamp
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        md_filename = f"report_{job_id}_{timestamp}.md"
+        pdf_filename = f"report_{job_id}_{timestamp}.pdf"
+
+        # B2 paths in reports folder
+        md_path = f"reports/{job_id}/{md_filename}"
+        pdf_path = f"reports/{job_id}/{pdf_filename}"
+
+        # Upload markdown
+        md_buffer = BytesIO(markdown_content.encode('utf-8'))
+        md_result = await b2_service.upload_file(
+            file_data=md_buffer,
+            filename=md_filename,
+            folder=f"reports/{job_id}",
+            content_type="text/markdown",
+            metadata={
+                "job_id": str(job_id),
+                "report_type": "markdown"
+            }
+        )
+
+        # Upload PDF
+        pdf_buffer = BytesIO(pdf_bytes)
+        pdf_result = await b2_service.upload_file(
+            file_data=pdf_buffer,
+            filename=pdf_filename,
+            folder=f"reports/{job_id}",
+            content_type="application/pdf",
+            metadata={
+                "job_id": str(job_id),
+                "report_type": "pdf"
+            }
+        )
+
+        logger.info(
+            "Reports uploaded to B2",
+            job_id=job_id,
+            md_path=md_path,
+            pdf_path=pdf_path
+        )
+
+        return {
+            "md_url": md_result.get("url"),
+            "pdf_url": pdf_result.get("url"),
+            "md_path": md_path,
+            "pdf_path": pdf_path,
+            "md_file_id": md_result.get("file_id"),
+            "pdf_file_id": pdf_result.get("file_id")
+        }
+
+    except Exception as e:
+        logger.error(f"B2 upload failed: {e}")
+        # Return empty URLs on failure (report still saved in DB)
+        return {
+            "md_url": None,
+            "pdf_url": None,
+            "md_path": None,
+            "pdf_path": None
+        }

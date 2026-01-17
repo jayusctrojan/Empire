@@ -81,9 +81,20 @@ class ResearchProjectService:
                 research_type=request.research_type.value
             )
 
-            # TODO: Trigger Celery task for initialization
-            # from app.tasks.research_tasks import initialize_research_job
-            # initialize_research_job.delay(job["id"])
+            # Task 187: Trigger Celery task for initialization
+            from app.tasks.research_tasks import initialize_research_job
+            celery_task = initialize_research_job.delay(job["id"])
+
+            # Store Celery task ID for potential cancellation
+            self.supabase.table("research_jobs").update({
+                "celery_task_id": celery_task.id
+            }).eq("id", job["id"]).execute()
+
+            logger.info(
+                "Research job initialization task queued",
+                job_id=job["id"],
+                celery_task_id=celery_task.id
+            )
 
             return CreateProjectResponse(
                 success=True,
@@ -250,9 +261,9 @@ class ResearchProjectService:
     async def cancel_project(self, user_id: str, job_id: int) -> CancelProjectResponse:
         """Cancel an active research project"""
         try:
-            # Get current status
+            # Get current status and celery task ID
             job_result = self.supabase.table("research_jobs").select(
-                "id, status"
+                "id, status, celery_task_id"
             ).eq("id", job_id).eq("user_id", user_id).single().execute()
 
             if not job_result.data:
@@ -262,7 +273,8 @@ class ResearchProjectService:
                     message="Project not found"
                 )
 
-            current_status = job_result.data["status"]
+            job = job_result.data
+            current_status = job["status"]
             if current_status in ["complete", "failed", "cancelled"]:
                 return CancelProjectResponse(
                     success=False,
@@ -271,30 +283,90 @@ class ResearchProjectService:
                     message=f"Cannot cancel project with status: {current_status}"
                 )
 
+            # Task 187: Revoke Celery tasks
+            revoked_tasks = 0
+            from app.celery_app import celery_app
+
+            # Revoke the main initialization/execution task if exists
+            if job.get("celery_task_id"):
+                try:
+                    celery_app.control.revoke(
+                        job["celery_task_id"],
+                        terminate=True,
+                        signal="SIGTERM"
+                    )
+                    revoked_tasks += 1
+                    logger.info(
+                        "Revoked main Celery task",
+                        job_id=job_id,
+                        celery_task_id=job["celery_task_id"]
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to revoke main Celery task",
+                        job_id=job_id,
+                        celery_task_id=job["celery_task_id"],
+                        error=str(e)
+                    )
+
+            # Revoke any running plan tasks with celery_task_id
+            running_tasks_result = self.supabase.table("plan_tasks").select(
+                "id, celery_task_id"
+            ).eq("job_id", job_id).in_(
+                "status", [TaskStatus.RUNNING.value, TaskStatus.QUEUED.value]
+            ).execute()
+
+            running_tasks = running_tasks_result.data or []
+            for task in running_tasks:
+                if task.get("celery_task_id"):
+                    try:
+                        celery_app.control.revoke(
+                            task["celery_task_id"],
+                            terminate=True,
+                            signal="SIGTERM"
+                        )
+                        revoked_tasks += 1
+                        logger.info(
+                            "Revoked plan task",
+                            task_id=task["id"],
+                            celery_task_id=task["celery_task_id"]
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to revoke plan task",
+                            task_id=task["id"],
+                            error=str(e)
+                        )
+
             # Update job status
             self.supabase.table("research_jobs").update({
                 "status": JobStatus.CANCELLED.value,
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("id", job_id).execute()
 
-            # Cancel pending tasks
+            # Cancel pending/queued/running tasks
             self.supabase.table("plan_tasks").update({
                 "status": TaskStatus.CANCELLED.value
             }).eq("job_id", job_id).in_(
-                "status", [TaskStatus.PENDING.value, TaskStatus.QUEUED.value]
+                "status", [
+                    TaskStatus.PENDING.value,
+                    TaskStatus.QUEUED.value,
+                    TaskStatus.RUNNING.value
+                ]
             ).execute()
 
-            # TODO: Revoke Celery tasks
-            # from celery.result import AsyncResult
-            # AsyncResult(task_id).revoke()
-
-            logger.info("Project cancelled", job_id=job_id, user_id=user_id)
+            logger.info(
+                "Project cancelled",
+                job_id=job_id,
+                user_id=user_id,
+                revoked_tasks=revoked_tasks
+            )
 
             return CancelProjectResponse(
                 success=True,
                 job_id=job_id,
                 status=JobStatus.CANCELLED,
-                message="Project cancelled successfully"
+                message=f"Project cancelled successfully. Revoked {revoked_tasks} Celery task(s)."
             )
 
         except Exception as e:
