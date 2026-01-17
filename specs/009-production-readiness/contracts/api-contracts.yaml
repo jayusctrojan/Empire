@@ -1,0 +1,282 @@
+openapi: 3.1.0
+info:
+  title: Production Readiness API Contracts
+  version: 1.0.0
+  description: |
+    API contracts for production readiness improvements.
+    These contracts define the expected behavior for error responses,
+    rate limiting headers, and circuit breaker status endpoints.
+
+paths:
+  /api/system/circuit-breakers:
+    get:
+      summary: Get circuit breaker states
+      description: Returns the current state of all circuit breakers
+      operationId: getCircuitBreakerStates
+      tags:
+        - System
+      responses:
+        '200':
+          description: Circuit breaker states
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CircuitBreakerStates'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/system/health:
+    get:
+      summary: Health check
+      description: Returns application health status including environment validation
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: Application is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    # Standard Error Response
+    StandardError:
+      type: object
+      required:
+        - code
+        - message
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - AUTHENTICATION_ERROR
+            - AUTHORIZATION_ERROR
+            - NOT_FOUND
+            - RATE_LIMITED
+            - EXTERNAL_SERVICE_ERROR
+            - SERVICE_UNAVAILABLE
+            - INTERNAL_ERROR
+          description: Error code identifying the type of error
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error details
+        request_id:
+          type: string
+          format: uuid
+          description: Unique request identifier for correlation
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/StandardError'
+
+    # Circuit Breaker Models
+    CircuitBreakerState:
+      type: object
+      required:
+        - state
+        - failure_count
+      properties:
+        state:
+          type: string
+          enum:
+            - CLOSED
+            - OPEN
+            - HALF_OPEN
+          description: Current state of the circuit breaker
+        failure_count:
+          type: integer
+          minimum: 0
+          description: Number of consecutive failures
+        last_failure_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the last failure occurred
+        recovery_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the circuit will attempt recovery
+
+    CircuitBreakerStates:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/CircuitBreakerState'
+      example:
+        llama_index:
+          state: CLOSED
+          failure_count: 0
+          last_failure_time: null
+          recovery_time: null
+        crewai:
+          state: OPEN
+          failure_count: 5
+          last_failure_time: "2025-01-15T12:00:00Z"
+          recovery_time: "2025-01-15T12:01:00Z"
+
+    # Health Status
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - environment_validated
+        - services
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+        environment_validated:
+          type: boolean
+          description: Whether all critical env vars are present
+        missing_recommended_vars:
+          type: array
+          items:
+            type: string
+          description: List of missing recommended environment variables
+        services:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+                enum:
+                  - up
+                  - down
+                  - degraded
+              circuit_breaker:
+                type: string
+                enum:
+                  - CLOSED
+                  - OPEN
+                  - HALF_OPEN
+
+  responses:
+    # Standard error responses
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request validation failed
+              details:
+                query: field required
+              request_id: "550e8400-e29b-41d4-a716-446655440000"
+              timestamp: "2025-01-15T12:00:00Z"
+
+    RateLimitError:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until rate limit resets
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Maximum requests allowed in window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in current window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: RATE_LIMITED
+              message: Rate limit exceeded
+              details:
+                retry_after: 60
+                limit: 5
+                window: 60
+              request_id: "550e8400-e29b-41d4-a716-446655440000"
+              timestamp: "2025-01-15T12:00:00Z"
+
+    ExternalServiceError:
+      description: External service failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EXTERNAL_SERVICE_ERROR
+              message: LlamaIndex service unavailable
+              details:
+                service: llama_index
+                reason: Circuit breaker open
+              request_id: "550e8400-e29b-41d4-a716-446655440000"
+              timestamp: "2025-01-15T12:00:00Z"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred
+              details: null
+              request_id: "550e8400-e29b-41d4-a716-446655440000"
+              timestamp: "2025-01-15T12:00:00Z"
+
+  headers:
+    # Rate limit headers
+    X-RateLimit-Limit:
+      description: Maximum requests allowed in current window
+      schema:
+        type: integer
+
+    X-RateLimit-Remaining:
+      description: Remaining requests in current window
+      schema:
+        type: integer
+
+    X-RateLimit-Reset:
+      description: Unix timestamp when rate limit window resets
+      schema:
+        type: integer
+
+    Retry-After:
+      description: Seconds to wait before retrying
+      schema:
+        type: integer

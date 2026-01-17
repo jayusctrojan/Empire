@@ -1,0 +1,393 @@
+# PRD: Production Readiness Improvements for Empire v7.3
+
+## Workflow
+
+This feature will be implemented using the speckit workflow:
+
+1. **PRD + Architecture** - This document (complete)
+2. **speckit.specify** - Create formal feature spec from this PRD
+3. **speckit.clarify** - Identify gaps and ask clarifying questions
+4. **speckit.plan** - Generate implementation plan using architecture below
+5. **TaskMaster parse_prd** - Parse PRD to generate tasks
+6. **speckit.tasks** - Create tasks.md for the feature
+7. **speckit.analyze** - Final cross-artifact consistency check
+
+---
+
+## Executive Summary
+
+Empire v7.3 has been assessed at 85/100 production readiness. This PRD addresses the remaining 15 points through critical security hardening, reliability improvements, and observability enhancements to achieve 100/100 production readiness.
+
+---
+
+## Problem Statement
+
+### Current State
+- Application starts without validating required environment variables
+- CORS allows wildcard origins in production (warning only, no failure)
+- External service calls lack timeouts (can hang indefinitely)
+- Circuit breakers not applied to all external services
+- Rate limiting not differentiated by endpoint sensitivity
+- Inconsistent error response formats across API
+
+### Impact
+- Production failures with unclear error messages
+- Security vulnerabilities (CSRF, brute force attacks)
+- Cascading failures when external services are down
+- Difficulty debugging production issues
+- Poor client experience with inconsistent errors
+
+---
+
+## Proposed Solution
+
+### Phase 1: Critical Security & Startup (Priority: CRITICAL)
+
+#### 1.1 Environment Variable Validation
+Create startup validation that fails fast if required variables are missing.
+
+**Required Variables to Validate:**
+- `SUPABASE_URL` - Database connection
+- `SUPABASE_SERVICE_KEY` - Database authentication
+- `REDIS_URL` - Cache and Celery broker
+- `NEO4J_URI` - Graph database
+- `NEO4J_PASSWORD` - Graph database auth
+- `ANTHROPIC_API_KEY` - AI services
+- `ENVIRONMENT` - Must be set (development/staging/production)
+
+**Implementation:**
+```python
+# app/core/startup_validation.py
+from typing import List, Dict, Optional
+import os
+import structlog
+
+logger = structlog.get_logger(__name__)
+
+REQUIRED_ENV_VARS = {
+    "critical": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_KEY",
+        "REDIS_URL",
+        "ANTHROPIC_API_KEY",
+        "ENVIRONMENT",
+    ],
+    "recommended": [
+        "NEO4J_URI",
+        "NEO4J_PASSWORD",
+        "LLAMAINDEX_SERVICE_URL",
+        "CREWAI_SERVICE_URL",
+    ]
+}
+
+def validate_environment() -> Dict[str, List[str]]:
+    """Validate required environment variables at startup."""
+    missing_critical = []
+    missing_recommended = []
+
+    for var in REQUIRED_ENV_VARS["critical"]:
+        if not os.getenv(var):
+            missing_critical.append(var)
+
+    for var in REQUIRED_ENV_VARS["recommended"]:
+        if not os.getenv(var):
+            missing_recommended.append(var)
+
+    if missing_critical:
+        logger.critical(
+            "Missing critical environment variables",
+            missing=missing_critical
+        )
+        raise RuntimeError(
+            f"Cannot start: Missing critical env vars: {', '.join(missing_critical)}"
+        )
+
+    if missing_recommended:
+        logger.warning(
+            "Missing recommended environment variables - some features may be unavailable",
+            missing=missing_recommended
+        )
+
+    return {
+        "critical": [],
+        "recommended": missing_recommended
+    }
+```
+
+#### 1.2 CORS Production Hardening
+Make CORS configuration fail in production if wildcard is detected.
+
+**Implementation:**
+```python
+# In app/main.py - replace warning with failure
+cors_origins = os.getenv("CORS_ORIGINS", "").split(",")
+if not cors_origins or cors_origins == [""]:
+    if os.getenv("ENVIRONMENT") == "production":
+        raise RuntimeError(
+            "CORS_ORIGINS must be explicitly set in production. "
+            "Set to specific origins like 'https://app.example.com,https://admin.example.com'"
+        )
+    cors_origins = ["*"]  # Allow in development only
+
+if "*" in cors_origins and os.getenv("ENVIRONMENT") == "production":
+    raise RuntimeError(
+        "CORS_ORIGINS cannot be '*' in production. "
+        "Set specific allowed origins for security."
+    )
+```
+
+#### 1.3 Sensitive Endpoint Rate Limiting
+Apply stricter rate limits to authentication and upload endpoints.
+
+**Rate Limit Tiers:**
+| Endpoint Pattern | Limit | Reason |
+|-----------------|-------|--------|
+| `/api/users/login` | 5/minute | Brute force prevention |
+| `/api/users/register` | 3/minute | Spam prevention |
+| `/api/documents/upload` | 10/minute | Resource protection |
+| `/api/query/*` | 60/minute | API abuse prevention |
+| `/api/orchestration/*` | 30/minute | AI cost protection |
+| Default | 200/minute | General protection |
+
+---
+
+### Phase 2: Reliability & Resilience (Priority: HIGH)
+
+#### 2.1 External Service Timeouts
+Add configurable timeouts to all external HTTP calls.
+
+**Services Requiring Timeouts:**
+- LlamaIndex Service: 60s (document parsing can be slow)
+- CrewAI Service: 120s (multi-agent workflows)
+- Ollama/Embeddings: 30s
+- Neo4j HTTP: 15s
+- Supabase: 10s
+
+**Implementation Pattern:**
+```python
+import httpx
+from app.services.circuit_breaker import circuit_breaker
+
+class ExternalServiceClient:
+    def __init__(self, base_url: str, timeout: float = 30.0):
+        self.client = httpx.AsyncClient(
+            base_url=base_url,
+            timeout=httpx.Timeout(timeout, connect=5.0),
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)
+        )
+
+    @circuit_breaker("service_name")
+    async def call(self, endpoint: str, **kwargs):
+        return await self.client.post(endpoint, **kwargs)
+```
+
+#### 2.2 Circuit Breaker Coverage
+Apply circuit breakers to ALL external service calls.
+
+**Services to Protect:**
+1. `llama_index_service.py` - LlamaIndex HTTP calls
+2. `crewai_service.py` - CrewAI HTTP calls
+3. `embedding_service.py` - Ollama embedding calls
+4. `arcade_service.py` - Arcade.dev API calls
+5. `neo4j_service.py` - Neo4j HTTP/Bolt calls
+6. `b2_storage.py` - Backblaze B2 calls
+
+**Circuit Breaker Settings:**
+```python
+CIRCUIT_BREAKER_CONFIG = {
+    "llama_index": {"failure_threshold": 5, "recovery_timeout": 30},
+    "crewai": {"failure_threshold": 3, "recovery_timeout": 60},
+    "ollama": {"failure_threshold": 5, "recovery_timeout": 15},
+    "neo4j": {"failure_threshold": 3, "recovery_timeout": 30},
+    "b2": {"failure_threshold": 5, "recovery_timeout": 60},
+}
+```
+
+---
+
+### Phase 3: Error Handling & Observability (Priority: HIGH)
+
+#### 3.1 Standardized Error Responses
+Ensure all endpoints use the standardized error format from `app/models/errors.py`.
+
+**Standard Error Response:**
+```python
+{
+    "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Human-readable error message",
+        "details": {"field": "description of issue"},
+        "request_id": "uuid-from-header",
+        "timestamp": "2025-01-15T12:00:00Z"
+    }
+}
+```
+
+**Error Codes to Implement:**
+- `VALIDATION_ERROR` (400)
+- `AUTHENTICATION_ERROR` (401)
+- `AUTHORIZATION_ERROR` (403)
+- `NOT_FOUND` (404)
+- `RATE_LIMITED` (429)
+- `EXTERNAL_SERVICE_ERROR` (502)
+- `SERVICE_UNAVAILABLE` (503)
+- `INTERNAL_ERROR` (500)
+
+#### 3.2 Enhanced Exception Logging
+All exception handlers must include:
+- Error type and message
+- Request context (endpoint, method, user_id)
+- Stack trace for 500 errors
+- Request ID for correlation
+
+**Implementation:**
+```python
+except Exception as e:
+    logger.exception(
+        "Unhandled exception in request",
+        error_type=type(e).__name__,
+        error_message=str(e),
+        endpoint=request.url.path,
+        method=request.method,
+        request_id=request.headers.get("X-Request-ID"),
+        user_id=request.state.user_id if hasattr(request.state, "user_id") else None
+    )
+    raise
+```
+
+---
+
+### Phase 4: Input Validation (Priority: HIGH)
+
+#### 4.1 Query Parameter Validation
+Add Pydantic models for all query parameters.
+
+**Endpoints Requiring Validation:**
+- `/api/query/*` - query string length, allowed characters
+- `/api/documents/*` - file IDs, pagination params
+- `/api/graph/*` - entity IDs, traversal depth
+- `/api/search/*` - search terms, filters
+
+**Validation Rules:**
+```python
+class QueryRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=10000)
+    top_k: int = Field(default=10, ge=1, le=100)
+    filters: Optional[Dict[str, Any]] = Field(default=None)
+
+    @validator("query")
+    def sanitize_query(cls, v):
+        # Remove potential injection patterns
+        dangerous_patterns = ["--", ";", "DROP", "DELETE", "INSERT"]
+        for pattern in dangerous_patterns:
+            if pattern.upper() in v.upper():
+                raise ValueError(f"Query contains disallowed pattern: {pattern}")
+        return v.strip()
+```
+
+---
+
+## Technical Specifications
+
+### New Files to Create
+
+| File | Purpose |
+|------|---------|
+| `app/core/startup_validation.py` | Environment variable validation |
+| `app/core/service_timeouts.py` | Timeout configuration constants |
+| `app/middleware/rate_limit_tiers.py` | Tiered rate limiting config |
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `app/main.py` | Add startup validation, fix CORS |
+| `app/middleware/rate_limit.py` | Add endpoint-specific limits |
+| `app/services/llama_index_service.py` | Add timeout + circuit breaker |
+| `app/services/crewai_service.py` | Add timeout + circuit breaker |
+| `app/services/embedding_service.py` | Add timeout + circuit breaker |
+| `app/middleware/error_handler.py` | Enhance exception logging |
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Production Readiness Score | 85/100 | 100/100 |
+| Startup Validation Coverage | 0% | 100% |
+| Circuit Breaker Coverage | 40% | 100% |
+| External Call Timeout Coverage | 20% | 100% |
+| Standardized Error Response | 60% | 100% |
+
+---
+
+## Implementation Priority
+
+### Week 1: Critical (Must Have)
+1. Environment variable validation at startup
+2. CORS production hardening
+3. Sensitive endpoint rate limiting
+
+### Week 2: High Priority
+4. External service timeouts
+5. Circuit breaker coverage expansion
+6. Standardized error responses
+
+### Week 3: Completion
+7. Enhanced exception logging
+8. Input validation for all routes
+9. Final testing and verification
+
+---
+
+## Risk Mitigation
+
+| Risk | Mitigation |
+|------|------------|
+| Breaking existing deployments | Add feature flags for gradual rollout |
+| Performance impact from validation | Use caching for repeated validations |
+| Rate limit too restrictive | Start with higher limits, tune down |
+
+---
+
+## Dependencies
+
+- **No new packages required**
+- Uses existing: `httpx`, `structlog`, `pydantic`, `prometheus_client`
+
+---
+
+## Testing Requirements
+
+1. Unit tests for startup validation
+2. Integration tests for rate limiting
+3. Circuit breaker behavior tests
+4. Error response format validation tests
+5. Timeout behavior verification tests
+
+---
+
+## Rollback Plan
+
+Each change should be:
+1. Behind a feature flag where possible
+2. Independently deployable
+3. Reversible without data loss
+
+---
+
+## File Changes Summary
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `app/core/startup_validation.py` | Create | Env var validation module |
+| `app/core/service_timeouts.py` | Create | Timeout constants |
+| `app/main.py` | Modify | Add validation, fix CORS |
+| `app/middleware/rate_limit.py` | Modify | Add tiered limits |
+| `app/services/llama_index_service.py` | Modify | Add timeout + CB |
+| `app/services/crewai_service.py` | Modify | Add timeout + CB |
+| `app/services/embedding_service.py` | Modify | Add timeout + CB |
+| `app/middleware/error_handler.py` | Modify | Enhanced logging |
+| `tests/test_startup_validation.py` | Create | Validation tests |
+| `tests/test_rate_limiting.py` | Create | Rate limit tests |

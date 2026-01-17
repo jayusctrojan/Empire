@@ -290,7 +290,7 @@ async def get_circuit_config(service_name: str) -> CircuitConfigResponse:
         )
 
     circuit = _circuit_registry[service_name]
-    config = circuit._config
+    config = circuit.config
 
     return CircuitConfigResponse(
         service_name=service_name,
