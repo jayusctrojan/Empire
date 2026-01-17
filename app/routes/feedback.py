@@ -3,6 +3,10 @@ Empire v7.3 - Agent Feedback Routes
 Task 188: Agent Feedback System
 
 API endpoints for managing feedback on AI agent outputs.
+
+NOTE: Route ordering is CRITICAL in FastAPI. Specific routes must come BEFORE
+parameterized routes like /{feedback_id}, otherwise the parameter captures
+paths like /agents, /health, /stats.
 """
 
 from typing import Any, Dict, List, Optional
@@ -78,7 +82,7 @@ class CreateFeedbackResponse(BaseModel):
 
 
 # =============================================================================
-# Endpoints
+# Endpoints - SPECIFIC ROUTES FIRST (before parameterized routes)
 # =============================================================================
 
 
@@ -122,84 +126,49 @@ async def create_feedback(feedback: FeedbackCreate):
         raise HTTPException(status_code=500, detail="Failed to store feedback")
 
 
-@router.get(
-    "/{feedback_id}",
-    response_model=FeedbackResponse,
-    summary="Get feedback by ID",
-    description="Retrieve a specific feedback record"
-)
-async def get_feedback(feedback_id: str):
-    """Get a specific feedback record by its ID."""
-    try:
-        service = get_agent_feedback_service()
-        feedback = service.get_feedback(feedback_id)
-
-        if not feedback:
-            raise HTTPException(status_code=404, detail="Feedback not found")
-
-        return feedback
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Failed to get feedback", error=str(e), feedback_id=feedback_id)
-        raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
+# -----------------------------------------------------------------------------
+# SPECIFIC ROUTES - Must come BEFORE /{feedback_id}
+# -----------------------------------------------------------------------------
 
 
 @router.get(
-    "/agent/{agent_id}",
-    response_model=List[FeedbackResponse],
-    summary="Get agent feedback",
-    description="Get all feedback for a specific agent"
+    "/agents",
+    summary="List available agents",
+    description="Get list of known agent identifiers"
 )
-async def get_agent_feedback(
-    agent_id: str,
-    feedback_type: Optional[str] = Query(None, description="Filter by feedback type"),
-    limit: int = Query(100, ge=1, le=500, description="Maximum records to return"),
-    offset: int = Query(0, ge=0, description="Records to skip")
-):
-    """Get feedback for a specific agent with optional filtering."""
-    try:
-        service = get_agent_feedback_service()
-        feedback_list = service.get_agent_feedback(
-            agent_id=agent_id,
-            limit=limit,
-            offset=offset,
-            feedback_type=feedback_type
-        )
-
-        return feedback_list
-
-    except Exception as e:
-        logger.error("Failed to get agent feedback", error=str(e), agent_id=agent_id)
-        raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
+async def list_agents():
+    """List all known agent identifiers that can receive feedback."""
+    return {
+        "agents": [a.value for a in AgentId],
+        "feedback_types": [t.value for t in AgentFeedbackType]
+    }
 
 
 @router.get(
-    "/type/{feedback_type}",
-    response_model=List[FeedbackResponse],
-    summary="Get feedback by type",
-    description="Get all feedback of a specific type"
+    "/health",
+    summary="Feedback service health",
+    description="Check if feedback service is healthy"
 )
-async def get_feedback_by_type(
-    feedback_type: str,
-    limit: int = Query(100, ge=1, le=500, description="Maximum records to return"),
-    offset: int = Query(0, ge=0, description="Records to skip")
-):
-    """Get feedback filtered by feedback type."""
+async def health_check():
+    """Health check for the feedback service."""
     try:
         service = get_agent_feedback_service()
-        feedback_list = service.get_feedback_by_type(
-            feedback_type=feedback_type,
-            limit=limit,
-            offset=offset
-        )
+        # Simple check - just verify we can initialize
+        service._get_supabase()
 
-        return feedback_list
+        return {
+            "status": "healthy",
+            "service": "feedback",
+            "message": "Feedback service is operational"
+        }
 
     except Exception as e:
-        logger.error("Failed to get feedback by type", error=str(e), feedback_type=feedback_type)
-        raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
+        logger.error("Feedback service health check failed", error=str(e))
+        return {
+            "status": "unhealthy",
+            "service": "feedback",
+            "message": str(e)
+        }
 
 
 @router.get(
@@ -271,41 +240,91 @@ async def get_low_ratings(
         raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
 
 
-@router.get(
-    "/agents",
-    summary="List available agents",
-    description="Get list of known agent identifiers"
-)
-async def list_agents():
-    """List all known agent identifiers that can receive feedback."""
-    return {
-        "agents": [a.value for a in AgentId],
-        "feedback_types": [t.value for t in AgentFeedbackType]
-    }
+# -----------------------------------------------------------------------------
+# ROUTES WITH PATH PREFIXES - Can come before /{feedback_id}
+# -----------------------------------------------------------------------------
 
 
 @router.get(
-    "/health",
-    summary="Feedback service health",
-    description="Check if feedback service is healthy"
+    "/agent/{agent_id}",
+    response_model=List[FeedbackResponse],
+    summary="Get agent feedback",
+    description="Get all feedback for a specific agent"
 )
-async def health_check():
-    """Health check for the feedback service."""
+async def get_agent_feedback(
+    agent_id: str,
+    feedback_type: Optional[str] = Query(None, description="Filter by feedback type"),
+    limit: int = Query(100, ge=1, le=500, description="Maximum records to return"),
+    offset: int = Query(0, ge=0, description="Records to skip")
+):
+    """Get feedback for a specific agent with optional filtering."""
     try:
         service = get_agent_feedback_service()
-        # Simple check - just verify we can initialize
-        service._get_supabase()
+        feedback_list = service.get_agent_feedback(
+            agent_id=agent_id,
+            limit=limit,
+            offset=offset,
+            feedback_type=feedback_type
+        )
 
-        return {
-            "status": "healthy",
-            "service": "feedback",
-            "message": "Feedback service is operational"
-        }
+        return feedback_list
 
     except Exception as e:
-        logger.error("Feedback service health check failed", error=str(e))
-        return {
-            "status": "unhealthy",
-            "service": "feedback",
-            "message": str(e)
-        }
+        logger.error("Failed to get agent feedback", error=str(e), agent_id=agent_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
+
+
+@router.get(
+    "/type/{feedback_type}",
+    response_model=List[FeedbackResponse],
+    summary="Get feedback by type",
+    description="Get all feedback of a specific type"
+)
+async def get_feedback_by_type(
+    feedback_type: str,
+    limit: int = Query(100, ge=1, le=500, description="Maximum records to return"),
+    offset: int = Query(0, ge=0, description="Records to skip")
+):
+    """Get feedback filtered by feedback type."""
+    try:
+        service = get_agent_feedback_service()
+        feedback_list = service.get_feedback_by_type(
+            feedback_type=feedback_type,
+            limit=limit,
+            offset=offset
+        )
+
+        return feedback_list
+
+    except Exception as e:
+        logger.error("Failed to get feedback by type", error=str(e), feedback_type=feedback_type)
+        raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
+
+
+# -----------------------------------------------------------------------------
+# PARAMETERIZED ROUTE - Must come LAST to avoid catching specific paths
+# -----------------------------------------------------------------------------
+
+
+@router.get(
+    "/{feedback_id}",
+    response_model=FeedbackResponse,
+    summary="Get feedback by ID",
+    description="Retrieve a specific feedback record"
+)
+async def get_feedback(feedback_id: str):
+    """Get a specific feedback record by its ID."""
+    try:
+        service = get_agent_feedback_service()
+        feedback = service.get_feedback(feedback_id)
+
+        if not feedback:
+            raise HTTPException(status_code=404, detail="Feedback not found")
+
+        return feedback
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to get feedback", error=str(e), feedback_id=feedback_id)
+        raise HTTPException(status_code=500, detail="Failed to retrieve feedback")
