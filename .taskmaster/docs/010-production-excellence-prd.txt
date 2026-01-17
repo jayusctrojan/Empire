@@ -1,0 +1,342 @@
+# PRD: 010-Production Excellence - Achieving 100/100 Production Readiness
+
+## Overview
+This PRD outlines the requirements to elevate Empire v7.3 from 78/100 to 100/100 production readiness. The focus is on completing all remaining TODOs, increasing test coverage, adding observability, and ensuring enterprise-grade reliability.
+
+## Current State Assessment
+- **Production Readiness Score**: 78/100
+- **Remaining TODOs**: 25 items across 15 files
+- **Test Coverage**: ~12% (target: 80%+)
+- **Key Gaps**: Service integrations, observability, test coverage, documentation
+
+## Goals
+1. Resolve all 25 remaining TODO items
+2. Achieve 80%+ test coverage on critical paths
+3. Add distributed tracing with OpenTelemetry
+4. Complete database migration strategy
+5. Implement comprehensive health monitoring
+6. Create runbook documentation for operations
+
+---
+
+## Feature Requirements
+
+### FR-001: Complete Service Integration TODOs (Priority: Critical)
+
+#### FR-001.1: Document Management B2 Integration
+**File**: `app/services/document_management.py`
+**TODOs**: 4 items
+- Implement B2 upload in `upload_document()` using existing B2StorageService
+- Implement B2 deletion in `delete_document()`
+- Implement text re-extraction in `reprocess_document()` when `force_reparse=True`
+- Implement embedding regeneration when `update_embeddings=True`
+
+**Acceptance Criteria**:
+- Documents upload to B2 with proper folder structure
+- Deletion removes files from B2 and Supabase
+- Reprocessing extracts text using LlamaIndex service
+- Embeddings regenerate using embedding service
+
+#### FR-001.2: Research Tasks Report Generation
+**File**: `app/tasks/research_tasks.py`
+**TODOs**: 2 items
+- Implement actual report generation using ReportExecutor
+- Connect to B2 for report storage
+
+**Acceptance Criteria**:
+- Reports generate using Claude with proper formatting
+- Reports stored in B2 under `reports/{project_id}/` folder
+- Report metadata stored in Supabase
+
+#### FR-001.3: Retrieval Executor Service Integrations
+**File**: `app/services/task_executors/retrieval_executor.py`
+**TODOs**: 3 items
+- Integrate NLQ service for natural language queries
+- Integrate Neo4j service for graph retrieval
+- Implement external API retrieval
+
+**Acceptance Criteria**:
+- NLQ queries translate to SQL and execute
+- Graph queries traverse Neo4j knowledge graph
+- API retrieval supports configurable endpoints
+
+#### FR-001.4: Upload API B2 Verification
+**File**: `app/api/upload.py`
+**TODOs**: 2 items
+- Verify file exists in B2 before returning success
+- Check processing status from database
+
+**Acceptance Criteria**:
+- Upload endpoint verifies B2 storage success
+- Returns accurate processing status
+
+#### FR-001.5: LangGraph Tool Calling
+**File**: `app/workflows/langgraph_workflows.py`
+**TODO**: 1 item
+- Implement proper tool calling with LLM.bind_tools()
+
+**Acceptance Criteria**:
+- Tools properly bound to LLM
+- Tool results integrated into workflow
+
+### FR-002: Authentication & Authorization Completions (Priority: High)
+
+#### FR-002.1: WebSocket Authentication
+**File**: `app/routes/research_projects.py`
+**TODO**: 1 item
+- Implement proper WebSocket authentication
+
+**Acceptance Criteria**:
+- WebSocket connections require valid JWT
+- Unauthorized connections rejected with proper error
+
+#### FR-002.2: Admin Authorization Check
+**File**: `app/routes/documents.py`
+**TODO**: 1 item
+- Implement admin check for approval listings
+
+**Acceptance Criteria**:
+- Non-admin users see only their own pending approvals
+- Admin users see all pending approvals
+
+### FR-003: Celery Task Completions (Priority: High)
+
+#### FR-003.1: Research Project Celery Integration
+**File**: `app/services/research_project_service.py`
+**TODOs**: 2 items
+- Trigger Celery task for project initialization
+- Implement task revocation on project cancellation
+
+**Acceptance Criteria**:
+- New projects trigger background initialization
+- Cancelled projects revoke pending tasks
+
+### FR-004: Feedback System Implementation (Priority: Medium)
+
+#### FR-004.1: Agent Feedback Table
+**Files**: `app/services/classification_service.py`, `app/services/asset_management_service.py`
+**TODOs**: 2 items
+- Create agent_feedback table in Supabase
+- Implement feedback storage
+
+**Acceptance Criteria**:
+- Feedback table created with proper schema
+- Classification feedback stored for model improvement
+- Asset feedback tracked for quality metrics
+
+### FR-005: Minor Completions (Priority: Low)
+
+#### FR-005.1: Semantic Similarity Search
+**File**: `app/services/agent_router_service.py`
+**TODO**: 1 item
+- Implement semantic similarity with embeddings
+
+#### FR-005.2: Content Prep JSON Parsing
+**File**: `app/services/content_prep_agent.py`
+**TODO**: 1 item
+- Implement proper JSON parsing of LLM output
+
+#### FR-005.3: Cost Tracking Notifications
+**File**: `app/services/cost_tracking_service.py`
+**TODO**: 1 item
+- Integrate with notification service for budget alerts
+
+---
+
+## Non-Functional Requirements
+
+### NFR-001: Test Coverage (Priority: Critical)
+
+#### NFR-001.1: Unit Test Coverage
+- Achieve 80% coverage on all service files
+- 100% coverage on critical paths (auth, security, payments)
+
+**Files Requiring Tests**:
+- `app/services/document_management.py` (currently 0%)
+- `app/services/research_project_service.py` (currently 0%)
+- `app/tasks/document_processing.py` (currently 0%)
+- `app/tasks/graph_sync.py` (currently 0%)
+- `app/celery_app.py` (currently 0%)
+
+#### NFR-001.2: Integration Test Coverage
+- API endpoint integration tests
+- Database operation tests
+- External service mock tests
+
+### NFR-002: Observability (Priority: High)
+
+#### NFR-002.1: OpenTelemetry Integration
+- Add distributed tracing across all services
+- Trace propagation through Celery tasks
+- Export traces to configured backend
+
+**Implementation**:
+- Create `app/core/tracing.py` with OpenTelemetry setup
+- Add tracing middleware to FastAPI
+- Instrument Celery tasks
+- Add trace IDs to logs
+
+#### NFR-002.2: Enhanced Health Checks
+- Deep health checks for all dependencies
+- Readiness vs Liveness probes
+- Dependency timeout handling
+
+### NFR-003: Database Migration Strategy (Priority: High)
+
+#### NFR-003.1: Migration Framework
+- Implement Alembic for PostgreSQL migrations
+- Version control all schema changes
+- Rollback capability
+
+**Deliverables**:
+- `alembic.ini` configuration
+- `migrations/` directory structure
+- Initial migration from current schema
+- Migration documentation
+
+### NFR-004: Documentation (Priority: Medium)
+
+#### NFR-004.1: Operations Runbook
+- Deployment procedures
+- Rollback procedures
+- Incident response playbook
+- Monitoring alert responses
+
+#### NFR-004.2: API Documentation
+- OpenAPI spec completeness check
+- Example requests/responses
+- Error code documentation
+
+---
+
+## Database Schema Additions
+
+### Table: agent_feedback
+```sql
+CREATE TABLE agent_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id VARCHAR(50) NOT NULL,
+    task_id UUID,
+    feedback_type VARCHAR(50) NOT NULL, -- 'classification', 'generation', 'retrieval'
+    input_summary TEXT,
+    output_summary TEXT,
+    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    feedback_text TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES auth.users(id)
+);
+
+CREATE INDEX idx_agent_feedback_agent ON agent_feedback(agent_id);
+CREATE INDEX idx_agent_feedback_type ON agent_feedback(feedback_type);
+CREATE INDEX idx_agent_feedback_created ON agent_feedback(created_at DESC);
+```
+
+### Table: dead_letter_queue (if not exists)
+```sql
+CREATE TABLE IF NOT EXISTS dead_letter_queue (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id VARCHAR(255) NOT NULL,
+    task_name VARCHAR(255) NOT NULL,
+    exception TEXT,
+    task_args JSONB,
+    task_kwargs JSONB,
+    retries INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    status VARCHAR(50) DEFAULT 'pending_review',
+    resolution_notes TEXT,
+    new_task_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE,
+    retried_at TIMESTAMP WITH TIME ZONE,
+    resolved_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_dlq_status ON dead_letter_queue(status);
+CREATE INDEX idx_dlq_task_name ON dead_letter_queue(task_name);
+CREATE INDEX idx_dlq_created ON dead_letter_queue(created_at DESC);
+```
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Production Readiness Score | 78/100 | 100/100 |
+| TODO Count | 25 | 0 |
+| Test Coverage | 12% | 80% |
+| Critical Path Coverage | ~50% | 100% |
+| Health Check Endpoints | 1 | 5 (per service) |
+| Documented Runbooks | 0 | 3 |
+
+---
+
+## Implementation Phases
+
+### Phase 1: Critical Service Integrations (Tasks 180-189)
+- FR-001.1: Document Management B2 Integration
+- FR-001.2: Research Tasks Report Generation
+- FR-001.3: Retrieval Executor Integrations
+- FR-001.4: Upload API B2 Verification
+- NFR-003: Database Migration Setup
+
+### Phase 2: Authentication & Tasks (Tasks 190-194)
+- FR-002.1: WebSocket Authentication
+- FR-002.2: Admin Authorization Check
+- FR-003.1: Research Project Celery Integration
+- FR-001.5: LangGraph Tool Calling
+
+### Phase 3: Observability & Testing (Tasks 195-199)
+- NFR-002.1: OpenTelemetry Integration
+- NFR-002.2: Enhanced Health Checks
+- NFR-001.1: Unit Test Coverage (critical services)
+
+### Phase 4: Completions & Documentation (Tasks 200-205)
+- FR-004: Feedback System
+- FR-005: Minor Completions
+- NFR-001.2: Integration Test Coverage
+- NFR-004: Documentation & Runbooks
+
+---
+
+## Risk Assessment
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| B2 integration complexity | Medium | Use existing B2StorageService patterns |
+| Test coverage time | High | Focus on critical paths first |
+| OpenTelemetry overhead | Low | Configure sampling rate |
+| Migration risks | Medium | Test on staging first |
+
+---
+
+## Dependencies
+
+- Existing B2StorageService implementation
+- Existing ReportExecutor implementation
+- Neo4j HTTP client for graph queries
+- OpenTelemetry Python SDK
+- Alembic migration framework
+
+---
+
+## Estimated Effort
+
+| Phase | Tasks | Estimated Effort |
+|-------|-------|------------------|
+| Phase 1 | 10 tasks | High |
+| Phase 2 | 5 tasks | Medium |
+| Phase 3 | 5 tasks | High |
+| Phase 4 | 6 tasks | Medium |
+| **Total** | **26 tasks** | -- |
+
+---
+
+## Approval
+
+This PRD requires approval before implementation begins.
+
+**Author**: Claude Code
+**Date**: 2026-01-17
+**Version**: 1.0

@@ -269,6 +269,11 @@ async def upload_files(
                 except Exception as supabase_error:
                     logger.error(f"Error storing metadata in Supabase for {file.filename}: {supabase_error}")
 
+                # Task 183: Verify file exists in B2 after upload
+                file_verified = b2_service.check_file_exists_by_id(result["file_id"])
+                if not file_verified:
+                    logger.warning(f"B2 verification failed for {file.filename} - file may not be accessible")
+
                 # Prepare upload result
                 upload_result = {
                     "filename": file.filename,
@@ -276,6 +281,7 @@ async def upload_files(
                     "size": result["size"],
                     "url": result["url"],
                     "status": "uploaded",
+                    "b2_verified": file_verified,  # Task 183: B2 verification status
                     "metadata": extracted_metadata,  # Include extracted metadata
                     "supabase_stored": supabase_record is not None  # Indicate if stored in Supabase
                 }
@@ -364,30 +370,124 @@ async def get_allowed_types():
 @router.get("/upload/status/{file_id}")
 async def get_upload_status(file_id: str):
     """
-    Check status of an uploaded file
+    Check status of an uploaded file (Task 183).
+
+    Verifies:
+    - File exists in B2 storage
+    - Processing status from Supabase database
+    - Celery task status (if processing)
 
     Args:
         file_id: B2 file ID
 
     Returns:
-        File status information
+        Comprehensive file status information including:
+        - B2 file existence and details
+        - Database record and processing status
+        - Celery task status (if applicable)
     """
     try:
-        # TODO: Use b2_service to verify file exists
-        # b2_service = get_b2_service()
+        b2_service = get_b2_service()
+        supabase_storage = get_supabase_storage()
 
-        # TODO: Check processing status from database
-        # For now, just return a status placeholder
+        # Task 183: Verify file exists in B2
+        file_exists = b2_service.check_file_exists_by_id(file_id)
+        b2_file_info = None
 
-        return {
+        if file_exists:
+            b2_file_info = await b2_service.get_file_info(file_id)
+
+        # Task 183: Get document record from Supabase
+        document_record = None
+        processing_status = "unknown"
+        task_status = None
+
+        try:
+            document_record = await supabase_storage.get_document_by_file_id(file_id)
+
+            if document_record:
+                processing_status = document_record.get("status", "unknown")
+
+                # Check Celery task status if processing
+                task_id = document_record.get("processing_task_id")
+                if task_id and CELERY_AVAILABLE:
+                    try:
+                        from celery.result import AsyncResult
+                        from app.celery_app import celery_app
+                        task_result = AsyncResult(task_id, app=celery_app)
+                        task_status = {
+                            "task_id": task_id,
+                            "state": task_result.state,
+                            "ready": task_result.ready(),
+                            "successful": task_result.successful() if task_result.ready() else None
+                        }
+                    except Exception as task_error:
+                        logger.warning(f"Error getting task status: {task_error}")
+                        task_status = {"task_id": task_id, "state": "unknown", "error": str(task_error)}
+
+        except Exception as db_error:
+            logger.warning(f"Error fetching document record: {db_error}")
+
+        # Build response
+        response = {
             "file_id": file_id,
-            "status": "uploaded",
-            "message": "File successfully uploaded to B2"
+            "exists_in_b2": file_exists,
+            "processing_status": processing_status,
+            "timestamp": datetime.utcnow().isoformat()
         }
+
+        # Add B2 file info if available
+        if b2_file_info:
+            response["b2_info"] = {
+                "file_name": b2_file_info.get("file_name"),
+                "size": b2_file_info.get("size"),
+                "content_type": b2_file_info.get("content_type"),
+                "upload_timestamp": b2_file_info.get("upload_timestamp")
+            }
+
+        # Add document record info if available
+        if document_record:
+            response["document"] = {
+                "document_id": document_record.get("id"),
+                "filename": document_record.get("filename"),
+                "status": document_record.get("status"),
+                "created_at": document_record.get("created_at"),
+                "updated_at": document_record.get("updated_at"),
+                "error_message": document_record.get("error_message")
+            }
+
+        # Add task status if available
+        if task_status:
+            response["task"] = task_status
+
+        # Determine overall status message
+        if not file_exists:
+            response["message"] = "File not found in B2 storage"
+            response["status"] = "missing"
+        elif processing_status == "complete" or processing_status == "processed":
+            response["message"] = "File processed successfully"
+            response["status"] = "complete"
+        elif processing_status == "processing":
+            response["message"] = "File is currently being processed"
+            response["status"] = "processing"
+        elif processing_status == "failed":
+            response["message"] = "File processing failed"
+            response["status"] = "failed"
+        elif processing_status == "pending":
+            response["message"] = "File is queued for processing"
+            response["status"] = "pending"
+        else:
+            response["message"] = "File uploaded to B2"
+            response["status"] = "uploaded"
+
+        return response
 
     except Exception as e:
         logger.error(f"Failed to get status for {file_id}: {e}")
-        raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error checking file status: {str(e)}"
+        )
 
 
 @router.get("/upload/list")
