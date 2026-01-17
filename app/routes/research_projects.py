@@ -4,18 +4,23 @@ Endpoints for the Research Projects (Agent Harness) feature.
 
 Provides autonomous research capability with task decomposition,
 concurrent execution, and comprehensive report generation.
+
+T185: WebSocket authentication implemented for secure real-time communication.
 """
 
+import os
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Query, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 import structlog
+import jwt
 
 from app.middleware.auth import get_current_user
 from app.services.research_project_service import (
     ResearchProjectService,
     get_research_project_service,
 )
+from app.services.rbac_service import get_rbac_service
 from app.models.research_project import (
     JobStatus,
     CreateResearchProjectRequest,
@@ -34,6 +39,9 @@ from app.models.research_project import (
 )
 
 logger = structlog.get_logger(__name__)
+
+# JWT secret for token validation
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
 
 router = APIRouter(prefix="/api/research-projects", tags=["Research Projects"])
 
@@ -344,8 +352,161 @@ async def get_shared_report(
 
 
 # ==============================================================================
-# WebSocket for Real-time Updates - Subtask 92.3
+# WebSocket for Real-time Updates - Subtask 92.3, T185 (Authentication)
 # ==============================================================================
+
+async def _authenticate_websocket(
+    websocket: WebSocket,
+    job_id: int,
+    service: ResearchProjectService
+) -> Optional[str]:
+    """
+    Authenticate WebSocket connection using token or API key.
+
+    T185: WebSocket authentication implementation.
+
+    Supports:
+    - Bearer JWT token via query param: ?token=xxx
+    - API key via query param: ?api_key=emp_xxx
+
+    Args:
+        websocket: WebSocket connection
+        job_id: Research project ID
+        service: Research project service
+
+    Returns:
+        user_id if authenticated, None if authentication fails
+    """
+    # Get token from query parameters
+    token = websocket.query_params.get("token")
+    api_key = websocket.query_params.get("api_key")
+
+    user_id = None
+
+    # Strategy 1: JWT Token authentication
+    if token:
+        try:
+            if not CLERK_SECRET_KEY:
+                logger.error("WebSocket auth: CLERK_SECRET_KEY not configured")
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "Server authentication not configured"
+                })
+                await websocket.close(code=1011)  # Internal error
+                return None
+
+            # Decode and verify the JWT token
+            payload = jwt.decode(
+                token,
+                CLERK_SECRET_KEY,
+                algorithms=["HS256"],
+                options={"verify_signature": True, "verify_exp": True}
+            )
+
+            user_id = payload.get("sub")
+            if not user_id:
+                logger.warning("WebSocket auth: Token missing user ID", job_id=job_id)
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "Invalid token: missing user ID"
+                })
+                await websocket.close(code=1008)  # Policy violation
+                return None
+
+            logger.debug("WebSocket JWT auth success", user_id=user_id, job_id=job_id)
+
+        except jwt.ExpiredSignatureError:
+            logger.warning("WebSocket auth: Token expired", job_id=job_id)
+            await websocket.send_json({
+                "type": "error",
+                "error": "Token has expired"
+            })
+            await websocket.close(code=1008)  # Policy violation
+            return None
+
+        except jwt.InvalidTokenError as e:
+            logger.warning("WebSocket auth: Invalid token", job_id=job_id, error=str(e))
+            await websocket.send_json({
+                "type": "error",
+                "error": f"Invalid token: {str(e)}"
+            })
+            await websocket.close(code=1008)  # Policy violation
+            return None
+
+    # Strategy 2: API Key authentication
+    elif api_key and api_key.startswith("emp_"):
+        try:
+            rbac_service = get_rbac_service()
+            key_record = await rbac_service.validate_api_key(api_key)
+
+            if not key_record:
+                logger.warning(
+                    "WebSocket auth: Invalid API key",
+                    job_id=job_id,
+                    key_prefix=api_key[:12]
+                )
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "Invalid or expired API key"
+                })
+                await websocket.close(code=1008)  # Policy violation
+                return None
+
+            user_id = key_record["user_id"]
+            logger.debug("WebSocket API key auth success", user_id=user_id, job_id=job_id)
+
+        except Exception as e:
+            logger.error("WebSocket auth: API key validation error", error=str(e))
+            await websocket.send_json({
+                "type": "error",
+                "error": "Authentication failed"
+            })
+            await websocket.close(code=1011)  # Internal error
+            return None
+
+    # No authentication provided
+    else:
+        logger.warning("WebSocket auth: No credentials provided", job_id=job_id)
+        await websocket.send_json({
+            "type": "error",
+            "error": "Authentication required. Provide token or api_key query parameter."
+        })
+        await websocket.close(code=1008)  # Policy violation
+        return None
+
+    # Verify user has access to the project
+    try:
+        project = await service.get_project(user_id, job_id)
+
+        if not project:
+            logger.warning(
+                "WebSocket auth: Project access denied",
+                user_id=user_id,
+                job_id=job_id
+            )
+            await websocket.send_json({
+                "type": "error",
+                "error": "Project not found or access denied"
+            })
+            await websocket.close(code=1008)  # Policy violation
+            return None
+
+    except Exception as e:
+        logger.error(
+            "WebSocket auth: Project access check failed",
+            user_id=user_id,
+            job_id=job_id,
+            error=str(e)
+        )
+        await websocket.send_json({
+            "type": "error",
+            "error": "Failed to verify project access"
+        })
+        await websocket.close(code=1011)  # Internal error
+        return None
+
+    return user_id
+
 
 @router.websocket("/ws/{job_id}")
 async def websocket_project_updates(
@@ -356,43 +517,117 @@ async def websocket_project_updates(
     """
     WebSocket endpoint for real-time project updates.
 
-    Clients should authenticate via the initial connection.
-    Messages are sent when:
+    T185: Secure WebSocket with proper authentication.
+
+    Authentication options:
+    - JWT token: ws://host/ws/{job_id}?token=<jwt_token>
+    - API key: ws://host/ws/{job_id}?api_key=emp_xxx
+
+    Messages sent when:
     - Task status changes
     - Progress updates
     - Project completes or fails
+
+    WebSocket Close Codes:
+    - 1000: Normal closure
+    - 1008: Policy violation (authentication/authorization failed)
+    - 1011: Internal server error
     """
     await websocket.accept()
 
-    # TODO: Implement proper WebSocket authentication
-    # For now, accept all connections but validate on first message
+    # Authenticate the connection
+    user_id = await _authenticate_websocket(websocket, job_id, service)
+    if not user_id:
+        # Connection already closed in _authenticate_websocket
+        return
+
+    logger.info(
+        "WebSocket connected",
+        user_id=user_id,
+        job_id=job_id
+    )
 
     try:
         # Send initial status
-        # In production, this would subscribe to Redis pub/sub for updates
         initial_message = {
             "type": "connected",
             "job_id": job_id,
+            "user_id": user_id,
             "message": "Connected to project updates"
         }
         await websocket.send_json(initial_message)
 
+        # Send current project status
+        try:
+            status_response = await service.get_project_status(user_id, job_id)
+            if status_response:
+                await websocket.send_json({
+                    "type": "status",
+                    "job_id": job_id,
+                    "status": status_response.status.value if hasattr(status_response.status, 'value') else str(status_response.status),
+                    "progress": status_response.progress if hasattr(status_response, 'progress') else 0,
+                    "tasks_completed": status_response.tasks_completed if hasattr(status_response, 'tasks_completed') else 0,
+                    "tasks_total": status_response.tasks_total if hasattr(status_response, 'tasks_total') else 0,
+                })
+        except Exception as e:
+            logger.warning("Failed to send initial status", error=str(e), job_id=job_id)
+
         # Keep connection alive and wait for updates
         while True:
-            # In production: subscribe to Redis channel for this job_id
+            # In production: subscribe to Redis pub/sub channel for this job_id
             # and forward messages to WebSocket
 
-            # For now, just wait for client messages (ping/pong)
+            # Wait for client messages (ping/pong, commands)
             data = await websocket.receive_text()
 
             if data == "ping":
                 await websocket.send_json({"type": "pong"})
+            elif data == "status":
+                # Client requesting status update
+                try:
+                    status_response = await service.get_project_status(user_id, job_id)
+                    if status_response:
+                        await websocket.send_json({
+                            "type": "status",
+                            "job_id": job_id,
+                            "status": status_response.status.value if hasattr(status_response.status, 'value') else str(status_response.status),
+                            "progress": status_response.progress if hasattr(status_response, 'progress') else 0,
+                            "tasks_completed": status_response.tasks_completed if hasattr(status_response, 'tasks_completed') else 0,
+                            "tasks_total": status_response.tasks_total if hasattr(status_response, 'tasks_total') else 0,
+                        })
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": f"Failed to get status: {str(e)}"
+                    })
+            elif data == "findings":
+                # Client requesting partial findings
+                try:
+                    findings = await service.get_partial_findings(user_id, job_id)
+                    if findings:
+                        await websocket.send_json({
+                            "type": "findings",
+                            "job_id": job_id,
+                            "findings": findings.model_dump() if hasattr(findings, 'model_dump') else findings
+                        })
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": f"Failed to get findings: {str(e)}"
+                    })
 
     except WebSocketDisconnect:
-        logger.info("WebSocket disconnected", job_id=job_id)
+        logger.info("WebSocket disconnected", user_id=user_id, job_id=job_id)
     except Exception as e:
-        logger.error("WebSocket error", job_id=job_id, error=str(e))
-        await websocket.close()
+        logger.error("WebSocket error", user_id=user_id, job_id=job_id, error=str(e))
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "error": str(e)
+            })
+            await websocket.close(code=1011)  # Internal error
+        except Exception:
+            pass  # Connection may already be closed
 
 
 # ==============================================================================
