@@ -1,10 +1,12 @@
 """
 Empire v7.3 - Logging Configuration
 Task 136: X-Request-ID Tracing Integration
+Task 189: OpenTelemetry Trace ID Integration
 
 Centralized logging configuration with:
 - Structlog for structured logging
 - Request ID injection into all log entries
+- OpenTelemetry trace/span ID injection (Task 189)
 - JSON output for production
 - Console output for development
 - Standard library logging integration
@@ -22,6 +24,9 @@ from app.middleware.request_tracing import (
     RequestIdFilter,
     get_request_id,
 )
+
+# Task 189: Import trace context processor for OpenTelemetry
+from app.core.tracing import add_trace_context_processor
 
 
 def configure_logging(
@@ -69,6 +74,8 @@ def configure_logging(
         structlog.stdlib.add_logger_name,
         # Add request ID from context (Task 136)
         add_request_id_processor,
+        # Add OpenTelemetry trace context (Task 189)
+        add_trace_context_processor,
         # Add timestamps if enabled
         structlog.processors.TimeStamper(fmt="iso") if include_timestamps else structlog.processors.TimeStamper(fmt=None),
         # Handle positional arguments
@@ -106,17 +113,18 @@ def _configure_stdlib_logging(log_level: str, is_production: bool) -> None:
     # Get numeric log level
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
 
-    # Create formatter with request_id support
+    # Create formatter with request_id and trace context support (Task 189)
     if is_production:
         formatter = logging.Formatter(
             '{"timestamp": "%(asctime)s", "level": "%(levelname)s", '
             '"logger": "%(name)s", "request_id": "%(request_id)s", '
+            '"trace_id": "%(trace_id)s", "span_id": "%(span_id)s", '
             '"message": "%(message)s"}'
         )
     else:
         formatter = logging.Formatter(
             "%(asctime)s | %(levelname)-8s | %(name)s | "
-            "[%(request_id)s] | %(message)s"
+            "[%(request_id)s] | trace=%(trace_id)s | %(message)s"
         )
 
     # Create handler

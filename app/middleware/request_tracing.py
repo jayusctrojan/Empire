@@ -310,9 +310,9 @@ def add_request_id_processor(
 
 class RequestIdFilter:
     """
-    Standard library logging filter that adds request_id to log records.
+    Standard library logging filter that adds request_id and trace context to log records.
 
-    Use with Python's standard logging to include request_id:
+    Use with Python's standard logging to include request_id, trace_id, and span_id:
 
     Example:
         import logging
@@ -321,14 +321,25 @@ class RequestIdFilter:
         handler.addFilter(RequestIdFilter())
 
         formatter = logging.Formatter(
-            '%(asctime)s [%(request_id)s] %(levelname)s: %(message)s'
+            '%(asctime)s [%(request_id)s] trace=%(trace_id)s %(levelname)s: %(message)s'
         )
         handler.setFormatter(formatter)
     """
 
     def filter(self, record):
-        """Add request_id to log record."""
+        """Add request_id and trace context to log record."""
         record.request_id = get_request_id() or "no-request-id"
+
+        # Task 189: Add OpenTelemetry trace context
+        try:
+            from app.core.tracing import get_current_trace_id, get_current_span_id
+            record.trace_id = get_current_trace_id() or "no-trace"
+            record.span_id = get_current_span_id() or "no-span"
+        except ImportError:
+            # Tracing module not available
+            record.trace_id = "no-trace"
+            record.span_id = "no-span"
+
         return True
 
 
