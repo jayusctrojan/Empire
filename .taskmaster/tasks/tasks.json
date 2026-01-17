@@ -4191,13 +4191,1021 @@
         "priority": "medium",
         "subtasks": [],
         "updatedAt": "2026-01-15T22:06:17.589Z"
+      },
+      {
+        "id": "160",
+        "title": "Implement Environment Variable Validation",
+        "description": "Create a startup validation module that fails fast if required environment variables are missing, ensuring the application doesn't start in an invalid state.",
+        "details": "Create a new file `app/core/startup_validation.py` that validates critical and recommended environment variables. The module should:\n1. Define two categories of variables: critical (must be present) and recommended\n2. Check for presence of all variables at startup\n3. Raise RuntimeError if any critical variables are missing\n4. Log warnings for missing recommended variables\n5. Return a dictionary with missing variables by category\n\nImplement the validation function as specified in the PRD, with proper error messages and logging.\n\nIntegrate this validation in `app/main.py` by calling it during application startup before any services are initialized:\n```python\nfrom app.core.startup_validation import validate_environment\n\n# At the beginning of FastAPI app initialization\ndef startup_event():\n    validate_environment()\n    # Other startup tasks\n\napp = FastAPI()\napp.add_event_handler(\"startup\", startup_event)\n```",
+        "testStrategy": "1. Create unit tests in `tests/test_startup_validation.py` that:\n   - Test successful validation when all critical variables are present\n   - Test failure when critical variables are missing\n   - Test warning generation for missing recommended variables\n   - Verify correct error messages and return values\n2. Create integration tests that verify the application fails to start when critical variables are missing\n3. Test with various combinations of missing variables to ensure all validation paths work correctly",
+        "priority": "high",
+        "dependencies": [],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:16.877Z"
+      },
+      {
+        "id": "161",
+        "title": "Implement CORS Production Hardening",
+        "description": "Enhance CORS configuration to fail in production if wildcard origins are detected, preventing potential security vulnerabilities.",
+        "details": "Modify `app/main.py` to enforce strict CORS rules in production environments:\n\n1. Extract the current CORS configuration logic\n2. Add environment-aware validation that:\n   - Allows wildcard origins (`*`) in development only\n   - Requires explicit origin list in production\n   - Raises RuntimeError with clear error message if wildcard is detected in production\n\nImplementation should follow the pattern provided in the PRD:\n```python\ncors_origins = os.getenv(\"CORS_ORIGINS\", \"\").split(\",\")\nif not cors_origins or cors_origins == [\"\"]:\n    if os.getenv(\"ENVIRONMENT\") == \"production\":\n        raise RuntimeError(\n            \"CORS_ORIGINS must be explicitly set in production. \"\n            \"Set to specific origins like 'https://app.example.com,https://admin.example.com'\"\n        )\n    cors_origins = [\"*\"]  # Allow in development only\n\nif \"*\" in cors_origins and os.getenv(\"ENVIRONMENT\") == \"production\":\n    raise RuntimeError(\n        \"CORS_ORIGINS cannot be '*' in production. \"\n        \"Set specific allowed origins for security.\"\n    )\n```\n\nEnsure this validation happens before the FastAPI CORSMiddleware is initialized.",
+        "testStrategy": "1. Create unit tests that verify:\n   - Wildcard origins are allowed in development\n   - Empty CORS settings default to wildcard in development\n   - Empty CORS settings raise error in production\n   - Wildcard origins raise error in production\n   - Valid origin lists are accepted in all environments\n2. Create integration tests that verify application startup behavior with different CORS configurations\n3. Test with various environment configurations to ensure correct behavior in all scenarios",
+        "priority": "high",
+        "dependencies": [],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:16.943Z"
+      },
+      {
+        "id": "162",
+        "title": "Implement Tiered Rate Limiting for Sensitive Endpoints",
+        "description": "Apply stricter rate limits to authentication and upload endpoints to prevent brute force attacks, spam, and resource abuse.",
+        "details": "Create a new file `app/middleware/rate_limit_tiers.py` to define endpoint-specific rate limits and modify the existing rate limiting middleware:\n\n1. Define rate limit tiers as specified in the PRD:\n```python\nRATE_LIMIT_TIERS = {\n    \"/api/users/login\": {\"limit\": 5, \"period\": 60},  # 5/minute\n    \"/api/users/register\": {\"limit\": 3, \"period\": 60},  # 3/minute\n    \"/api/documents/upload\": {\"limit\": 10, \"period\": 60},  # 10/minute\n    \"/api/query/*\": {\"limit\": 60, \"period\": 60},  # 60/minute\n    \"/api/orchestration/*\": {\"limit\": 30, \"period\": 60},  # 30/minute\n    \"default\": {\"limit\": 200, \"period\": 60}  # 200/minute\n}\n```\n\n2. Modify `app/middleware/rate_limit.py` to use these tiers:\n   - Add function to match request path against patterns (supporting wildcards)\n   - Determine applicable rate limit based on endpoint\n   - Apply the appropriate limit\n   - Return standardized 429 error when limit exceeded\n\n3. Update Redis key generation to include the endpoint pattern to ensure separate rate limit buckets per endpoint type\n\n4. Add proper error responses with retry-after headers when limits are exceeded",
+        "testStrategy": "1. Create unit tests in `tests/test_rate_limiting.py` that verify:\n   - Correct limit is applied to each endpoint type\n   - Pattern matching works correctly with wildcards\n   - Default limit is applied to unmatched endpoints\n   - Rate limit counters increment correctly\n\n2. Create integration tests that:\n   - Verify rate limiting behavior for each endpoint type\n   - Test rate limit reset after period expiration\n   - Confirm correct error responses and status codes\n   - Verify retry-after headers are present and accurate",
+        "priority": "high",
+        "dependencies": [],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:17.015Z"
+      },
+      {
+        "id": "163",
+        "title": "Add Configurable Timeouts to External Service Calls",
+        "description": "Implement configurable timeouts for all external HTTP calls to prevent indefinite hanging when external services are slow or unresponsive.",
+        "details": "Create a new file `app/core/service_timeouts.py` to define timeout constants and modify service client implementations:\n\n1. Define timeout constants for each service:\n```python\nSERVICE_TIMEOUTS = {\n    \"llama_index\": 60.0,  # 60 seconds for document parsing\n    \"crewai\": 120.0,     # 120 seconds for multi-agent workflows\n    \"ollama\": 30.0,      # 30 seconds for embeddings\n    \"neo4j\": 15.0,       # 15 seconds for graph database\n    \"supabase\": 10.0,    # 10 seconds for database operations\n    \"default\": 30.0      # Default timeout\n}\n```\n\n2. Create a base ExternalServiceClient class as specified in the PRD:\n```python\nimport httpx\nfrom app.services.circuit_breaker import circuit_breaker\nfrom app.core.service_timeouts import SERVICE_TIMEOUTS\n\nclass ExternalServiceClient:\n    def __init__(self, service_name: str, base_url: str, timeout: float = None):\n        self.service_name = service_name\n        timeout = timeout or SERVICE_TIMEOUTS.get(service_name, SERVICE_TIMEOUTS[\"default\"])\n        self.client = httpx.AsyncClient(\n            base_url=base_url,\n            timeout=httpx.Timeout(timeout, connect=5.0),\n            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)\n        )\n\n    @circuit_breaker()\n    async def call(self, endpoint: str, **kwargs):\n        return await self.client.post(endpoint, **kwargs)\n```\n\n3. Modify each service client to use this base class or implement similar timeout logic:\n   - `app/services/llama_index_service.py`\n   - `app/services/crewai_service.py`\n   - `app/services/embedding_service.py`\n   - `app/services/neo4j_service.py`\n   - Any other services making external calls",
+        "testStrategy": "1. Create unit tests that verify:\n   - Timeout values are correctly applied from configuration\n   - Default timeout is used for undefined services\n   - Custom timeout overrides work correctly\n\n2. Create integration tests that:\n   - Mock slow responses and verify timeout behavior\n   - Test timeout exceptions are properly handled\n   - Verify timeout settings for each service type\n\n3. Create a test utility that simulates slow responses to verify timeout behavior across all service clients",
+        "priority": "high",
+        "dependencies": [],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:17.078Z"
+      },
+      {
+        "id": "164",
+        "title": "Implement Circuit Breaker Pattern for All External Services",
+        "description": "Apply circuit breakers to all external service calls to prevent cascading failures when external services are down or degraded.",
+        "details": "Extend the existing circuit breaker implementation to cover all external services:\n\n1. Define circuit breaker configuration in a central location:\n```python\n# app/core/circuit_breaker_config.py\nCIRCUIT_BREAKER_CONFIG = {\n    \"llama_index\": {\"failure_threshold\": 5, \"recovery_timeout\": 30},\n    \"crewai\": {\"failure_threshold\": 3, \"recovery_timeout\": 60},\n    \"ollama\": {\"failure_threshold\": 5, \"recovery_timeout\": 15},\n    \"neo4j\": {\"failure_threshold\": 3, \"recovery_timeout\": 30},\n    \"b2\": {\"failure_threshold\": 5, \"recovery_timeout\": 60},\n    \"default\": {\"failure_threshold\": 3, \"recovery_timeout\": 30},\n}\n```\n\n2. Enhance the circuit breaker decorator to use this configuration:\n```python\n# app/services/circuit_breaker.py\nimport functools\nimport time\nfrom typing import Dict, Any, Callable, Optional\nimport structlog\nfrom app.core.circuit_breaker_config import CIRCUIT_BREAKER_CONFIG\n\nlogger = structlog.get_logger(__name__)\n\nclass CircuitBreaker:\n    _instances: Dict[str, \"CircuitBreaker\"] = {}\n    \n    @classmethod\n    def get_instance(cls, service_name: str) -> \"CircuitBreaker\":\n        if service_name not in cls._instances:\n            config = CIRCUIT_BREAKER_CONFIG.get(\n                service_name, CIRCUIT_BREAKER_CONFIG[\"default\"]\n            )\n            cls._instances[service_name] = CircuitBreaker(\n                service_name=service_name,\n                failure_threshold=config[\"failure_threshold\"],\n                recovery_timeout=config[\"recovery_timeout\"]\n            )\n        return cls._instances[service_name]\n    \n    def __init__(self, service_name: str, failure_threshold: int, recovery_timeout: int):\n        self.service_name = service_name\n        self.failure_threshold = failure_threshold\n        self.recovery_timeout = recovery_timeout\n        self.failure_count = 0\n        self.last_failure_time = 0\n        self.open = False\n    \n    def record_failure(self):\n        self.failure_count += 1\n        self.last_failure_time = time.time()\n        if self.failure_count >= self.failure_threshold:\n            self.open = True\n            logger.warning(\n                \"Circuit breaker opened\",\n                service=self.service_name,\n                failures=self.failure_count\n            )\n    \n    def record_success(self):\n        self.failure_count = 0\n        if self.open:\n            self.open = False\n            logger.info(\n                \"Circuit breaker closed\",\n                service=self.service_name\n            )\n    \n    def is_open(self) -> bool:\n        if not self.open:\n            return False\n            \n        # Check if recovery timeout has elapsed\n        if time.time() - self.last_failure_time > self.recovery_timeout:\n            logger.info(\n                \"Circuit breaker recovery timeout elapsed, allowing request\",\n                service=self.service_name\n            )\n            return False\n            \n        return True\n\ndef circuit_breaker(service_name: Optional[str] = None):\n    def decorator(func: Callable):\n        @functools.wraps(func)\n        async def wrapper(self, *args, **kwargs):\n            # Get service name from instance or parameter\n            svc_name = service_name or getattr(self, \"service_name\", \"default\")\n            breaker = CircuitBreaker.get_instance(svc_name)\n            \n            if breaker.is_open():\n                logger.warning(\n                    \"Circuit breaker open, rejecting request\",\n                    service=svc_name\n                )\n                raise ServiceUnavailableError(f\"{svc_name} service is currently unavailable\")\n                \n            try:\n                result = await func(self, *args, **kwargs)\n                breaker.record_success()\n                return result\n            except Exception as e:\n                breaker.record_failure()\n                logger.exception(\n                    \"External service call failed\",\n                    service=svc_name,\n                    error=str(e)\n                )\n                raise\n                \n        return wrapper\n    return decorator\n```\n\n3. Apply the circuit breaker decorator to all external service calls in:\n   - `app/services/llama_index_service.py`\n   - `app/services/crewai_service.py`\n   - `app/services/embedding_service.py`\n   - `app/services/arcade_service.py`\n   - `app/services/neo4j_service.py`\n   - `app/services/b2_storage.py`\n\n4. Create a ServiceUnavailableError class that returns appropriate 503 responses",
+        "testStrategy": "1. Create unit tests that verify:\n   - Circuit breaker opens after threshold failures\n   - Circuit breaker rejects requests when open\n   - Circuit breaker allows requests after recovery timeout\n   - Circuit breaker resets on successful calls\n\n2. Create integration tests that:\n   - Simulate service failures to trigger circuit breaker\n   - Verify correct error responses when circuit is open\n   - Test recovery behavior after timeout\n   - Confirm circuit breaker state is maintained between requests\n\n3. Test with various failure scenarios to ensure all services are properly protected",
+        "priority": "high",
+        "dependencies": [
+          "163"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:17.477Z"
+      },
+      {
+        "id": "165",
+        "title": "Standardize Error Response Format",
+        "description": "Ensure all endpoints use a standardized error response format to provide consistent error handling across the API.",
+        "details": "Create or update the error models and handlers to ensure standardized error responses:\n\n1. Update `app/models/errors.py` to define standard error response models:\n```python\nfrom pydantic import BaseModel, Field\nfrom typing import Dict, Any, Optional\nfrom datetime import datetime\nimport uuid\n\nclass ErrorDetails(BaseModel):\n    code: str\n    message: str\n    details: Optional[Dict[str, Any]] = None\n    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n    timestamp: datetime = Field(default_factory=datetime.utcnow)\n\nclass ErrorResponse(BaseModel):\n    error: ErrorDetails\n\n# Define standard error codes\nclass ErrorCode:\n    VALIDATION_ERROR = \"VALIDATION_ERROR\"  # 400\n    AUTHENTICATION_ERROR = \"AUTHENTICATION_ERROR\"  # 401\n    AUTHORIZATION_ERROR = \"AUTHORIZATION_ERROR\"  # 403\n    NOT_FOUND = \"NOT_FOUND\"  # 404\n    RATE_LIMITED = \"RATE_LIMITED\"  # 429\n    EXTERNAL_SERVICE_ERROR = \"EXTERNAL_SERVICE_ERROR\"  # 502\n    SERVICE_UNAVAILABLE = \"SERVICE_UNAVAILABLE\"  # 503\n    INTERNAL_ERROR = \"INTERNAL_ERROR\"  # 500\n```\n\n2. Create error factory functions:\n```python\ndef create_error_response(code: str, message: str, details: Dict[str, Any] = None, request_id: str = None) -> ErrorResponse:\n    return ErrorResponse(\n        error=ErrorDetails(\n            code=code,\n            message=message,\n            details=details,\n            request_id=request_id or str(uuid.uuid4()),\n            timestamp=datetime.utcnow()\n        )\n    )\n```\n\n3. Update `app/middleware/error_handler.py` to use these standardized formats:\n```python\nfrom fastapi import Request, status\nfrom fastapi.responses import JSONResponse\nfrom fastapi.exceptions import RequestValidationError\nfrom app.models.errors import create_error_response, ErrorCode\nimport structlog\n\nlogger = structlog.get_logger(__name__)\n\nasync def validation_exception_handler(request: Request, exc: RequestValidationError):\n    details = {}\n    for error in exc.errors():\n        loc = \"_\".join([str(l) for l in error[\"loc\"]])\n        details[loc] = error[\"msg\"]\n        \n    return JSONResponse(\n        status_code=status.HTTP_400_BAD_REQUEST,\n        content=create_error_response(\n            code=ErrorCode.VALIDATION_ERROR,\n            message=\"Validation error\",\n            details=details,\n            request_id=request.headers.get(\"X-Request-ID\")\n        ).dict()\n    )\n\n# Add similar handlers for other error types\n```\n\n4. Update all custom exception handlers to use the standardized format\n\n5. Register the exception handlers in `app/main.py`:\n```python\nfrom app.middleware.error_handler import validation_exception_handler\nfrom fastapi.exceptions import RequestValidationError\n\napp = FastAPI()\napp.add_exception_handler(RequestValidationError, validation_exception_handler)\n# Register other exception handlers\n```",
+        "testStrategy": "1. Create unit tests that verify:\n   - Error response format matches the specification\n   - All error codes produce correct status codes\n   - Error details are properly included\n   - Request ID and timestamp are present\n\n2. Create integration tests that:\n   - Trigger various error conditions (validation, auth, not found, etc.)\n   - Verify response format is consistent across all error types\n   - Check that status codes match the error type\n   - Confirm all required fields are present in responses\n\n3. Create a test utility that validates error response structure against the schema",
+        "priority": "high",
+        "dependencies": [],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:17.837Z"
+      },
+      {
+        "id": "166",
+        "title": "Enhance Exception Logging",
+        "description": "Improve exception handling to include detailed context information for better debugging and observability in production.",
+        "details": "Enhance the exception logging in error handlers to include more context:\n\n1. Update `app/middleware/error_handler.py` to include comprehensive logging:\n```python\nimport traceback\nimport structlog\nfrom fastapi import Request, status\nfrom fastapi.responses import JSONResponse\n\nlogger = structlog.get_logger(__name__)\n\nasync def generic_exception_handler(request: Request, exc: Exception):\n    # Extract user ID if available\n    user_id = getattr(request.state, \"user_id\", None) if hasattr(request, \"state\") else None\n    \n    # Get request ID from header or generate one\n    request_id = request.headers.get(\"X-Request-ID\") or str(uuid.uuid4())\n    \n    # Log the exception with context\n    logger.exception(\n        \"Unhandled exception in request\",\n        error_type=type(exc).__name__,\n        error_message=str(exc),\n        endpoint=request.url.path,\n        method=request.method,\n        request_id=request_id,\n        user_id=user_id,\n        traceback=traceback.format_exc()\n    )\n    \n    # Create standardized error response\n    return JSONResponse(\n        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,\n        content=create_error_response(\n            code=ErrorCode.INTERNAL_ERROR,\n            message=\"An unexpected error occurred\",\n            request_id=request_id\n        ).dict()\n    )\n```\n\n2. Add try-except blocks with enhanced logging in all service methods:\n```python\ntry:\n    # Service method implementation\n    return result\nexcept Exception as e:\n    logger.exception(\n        \"Error in service method\",\n        error_type=type(e).__name__,\n        error_message=str(e),\n        method=\"method_name\",\n        params={\"param1\": value1, \"param2\": value2},  # Include relevant parameters\n        user_id=user_id,\n        request_id=request_id\n    )\n    raise\n```\n\n3. Update all custom exception handlers to include similar detailed logging\n\n4. Ensure all logs include the request ID for correlation\n\n5. Register the enhanced exception handler in `app/main.py`:\n```python\nfrom app.middleware.error_handler import generic_exception_handler\n\napp = FastAPI()\napp.add_exception_handler(Exception, generic_exception_handler)\n```",
+        "testStrategy": "1. Create unit tests that verify:\n   - Exception logs include all required context fields\n   - User ID is correctly extracted and included\n   - Request ID is properly propagated\n   - Stack traces are included for 500 errors\n\n2. Create integration tests that:\n   - Trigger various exception types\n   - Verify log output contains all required information\n   - Check that request context is properly captured\n   - Confirm correlation between logs and error responses\n\n3. Test with various request scenarios to ensure all context is properly captured",
+        "priority": "medium",
+        "dependencies": [
+          "165"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:18.209Z"
+      },
+      {
+        "id": "167",
+        "title": "Implement Query Parameter Validation",
+        "description": "Add Pydantic models for all query parameters to ensure proper validation and sanitization of user input.",
+        "details": "Implement Pydantic models for query parameter validation across all endpoints:\n\n1. Create base validation models in `app/models/validators.py`:\n```python\nfrom pydantic import BaseModel, Field, validator\nfrom typing import Dict, Any, Optional, List\n\nclass QueryRequest(BaseModel):\n    query: str = Field(..., min_length=1, max_length=10000)\n    top_k: int = Field(default=10, ge=1, le=100)\n    filters: Optional[Dict[str, Any]] = Field(default=None)\n\n    @validator(\"query\")\n    def sanitize_query(cls, v):\n        # Remove potential injection patterns\n        dangerous_patterns = [\"--\", \";\", \"DROP\", \"DELETE\", \"INSERT\"]\n        for pattern in dangerous_patterns:\n            if pattern.upper() in v.upper():\n                raise ValueError(f\"Query contains disallowed pattern: {pattern}\")\n        return v.strip()\n\nclass PaginationParams(BaseModel):\n    page: int = Field(default=1, ge=1)\n    page_size: int = Field(default=20, ge=1, le=100)\n\nclass DocumentQueryParams(PaginationParams):\n    sort_by: str = Field(default=\"created_at\")\n    sort_order: str = Field(default=\"desc\")\n    filter_tag: Optional[str] = None\n    \n    @validator(\"sort_by\")\n    def validate_sort_field(cls, v):\n        allowed_fields = [\"created_at\", \"updated_at\", \"title\", \"size\"]\n        if v not in allowed_fields:\n            raise ValueError(f\"Invalid sort field. Must be one of: {', '.join(allowed_fields)}\")\n        return v\n        \n    @validator(\"sort_order\")\n    def validate_sort_order(cls, v):\n        if v.lower() not in [\"asc\", \"desc\"]:\n            raise ValueError(\"Sort order must be 'asc' or 'desc'\")\n        return v.lower()\n\nclass GraphQueryParams(BaseModel):\n    entity_id: str = Field(..., min_length=1, max_length=100)\n    depth: int = Field(default=2, ge=1, le=5)\n    relationship_types: Optional[List[str]] = None\n    \n    @validator(\"entity_id\")\n    def validate_entity_id(cls, v):\n        if not v.isalnum() and not \"-\" in v:\n            raise ValueError(\"Entity ID must contain only alphanumeric characters and hyphens\")\n        return v\n\nclass SearchParams(BaseModel):\n    term: str = Field(..., min_length=1, max_length=200)\n    category: Optional[str] = None\n    date_from: Optional[str] = None\n    date_to: Optional[str] = None\n    \n    @validator(\"term\")\n    def sanitize_term(cls, v):\n        return v.strip()\n```\n\n2. Apply these validators in route handlers:\n```python\nfrom fastapi import Depends\nfrom app.models.validators import QueryRequest, DocumentQueryParams\n\n@router.post(\"/query\")\nasync def query_endpoint(query_params: QueryRequest):\n    # Use validated parameters\n    result = await query_service.process_query(\n        query=query_params.query,\n        top_k=query_params.top_k,\n        filters=query_params.filters\n    )\n    return result\n\n@router.get(\"/documents\")\nasync def list_documents(params: DocumentQueryParams = Depends()):\n    # Use validated parameters\n    documents = await document_service.list_documents(\n        page=params.page,\n        page_size=params.page_size,\n        sort_by=params.sort_by,\n        sort_order=params.sort_order,\n        filter_tag=params.filter_tag\n    )\n    return documents\n```\n\n3. Update all API endpoints to use appropriate validators:\n   - `/api/query/*` endpoints\n   - `/api/documents/*` endpoints\n   - `/api/graph/*` endpoints\n   - `/api/search/*` endpoints",
+        "testStrategy": "1. Create unit tests that verify:\n   - Valid parameters are accepted\n   - Invalid parameters are rejected with appropriate errors\n   - Validators correctly sanitize and transform input\n   - Default values are applied correctly\n\n2. Create integration tests that:\n   - Test each endpoint with valid and invalid parameters\n   - Verify error responses for validation failures\n   - Check that sanitized values are used correctly\n   - Test edge cases for each parameter type\n\n3. Create security tests that attempt to inject malicious patterns and verify they are caught by validators",
+        "priority": "medium",
+        "dependencies": [
+          "165"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:18.589Z"
+      },
+      {
+        "id": "168",
+        "title": "Create Integration Tests for Production Readiness",
+        "description": "Develop comprehensive integration tests to verify all production readiness improvements function correctly together.",
+        "details": "Create integration tests that verify the combined functionality of all production readiness improvements:\n\n1. Create a test suite in `tests/integration/test_production_readiness.py`:\n```python\nimport pytest\nimport os\nfrom fastapi.testclient import TestClient\nfrom unittest.mock import patch, MagicMock\nfrom app.main import app\n\n@pytest.fixture\ndef client():\n    return TestClient(app)\n\n# Environment Variable Validation Tests\ndef test_startup_validation_fails_with_missing_critical_vars():\n    with patch.dict(os.environ, {\"SUPABASE_URL\": \"\", \"REDIS_URL\": \"\"}, clear=True):\n        with pytest.raises(RuntimeError, match=\"Missing critical env vars\"):\n            from app.core.startup_validation import validate_environment\n            validate_environment()\n\n# CORS Tests\ndef test_cors_rejects_wildcard_in_production():\n    with patch.dict(os.environ, {\"ENVIRONMENT\": \"production\", \"CORS_ORIGINS\": \"*\"}, clear=False):\n        with pytest.raises(RuntimeError, match=\"CORS_ORIGINS cannot be '*' in production\"):\n            # Import here to trigger CORS validation\n            from app.main import setup_cors\n            setup_cors()\n\n# Rate Limiting Tests\ndef test_login_endpoint_rate_limiting(client):\n    # Make 6 requests to login endpoint (limit is 5/minute)\n    for i in range(6):\n        response = client.post(\"/api/users/login\", json={\"username\": \"test\", \"password\": \"test\"})\n        if i < 5:\n            assert response.status_code != 429\n        else:\n            assert response.status_code == 429\n            assert \"error\" in response.json()\n            assert response.json()[\"error\"][\"code\"] == \"RATE_LIMITED\"\n\n# Timeout Tests\n@patch(\"httpx.AsyncClient.post\")\nasync def test_external_service_timeout(mock_post):\n    # Simulate timeout\n    mock_post.side_effect = httpx.TimeoutException(\"Timeout\")\n    \n    from app.services.llama_index_service import LlamaIndexService\n    service = LlamaIndexService()\n    \n    with pytest.raises(httpx.TimeoutException):\n        await service.process_document(\"test.pdf\")\n\n# Circuit Breaker Tests\n@patch(\"httpx.AsyncClient.post\")\nasync def test_circuit_breaker_opens_after_failures(mock_post):\n    # Simulate multiple failures\n    mock_post.side_effect = Exception(\"Service error\")\n    \n    from app.services.llama_index_service import LlamaIndexService\n    service = LlamaIndexService()\n    \n    # Cause failures to trigger circuit breaker\n    for i in range(6):  # Threshold is 5\n        try:\n            await service.process_document(\"test.pdf\")\n        except Exception:\n            pass\n    \n    # Next call should be rejected by circuit breaker\n    with pytest.raises(ServiceUnavailableError):\n        await service.process_document(\"test.pdf\")\n\n# Error Response Format Tests\ndef test_error_response_format(client):\n    # Test validation error\n    response = client.post(\"/api/query\", json={})\n    assert response.status_code == 400\n    \n    error_data = response.json()\n    assert \"error\" in error_data\n    assert \"code\" in error_data[\"error\"]\n    assert \"message\" in error_data[\"error\"]\n    assert \"details\" in error_data[\"error\"]\n    assert \"request_id\" in error_data[\"error\"]\n    assert \"timestamp\" in error_data[\"error\"]\n    \n    assert error_data[\"error\"][\"code\"] == \"VALIDATION_ERROR\"\n```\n\n2. Create a test fixture that simulates production environment:\n```python\n@pytest.fixture\ndef production_environment():\n    original_env = os.environ.copy()\n    os.environ.update({\n        \"ENVIRONMENT\": \"production\",\n        \"CORS_ORIGINS\": \"https://app.example.com,https://admin.example.com\",\n        \"SUPABASE_URL\": \"https://example.supabase.co\",\n        \"SUPABASE_SERVICE_KEY\": \"dummy-key\",\n        \"REDIS_URL\": \"redis://localhost:6379/0\",\n        \"NEO4J_URI\": \"bolt://localhost:7687\",\n        \"NEO4J_PASSWORD\": \"password\",\n        \"ANTHROPIC_API_KEY\": \"dummy-key\"\n    })\n    yield\n    os.environ.clear()\n    os.environ.update(original_env)\n```\n\n3. Create tests that verify all components work together in a production-like environment",
+        "testStrategy": "1. Run the integration tests in a CI/CD pipeline to verify production readiness\n2. Test with various environment configurations to ensure all validation works correctly\n3. Verify that all components (validation, CORS, rate limiting, timeouts, circuit breakers, error handling) work together correctly\n4. Create a test matrix that covers all possible combinations of failure scenarios\n5. Verify that the tests accurately reflect the production environment",
+        "priority": "medium",
+        "dependencies": [
+          "160",
+          "161",
+          "162",
+          "163",
+          "164",
+          "165",
+          "166",
+          "167"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:19.063Z"
+      },
+      {
+        "id": "169",
+        "title": "Implement Feature Flags for Gradual Rollout",
+        "description": "Create a feature flag system to enable gradual rollout of production readiness improvements and provide a rollback mechanism.",
+        "details": "Implement a feature flag system to control the rollout of production readiness features:\n\n1. Create a feature flag module in `app/core/feature_flags.py`:\n```python\nimport os\nimport redis\nfrom typing import Dict, Any, Optional\nimport structlog\n\nlogger = structlog.get_logger(__name__)\n\nclass FeatureFlags:\n    _instance = None\n    \n    @classmethod\n    def get_instance(cls) -> \"FeatureFlags\":\n        if cls._instance is None:\n            cls._instance = FeatureFlags()\n        return cls._instance\n    \n    def __init__(self):\n        self.redis_client = None\n        self.local_flags = {\n            \"strict_env_validation\": True,\n            \"strict_cors\": True,\n            \"tiered_rate_limiting\": True,\n            \"service_timeouts\": True,\n            \"circuit_breakers\": True,\n            \"standardized_errors\": True,\n            \"enhanced_logging\": True,\n            \"query_validation\": True\n        }\n        \n        # Try to connect to Redis for distributed flags\n        redis_url = os.getenv(\"REDIS_URL\")\n        if redis_url:\n            try:\n                self.redis_client = redis.from_url(redis_url)\n                logger.info(\"Connected to Redis for feature flags\")\n            except Exception as e:\n                logger.warning(\n                    \"Failed to connect to Redis for feature flags, using local flags\",\n                    error=str(e)\n                )\n    \n    def is_enabled(self, flag_name: str, default: bool = False) -> bool:\n        # Check environment variable override first\n        env_override = os.getenv(f\"FEATURE_{flag_name.upper()}\")\n        if env_override is not None:\n            return env_override.lower() in (\"1\", \"true\", \"yes\")\n        \n        # Check Redis if available\n        if self.redis_client:\n            try:\n                value = self.redis_client.get(f\"feature:{flag_name}\")\n                if value is not None:\n                    return value.decode() in (\"1\", \"true\", \"yes\")\n            except Exception as e:\n                logger.warning(\n                    \"Error reading feature flag from Redis\",\n                    flag=flag_name,\n                    error=str(e)\n                )\n        \n        # Fall back to local flags\n        return self.local_flags.get(flag_name, default)\n\n# Convenience function\ndef is_feature_enabled(flag_name: str, default: bool = False) -> bool:\n    return FeatureFlags.get_instance().is_enabled(flag_name, default)\n```\n\n2. Wrap each production readiness feature with feature flag checks:\n\n```python\n# In app/core/startup_validation.py\nfrom app.core.feature_flags import is_feature_enabled\n\ndef validate_environment():\n    if not is_feature_enabled(\"strict_env_validation\"):\n        logger.info(\"Strict environment validation disabled by feature flag\")\n        return {\"critical\": [], \"recommended\": []}\n    \n    # Proceed with validation as normal\n    # ...\n```\n\n3. Create an admin endpoint to control feature flags in production:\n```python\n@router.post(\"/admin/features/{feature_name}\", status_code=200)\nasync def set_feature_flag(\n    feature_name: str,\n    enabled: bool,\n    request: Request,\n    current_user: User = Depends(get_current_user)\n):\n    # Check admin permissions\n    if not current_user.is_admin:\n        raise HTTPException(status_code=403, detail=\"Admin access required\")\n    \n    # Set the flag in Redis\n    redis_client = get_redis_client()\n    redis_client.set(f\"feature:{feature_name}\", \"1\" if enabled else \"0\")\n    \n    logger.info(\n        \"Feature flag updated\",\n        feature=feature_name,\n        enabled=enabled,\n        user_id=current_user.id\n    )\n    \n    return {\"status\": \"success\", \"feature\": feature_name, \"enabled\": enabled}\n```\n\n4. Add feature flag documentation in `docs/feature_flags.md` explaining each flag and its purpose",
+        "testStrategy": "1. Create unit tests that verify:\n   - Feature flags can be enabled/disabled\n   - Environment variable overrides work correctly\n   - Redis-based flags take precedence over local flags\n   - Default values are used when flags are not defined\n\n2. Create integration tests that:\n   - Test each feature with flags enabled and disabled\n   - Verify admin endpoints correctly update flags\n   - Test fallback behavior when Redis is unavailable\n\n3. Create documentation tests that verify all features have corresponding flags and documentation",
+        "priority": "medium",
+        "dependencies": [
+          "160",
+          "161",
+          "162",
+          "163",
+          "164",
+          "165",
+          "166",
+          "167"
+        ],
+        "status": "cancelled",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T05:27:19.585Z"
+      },
+      {
+        "id": "170",
+        "title": "Implement Environment Variable Validation",
+        "description": "Create a startup validation module that fails fast if required environment variables are missing, ensuring the application doesn't start in an invalid state.",
+        "details": "Create a new module `app/core/startup_validation.py` that validates critical and recommended environment variables. The module should:\n1. Define lists of critical variables (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `REDIS_URL`, `ANTHROPIC_API_KEY`, `ENVIRONMENT`) and recommended variables (`NEO4J_URI`, `NEO4J_PASSWORD`, `LLAMAINDEX_SERVICE_URL`, `CREWAI_SERVICE_URL`)\n2. Implement a `validate_environment()` function that checks for missing variables\n3. Raise a `RuntimeError` with a clear message if any critical variables are missing\n4. Log warnings for missing recommended variables\n5. Return a dictionary with lists of missing variables by category\n\nModify `app/main.py` to call this validation function during application startup before any services are initialized.",
+        "testStrategy": "1. Create unit tests in `tests/test_startup_validation.py` that:\n   - Test successful validation when all critical variables are present\n   - Test failure when critical variables are missing\n   - Test warning generation for missing recommended variables\n   - Test the returned dictionary structure\n2. Create integration tests that verify the application fails to start when critical variables are missing\n3. Test with various combinations of missing variables to ensure proper error messages",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create test_startup_validation.py with test fixtures",
+            "description": "Create a test file with fixtures for environment variable validation tests",
+            "dependencies": [],
+            "details": "Create tests/test_startup_validation.py with pytest fixtures that can mock environment variables for testing. Include fixtures for setting up different environment scenarios (all vars present, missing critical vars, missing recommended vars, empty string vars).",
+            "status": "pending",
+            "testStrategy": "Use pytest monkeypatch fixture to temporarily modify environment variables during tests. Create parametrized tests for different scenarios.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Test missing critical env var causes startup failure",
+            "description": "Implement test case to verify that missing critical environment variables cause application startup to fail",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test function that mocks environment with one or more missing critical variables and verifies that validate_environment() raises a RuntimeError with appropriate error message listing the missing variables.",
+            "status": "pending",
+            "testStrategy": "Use pytest.raises to verify RuntimeError is raised with the expected error message containing the names of missing critical variables.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Test missing recommended env var logs warning but continues",
+            "description": "Implement test case to verify that missing recommended variables generate warnings but don't prevent startup",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test function that mocks environment with all critical variables but missing recommended variables, and verifies that validate_environment() logs warnings but returns successfully with a dictionary containing the missing recommended variables.",
+            "status": "pending",
+            "testStrategy": "Use caplog fixture to capture log output and verify warning messages. Check the returned dictionary structure contains the missing recommended variables.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Test empty string env var treated as missing",
+            "description": "Implement test case to verify that environment variables with empty string values are treated as missing",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test function that sets critical and recommended environment variables to empty strings and verifies they are treated the same as missing variables (raising errors for critical vars, warnings for recommended vars).",
+            "status": "pending",
+            "testStrategy": "Set environment variables to empty strings and verify the same behavior as when they're completely missing.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Test all env vars present logs success message",
+            "description": "Implement test case to verify that when all environment variables are present, a success message is logged",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test function that mocks environment with all critical and recommended variables present and verifies that validate_environment() logs a success message and returns an empty dictionary (no missing variables).",
+            "status": "pending",
+            "testStrategy": "Use caplog fixture to capture log output and verify success message. Check the returned dictionary structure shows no missing variables.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Create startup_validation.py with environment variable constants",
+            "description": "Create the startup validation module with constants for critical and recommended environment variables",
+            "dependencies": [],
+            "details": "Create app/core/startup_validation.py module and define CRITICAL_ENV_VARS and RECOMMENDED_ENV_VARS lists containing the required environment variables as specified in the task description. CRITICAL_ENV_VARS should include SUPABASE_URL, SUPABASE_SERVICE_KEY, REDIS_URL, ANTHROPIC_API_KEY, and ENVIRONMENT. RECOMMENDED_ENV_VARS should include NEO4J_URI, NEO4J_PASSWORD, LLAMAINDEX_SERVICE_URL, and CREWAI_SERVICE_URL.",
+            "status": "pending",
+            "testStrategy": "Verify constants are correctly defined through the tests implemented in subtasks 2-5.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Implement validate_environment() function",
+            "description": "Implement the core validation function that checks for missing environment variables",
+            "dependencies": [
+              6
+            ],
+            "details": "Implement validate_environment() function in app/core/startup_validation.py that checks for missing critical and recommended variables, raises RuntimeError for missing critical variables, logs warnings for missing recommended variables, and returns a dictionary with lists of missing variables by category.",
+            "status": "pending",
+            "testStrategy": "Function will be tested by the test cases implemented in subtasks 2-5.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Add structlog logging for validation results",
+            "description": "Implement structured logging for environment variable validation results",
+            "dependencies": [
+              7
+            ],
+            "details": "Add structlog logging to the validate_environment() function to log validation results with appropriate log levels (error for missing critical vars, warning for missing recommended vars, info for successful validation). Include structured data in logs for easier parsing and monitoring.",
+            "status": "pending",
+            "testStrategy": "Verify log messages and structure through the tests implemented in subtasks 2-5 using caplog fixture.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Add startup hook in app/main.py",
+            "description": "Modify app/main.py to call validate_environment() during application startup",
+            "dependencies": [
+              7,
+              8
+            ],
+            "details": "Modify app/main.py to import and call the validate_environment() function during application startup, before any services are initialized. Ensure the application fails to start if validate_environment() raises a RuntimeError due to missing critical environment variables.",
+            "status": "pending",
+            "testStrategy": "Create an integration test that verifies the application startup sequence calls validate_environment() and handles errors appropriately.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-16T17:43:23.112Z"
+      },
+      {
+        "id": "171",
+        "title": "Implement CORS Production Hardening",
+        "description": "Enhance CORS configuration to fail in production if wildcard origins are detected, preventing potential security vulnerabilities.",
+        "details": "Modify the CORS configuration in `app/main.py` to:\n1. Parse the `CORS_ORIGINS` environment variable into a list of allowed origins\n2. Check if the environment is production (`ENVIRONMENT=production`)\n3. If in production, raise a `RuntimeError` if:\n   - `CORS_ORIGINS` is not set or empty\n   - `CORS_ORIGINS` contains a wildcard (`*`)\n4. Allow wildcard origins only in non-production environments\n5. Add clear error messages explaining the security requirement\n\nExample implementation:\n```python\ncors_origins = os.getenv(\"CORS_ORIGINS\", \"\").split(\",\")\nif not cors_origins or cors_origins == [\"\"]:\n    if os.getenv(\"ENVIRONMENT\") == \"production\":\n        raise RuntimeError(\n            \"CORS_ORIGINS must be explicitly set in production. \"\n            \"Set to specific origins like 'https://app.example.com,https://admin.example.com'\"\n        )\n    cors_origins = [\"*\"]  # Allow in development only\n\nif \"*\" in cors_origins and os.getenv(\"ENVIRONMENT\") == \"production\":\n    raise RuntimeError(\n        \"CORS_ORIGINS cannot be '*' in production. \"\n        \"Set specific allowed origins for security.\"\n    )\n```",
+        "testStrategy": "1. Create unit tests that verify:\n   - Application starts with explicit origins in production\n   - Application fails with wildcard origins in production\n   - Application fails with empty origins in production\n   - Application allows wildcard in development/staging\n2. Create integration tests that verify CORS headers are properly set\n3. Test with various origin configurations to ensure proper behavior",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create test fixtures for CORS hardening tests",
+            "description": "Create a new test file tests/test_cors_hardening.py with necessary test fixtures and setup for testing CORS validation in different environments.",
+            "dependencies": [],
+            "details": "Create tests/test_cors_hardening.py with pytest fixtures that simulate different environment configurations (production vs development). Include fixtures for mocking environment variables like ENVIRONMENT and CORS_ORIGINS with various values. Set up the test structure with appropriate imports and mock application initialization.",
+            "status": "pending",
+            "testStrategy": "Verify that test fixtures correctly simulate different environment configurations and CORS settings. Ensure mocks are properly set up to isolate tests from actual environment variables.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Test wildcard CORS in production causes startup failure",
+            "description": "Implement a test case that verifies the application raises a RuntimeError when wildcard CORS origins are detected in production environment.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a test function in tests/test_cors_hardening.py that sets ENVIRONMENT='production' and CORS_ORIGINS='*' and verifies that application initialization raises a RuntimeError with an appropriate error message about wildcard CORS not being allowed in production.",
+            "status": "pending",
+            "testStrategy": "Use pytest's raises context manager to verify the correct exception type is raised with the expected error message about wildcard CORS being insecure in production.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Test missing CORS_ORIGINS in production causes startup failure",
+            "description": "Implement a test case that verifies the application raises a RuntimeError when CORS_ORIGINS is not set or empty in production environment.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a test function in tests/test_cors_hardening.py that sets ENVIRONMENT='production' and either doesn't set CORS_ORIGINS or sets it to an empty string. Verify that application initialization raises a RuntimeError with an appropriate error message about explicit CORS origins being required in production.",
+            "status": "pending",
+            "testStrategy": "Test both scenarios: completely unset CORS_ORIGINS and empty string CORS_ORIGINS. Verify the correct exception type and error message in both cases.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Test wildcard CORS in development is allowed with warning",
+            "description": "Implement a test case that verifies the application allows wildcard CORS origins in development environment but logs a warning.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a test function in tests/test_cors_hardening.py that sets ENVIRONMENT='development' and CORS_ORIGINS='*' or empty. Verify that application initialization succeeds without errors but logs an appropriate warning message about using wildcard CORS in development.",
+            "status": "pending",
+            "testStrategy": "Use a log capture fixture to verify that the appropriate warning is logged. Test both wildcard and empty CORS_ORIGINS scenarios in development environment.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement validate_cors_origins() function",
+            "description": "Create a new function validate_cors_origins() in app/core/startup_validation.py that handles CORS validation logic.",
+            "dependencies": [],
+            "details": "Create app/core/startup_validation.py if it doesn't exist. Implement validate_cors_origins() function that takes cors_origins list and environment as parameters. The function should validate that cors_origins is not empty and doesn't contain wildcards in production, raising appropriate RuntimeErrors with clear error messages. In non-production environments, it should return a default ['*'] if cors_origins is empty.",
+            "status": "pending",
+            "testStrategy": "Unit test the function directly with various input combinations to verify it correctly validates CORS origins based on environment and returns appropriate values or raises expected exceptions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Update CORS configuration in app/main.py",
+            "description": "Modify the CORS configuration in app/main.py to use the new validate_cors_origins() function for validating CORS settings.",
+            "dependencies": [
+              5
+            ],
+            "details": "Update app/main.py to import and use the validate_cors_origins() function. Parse the CORS_ORIGINS environment variable into a list, get the current environment, and pass both to validate_cors_origins(). Use the validated origins list for configuring the CORS middleware. Remove any existing CORS validation logic from main.py that's now handled by the validation function.",
+            "status": "pending",
+            "testStrategy": "Integration test to verify the application correctly initializes with valid CORS settings and fails with invalid settings. Test both production and development environments.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Add structlog logging for CORS validation",
+            "description": "Implement structured logging using structlog for CORS validation events in app/main.py.",
+            "dependencies": [
+              5,
+              6
+            ],
+            "details": "Import structlog in app/main.py and add logging statements for CORS validation events. Log when CORS origins are validated successfully, including the list of allowed origins. In development, log a warning when wildcard origins are used. Ensure logs include relevant context such as environment name and validation status.",
+            "status": "pending",
+            "testStrategy": "Verify logs are correctly generated with appropriate log levels and context information. Test both success and warning scenarios to ensure proper logging in each case.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-16T17:46:34.811Z"
+      },
+      {
+        "id": "172",
+        "title": "Implement Tiered Rate Limiting for Sensitive Endpoints",
+        "description": "Apply stricter rate limits to authentication and upload endpoints to prevent brute force attacks, spam, and resource abuse.",
+        "details": "1. Create a new file `app/middleware/rate_limit_tiers.py` to define rate limit configurations for different endpoint patterns:\n```python\nRATE_LIMIT_TIERS = {\n    \"/api/users/login\": {\"limit\": 5, \"period\": 60},  # 5 per minute\n    \"/api/users/register\": {\"limit\": 3, \"period\": 60},  # 3 per minute\n    \"/api/documents/upload\": {\"limit\": 10, \"period\": 60},  # 10 per minute\n    \"/api/query/*\": {\"limit\": 60, \"period\": 60},  # 60 per minute\n    \"/api/orchestration/*\": {\"limit\": 30, \"period\": 60},  # 30 per minute\n    \"default\": {\"limit\": 200, \"period\": 60}  # 200 per minute\n}\n```\n\n2. Modify `app/middleware/rate_limit.py` to use these tiered configurations:\n   - Implement pattern matching for endpoints\n   - Apply the most specific matching rate limit\n   - Fall back to default limit if no pattern matches\n   - Use Redis to track request counts\n   - Return standardized 429 error responses when limits are exceeded\n\n3. Add proper headers to responses:\n   - `X-RateLimit-Limit`: The rate limit ceiling\n   - `X-RateLimit-Remaining`: The number of requests left\n   - `X-RateLimit-Reset`: The time when the limit resets",
+        "testStrategy": "1. Create unit tests in `tests/test_rate_limiting.py` that verify:\n   - Correct rate limit is applied for each endpoint pattern\n   - Pattern matching works correctly for wildcard patterns\n   - Default limit is applied when no pattern matches\n\n2. Create integration tests that:\n   - Verify rate limiting actually blocks requests after limit is reached\n   - Test rate limit headers are correctly set\n   - Verify different clients get separate rate limits\n   - Test rate limit reset behavior\n\n3. Load test to ensure rate limiting doesn't add significant overhead",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create test_rate_limiting.py with Redis mock fixtures",
+            "description": "Set up the test file with necessary fixtures to mock Redis for rate limiting tests",
+            "dependencies": [],
+            "details": "Create tests/test_rate_limiting.py with Redis mock fixtures that simulate the rate limiting behavior without requiring a real Redis instance. Include setup and teardown methods to initialize and clean up the mock Redis environment for each test.",
+            "status": "pending",
+            "testStrategy": "Verify that the Redis mock correctly simulates increment operations and expiry times. Ensure fixtures can be reused across multiple test cases.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement test for login endpoint rate limiting",
+            "description": "Create test case to verify login endpoint blocks after 5 requests per minute",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a test function in tests/test_rate_limiting.py that sends 6 consecutive requests to the login endpoint and verifies that the 6th request returns a 429 status code. Ensure the test checks that the first 5 requests succeed with 200 status codes.",
+            "status": "pending",
+            "testStrategy": "Use pytest to simulate 6 rapid requests to the login endpoint and assert the expected response status codes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement test for registration endpoint rate limiting",
+            "description": "Create test case to verify registration endpoint blocks after 3 requests per minute",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a test function in tests/test_rate_limiting.py that sends 4 consecutive requests to the registration endpoint and verifies that the 4th request returns a 429 status code. Ensure the test checks that the first 3 requests succeed with 200 status codes.",
+            "status": "pending",
+            "testStrategy": "Use pytest to simulate 4 rapid requests to the registration endpoint and assert the expected response status codes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement test for upload endpoint rate limiting",
+            "description": "Create test case to verify upload endpoint blocks after 10 requests per minute",
+            "dependencies": [
+              1
+            ],
+            "details": "Add a test function in tests/test_rate_limiting.py that sends 11 consecutive requests to the document upload endpoint and verifies that the 11th request returns a 429 status code. Ensure the test checks that the first 10 requests succeed with 200 status codes.",
+            "status": "pending",
+            "testStrategy": "Use pytest to simulate 11 rapid requests to the upload endpoint and assert the expected response status codes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement test for Retry-After header in rate limit responses",
+            "description": "Create test case to verify rate limit responses include the Retry-After header",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Add a test function in tests/test_rate_limiting.py that triggers a rate limit response and verifies that the response includes the Retry-After header with an appropriate value indicating when the client can retry the request.",
+            "status": "pending",
+            "testStrategy": "Verify the Retry-After header is present and contains a valid integer value representing seconds until the rate limit resets.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Create rate_limit_tiers.py with RateLimitTier model",
+            "description": "Implement the rate limit tiers configuration file with appropriate models and constants",
+            "dependencies": [],
+            "details": "Create app/middleware/rate_limit_tiers.py that defines a RateLimitTier model class and the RATE_LIMIT_TIERS constant dictionary mapping endpoint patterns to their respective rate limits. Include pattern matching utility functions to determine the appropriate tier for a given endpoint.",
+            "status": "pending",
+            "testStrategy": "Unit test the pattern matching functionality to ensure it correctly identifies the most specific matching pattern for various endpoint URLs.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Update rate_limit.py to support tiered rate limiting",
+            "description": "Modify the existing rate limiting middleware to use the tiered configuration",
+            "dependencies": [
+              6
+            ],
+            "details": "Update app/middleware/rate_limit.py to use the RATE_LIMIT_TIERS configuration. Implement pattern matching for endpoints to apply the most specific matching rate limit, falling back to the default limit if no pattern matches. Ensure Redis is used to track request counts and implement standardized 429 error responses.",
+            "status": "pending",
+            "testStrategy": "Test the middleware with various endpoint patterns to ensure it applies the correct rate limit tier and properly tracks request counts in Redis.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Add rate limit decorators to login endpoint",
+            "description": "Apply rate limiting to the login endpoint with a limit of 5 requests per minute",
+            "dependencies": [
+              7
+            ],
+            "details": "Update app/routes/users.py to apply the rate limiting decorator to the login endpoint. Ensure the decorator is configured to use the '/api/users/login' tier which allows 5 requests per minute. Verify that the rate limit is applied before any authentication logic.",
+            "status": "pending",
+            "testStrategy": "Test that the login endpoint correctly applies the rate limit by sending multiple requests and verifying the behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Add rate limit decorators to register endpoint",
+            "description": "Apply rate limiting to the registration endpoint with a limit of 3 requests per minute",
+            "dependencies": [
+              7
+            ],
+            "details": "Update app/routes/users.py to apply the rate limiting decorator to the register endpoint. Ensure the decorator is configured to use the '/api/users/register' tier which allows 3 requests per minute. Verify that the rate limit is applied before any registration logic.",
+            "status": "pending",
+            "testStrategy": "Test that the register endpoint correctly applies the rate limit by sending multiple requests and verifying the behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "Add rate limit decorators to upload endpoint",
+            "description": "Apply rate limiting to the document upload endpoint with a limit of 10 requests per minute",
+            "dependencies": [
+              7
+            ],
+            "details": "Update app/routes/documents.py to apply the rate limiting decorator to the upload endpoint. Ensure the decorator is configured to use the '/api/documents/upload' tier which allows 10 requests per minute. Verify that the rate limit is applied before any file processing logic.",
+            "status": "pending",
+            "testStrategy": "Test that the upload endpoint correctly applies the rate limit by sending multiple requests and verifying the behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 11,
+            "title": "Add rate limit decorators to query endpoints",
+            "description": "Apply rate limiting to all query endpoints with a limit of 60 requests per minute",
+            "dependencies": [
+              7
+            ],
+            "details": "Update app/routes/query.py to apply the rate limiting decorator to all query endpoints. Ensure the decorator is configured to use the '/api/query/*' tier which allows 60 requests per minute. Verify that the wildcard pattern correctly matches all endpoints in the query module.",
+            "status": "pending",
+            "testStrategy": "Test that all query endpoints correctly apply the rate limit by sending multiple requests to different query endpoints and verifying the behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 12,
+            "title": "Update rate limit response with standardized ErrorResponse",
+            "description": "Enhance rate limit responses to use a standardized error format with Retry-After header",
+            "dependencies": [
+              7
+            ],
+            "details": "Modify the rate limiting middleware to return a standardized ErrorResponse object when rate limits are exceeded. Include the Retry-After header in the response with the time (in seconds) until the rate limit resets. Ensure the response includes appropriate HTTP headers: X-RateLimit-Limit, X-RateLimit-Remaining, and X-RateLimit-Reset.",
+            "status": "pending",
+            "testStrategy": "Test that rate limit responses contain the correct ErrorResponse format and all required headers with appropriate values.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-16T17:58:41.226Z"
+      },
+      {
+        "id": "173",
+        "title": "Implement External Service Timeouts",
+        "description": "Add configurable timeouts to all external HTTP calls to prevent indefinite hanging when external services are slow or unresponsive.",
+        "details": "1. Create a new file `app/core/service_timeouts.py` to define timeout constants:\n```python\nSERVICE_TIMEOUTS = {\n    \"llama_index\": 60.0,  # 60 seconds (document parsing can be slow)\n    \"crewai\": 120.0,     # 120 seconds (multi-agent workflows)\n    \"ollama\": 30.0,      # 30 seconds (embeddings)\n    \"neo4j\": 15.0,       # 15 seconds\n    \"supabase\": 10.0,    # 10 seconds\n    \"default\": 30.0      # Default timeout\n}\n```\n\n2. Create a base client class that implements timeouts:\n```python\nclass ExternalServiceClient:\n    def __init__(self, base_url: str, service_name: str):\n        timeout = SERVICE_TIMEOUTS.get(service_name, SERVICE_TIMEOUTS[\"default\"])\n        self.client = httpx.AsyncClient(\n            base_url=base_url,\n            timeout=httpx.Timeout(timeout, connect=5.0),\n            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)\n        )\n        self.service_name = service_name\n\n    async def call(self, endpoint: str, **kwargs):\n        try:\n            return await self.client.post(endpoint, **kwargs)\n        except httpx.TimeoutException:\n            logger.error(f\"{self.service_name} request timed out\", endpoint=endpoint)\n            raise ServiceTimeoutError(f\"{self.service_name} request timed out\")\n```\n\n3. Modify the following service files to use the timeout-enabled client:\n   - `app/services/llama_index_service.py`\n   - `app/services/crewai_service.py`\n   - `app/services/embedding_service.py`\n   - `app/services/neo4j_service.py`\n   - `app/services/b2_storage.py`",
+        "testStrategy": "1. Create unit tests that verify:\n   - Timeout values are correctly applied from configuration\n   - TimeoutException is properly caught and converted to ServiceTimeoutError\n\n2. Create integration tests that:\n   - Use a mock server that delays responses beyond timeout threshold\n   - Verify requests actually timeout after the configured duration\n   - Test different timeout values for different services\n\n3. Create tests for timeout error handling and reporting",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create test_service_timeouts.py with httpx mock fixtures",
+            "description": "Set up the test file with necessary fixtures for mocking httpx responses and timeouts",
+            "dependencies": [],
+            "details": "Create tests/test_service_timeouts.py with httpx mock fixtures for simulating timeouts. Include setup for mocked responses, delayed responses, and timeout exceptions. Set up pytest fixtures that can be reused across all timeout tests.",
+            "status": "pending",
+            "testStrategy": "Verify that the mock fixtures correctly simulate timeouts and can be used in subsequent tests. Ensure the mocks can be configured with different timeout durations.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Test LlamaIndex service timeout after 60s",
+            "description": "Implement test case to verify LlamaIndex service times out correctly after 60 seconds",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test that verifies the LlamaIndex service correctly applies a 60-second timeout. Use the httpx mock to simulate a response that takes longer than 60 seconds and verify that a ServiceTimeoutError is raised with the appropriate message.",
+            "status": "pending",
+            "testStrategy": "Use a mock server that delays responses beyond 60 seconds and verify the timeout exception is properly caught and converted to ServiceTimeoutError.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Test CrewAI service timeout after 120s",
+            "description": "Implement test case to verify CrewAI service times out correctly after 120 seconds",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test that verifies the CrewAI service correctly applies a 120-second timeout. Use the httpx mock to simulate a response that takes longer than 120 seconds and verify that a ServiceTimeoutError is raised with the appropriate message.",
+            "status": "pending",
+            "testStrategy": "Use a mock server that delays responses beyond 120 seconds and verify the timeout exception is properly caught and converted to ServiceTimeoutError.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Test Ollama service timeout after 30s",
+            "description": "Implement test case to verify Ollama service times out correctly after 30 seconds",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test that verifies the Ollama service correctly applies a 30-second timeout. Use the httpx mock to simulate a response that takes longer than 30 seconds and verify that a ServiceTimeoutError is raised with the appropriate message.",
+            "status": "pending",
+            "testStrategy": "Use a mock server that delays responses beyond 30 seconds and verify the timeout exception is properly caught and converted to ServiceTimeoutError.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Test Neo4j service timeout after 15s",
+            "description": "Implement test case to verify Neo4j service times out correctly after 15 seconds",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test that verifies the Neo4j service correctly applies a 15-second timeout. Use the httpx mock to simulate a response that takes longer than 15 seconds and verify that a ServiceTimeoutError is raised with the appropriate message.",
+            "status": "pending",
+            "testStrategy": "Use a mock server that delays responses beyond 15 seconds and verify the timeout exception is properly caught and converted to ServiceTimeoutError.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Create service_timeouts.py with timeout constants",
+            "description": "Implement the core timeout configuration file with constants for all services",
+            "dependencies": [],
+            "details": "Create app/core/service_timeouts.py with the SERVICE_TIMEOUTS dictionary containing timeout values for all external services. Implement the ExternalServiceClient class that uses these timeout values to create httpx clients with appropriate timeout settings.",
+            "status": "pending",
+            "testStrategy": "Verify that the SERVICE_TIMEOUTS dictionary contains all required service entries with correct timeout values. Test that the ExternalServiceClient correctly applies the timeout values from the configuration.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Add timeout configuration to llama_index_service.py",
+            "description": "Modify the LlamaIndex service to use the timeout-enabled client",
+            "dependencies": [
+              6
+            ],
+            "details": "Update app/services/llama_index_service.py to use the ExternalServiceClient with the 'llama_index' service name. Replace direct httpx calls with the timeout-enabled client. Ensure proper error handling for timeout exceptions.",
+            "status": "pending",
+            "testStrategy": "Verify that the LlamaIndex service correctly initializes the ExternalServiceClient with the 'llama_index' service name and that all HTTP calls use the timeout-enabled client.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Add timeout configuration to crewai_service.py",
+            "description": "Modify the CrewAI service to use the timeout-enabled client",
+            "dependencies": [
+              6
+            ],
+            "details": "Update app/services/crewai_service.py to use the ExternalServiceClient with the 'crewai' service name. Replace direct httpx calls with the timeout-enabled client. Ensure proper error handling for timeout exceptions.",
+            "status": "pending",
+            "testStrategy": "Verify that the CrewAI service correctly initializes the ExternalServiceClient with the 'crewai' service name and that all HTTP calls use the timeout-enabled client.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Add timeout configuration to embedding_service.py",
+            "description": "Modify the embedding service to use the timeout-enabled client for Ollama",
+            "dependencies": [
+              6
+            ],
+            "details": "Update app/services/embedding_service.py to use the ExternalServiceClient with the 'ollama' service name. Replace direct httpx calls with the timeout-enabled client. Ensure proper error handling for timeout exceptions.",
+            "status": "pending",
+            "testStrategy": "Verify that the embedding service correctly initializes the ExternalServiceClient with the 'ollama' service name and that all HTTP calls use the timeout-enabled client.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "Add timeout configuration to neo4j_service.py",
+            "description": "Modify the Neo4j service to use the timeout-enabled client",
+            "dependencies": [
+              6
+            ],
+            "details": "Update app/services/neo4j_service.py to use the ExternalServiceClient with the 'neo4j' service name. Replace direct httpx calls with the timeout-enabled client. Ensure proper error handling for timeout exceptions.",
+            "status": "pending",
+            "testStrategy": "Verify that the Neo4j service correctly initializes the ExternalServiceClient with the 'neo4j' service name and that all HTTP calls use the timeout-enabled client.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 11,
+            "title": "Add timeout error handling with EXTERNAL_SERVICE_ERROR response",
+            "description": "Implement standardized error handling for service timeouts across the application",
+            "dependencies": [
+              7,
+              8,
+              9,
+              10
+            ],
+            "details": "Create a ServiceTimeoutError exception class and implement error handling that returns a standardized EXTERNAL_SERVICE_ERROR response when timeouts occur. Update all service files to catch timeout exceptions and convert them to ServiceTimeoutError with appropriate logging.",
+            "status": "pending",
+            "testStrategy": "Test that timeout exceptions are properly caught and converted to ServiceTimeoutError. Verify that the error response includes appropriate status codes and error messages for client handling.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-16T18:47:22.672Z"
+      },
+      {
+        "id": "174",
+        "title": "Implement Circuit Breaker Pattern for External Services",
+        "description": "Apply circuit breakers to all external service calls to prevent cascading failures when external services are down or degraded.",
+        "details": "1. Create a circuit breaker implementation in `app/services/circuit_breaker.py`:\n```python\nimport functools\nimport time\nfrom typing import Dict, Any, Callable, TypeVar, Awaitable\nimport structlog\n\nlogger = structlog.get_logger(__name__)\n\nT = TypeVar('T')\n\nCIRCUIT_BREAKER_CONFIG = {\n    \"llama_index\": {\"failure_threshold\": 5, \"recovery_timeout\": 30},\n    \"crewai\": {\"failure_threshold\": 3, \"recovery_timeout\": 60},\n    \"ollama\": {\"failure_threshold\": 5, \"recovery_timeout\": 15},\n    \"neo4j\": {\"failure_threshold\": 3, \"recovery_timeout\": 30},\n    \"b2\": {\"failure_threshold\": 5, \"recovery_timeout\": 60},\n    \"default\": {\"failure_threshold\": 3, \"recovery_timeout\": 30},\n}\n\nclass CircuitBreaker:\n    _instances: Dict[str, 'CircuitBreaker'] = {}\n    \n    @classmethod\n    def get_instance(cls, service_name: str) -> 'CircuitBreaker':\n        if service_name not in cls._instances:\n            config = CIRCUIT_BREAKER_CONFIG.get(\n                service_name, CIRCUIT_BREAKER_CONFIG[\"default\"]\n            )\n            cls._instances[service_name] = CircuitBreaker(\n                service_name=service_name,\n                failure_threshold=config[\"failure_threshold\"],\n                recovery_timeout=config[\"recovery_timeout\"]\n            )\n        return cls._instances[service_name]\n    \n    def __init__(self, service_name: str, failure_threshold: int, recovery_timeout: int):\n        self.service_name = service_name\n        self.failure_threshold = failure_threshold\n        self.recovery_timeout = recovery_timeout\n        self.failure_count = 0\n        self.last_failure_time = 0\n        self.open = False\n        \n    def record_failure(self):\n        self.failure_count += 1\n        self.last_failure_time = time.time()\n        \n        if self.failure_count >= self.failure_threshold:\n            if not self.open:\n                logger.warning(\n                    f\"Circuit breaker opened for {self.service_name}\",\n                    service=self.service_name,\n                    failures=self.failure_count,\n                    threshold=self.failure_threshold\n                )\n            self.open = True\n    \n    def record_success(self):\n        self.failure_count = 0\n        if self.open:\n            logger.info(\n                f\"Circuit breaker closed for {self.service_name}\",\n                service=self.service_name\n            )\n            self.open = False\n    \n    def is_open(self) -> bool:\n        if not self.open:\n            return False\n            \n        # Check if recovery timeout has elapsed\n        if time.time() - self.last_failure_time > self.recovery_timeout:\n            logger.info(\n                f\"Circuit breaker recovery timeout elapsed for {self.service_name}\",\n                service=self.service_name\n            )\n            return False\n            \n        return True\n\ndef circuit_breaker(service_name: str):\n    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:\n        @functools.wraps(func)\n        async def wrapper(*args: Any, **kwargs: Any) -> T:\n            breaker = CircuitBreaker.get_instance(service_name)\n            \n            if breaker.is_open():\n                raise ServiceUnavailableError(\n                    f\"{service_name} circuit breaker is open\"\n                )\n                \n            try:\n                result = await func(*args, **kwargs)\n                breaker.record_success()\n                return result\n            except Exception as e:\n                breaker.record_failure()\n                logger.error(\n                    f\"Circuit breaker recorded failure for {service_name}\",\n                    service=service_name,\n                    error=str(e),\n                    error_type=type(e).__name__\n                )\n                raise\n                \n        return wrapper\n    return decorator\n```\n\n2. Apply the circuit breaker decorator to all external service methods in:\n   - `app/services/llama_index_service.py`\n   - `app/services/crewai_service.py`\n   - `app/services/embedding_service.py`\n   - `app/services/neo4j_service.py`\n   - `app/services/b2_storage.py`\n\n3. Create a `ServiceUnavailableError` class in `app/models/errors.py` that returns a 503 status code",
+        "testStrategy": "1. Create unit tests that verify:\n   - Circuit breaker opens after threshold failures\n   - Circuit breaker stays open during recovery timeout\n   - Circuit breaker closes after recovery timeout\n   - Circuit breaker closes after successful call\n\n2. Create integration tests that:\n   - Test circuit breaker with mock services that fail\n   - Verify circuit breaker prevents calls to failed services\n   - Test recovery behavior\n\n3. Test different configuration values for different services",
+        "priority": "high",
+        "dependencies": [
+          "173"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create tests/test_circuit_breakers.py with mock service fixtures",
+            "description": "Set up a test file with mock service fixtures to test the circuit breaker functionality",
+            "dependencies": [],
+            "details": "Create a new test file at tests/test_circuit_breakers.py that includes pytest fixtures for mocking external services. Include setup for simulating failures and successes, and configure the test environment with appropriate timeouts for testing recovery periods.",
+            "status": "pending",
+            "testStrategy": "Use pytest fixtures to create isolated test environments. Mock external service calls to simulate failures and successes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Test LlamaIndex circuit opens after 5 failures",
+            "description": "Implement a test case to verify that the circuit breaker for LlamaIndex opens after 5 consecutive failures",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a test function that simulates 5 consecutive failures when calling LlamaIndex service. Verify that after the 5th failure, the circuit breaker transitions to the open state and logs the appropriate warning message.",
+            "status": "pending",
+            "testStrategy": "Use mocks to simulate service failures. Assert that the circuit breaker state changes correctly and verify log messages.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Test circuit in open state fails immediately",
+            "description": "Verify that when a circuit is in the open state, subsequent requests fail immediately without attempting to call the service",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create a test function that first puts a circuit breaker into the open state, then attempts to make additional service calls. Verify that these calls immediately raise a ServiceUnavailableError without attempting to call the underlying service.",
+            "status": "pending",
+            "testStrategy": "Use spy objects to verify that the underlying service is not called when the circuit is open.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Test circuit transitions to half-open after recovery timeout",
+            "description": "Implement a test to verify that a circuit breaker transitions from open to half-open state after the recovery timeout period",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Create a test function that puts a circuit breaker into the open state, then advances the mock time beyond the recovery timeout period. Verify that the next call attempt is allowed through (half-open state) rather than failing immediately.",
+            "status": "pending",
+            "testStrategy": "Use time mocking to simulate the passage of time without waiting for actual timeouts.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Test successful request in half-open closes circuit",
+            "description": "Verify that a successful service call when the circuit is in half-open state causes it to transition back to closed",
+            "dependencies": [
+              1,
+              4
+            ],
+            "details": "Create a test function that puts a circuit breaker into the half-open state, then simulates a successful service call. Verify that the circuit breaker transitions back to the closed state and resets its failure counter.",
+            "status": "pending",
+            "testStrategy": "Mock a successful service response and verify the circuit breaker state changes correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Apply circuit breaker decorator to app/services/llama_index_service.py",
+            "description": "Apply the circuit breaker decorator to all external service methods in the LlamaIndex service",
+            "dependencies": [
+              1,
+              5
+            ],
+            "details": "Modify app/services/llama_index_service.py to apply the @circuit_breaker('llama_index') decorator to all methods that make external API calls. Ensure the configuration uses 5 failures threshold and 30s recovery timeout as specified in the CIRCUIT_BREAKER_CONFIG.",
+            "status": "pending",
+            "testStrategy": "Create integration tests that verify the circuit breaker behavior with the LlamaIndex service.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Apply circuit breaker decorator to app/services/crewai_service.py",
+            "description": "Apply the circuit breaker decorator to all external service methods in the CrewAI service",
+            "dependencies": [
+              1,
+              5
+            ],
+            "details": "Modify app/services/crewai_service.py to apply the @circuit_breaker('crewai') decorator to all methods that make external API calls. Ensure the configuration uses 3 failures threshold and 60s recovery timeout as specified in the CIRCUIT_BREAKER_CONFIG.",
+            "status": "pending",
+            "testStrategy": "Create integration tests that verify the circuit breaker behavior with the CrewAI service.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Apply circuit breaker decorator to app/services/embedding_service.py",
+            "description": "Apply the circuit breaker decorator to all external service methods in the Embedding service",
+            "dependencies": [
+              1,
+              5
+            ],
+            "details": "Modify app/services/embedding_service.py to apply the @circuit_breaker('ollama') decorator to all methods that make external API calls. Ensure the configuration uses 5 failures threshold and 15s recovery timeout as specified in the CIRCUIT_BREAKER_CONFIG.",
+            "status": "pending",
+            "testStrategy": "Create integration tests that verify the circuit breaker behavior with the Embedding service.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Apply circuit breaker decorator to app/services/neo4j_service.py",
+            "description": "Apply the circuit breaker decorator to all external service methods in the Neo4j service",
+            "dependencies": [
+              1,
+              5
+            ],
+            "details": "Modify app/services/neo4j_service.py to apply the @circuit_breaker('neo4j') decorator to all methods that make external API calls. Ensure the configuration uses 3 failures threshold and 30s recovery timeout as specified in the CIRCUIT_BREAKER_CONFIG.",
+            "status": "pending",
+            "testStrategy": "Create integration tests that verify the circuit breaker behavior with the Neo4j service.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "Apply circuit breaker decorator to app/services/b2_storage.py",
+            "description": "Apply the circuit breaker decorator to all external service methods in the B2 Storage service",
+            "dependencies": [
+              1,
+              5
+            ],
+            "details": "Modify app/services/b2_storage.py to apply the @circuit_breaker('b2') decorator to all methods that make external API calls. Ensure the configuration uses 5 failures threshold and 60s recovery timeout as specified in the CIRCUIT_BREAKER_CONFIG.",
+            "status": "pending",
+            "testStrategy": "Create integration tests that verify the circuit breaker behavior with the B2 Storage service.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 11,
+            "title": "Implement /api/system/circuit-breakers endpoint",
+            "description": "Create an API endpoint that exposes the current state of all circuit breakers in the system",
+            "dependencies": [
+              6,
+              7,
+              8,
+              9,
+              10
+            ],
+            "details": "Create a new endpoint at /api/system/circuit-breakers that returns the current state of all circuit breakers, including their service name, current state (open/closed), failure count, and last failure time. This will be used for monitoring and debugging purposes.",
+            "status": "pending",
+            "testStrategy": "Create API tests that verify the endpoint returns the correct information for all circuit breakers in various states.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-16T19:29:42.662Z"
+      },
+      {
+        "id": "175",
+        "title": "Implement Standardized Error Responses",
+        "description": "Ensure all endpoints use a standardized error format from app/models/errors.py to provide consistent error responses across the API.",
+        "details": "1. Enhance `app/models/errors.py` to define a standard error response model:\n```python\nfrom pydantic import BaseModel, Field\nfrom typing import Dict, Any, Optional\nfrom datetime import datetime\nimport uuid\n\nclass ErrorResponse(BaseModel):\n    code: str\n    message: str\n    details: Optional[Dict[str, Any]] = Field(default=None)\n    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n    timestamp: datetime = Field(default_factory=datetime.utcnow)\n    \n    class Config:\n        schema_extra = {\n            \"example\": {\n                \"error\": {\n                    \"code\": \"VALIDATION_ERROR\",\n                    \"message\": \"Invalid input parameters\",\n                    \"details\": {\"field\": \"description of issue\"},\n                    \"request_id\": \"123e4567-e89b-12d3-a456-426614174000\",\n                    \"timestamp\": \"2025-01-15T12:00:00Z\"\n                }\n            }\n        }\n\nclass APIError(Exception):\n    def __init__(self, \n                 code: str, \n                 message: str, \n                 status_code: int = 500, \n                 details: Optional[Dict[str, Any]] = None):\n        self.code = code\n        self.message = message\n        self.status_code = status_code\n        self.details = details\n        super().__init__(self.message)\n        \n    def to_response(self, request_id: Optional[str] = None) -> Dict[str, Any]:\n        return {\n            \"error\": ErrorResponse(\n                code=self.code,\n                message=self.message,\n                details=self.details,\n                request_id=request_id or str(uuid.uuid4())\n            ).dict()\n        }\n\n# Define standard error types\nclass ValidationError(APIError):\n    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):\n        super().__init__(\"VALIDATION_ERROR\", message, 400, details)\n\nclass AuthenticationError(APIError):\n    def __init__(self, message: str = \"Authentication required\"):\n        super().__init__(\"AUTHENTICATION_ERROR\", message, 401)\n\nclass AuthorizationError(APIError):\n    def __init__(self, message: str = \"Not authorized\"):\n        super().__init__(\"AUTHORIZATION_ERROR\", message, 403)\n\nclass NotFoundError(APIError):\n    def __init__(self, message: str = \"Resource not found\"):\n        super().__init__(\"NOT_FOUND\", message, 404)\n\nclass RateLimitedError(APIError):\n    def __init__(self, message: str = \"Rate limit exceeded\"):\n        super().__init__(\"RATE_LIMITED\", message, 429)\n\nclass ExternalServiceError(APIError):\n    def __init__(self, message: str = \"External service error\"):\n        super().__init__(\"EXTERNAL_SERVICE_ERROR\", message, 502)\n\nclass ServiceUnavailableError(APIError):\n    def __init__(self, message: str = \"Service temporarily unavailable\"):\n        super().__init__(\"SERVICE_UNAVAILABLE\", message, 503)\n\nclass InternalError(APIError):\n    def __init__(self, message: str = \"Internal server error\"):\n        super().__init__(\"INTERNAL_ERROR\", message, 500)\n```\n\n2. Modify `app/middleware/error_handler.py` to use these standardized errors:\n```python\nfrom fastapi import Request\nfrom fastapi.responses import JSONResponse\nfrom app.models.errors import APIError, InternalError\nimport structlog\n\nlogger = structlog.get_logger(__name__)\n\nasync def error_handler(request: Request, exc: Exception):\n    request_id = request.headers.get(\"X-Request-ID\")\n    \n    if isinstance(exc, APIError):\n        return JSONResponse(\n            status_code=exc.status_code,\n            content=exc.to_response(request_id)\n        )\n    \n    # Handle unexpected errors\n    logger.exception(\n        \"Unhandled exception in request\",\n        error_type=type(exc).__name__,\n        error_message=str(exc),\n        endpoint=request.url.path,\n        method=request.method,\n        request_id=request_id,\n        user_id=request.state.user_id if hasattr(request.state, \"user_id\") else None\n    )\n    \n    internal_error = InternalError()\n    return JSONResponse(\n        status_code=500,\n        content=internal_error.to_response(request_id)\n    )\n```\n\n3. Update all route handlers to use these error classes instead of raising raw exceptions or returning inconsistent error formats",
+        "testStrategy": "1. Create unit tests that verify:\n   - Each error type produces the correct status code\n   - Error responses have the correct structure\n   - Request IDs are properly propagated\n\n2. Create integration tests that:\n   - Trigger various error conditions\n   - Verify the response format matches the standard\n   - Check that all required fields are present\n\n3. Test error handling for different HTTP methods and endpoints",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create test fixtures for error response testing",
+            "description": "Create tests/test_error_responses.py with endpoint fixtures to test various error scenarios",
+            "dependencies": [],
+            "details": "Create a new test file with fixtures that can trigger different error conditions. Include setup for validation errors, authentication errors, not found errors, and internal server errors. Set up test client and necessary mocks for external services.",
+            "status": "pending",
+            "testStrategy": "Verify that test fixtures correctly trigger the intended error conditions and return appropriate status codes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement validation error response tests",
+            "description": "Create tests to verify validation errors return VALIDATION_ERROR code with 400 status",
+            "dependencies": [
+              1
+            ],
+            "details": "Add test cases that trigger validation errors by sending invalid data to endpoints. Verify the response contains the correct error code 'VALIDATION_ERROR', status code 400, and includes details about which fields failed validation.",
+            "status": "pending",
+            "testStrategy": "Test with multiple invalid input scenarios to ensure consistent error format and appropriate field-level validation details.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement external service error response tests",
+            "description": "Create tests to verify external service errors return EXTERNAL_SERVICE_ERROR code with 502 status",
+            "dependencies": [
+              1
+            ],
+            "details": "Add test cases that simulate failures in external service calls. Mock external service dependencies to throw exceptions and verify the API returns the correct error code 'EXTERNAL_SERVICE_ERROR' with status code 502.",
+            "status": "pending",
+            "testStrategy": "Test with different external service failure scenarios including timeouts, connection errors, and invalid responses.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement request metadata tests for error responses",
+            "description": "Create tests to verify all errors include request_id and timestamp fields",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Add assertions to all error response tests to verify that request_id and timestamp fields are always present and properly formatted. Test with both system-generated request IDs and those provided via X-Request-ID header.",
+            "status": "pending",
+            "testStrategy": "Verify UUID format for request_id and ISO-8601 format for timestamp across all error types.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement error logging correlation tests",
+            "description": "Create tests to verify error logs include request_id for correlation with responses",
+            "dependencies": [
+              4
+            ],
+            "details": "Create test cases that capture log output during error conditions and verify that the request_id in the logs matches the request_id in the error response. Test with both system-generated and client-provided request IDs.",
+            "status": "pending",
+            "testStrategy": "Use log capture fixtures to verify log entries contain the same request_id as the response.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Extend error models with StandardError and ErrorCode enum",
+            "description": "Enhance app/models/errors.py with StandardError model and ErrorCode enum for consistent error typing",
+            "dependencies": [],
+            "details": "Refactor the error models to use an ErrorCode enum for all error types. Create a StandardError model that extends the existing ErrorResponse with additional fields as needed. Update all error classes to use the enum values for consistent error codes.",
+            "status": "pending",
+            "testStrategy": "Unit test the error models to ensure they generate the expected JSON structure and validate required fields.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Update error handler middleware to use StandardError",
+            "description": "Modify app/middleware/error_handler.py to use StandardError for all exception types",
+            "dependencies": [
+              6
+            ],
+            "details": "Update the error handler middleware to convert all exceptions to StandardError instances. Implement specific mapping logic for common exceptions like ValidationError, NotFoundError, etc. Ensure all unhandled exceptions are converted to InternalError with appropriate logging.",
+            "status": "pending",
+            "testStrategy": "Test the middleware with various exception types to verify correct conversion to StandardError format.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Implement request_id extraction and propagation",
+            "description": "Add middleware to extract X-Request-ID header or generate a new request_id for each request",
+            "dependencies": [
+              7
+            ],
+            "details": "Create or update middleware to extract the X-Request-ID header from incoming requests. If not present, generate a new UUID. Store the request_id in request.state for use throughout the request lifecycle. Ensure it's propagated to error responses and logs.",
+            "status": "pending",
+            "testStrategy": "Test with and without X-Request-ID header to verify extraction and generation behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Update structlog configuration for request_id inclusion",
+            "description": "Modify logging configuration to include request_id in all error logs for correlation",
+            "dependencies": [
+              8
+            ],
+            "details": "Update the structlog configuration to include request_id in the log context. Create a middleware or processor that adds the request_id from request.state to the log context. Ensure all log entries include the request_id field for correlation with API responses.",
+            "status": "pending",
+            "testStrategy": "Verify log entries contain request_id field and that it matches the ID used in the corresponding request/response.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "Implement stack trace logging for 500 errors",
+            "description": "Add detailed stack trace logging only for 500-level internal server errors",
+            "dependencies": [
+              7,
+              9
+            ],
+            "details": "Enhance the error handler to capture and log full stack traces only for 500-level errors (InternalError). For other error types, log only essential information. Configure structlog to format stack traces appropriately and ensure they're included in logs for debugging.",
+            "status": "pending",
+            "testStrategy": "Trigger various error types and verify stack traces are only included for 500 errors, while other errors log only essential information.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-16T19:16:35.628Z"
+      },
+      {
+        "id": "176",
+        "title": "Enhance Exception Logging",
+        "description": "Improve exception logging to include error type, message, request context, stack trace, and request ID for better debugging and correlation.",
+        "details": "1. Enhance the exception logging in `app/middleware/error_handler.py` to include comprehensive information:\n```python\nimport traceback\nfrom fastapi import Request\nfrom fastapi.responses import JSONResponse\nfrom app.models.errors import APIError, InternalError\nimport structlog\n\nlogger = structlog.get_logger(__name__)\n\nasync def error_handler(request: Request, exc: Exception):\n    request_id = request.headers.get(\"X-Request-ID\")\n    user_id = getattr(request.state, \"user_id\", None) if hasattr(request.state, \"user_id\") else None\n    \n    # Collect context information\n    context = {\n        \"error_type\": type(exc).__name__,\n        \"error_message\": str(exc),\n        \"endpoint\": request.url.path,\n        \"method\": request.method,\n        \"request_id\": request_id,\n        \"user_id\": user_id,\n        \"client_ip\": request.client.host if request.client else None,\n        \"user_agent\": request.headers.get(\"User-Agent\")\n    }\n    \n    if isinstance(exc, APIError):\n        # For known API errors, log at appropriate level\n        if exc.status_code >= 500:\n            logger.error(f\"Server error: {exc.message}\", **context)\n        else:\n            logger.info(f\"Client error: {exc.message}\", **context)\n            \n        return JSONResponse(\n            status_code=exc.status_code,\n            content=exc.to_response(request_id)\n        )\n    \n    # For unexpected errors, include stack trace\n    stack_trace = traceback.format_exc()\n    context[\"stack_trace\"] = stack_trace\n    \n    logger.exception(\n        \"Unhandled exception in request\",\n        **context\n    )\n    \n    # Return standardized 500 error\n    internal_error = InternalError()\n    return JSONResponse(\n        status_code=500,\n        content=internal_error.to_response(request_id)\n    )\n```\n\n2. Add a middleware to ensure request IDs are always available:\n```python\n# app/middleware/request_id.py\nimport uuid\nfrom fastapi import Request\nfrom starlette.middleware.base import BaseHTTPMiddleware\n\nclass RequestIDMiddleware(BaseHTTPMiddleware):\n    async def dispatch(self, request: Request, call_next):\n        request_id = request.headers.get(\"X-Request-ID\")\n        if not request_id:\n            request_id = str(uuid.uuid4())\n            request.headers.__dict__[\"_list\"].append(\n                (b\"x-request-id\", request_id.encode())\n            )\n        \n        response = await call_next(request)\n        response.headers[\"X-Request-ID\"] = request_id\n        return response\n```\n\n3. Register the middleware in `app/main.py`:\n```python\nfrom app.middleware.request_id import RequestIDMiddleware\n\napp = FastAPI()\napp.add_middleware(RequestIDMiddleware)\n```",
+        "testStrategy": "1. Create unit tests that verify:\n   - All context fields are properly captured\n   - Different error types are logged at appropriate levels\n   - Stack traces are included for unexpected errors\n\n2. Create integration tests that:\n   - Trigger various error conditions\n   - Verify logs contain all required information\n   - Check that request IDs are properly propagated\n\n3. Test with different types of requests and error scenarios",
+        "priority": "medium",
+        "dependencies": [
+          "175"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T19:57:06.845Z"
+      },
+      {
+        "id": "177",
+        "title": "Implement Query Parameter Validation",
+        "description": "Add Pydantic models for all query parameters to ensure proper validation and sanitization of user input.",
+        "details": "1. Create Pydantic models for query parameters in appropriate modules:\n\n```python\n# app/models/query.py\nfrom pydantic import BaseModel, Field, validator\nfrom typing import Dict, Any, Optional, List\n\nclass QueryRequest(BaseModel):\n    query: str = Field(..., min_length=1, max_length=10000)\n    top_k: int = Field(default=10, ge=1, le=100)\n    filters: Optional[Dict[str, Any]] = Field(default=None)\n\n    @validator(\"query\")\n    def sanitize_query(cls, v):\n        # Remove potential injection patterns\n        dangerous_patterns = [\"--\", \";\", \"DROP\", \"DELETE\", \"INSERT\"]\n        for pattern in dangerous_patterns:\n            if pattern.upper() in v.upper():\n                raise ValueError(f\"Query contains disallowed pattern: {pattern}\")\n        return v.strip()\n\n# app/models/document.py\nclass DocumentListParams(BaseModel):\n    page: int = Field(default=1, ge=1)\n    page_size: int = Field(default=20, ge=1, le=100)\n    sort_by: str = Field(default=\"created_at\")\n    sort_order: str = Field(default=\"desc\")\n    filter_tag: Optional[str] = None\n\n    @validator(\"sort_by\")\n    def validate_sort_field(cls, v):\n        allowed_fields = [\"created_at\", \"updated_at\", \"title\", \"size\"]\n        if v not in allowed_fields:\n            raise ValueError(f\"Invalid sort field. Must be one of: {', '.join(allowed_fields)}\")\n        return v\n\n    @validator(\"sort_order\")\n    def validate_sort_order(cls, v):\n        if v.lower() not in [\"asc\", \"desc\"]:\n            raise ValueError(\"Sort order must be 'asc' or 'desc'\")\n        return v.lower()\n\n# app/models/graph.py\nclass GraphQueryParams(BaseModel):\n    entity_id: str = Field(..., min_length=1, max_length=100)\n    traversal_depth: int = Field(default=2, ge=1, le=5)\n    relationship_types: Optional[List[str]] = None\n    limit: int = Field(default=50, ge=1, le=200)\n\n# app/models/search.py\nclass SearchParams(BaseModel):\n    query: str = Field(..., min_length=1, max_length=1000)\n    page: int = Field(default=1, ge=1)\n    page_size: int = Field(default=20, ge=1, le=100)\n    content_type: Optional[List[str]] = None\n    date_from: Optional[str] = None\n    date_to: Optional[str] = None\n\n    @validator(\"query\")\n    def sanitize_search_query(cls, v):\n        return v.strip()\n\n    @validator(\"content_type\")\n    def validate_content_type(cls, v):\n        if v is not None:\n            allowed_types = [\"document\", \"image\", \"audio\", \"video\"]\n            for t in v:\n                if t not in allowed_types:\n                    raise ValueError(f\"Invalid content type: {t}\")\n        return v\n```\n\n2. Update route handlers to use these models for parameter validation:\n\n```python\n# Example for query endpoint\n@router.post(\"/api/query\")\nasync def query_documents(query_params: QueryRequest):\n    # Access validated parameters\n    query = query_params.query\n    top_k = query_params.top_k\n    filters = query_params.filters or {}\n    \n    # Process query...\n    \n# Example for document listing\n@router.get(\"/api/documents\")\nasync def list_documents(params: DocumentListParams = Depends()):\n    # Access validated parameters\n    page = params.page\n    page_size = params.page_size\n    sort_by = params.sort_by\n    sort_order = params.sort_order\n    \n    # Process request...\n```",
+        "testStrategy": "1. Create unit tests that verify:\n   - Valid parameters are accepted\n   - Invalid parameters are rejected with appropriate error messages\n   - Validators correctly sanitize and transform input\n\n2. Create integration tests that:\n   - Test endpoints with various parameter combinations\n   - Verify error responses for invalid parameters\n   - Check that sanitization is working correctly\n\n3. Test edge cases like minimum/maximum values and special characters",
+        "priority": "medium",
+        "dependencies": [
+          "175"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T20:04:51.719Z"
+      },
+      {
+        "id": "178",
+        "title": "Create Service Timeout Configuration Module",
+        "description": "Create a central configuration module for service timeouts to ensure consistent timeout settings across the application.",
+        "details": "1. Create a new file `app/core/service_timeouts.py` to define timeout constants and configuration:\n\n```python\nfrom typing import Dict, Any\nimport os\n\n# Default timeout values in seconds\nDEFAULT_TIMEOUTS = {\n    \"llama_index\": 60.0,  # 60 seconds (document parsing can be slow)\n    \"crewai\": 120.0,     # 120 seconds (multi-agent workflows)\n    \"ollama\": 30.0,      # 30 seconds (embeddings)\n    \"neo4j\": 15.0,       # 15 seconds\n    \"supabase\": 10.0,    # 10 seconds\n    \"arcade\": 30.0,      # 30 seconds\n    \"b2\": 45.0,          # 45 seconds\n    \"default\": 30.0      # Default timeout\n}\n\n# Environment variable prefix for overriding timeouts\nENV_PREFIX = \"TIMEOUT_\"\n\ndef get_timeout(service_name: str) -> float:\n    \"\"\"Get timeout for a service, allowing environment variable override.\"\"\"\n    # Check for environment variable override (e.g., TIMEOUT_LLAMA_INDEX=90)\n    env_var = f\"{ENV_PREFIX}{service_name.upper()}\"\n    env_value = os.getenv(env_var)\n    \n    if env_value:\n        try:\n            return float(env_value)\n        except ValueError:\n            # Log warning about invalid timeout value\n            pass\n    \n    # Fall back to default timeout\n    return DEFAULT_TIMEOUTS.get(service_name, DEFAULT_TIMEOUTS[\"default\"])\n\ndef get_connect_timeout(service_name: str) -> float:\n    \"\"\"Get connection timeout, which is typically shorter than request timeout.\"\"\"\n    # Connection timeouts are usually shorter\n    return min(5.0, get_timeout(service_name) / 4)\n\ndef get_all_timeouts() -> Dict[str, Any]:\n    \"\"\"Get all timeout configurations for monitoring/logging.\"\"\"\n    result = {}\n    \n    # Include defaults\n    for service, timeout in DEFAULT_TIMEOUTS.items():\n        result[service] = {\n            \"default\": timeout,\n            \"current\": get_timeout(service),\n            \"connect\": get_connect_timeout(service)\n        }\n    \n    return result\n```\n\n2. Create a utility function to configure httpx clients with proper timeouts:\n\n```python\n# app/utils/http_client.py\nimport httpx\nfrom app.core.service_timeouts import get_timeout, get_connect_timeout\n\ndef create_http_client(service_name: str, base_url: str = None) -> httpx.AsyncClient:\n    \"\"\"Create an httpx client with appropriate timeouts for the service.\"\"\"\n    timeout = get_timeout(service_name)\n    connect_timeout = get_connect_timeout(service_name)\n    \n    return httpx.AsyncClient(\n        base_url=base_url,\n        timeout=httpx.Timeout(timeout, connect=connect_timeout),\n        limits=httpx.Limits(max_connections=100, max_keepalive_connections=20)\n    )\n```\n\n3. Add a startup event handler to log all timeout configurations:\n\n```python\n# In app/main.py\nfrom app.core.service_timeouts import get_all_timeouts\nimport structlog\n\nlogger = structlog.get_logger(__name__)\n\n@app.on_event(\"startup\")\nasync def log_timeout_configuration():\n    timeouts = get_all_timeouts()\n    logger.info(\"Service timeout configuration\", timeouts=timeouts)\n```",
+        "testStrategy": "1. Create unit tests in `tests/test_service_timeouts.py` that verify:\n   - Default timeouts are correctly defined\n   - Environment variable overrides work correctly\n   - Invalid environment values are handled gracefully\n   - Connection timeouts are calculated correctly\n\n2. Create integration tests that:\n   - Verify HTTP clients are created with correct timeout values\n   - Test that timeouts actually trigger after the specified duration\n   - Check that timeout configurations are properly logged at startup\n\n3. Test with various environment variable configurations",
+        "priority": "medium",
+        "dependencies": [
+          "173"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T20:05:40.362Z"
+      },
+      {
+        "id": "179",
+        "title": "Create Comprehensive Test Suite for Production Readiness",
+        "description": "Develop a comprehensive test suite to verify all production readiness improvements, including startup validation, rate limiting, circuit breakers, and error handling.",
+        "details": "1. Create a test directory structure:\n```\ntests/\n  test_startup_validation.py\n  test_cors_security.py\n  test_rate_limiting.py\n  test_circuit_breaker.py\n  test_error_handling.py\n  test_timeouts.py\n  test_input_validation.py\n  integration/\n    test_production_readiness.py\n```\n\n2. Implement unit tests for each component:\n\n```python\n# tests/test_startup_validation.py\nimport os\nimport pytest\nfrom unittest.mock import patch\nfrom app.core.startup_validation import validate_environment, REQUIRED_ENV_VARS\n\ndef test_validate_environment_success():\n    # Mock all required env vars\n    with patch.dict(os.environ, {\n        var: \"test_value\" for var in REQUIRED_ENV_VARS[\"critical\"]\n    }):\n        result = validate_environment()\n        assert result[\"critical\"] == []\n\ndef test_validate_environment_missing_critical():\n    # Mock with missing critical vars\n    with patch.dict(os.environ, {}, clear=True):\n        with pytest.raises(RuntimeError) as excinfo:\n            validate_environment()\n        # Check error message contains missing vars\n        for var in REQUIRED_ENV_VARS[\"critical\"]:\n            assert var in str(excinfo.value)\n\n# tests/test_cors_security.py\n# Similar tests for CORS configuration\n\n# tests/test_rate_limiting.py\n# Tests for rate limiting tiers and behavior\n\n# tests/test_circuit_breaker.py\n# Tests for circuit breaker behavior\n```\n\n3. Implement integration tests that verify the entire system:\n\n```python\n# tests/integration/test_production_readiness.py\nimport pytest\nfrom fastapi.testclient import TestClient\nfrom app.main import app\n\n@pytest.fixture\ndef client():\n    return TestClient(app)\n\ndef test_error_response_format(client):\n    # Test invalid input to trigger validation error\n    response = client.post(\"/api/query\", json={\"query\": \"\"})\n    assert response.status_code == 400\n    data = response.json()\n    \n    # Verify error structure\n    assert \"error\" in data\n    assert \"code\" in data[\"error\"]\n    assert \"message\" in data[\"error\"]\n    assert \"request_id\" in data[\"error\"]\n    assert \"timestamp\" in data[\"error\"]\n    \n    # Verify specific error code\n    assert data[\"error\"][\"code\"] == \"VALIDATION_ERROR\"\n\ndef test_rate_limiting(client):\n    # Make multiple requests to trigger rate limit\n    endpoint = \"/api/users/login\"\n    for _ in range(10):  # Limit is 5/minute\n        client.post(endpoint, json={\"username\": \"test\", \"password\": \"test\"})\n    \n    # This should be rate limited\n    response = client.post(endpoint, json={\"username\": \"test\", \"password\": \"test\"})\n    assert response.status_code == 429\n    \n    # Verify rate limit headers\n    assert \"X-RateLimit-Limit\" in response.headers\n    assert \"X-RateLimit-Remaining\" in response.headers\n    assert \"X-RateLimit-Reset\" in response.headers\n    \n    # Verify error response format\n    data = response.json()\n    assert data[\"error\"][\"code\"] == \"RATE_LIMITED\"\n```\n\n4. Create a test for the overall production readiness score:\n\n```python\ndef test_production_readiness_score():\n    # This test verifies all production readiness criteria\n    # Each check contributes to the overall score\n    \n    # Check environment validation\n    from app.core.startup_validation import validate_environment\n    with patch.dict(os.environ, {var: \"test\" for var in REQUIRED_ENV_VARS[\"critical\"]}):\n        result = validate_environment()\n        assert result[\"critical\"] == []\n    \n    # Check CORS configuration\n    # ...\n    \n    # Check rate limiting configuration\n    # ...\n    \n    # Check circuit breaker configuration\n    # ...\n    \n    # Check error handling\n    # ...\n    \n    # Calculate final score based on passing checks\n    # assert score == 100\n```",
+        "testStrategy": "1. Run unit tests for each component:\n   - Use pytest for all tests\n   - Use mocking to isolate components\n   - Test both success and failure cases\n\n2. Run integration tests:\n   - Use TestClient to make actual HTTP requests\n   - Test end-to-end behavior\n   - Verify all components work together\n\n3. Run performance tests:\n   - Measure overhead of new features\n   - Ensure rate limiting and circuit breakers work under load\n\n4. Run security tests:\n   - Verify CORS protection\n   - Test input validation against injection attacks",
+        "priority": "medium",
+        "dependencies": [
+          "170",
+          "171",
+          "172",
+          "173",
+          "174",
+          "175",
+          "176",
+          "177",
+          "178"
+        ],
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-01-16T20:15:07.155Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-16T04:30:34.821Z",
-      "taskCount": 59,
-      "completedCount": 59,
+      "lastModified": "2026-01-16T20:15:07.155Z",
+      "taskCount": 79,
+      "completedCount": 69,
       "tags": [
         "v7_3_features"
       ]

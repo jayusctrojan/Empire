@@ -47,6 +47,9 @@ from app.core.logging_config import configure_logging
 # Task 154: Standardized Exception Handling Framework
 from app.middleware.error_handler import setup_error_handling
 
+# Task 170, 171: Startup Environment and CORS Validation (US1, US2 - Production Readiness)
+from app.core.startup_validation import validate_environment, validate_cors_origins
+
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
 REQUEST_LATENCY = Histogram('empire_request_duration_seconds', 'HTTP request latency', ['method', 'endpoint'])
@@ -66,6 +69,12 @@ async def lifespan(app: FastAPI):
         json_output=os.getenv("ENVIRONMENT") == "production",
         include_timestamps=True
     )
+
+    # Task 170: Fail-fast environment variable validation (US1 - Production Readiness)
+    # This will raise RuntimeError and prevent startup if critical vars are missing
+    validation_result = validate_environment()
+    if validation_result["recommended"]:
+        print(f"⚠️  Missing recommended env vars: {', '.join(validation_result['recommended'])}")
 
     # Startup: Initialize connections
     print("🚀 Empire v7.3 FastAPI starting...")
@@ -180,11 +189,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration (Task 41.1: Hardened CORS)
-# In production, restrict to specific origins. In development, allow all for testing.
-cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
-if "*" in cors_origins and os.getenv("ENVIRONMENT") == "production":
-    print("⚠️  WARNING: CORS allowing all origins (*) in production - security risk!")
+# CORS Configuration (Task 41.1, Task 171: Hardened CORS with fail-fast validation)
+# In production, CORS_ORIGINS must be explicitly set and cannot be wildcard.
+# In development, defaults to "*" with warning. This is validated at startup.
+cors_origins = validate_cors_origins()
 
 app.add_middleware(
     CORSMiddleware,

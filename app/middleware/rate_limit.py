@@ -1,13 +1,21 @@
 """
 Empire v7.3 - Rate Limiting Middleware
 Task 41.1: JWT Authentication hardening with rate limiting
+Task 172: Tiered Rate Limiting for Sensitive Endpoints (US3 - Production Readiness)
 
 Implements rate limiting to prevent:
 - Brute force authentication attacks
 - API abuse and DoS attacks
 - Resource exhaustion
 
-Uses slowapi library for flexible rate limiting with Redis backend support.
+Rate Limits (from spec 009-production-readiness):
+- Login endpoints: 5 requests/minute (FR-008)
+- Registration endpoints: 3 requests/minute (FR-009)
+- Upload endpoints: 10 requests/minute (FR-010)
+- Query endpoints: 60 requests/minute (FR-011)
+- AI orchestration endpoints: 30 requests/minute (FR-012)
+
+Uses slowapi library for flexible rate limiting with Redis backend support (FR-014).
 """
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -16,8 +24,23 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from fastapi import Request, Response
 from typing import Callable, Optional
+from datetime import datetime, timezone
 import os
 import redis
+import time
+import uuid
+
+# Import tiered rate limit configurations
+from app.middleware.rate_limit_tiers import (
+    get_tier_for_endpoint,
+    get_rate_limit_string,
+    LOGIN_TIER,
+    REGISTRATION_TIER,
+    UPLOAD_TIER,
+    QUERY_TIER,
+    ORCHESTRATION_TIER,
+    DEFAULT_TIER,
+)
 
 
 # Rate limit storage backend
@@ -102,10 +125,11 @@ limiter = Limiter(
 
 
 # Rate limit configurations for different endpoint types
+# Updated for Task 172 to match spec 009-production-readiness requirements (FR-008 to FR-012)
 RATE_LIMITS = {
-    # Authentication endpoints (most restrictive)
-    "auth_login": "5/minute",  # 5 login attempts per minute
-    "auth_register": "3/hour",  # 3 registrations per hour
+    # Authentication endpoints - most restrictive (FR-008, FR-009)
+    "auth_login": LOGIN_TIER.slowapi_format,  # 5/minute (FR-008)
+    "auth_register": REGISTRATION_TIER.slowapi_format,  # 3/minute (FR-009)
     "auth_refresh": "10/minute",  # 10 token refreshes per minute
     "auth_logout": "10/minute",  # 10 logouts per minute
 
@@ -114,13 +138,16 @@ RATE_LIMITS = {
     "api_key_list": "100/minute",  # 100 list requests per minute
     "api_key_revoke": "20/minute",  # 20 revocations per minute
 
-    # File upload endpoints
-    "upload_single": "50/hour",  # 50 file uploads per hour
-    "upload_bulk": "10/hour",  # 10 bulk uploads per hour
+    # File upload endpoints (FR-010)
+    "upload_single": UPLOAD_TIER.slowapi_format,  # 10/minute (FR-010)
+    "upload_bulk": "5/minute",  # 5 bulk uploads per minute
 
-    # Query endpoints
-    "query_simple": "100/minute",  # 100 queries per minute
-    "query_complex": "20/minute",  # 20 complex queries per minute
+    # Query endpoints (FR-011)
+    "query_simple": QUERY_TIER.slowapi_format,  # 60/minute (FR-011)
+    "query_complex": "30/minute",  # 30 complex queries per minute
+
+    # AI Orchestration endpoints (FR-012)
+    "orchestration": ORCHESTRATION_TIER.slowapi_format,  # 30/minute (FR-012)
 
     # Document management
     "document_create": "100/hour",  # 100 document creates per hour
@@ -135,6 +162,9 @@ RATE_LIMITS = {
     # Health checks and metrics (least restrictive)
     "health_check": "1000/minute",  # High limit for health checks
     "metrics": "100/minute",  # Metrics endpoint
+
+    # Default rate limit
+    "default": DEFAULT_TIER.slowapi_format,  # 200/minute
 }
 
 
@@ -154,42 +184,76 @@ def get_rate_limit_for_endpoint(endpoint_type: str) -> str:
 # Exception handler for rate limit exceeded
 async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """
-    Custom handler for rate limit exceeded errors
+    Custom handler for rate limit exceeded errors (FR-013).
+
+    Returns standardized error response with:
+    - error.code: "RATE_LIMITED"
+    - error.message: Human-readable message
+    - error.details: Rate limit specific info
+    - request_id: For correlation
+    - timestamp: When the error occurred
+    - Retry-After header (FR-013)
 
     Args:
         request: FastAPI request object
         exc: RateLimitExceeded exception
 
     Returns:
-        JSON response with error details
+        JSON response with standardized error details
     """
     from fastapi.responses import JSONResponse
-
-    # Log rate limit violation
     import structlog
+
     logger = structlog.get_logger(__name__)
 
+    # Get request ID from header or generate one
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+
+    # Get the rate limit tier for this endpoint
+    tier = get_tier_for_endpoint(request.url.path)
+
+    # Calculate retry_after in seconds (use tier's period)
+    retry_after_seconds = tier.period
+
+    # Calculate reset timestamp
+    reset_timestamp = int(time.time()) + retry_after_seconds
+
+    # Log rate limit violation with structured logging
     logger.warning(
         "rate_limit_exceeded",
         path=request.url.path,
         method=request.method,
         key=get_rate_limit_key(request),
-        limit=str(exc)
+        limit=tier.limit,
+        period=tier.period,
+        request_id=request_id,
     )
+
+    # Standardized error response format (matches api-contracts.yaml)
+    error_response = {
+        "error": {
+            "code": "RATE_LIMITED",
+            "message": "Rate limit exceeded. Please try again later.",
+            "details": {
+                "retry_after": retry_after_seconds,
+                "limit": tier.limit,
+                "window": tier.period,
+                "path": request.url.path,
+            },
+            "request_id": request_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    }
 
     return JSONResponse(
         status_code=429,
-        content={
-            "error": "Rate limit exceeded",
-            "message": "Too many requests. Please try again later.",
-            "retry_after": exc.detail if hasattr(exc, 'detail') else "60 seconds",
-            "path": request.url.path
-        },
+        content=error_response,
         headers={
-            "Retry-After": "60",  # Tell client to retry after 60 seconds
-            "X-RateLimit-Limit": getattr(exc, 'limit', 'unknown'),
+            "Retry-After": str(retry_after_seconds),
+            "X-RateLimit-Limit": str(tier.limit),
             "X-RateLimit-Remaining": "0",
-            "X-RateLimit-Reset": getattr(exc, 'reset', 'unknown')
+            "X-RateLimit-Reset": str(reset_timestamp),
+            "X-Request-ID": request_id,
         }
     )
 
@@ -216,27 +280,65 @@ def configure_rate_limiting(app):
     print("✅ Rate limiting configured")
 
 
-# Decorator helpers for common rate limits
+# =============================================================================
+# Decorator Helpers for Common Rate Limits (Task 172)
+# =============================================================================
+
 def limit_auth_login(func):
-    """Decorator for login endpoints (5 attempts/minute)"""
+    """
+    Decorator for login endpoints (FR-008: 5 requests/minute).
+
+    Apply this decorator to login endpoints to enforce the security
+    rate limit that prevents brute force attacks.
+    """
     return limiter.limit(RATE_LIMITS["auth_login"])(func)
 
 
 def limit_auth_register(func):
-    """Decorator for registration endpoints (3 attempts/hour)"""
+    """
+    Decorator for registration endpoints (FR-009: 3 requests/minute).
+
+    Apply this decorator to registration endpoints to prevent
+    spam account creation.
+    """
     return limiter.limit(RATE_LIMITS["auth_register"])(func)
 
 
 def limit_upload(func):
-    """Decorator for upload endpoints (50/hour)"""
+    """
+    Decorator for upload endpoints (FR-010: 10 requests/minute).
+
+    Apply this decorator to file upload endpoints to prevent
+    resource abuse and storage exhaustion.
+    """
     return limiter.limit(RATE_LIMITS["upload_single"])(func)
 
 
 def limit_query(func):
-    """Decorator for query endpoints (100/minute)"""
+    """
+    Decorator for query endpoints (FR-011: 60 requests/minute).
+
+    Apply this decorator to search and query endpoints to balance
+    usability with protection against API abuse.
+    """
     return limiter.limit(RATE_LIMITS["query_simple"])(func)
+
+
+def limit_orchestration(func):
+    """
+    Decorator for AI orchestration endpoints (FR-012: 30 requests/minute).
+
+    Apply this decorator to multi-agent, CrewAI, and other AI orchestration
+    endpoints that are computationally intensive.
+    """
+    return limiter.limit(RATE_LIMITS["orchestration"])(func)
 
 
 def limit_admin(func):
     """Decorator for admin endpoints (50/minute)"""
     return limiter.limit(RATE_LIMITS["admin_user_management"])(func)
+
+
+def limit_default(func):
+    """Decorator for general endpoints (200/minute default)"""
+    return limiter.limit(RATE_LIMITS["default"])(func)

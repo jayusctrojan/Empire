@@ -2,15 +2,18 @@
 Empire v7.3 - Error Handler Middleware
 Task 135: Implement Standardized Error Response Model and Handling
 Task 154: Standardized Exception Handling Framework
+Task 175: Production Readiness Standardized Error Responses (US6)
+Task 176: Enhanced Exception Logging
 
 Centralized error handling middleware that provides consistent error responses
-across all agent services.
+across all agent services with comprehensive logging.
 """
 
 import uuid
 import traceback
-from typing import Optional, Callable
-from datetime import datetime
+import sys
+from typing import Optional, Callable, Dict, Any
+from datetime import datetime, timezone
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
@@ -26,6 +29,10 @@ from app.models.errors import (
     ErrorType,
     ErrorSeverity,
     create_validation_error,
+    # Task 175: Production Readiness standardized errors
+    APIError,
+    ErrorCode,
+    get_status_for_error_code,
 )
 from app.constants.error_codes import (
     INTERNAL_SERVER_ERROR,
@@ -253,6 +260,13 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 retry_after=e.retry_after
             )
 
+        except APIError as e:
+            # Task 175: Handle standardized API errors
+            return self._create_standardized_error_response(
+                error=e,
+                request_id=request_id,
+            )
+
         except BaseAppException as e:
             # Task 154: Handle the new exception hierarchy
             agent_id = e.details.get("agent_id", self._extract_agent_id(request.url.path))
@@ -288,17 +302,24 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             )
 
         except Exception as e:
-            # Handle unexpected exceptions
+            # Handle unexpected exceptions with enhanced logging (Task 176)
             agent_id = self._extract_agent_id(request.url.path)
 
-            # Log the full exception
-            logger.exception(
-                "Unhandled exception in request",
+            # Build comprehensive error context
+            context = self._build_error_context(
+                request=request,
+                exc=e,
                 request_id=request_id,
                 agent_id=agent_id,
-                path=request.url.path,
-                method=request.method,
-                error=str(e)
+                include_stack_trace=True
+            )
+
+            # Log with full exception traceback
+            self._log_error(
+                message="Unhandled exception in request",
+                context=context,
+                level="error",
+                include_exception=True
             )
 
             return self._create_error_response(
@@ -325,6 +346,113 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 return self.AGENT_PATH_MAPPING[prefix]
 
         return "unknown"
+
+    def _build_error_context(
+        self,
+        request: Request,
+        exc: Exception,
+        request_id: str,
+        agent_id: str = "unknown",
+        include_stack_trace: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Build comprehensive error context for logging (Task 176).
+
+        This method collects all relevant context information for debugging
+        and correlation purposes.
+
+        Args:
+            request: The incoming request
+            exc: The exception that occurred
+            request_id: The request ID for correlation
+            agent_id: The agent ID if applicable
+            include_stack_trace: Whether to include stack trace
+
+        Returns:
+            Dictionary containing error context
+        """
+        # Get client IP from request state or headers
+        client_ip = getattr(request.state, "client_ip", None)
+        if not client_ip:
+            # Check X-Forwarded-For for proxy scenarios
+            forwarded_for = request.headers.get("X-Forwarded-For")
+            if forwarded_for:
+                client_ip = forwarded_for.split(",")[0].strip()
+            elif request.client:
+                client_ip = request.client.host
+            else:
+                client_ip = "unknown"
+
+        # Get user ID if available in request state
+        user_id = None
+        if hasattr(request.state, "user_id"):
+            user_id = request.state.user_id
+        elif hasattr(request.state, "user"):
+            user = request.state.user
+            user_id = getattr(user, "id", None) or getattr(user, "user_id", None)
+
+        # Build base context
+        context: Dict[str, Any] = {
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+            "endpoint": request.url.path,
+            "method": request.method,
+            "request_id": request_id,
+            "agent_id": agent_id,
+            "client_ip": client_ip,
+            "user_agent": request.headers.get("User-Agent", "unknown"),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Add user ID if available
+        if user_id:
+            context["user_id"] = user_id
+
+        # Add query parameters if present (sanitized)
+        if request.query_params:
+            # Don't log sensitive params
+            sensitive_params = {"token", "key", "secret", "password", "auth"}
+            sanitized_params = {
+                k: "***" if k.lower() in sensitive_params else v
+                for k, v in request.query_params.items()
+            }
+            context["query_params"] = sanitized_params
+
+        # Add stack trace for unexpected errors
+        if include_stack_trace:
+            context["stack_trace"] = traceback.format_exc()
+            # Include exception chain info
+            if exc.__cause__:
+                context["caused_by"] = {
+                    "type": type(exc.__cause__).__name__,
+                    "message": str(exc.__cause__)
+                }
+
+        return context
+
+    def _log_error(
+        self,
+        message: str,
+        context: Dict[str, Any],
+        level: str = "error",
+        include_exception: bool = False
+    ) -> None:
+        """
+        Log an error with the given context (Task 176).
+
+        Args:
+            message: The log message
+            context: Error context dictionary
+            level: Log level (error, warning, info)
+            include_exception: Whether to use logger.exception()
+        """
+        log_method = getattr(logger, level, logger.error)
+
+        if include_exception:
+            # Use logger.exception to include traceback
+            logger.exception(message, **context)
+        else:
+            log_method(message, **context)
 
     def _create_error_response(
         self,
@@ -418,6 +546,50 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=error_response.model_dump(mode="json"),
+            headers=headers
+        )
+
+    def _create_standardized_error_response(
+        self,
+        error: APIError,
+        request_id: Optional[str] = None
+    ) -> JSONResponse:
+        """
+        Create a standardized error response (Task 175 - FR-027).
+
+        This produces the production-standard error format:
+        {
+            "error": {
+                "code": "...",
+                "message": "...",
+                "details": {...},
+                "request_id": "...",
+                "timestamp": "..."
+            }
+        }
+        """
+        response_content = error.to_response(request_id)
+
+        headers = {"X-Request-ID": request_id} if request_id else {}
+
+        # Add Retry-After header for rate limit errors
+        if hasattr(error, "retry_after") and error.retry_after:
+            headers["Retry-After"] = str(error.retry_after)
+
+        # Log the error with appropriate level
+        log_level = "warning" if error.status_code < 500 else "error"
+        log_method = getattr(logger, log_level, logger.error)
+        log_method(
+            "Standardized API error",
+            error_code=error.code.value,
+            message=error.message,
+            status_code=error.status_code,
+            request_id=request_id,
+        )
+
+        return JSONResponse(
+            status_code=error.status_code,
+            content=response_content,
             headers=headers
         )
 
@@ -538,6 +710,62 @@ async def base_app_exception_handler(request: Request, exc: BaseAppException) ->
 
 
 # =============================================================================
+# EXCEPTION HANDLER FOR STANDARDIZED API ERRORS (Task 175)
+# =============================================================================
+
+async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
+    """
+    Handle APIError exceptions and return standardized error responses.
+
+    This handler produces the production-standard error format (FR-027):
+    {
+        "error": {
+            "code": "...",
+            "message": "...",
+            "details": {...},
+            "request_id": "...",
+            "timestamp": "..."
+        }
+    }
+    """
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
+
+    response_content = exc.to_response(request_id)
+
+    headers = {"X-Request-ID": request_id}
+
+    # Add Retry-After header for rate limit errors
+    if hasattr(exc, "retry_after") and exc.retry_after:
+        headers["Retry-After"] = str(exc.retry_after)
+
+    # Log the error
+    if exc.status_code >= 500:
+        logger.error(
+            "API error",
+            error_code=exc.code.value,
+            message=exc.message,
+            status_code=exc.status_code,
+            request_id=request_id,
+            path=request.url.path,
+        )
+    else:
+        logger.warning(
+            "API error",
+            error_code=exc.code.value,
+            message=exc.message,
+            status_code=exc.status_code,
+            request_id=request_id,
+            path=request.url.path,
+        )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=response_content,
+        headers=headers
+    )
+
+
+# =============================================================================
 # SETUP FUNCTION
 # =============================================================================
 
@@ -560,5 +788,6 @@ def setup_error_handling(app):
 
     # Add exception handlers
     app.add_exception_handler(AgentError, agent_error_handler)
+    app.add_exception_handler(APIError, api_error_handler)  # Task 175: Standardized errors
     app.add_exception_handler(BaseAppException, base_app_exception_handler)  # Task 154
     app.add_exception_handler(RequestValidationError, validation_error_handler)

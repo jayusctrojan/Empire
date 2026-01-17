@@ -152,6 +152,7 @@ class CircuitBreakerConfig:
 
 
 # Service-specific default configurations
+# Task 174: Production Readiness - Circuit Breaker Configurations (FR-021 to FR-025)
 SERVICE_CONFIGS: Dict[str, CircuitBreakerConfig] = {
     "anthropic": CircuitBreakerConfig(
         failure_threshold=5,
@@ -159,8 +160,9 @@ SERVICE_CONFIGS: Dict[str, CircuitBreakerConfig] = {
         max_retries=3,
         operation_timeout=120.0,  # LLM calls can be slow
     ),
+    # FR-024: Neo4j circuit breaker (3 failures, 30s recovery)
     "neo4j": CircuitBreakerConfig(
-        failure_threshold=5,
+        failure_threshold=3,
         recovery_timeout=30.0,
         max_retries=3,
         operation_timeout=30.0,
@@ -171,12 +173,28 @@ SERVICE_CONFIGS: Dict[str, CircuitBreakerConfig] = {
         max_retries=3,
         operation_timeout=15.0,
     ),
+    # FR-021: LlamaIndex circuit breaker (5 failures, 30s recovery)
     "llamaindex": CircuitBreakerConfig(
         failure_threshold=5,
-        recovery_timeout=60.0,
+        recovery_timeout=30.0,
         max_retries=3,
         operation_timeout=120.0,  # Document parsing can be slow
     ),
+    # FR-022: CrewAI circuit breaker (3 failures, 60s recovery)
+    "crewai": CircuitBreakerConfig(
+        failure_threshold=3,
+        recovery_timeout=60.0,
+        max_retries=3,
+        operation_timeout=180.0,  # Multi-agent workflows can be slow
+    ),
+    # FR-023: Ollama circuit breaker (5 failures, 15s recovery)
+    "ollama": CircuitBreakerConfig(
+        failure_threshold=5,
+        recovery_timeout=15.0,
+        max_retries=3,
+        operation_timeout=60.0,  # Local model inference
+    ),
+    # FR-025: B2 storage circuit breaker (5 failures, 60s recovery)
     "b2": CircuitBreakerConfig(
         failure_threshold=5,
         recovery_timeout=60.0,
@@ -681,6 +699,14 @@ class CircuitBreaker(Generic[T]):
             "last_failure_time": self._last_failure_time,
             "last_success_time": self._last_success_time,
             "time_until_recovery": time_until_recovery,
+            "is_open": self._state == CircuitState.OPEN,
+            # Flatten stats for API compatibility
+            "total_calls": self._stats["total_calls"],
+            "total_failures": self._stats["failed_calls"],
+            "total_successes": self._stats["successful_calls"],
+            "fallback_calls": self._stats["fallback_calls"],
+            "rejected_calls": self._stats["rejected_calls"],
+            "retries": self._stats["retries"],
             "stats": self._stats,
         }
 
