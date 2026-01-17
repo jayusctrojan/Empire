@@ -1,17 +1,20 @@
 """
 LangGraph workflow definitions with Arcade.dev tool integration for Empire v7.3
 Implements adaptive query processing with branching, loops, and external tool access
+
+Task 184: Implements proper tool calling with LLM.bind_tools() for structured tool usage
 """
-from typing import TypedDict, Annotated, List, Literal, Any, Dict
+from typing import TypedDict, Annotated, List, Literal, Any, Dict, Optional
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage
 from langchain_anthropic import ChatAnthropic
-from langchain_core.tools import Tool
+from langchain_core.tools import Tool, tool
 import operator
 import structlog
 import os
 import json
+import asyncio
 
 from app.services.arcade_service import arcade_service
 from app.core.langfuse_config import observe
@@ -47,6 +50,16 @@ class LangGraphWorkflows:
         model = llm_model or os.getenv("LANGGRAPH_DEFAULT_MODEL", "claude-3-5-haiku-20241022")
         self.llm = ChatAnthropic(model=model, temperature=0)
         self.tools = self._setup_tools()
+
+        # Task 184: Bind tools to LLM for structured tool calling
+        # This allows the LLM to generate structured tool calls that can be executed
+        if self.tools:
+            self.llm_with_tools = self.llm.bind_tools(self.tools)
+            logger.info("LLM bound with tools for structured tool calling", tool_count=len(self.tools))
+        else:
+            self.llm_with_tools = self.llm
+            logger.warning("No tools available, LLM will not have tool calling capability")
+
         logger.info("LangGraph workflows initialized", tool_count=len(self.tools), model=model)
 
     def _setup_tools(self) -> List[Tool]:
@@ -225,34 +238,59 @@ Respond in JSON format:
         """
         Plan which tools to execute based on query analysis.
 
-        Determines the optimal sequence of tool calls.
+        Task 184: Uses LLM with bound tools to generate structured tool calls.
+        The LLM will decide which tools to call and generate proper tool_calls.
         """
         query = state["query"]
         needs_external = state.get("needs_external_data", False)
 
-        prompt = f"""Based on this query, determine which tools to use:
+        # Build context from previous messages for better tool selection
+        context = ""
+        if state.get("search_results"):
+            context = f"\nPrevious search results: {len(state['search_results'])} results found"
+
+        # Task 184: Use llm_with_tools to generate structured tool calls
+        # The prompt instructs the LLM to use available tools
+        prompt = f"""You are a research assistant with access to several tools.
+Based on this query, use the appropriate tools to gather information.
 
 Query: {query}
 Needs External Data: {needs_external}
+{context}
 
-Available Tools:
-- VectorSearch: Search internal knowledge base
-- GraphQuery: Query knowledge graph for relationships
-- HybridSearch: Combined vector + graph search
-- Google.Search: Search the web (use sparingly, only if truly needed)
+Instructions:
+1. If the query needs internal document search, use VectorSearch
+2. If the query needs relationship/entity information, use GraphQuery
+3. For comprehensive searches, use HybridSearch
+4. Only use Google.Search if external web data is truly needed
+5. You can call multiple tools if necessary
 
-Respond with JSON array of tool names to call:
-{{"tools": ["tool1", "tool2"]}}
-
-Keep it minimal - only use necessary tools."""
+Call the appropriate tool(s) now to answer this query."""
 
         try:
-            response = await self.llm.ainvoke([HumanMessage(content=prompt)])
+            # Use the LLM with bound tools - this will generate tool_calls if appropriate
+            response = await self.llm_with_tools.ainvoke([HumanMessage(content=prompt)])
             state["messages"].append(response)
 
-            logger.info("Execution planned", iteration=state["iteration_count"])
+            # Log tool calls if any were generated
+            if hasattr(response, 'tool_calls') and response.tool_calls:
+                tool_names = [tc.get('name', 'unknown') for tc in response.tool_calls]
+                logger.info(
+                    "Tool calls generated",
+                    iteration=state["iteration_count"],
+                    tools=tool_names,
+                    tool_count=len(response.tool_calls)
+                )
+            else:
+                logger.info(
+                    "No tool calls generated, LLM will synthesize directly",
+                    iteration=state["iteration_count"]
+                )
+
         except Exception as e:
             logger.error("Planning failed", error=str(e))
+            # Create a message without tool calls on error
+            state["messages"].append(AIMessage(content=f"Error during planning: {str(e)}"))
 
         return state
 
@@ -260,18 +298,39 @@ Keep it minimal - only use necessary tools."""
         """
         Evaluate result quality and decide if refinement needed.
 
+        Task 184: Extracts tool results from ToolMessages and stores them in search_results.
         Checks if gathered information is sufficient or if another iteration is needed.
         """
         state["iteration_count"] += 1
 
-        # Simple quality check for now
+        # Task 184: Extract tool results from messages
+        # ToolNode adds ToolMessage objects to the messages list
+        tool_results = []
+        for msg in state.get("messages", []):
+            if isinstance(msg, ToolMessage):
+                tool_results.append({
+                    "tool_name": msg.name if hasattr(msg, 'name') else "unknown",
+                    "tool_call_id": msg.tool_call_id if hasattr(msg, 'tool_call_id') else None,
+                    "content": msg.content
+                })
+
+        # Update search_results with extracted tool results
+        if tool_results:
+            current_results = state.get("search_results", [])
+            current_results.extend(tool_results)
+            state["search_results"] = current_results
+
+            # Also track tool calls for reference
+            state["tool_calls"].extend(tool_results)
+
         has_results = len(state.get("search_results", [])) > 0
 
         logger.info(
             "Results evaluated",
             iteration=state["iteration_count"],
             has_results=has_results,
-            result_count=len(state.get("search_results", []))
+            result_count=len(state.get("search_results", [])),
+            tool_results_count=len(tool_results)
         )
 
         return state
@@ -280,25 +339,53 @@ Keep it minimal - only use necessary tools."""
         """
         Generate final answer from all gathered information.
 
-        Combines search results and context into coherent response.
+        Task 184: Combines tool results and search results into a coherent response.
+        Extracts content from ToolMessages for better context.
         """
         query = state["query"]
         search_results = state.get("search_results", [])
 
-        prompt = f"""Generate a comprehensive answer based on the following:
+        # Task 184: Extract tool results from messages for synthesis
+        tool_context = []
+        for msg in state.get("messages", []):
+            if isinstance(msg, ToolMessage):
+                tool_name = msg.name if hasattr(msg, 'name') else "Tool"
+                tool_context.append(f"[{tool_name}]: {msg.content}")
+
+        # Build comprehensive context
+        context_parts = []
+        if tool_context:
+            context_parts.append("Tool Results:\n" + "\n".join(tool_context[:5]))
+        if search_results:
+            context_parts.append(f"Search Results: {json.dumps(search_results[:3], indent=2)}")
+
+        context = "\n\n".join(context_parts) if context_parts else "No results available."
+
+        prompt = f"""Generate a comprehensive answer based on the following information.
 
 Query: {query}
 
-Search Results: {json.dumps(search_results[:3], indent=2)}
+{context}
 
-Provide a clear, accurate answer based on the available information."""
+Instructions:
+1. Synthesize information from all available sources
+2. Provide a clear, accurate answer based on the available information
+3. If information is limited, acknowledge any gaps
+4. Cite specific tool results when relevant
+
+Provide your answer:"""
 
         try:
             response = await self.llm.ainvoke([HumanMessage(content=prompt)])
             state["final_answer"] = response.content
             state["messages"].append(response)
 
-            logger.info("Answer synthesized", query=query[:50])
+            logger.info(
+                "Answer synthesized",
+                query=query[:50],
+                tool_context_count=len(tool_context),
+                search_results_count=len(search_results)
+            )
         except Exception as e:
             logger.error("Synthesis failed", error=str(e))
             state["final_answer"] = f"Error generating answer: {str(e)}"
@@ -309,13 +396,38 @@ Provide a clear, accurate answer based on the available information."""
         """
         Decide if tools are needed or can go straight to synthesis.
 
+        Task 184: Checks if the LLM generated tool_calls in the last message.
+        If tool calls exist, route to tool execution. Otherwise, synthesize directly.
+
         Returns:
             "use_tools" or "synthesize"
         """
-        # TODO: Implement proper tool calling with LLM.bind_tools()
-        # For now, skip tool execution since ToolNode expects tool calls in messages
-        # and we're not making tool calls yet (tools are stubs anyway)
-        return "synthesize"
+        # Check if the last message has tool calls
+        messages = state.get("messages", [])
+        if not messages:
+            logger.debug("No messages in state, going to synthesize")
+            return "synthesize"
+
+        last_message = messages[-1]
+
+        # Check if the message has tool_calls attribute and it's not empty
+        has_tool_calls = (
+            hasattr(last_message, 'tool_calls') and
+            last_message.tool_calls and
+            len(last_message.tool_calls) > 0
+        )
+
+        if has_tool_calls:
+            tool_names = [tc.get('name', 'unknown') for tc in last_message.tool_calls]
+            logger.info(
+                "Tool calls detected, routing to tool execution",
+                tool_count=len(last_message.tool_calls),
+                tools=tool_names
+            )
+            return "use_tools"
+        else:
+            logger.debug("No tool calls in last message, going to synthesize")
+            return "synthesize"
 
     def _should_refine(self, state: QueryState) -> str:
         """

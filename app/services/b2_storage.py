@@ -577,6 +577,170 @@ class B2StorageService:
             valid_duration_seconds=valid_duration_seconds
         )
 
+    def check_file_exists(self, file_path: str) -> bool:
+        """
+        Check if a file exists in B2 by its path (Task 183).
+
+        Args:
+            file_path: Full path to file in B2 (e.g., pending/courses/document.pdf)
+
+        Returns:
+            bool: True if file exists, False otherwise
+        """
+        try:
+            bucket = self._get_bucket()
+
+            # List files with exact prefix to find the file
+            for file_version, _ in bucket.ls(folder_to_list=file_path, limit=1):
+                if file_version.file_name == file_path:
+                    return True
+
+            return False
+
+        except B2Error as e:
+            logger.error(f"Error checking file existence for {file_path}: {e}")
+            return False
+
+    def check_file_exists_by_id(self, file_id: str) -> bool:
+        """
+        Check if a file exists in B2 by its file ID (Task 183).
+
+        Args:
+            file_id: B2 file ID
+
+        Returns:
+            bool: True if file exists, False otherwise
+        """
+        try:
+            bucket = self._get_bucket()
+
+            # Get file info by ID - raises exception if not found
+            bucket.get_file_info_by_id(file_id)
+            return True
+
+        except FileNotPresent:
+            return False
+        except B2Error as e:
+            logger.error(f"Error checking file existence for ID {file_id}: {e}")
+            return False
+
+    async def get_file_info(self, file_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed file information from B2 (Task 183).
+
+        Args:
+            file_id: B2 file ID
+
+        Returns:
+            Dict with file information or None if not found
+        """
+        try:
+            bucket = self._get_bucket()
+            file_info = bucket.get_file_info_by_id(file_id)
+
+            return {
+                "file_id": file_info.id_,
+                "file_name": file_info.file_name,
+                "size": file_info.size,
+                "content_type": file_info.content_type,
+                "upload_timestamp": file_info.upload_timestamp,
+                "metadata": file_info.file_info
+            }
+
+        except FileNotPresent:
+            logger.warning(f"File not found: {file_id}")
+            return None
+        except B2Error as e:
+            logger.error(f"Error getting file info for {file_id}: {e}")
+            return None
+
+    def check_connection(self) -> bool:
+        """
+        Check if B2 connection is working (Task 190).
+
+        This is a lightweight health check that verifies:
+        - API authorization is successful
+        - Bucket is accessible
+
+        Returns:
+            bool: True if connection is healthy
+
+        Raises:
+            ConnectionError: If B2 connection fails
+        """
+        try:
+            # Try to get bucket - this validates auth and bucket access
+            bucket = self._get_bucket()
+
+            # Verify bucket by getting its ID (lightweight operation)
+            _bucket_id = bucket.id_
+
+            logger.debug("B2 connection check passed")
+            return True
+
+        except B2Error as e:
+            logger.error(f"B2 connection check failed: {e}")
+            raise ConnectionError(f"B2 connection failed: {str(e)}")
+        except Exception as e:
+            logger.error(f"B2 connection check failed with unexpected error: {e}")
+            raise ConnectionError(f"B2 connection failed: {str(e)}")
+
+    def list_files_for_health(
+        self,
+        prefix: str = "health_check",
+        max_files: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        List files in B2 with the given prefix for health checking (Task 190).
+
+        This is used by deep health checks to verify file listing works.
+
+        Args:
+            prefix: Folder/prefix to list files from
+            max_files: Maximum number of files to return
+
+        Returns:
+            List of file info dictionaries
+        """
+        try:
+            bucket = self._get_bucket()
+            files = []
+
+            for file_info, _ in bucket.ls(folder_to_list=prefix, limit=max_files):
+                files.append({
+                    "file_name": file_info.file_name,
+                    "size": file_info.size,
+                    "content_type": file_info.content_type,
+                    "upload_timestamp": file_info.upload_timestamp
+                })
+
+            logger.debug(f"Listed {len(files)} files from B2 prefix: {prefix}")
+            return files
+
+        except B2Error as e:
+            logger.error(f"Error listing files from B2 prefix {prefix}: {e}")
+            raise
+
+    def get_bucket_info(self) -> Dict[str, Any]:
+        """
+        Get bucket information for health check details (Task 190).
+
+        Returns:
+            Dict with bucket metadata
+        """
+        try:
+            bucket = self._get_bucket()
+
+            return {
+                "bucket_name": bucket.name,
+                "bucket_id": bucket.id_,
+                "bucket_type": bucket.type_,
+            }
+
+        except B2Error as e:
+            logger.error(f"Error getting bucket info: {e}")
+            raise
+
 
 # Singleton instance
 _b2_service = None
