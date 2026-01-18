@@ -953,30 +953,46 @@ async def faceted_search(
 
         # Get services
         faceted_service = get_faceted_search_service()
-        # TODO: Integrate hybrid_search_service when filter implementation is ready
-        # search_service = get_hybrid_search_service()
+        search_service = get_hybrid_search_service()
+
+        # Build metadata filter from facet filters
+        metadata_filter = {}
+        if filters.departments:
+            metadata_filter["department"] = filters.departments
+        if filters.file_types:
+            metadata_filter["file_type"] = filters.file_types
+        if filters.date_from:
+            metadata_filter["date_from"] = filters.date_from.isoformat()
+        if filters.date_to:
+            metadata_filter["date_to"] = filters.date_to.isoformat()
+        if filters.entities:
+            metadata_filter["entities"] = filters.entities
 
         # Perform hybrid search with filters
-        # TODO: Integrate filters with actual search service
-        # For now, using mock data
+        from app.services.hybrid_search_service import SearchMethod
+        search_results = await search_service.search(
+            query=query,
+            method=SearchMethod.HYBRID,
+            metadata_filter=metadata_filter if metadata_filter else None
+        )
 
-        # Mock search results
-        mock_results = [
-            {
-                "chunk_id": "test-1",
-                "document_id": "doc-1",
-                "content": "California insurance policy requires minimum coverage...",
-                "score": 0.95,
-                "rank": 1,
+        # Convert search results to expected format
+        search_results_list = []
+        for i, result in enumerate(search_results[:page_size]):
+            search_results_list.append({
+                "chunk_id": result.chunk_id,
+                "document_id": result.file_id or result.metadata.get("document_id", result.chunk_id),
+                "content": result.content,
+                "score": result.score,
+                "rank": i + 1,
                 "metadata": {
-                    "filename": "ca_insurance_policy.pdf",
-                    "department": "legal",
-                    "file_type": "pdf",
-                    "created_at": "2024-01-15",
-                    "b2_url": "https://b2.example.com/ca_insurance_policy.pdf"
+                    "filename": result.metadata.get("filename", "unknown"),
+                    "department": result.metadata.get("department", "unclassified"),
+                    "file_type": result.metadata.get("file_type", "unknown"),
+                    "created_at": result.metadata.get("created_at", ""),
+                    "b2_url": result.metadata.get("b2_url", "")
                 }
-            }
-        ]
+            })
 
         # Extract keywords from query for highlighting
         keywords = query.split()
@@ -985,7 +1001,7 @@ async def faceted_search(
         formatted_results = []
         document_ids = []
 
-        for result in mock_results:
+        for result in search_results_list:
             formatted = faceted_service.format_search_result(
                 chunk_id=result["chunk_id"],
                 document_id=result["document_id"],
@@ -1034,7 +1050,7 @@ async def faceted_search(
         ]
 
         # Calculate pagination
-        total_results = len(formatted_results)  # Mock - should be actual count
+        total_results = len(search_results)  # Total from hybrid search
         total_pages = (total_results + page_size - 1) // page_size
 
         logger.info(

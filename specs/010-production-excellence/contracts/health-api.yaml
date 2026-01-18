@@ -1,0 +1,251 @@
+openapi: 3.0.3
+info:
+  title: Health Check API
+  version: 1.0.0
+  description: Health check endpoints for production monitoring
+
+paths:
+  /health/live:
+    get:
+      summary: Liveness probe
+      description: Returns OK if the service is running
+      operationId: healthLive
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+
+  /health/ready:
+    get:
+      summary: Readiness probe
+      description: Returns OK if all dependencies are healthy
+      operationId: healthReady
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /health/deep:
+    get:
+      summary: Deep health check
+      description: Returns detailed status of all components
+      operationId: healthDeep
+      responses:
+        '200':
+          description: Detailed health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepHealthResponse'
+
+  /api/dlq:
+    get:
+      summary: List dead letter queue entries
+      description: Get failed tasks from dead letter queue
+      operationId: listDLQ
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending_review, retrying, resolved, abandoned]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: DLQ entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DLQListResponse'
+
+  /api/dlq/{id}/retry:
+    post:
+      summary: Retry a failed task
+      description: Retry a task from the dead letter queue
+      operationId: retryDLQ
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Retry initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DLQRetryResponse'
+
+  /api/feedback:
+    post:
+      summary: Submit agent feedback
+      description: Submit feedback for an agent output
+      operationId: submitFeedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '201':
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackResponse'
+
+components:
+  schemas:
+    LivenessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, unhealthy]
+        dependencies:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DependencyStatus'
+
+    DependencyStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, degraded]
+        response_time_ms:
+          type: number
+        error:
+          type: string
+          nullable: true
+
+    DeepHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, degraded]
+        version:
+          type: string
+        uptime_seconds:
+          type: number
+        dependencies:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DependencyStatus'
+        metrics:
+          type: object
+          properties:
+            requests_per_minute:
+              type: number
+            error_rate:
+              type: number
+            active_tasks:
+              type: integer
+
+    DLQListResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DLQEntry'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    DLQEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        task_id:
+          type: string
+        task_name:
+          type: string
+        exception:
+          type: string
+        retries:
+          type: integer
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DLQRetryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        new_task_id:
+          type: string
+
+    FeedbackRequest:
+      type: object
+      required:
+        - agent_id
+        - feedback_type
+        - rating
+      properties:
+        agent_id:
+          type: string
+        task_id:
+          type: string
+          format: uuid
+        feedback_type:
+          type: string
+          enum: [classification, generation, retrieval]
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        feedback_text:
+          type: string
+        metadata:
+          type: object
+
+    FeedbackResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time

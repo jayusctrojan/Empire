@@ -1980,6 +1980,8 @@ If you're unsure which tool to use:
 - Neo4j (graph), Supabase PostgreSQL (vectors), Upstash Redis (cache) (005-graph-agent)
 - Python 3.11 + FastAPI, LlamaIndex (core), Pydantic v2, structlog (006-markdown-chunking)
 - Supabase PostgreSQL (pgvector for embeddings), existing vector store (006-markdown-chunking)
+- Python 3.11 + FastAPI, httpx, redis, slowapi, structlog, pydantic v2 (009-production-readiness)
+- Supabase PostgreSQL (pgvector), Neo4j (knowledge graph), Upstash Redis (cache/broker) (009-production-readiness)
 
 ## Recent Changes
 - 004-agent-harness: Added Python 3.11 + FastAPI, Celery, Anthropic SDK, Pydantic v2, structlog
