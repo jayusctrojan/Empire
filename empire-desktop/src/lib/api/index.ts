@@ -187,6 +187,31 @@ export {
   type RatingValue,
 } from './feedback'
 
+// Compaction API (Task 209 - Context Window Management)
+export {
+  triggerCompaction,
+  triggerAsyncCompaction,
+  getCompactionProgress,
+  getCompactionHistory,
+  getTaskProgress,
+  cancelCompactionTask,
+  type TriggerCompactionRequest,
+  type CompactionLogEntry,
+  type CompactionResultResponse,
+  type CompactionHistoryResponse,
+  type CompactionProgressResponse,
+} from './compaction'
+
+// Error Recovery API (Task 210 - Automatic Error Recovery)
+export {
+  isContextOverflowError,
+  triggerRecovery,
+  getRecoveryProgress,
+  sendWithRecovery,
+  type RecoveryResponse,
+  type RecoveryProgressResponse,
+} from './compaction'
+
 // Health check
 import { get } from './client'
 import type { HealthResponse } from '@/types'

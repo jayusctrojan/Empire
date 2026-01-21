@@ -30,6 +30,8 @@ export interface Message {
   agent?: string
   department?: string
   isKBResponse?: boolean
+  // Context window protection (Feature 011)
+  isProtected?: boolean
 }
 
 export interface Source {
@@ -153,4 +155,51 @@ export interface MCPServer {
   name: string
   status: 'connected' | 'disconnected' | 'error'
   capabilities: string[]
+}
+
+// Context Window Types (Feature 011)
+export type ContextStatus = 'normal' | 'warning' | 'critical'
+
+export interface ContextWindowStatus {
+  conversationId: string
+  currentTokens: number
+  maxTokens: number
+  reservedTokens: number
+  thresholdPercent: number
+  usagePercent: number
+  status: ContextStatus
+  availableTokens: number
+  estimatedMessagesRemaining: number
+  isCompacting: boolean
+  lastCompactionAt?: Date
+  lastUpdated: Date
+}
+
+// Context Window WebSocket update event
+export interface ContextWindowUpdate {
+  type: 'context_status_update'
+  data: ContextWindowStatus
+}
+
+// Compaction Event Types (Feature 011 - Task 204)
+export type CompactionTrigger = 'auto' | 'manual' | 'threshold' | 'error_recovery'
+
+export interface CompactionEvent {
+  id: string
+  conversationId: string
+  preTokens: number
+  postTokens: number
+  reductionPercent: number
+  messagesCondensed: number
+  summary: string
+  summaryPreview?: string
+  trigger: CompactionTrigger
+  timestamp: Date
+  durationMs?: number
+}
+
+// Compaction WebSocket update event
+export interface CompactionUpdate {
+  type: 'compaction_started' | 'compaction_completed'
+  data: CompactionEvent | { conversationId: string }
 }
