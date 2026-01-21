@@ -156,7 +156,7 @@ class CKOConfig:
     expansion_strategy: str = "balanced"
 
     # Claude settings
-    model: str = "claude-sonnet-4-5"
+    model: str = "claude-sonnet-4-20250514"
     max_context_tokens: int = 8000
     response_max_tokens: int = 2000
     temperature: float = 0.3

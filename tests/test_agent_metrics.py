@@ -152,7 +152,7 @@ class TestTrackLLMCall:
         """Test tracking successful LLM call with tokens"""
         track_llm_call(
             AgentID.CONTENT_SUMMARIZER,
-            "claude-sonnet-4-5",
+            "claude-sonnet-4-5-20250514",
             "success",
             input_tokens=100,
             output_tokens=50
@@ -162,7 +162,7 @@ class TestTrackLLMCall:
         """Test tracking failed LLM call"""
         track_llm_call(
             AgentID.DEPARTMENT_CLASSIFIER,
-            "claude-haiku-4-5",
+            "claude-3-5-haiku-20241022",
             "failure"
         )
 
@@ -170,7 +170,7 @@ class TestTrackLLMCall:
         """Test tracking LLM call with zero tokens"""
         track_llm_call(
             AgentID.RESEARCH_AGENT,
-            "claude-sonnet-4-5",
+            "claude-sonnet-4-5-20250514",
             "success",
             input_tokens=0,
             output_tokens=0
@@ -262,7 +262,7 @@ class TestAgentMetricsContext:
         async with AgentMetricsContext(
             AgentID.CONTENT_SUMMARIZER,
             "summarize",
-            model="claude-sonnet-4-5"
+            model="claude-sonnet-4-5-20250514"
         ) as ctx:
             await asyncio.sleep(0.01)
             ctx.set_success()
@@ -400,7 +400,7 @@ class TestMetricsIntegration:
             # Simulate LLM call
             track_llm_call(
                 AgentID.RESEARCH_AGENT,
-                "claude-sonnet-4-5",
+                "claude-sonnet-4-5-20250514",
                 "success",
                 input_tokens=200,
                 output_tokens=100

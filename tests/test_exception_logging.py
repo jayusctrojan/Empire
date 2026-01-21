@@ -141,10 +141,7 @@ class TestRequestIDHelpers:
         """Test get_request_id generates UUID when not in state."""
         from app.middleware.request_id import get_request_id
 
-        # Create mock with state that doesn't have request_id attribute
-        mock_state = MagicMock(spec=[])  # Empty spec means no attributes
-        mock_request = MagicMock()
-        mock_request.state = mock_state
+        mock_request = MagicMock(spec=[])
 
         result = get_request_id(mock_request)
         # Should be a valid UUID
@@ -164,10 +161,7 @@ class TestRequestIDHelpers:
         """Test get_client_ip returns 'unknown' when not in state."""
         from app.middleware.request_id import get_client_ip
 
-        # Create mock with state that doesn't have client_ip attribute
-        mock_state = MagicMock(spec=[])  # Empty spec means no attributes
-        mock_request = MagicMock()
-        mock_request.state = mock_state
+        mock_request = MagicMock(spec=[])
 
         result = get_client_ip(mock_request)
         assert result == "unknown"

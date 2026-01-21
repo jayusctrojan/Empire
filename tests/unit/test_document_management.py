@@ -476,72 +476,35 @@ class TestReprocessDocument:
         mock_get_supabase.return_value = mock_supabase
 
         # Mock document exists
+        # First call for document, second for existing chunks
         existing_chunks = [
             {"chunk_id": "chunk_1", "content": "Existing content 1"},
             {"chunk_id": "chunk_2", "content": "Existing content 2"}
         ]
 
-        # Create separate mock chains for each table
-        mock_documents_table = MagicMock()
-        mock_chunks_table = MagicMock()
-
-        # Track which table is being accessed
-        def table_router(table_name):
-            if table_name == "documents":
-                return mock_documents_table
-            elif table_name == "document_chunks":
-                return mock_chunks_table
-            return MagicMock()
-
-        mock_supabase.table.side_effect = table_router
-
-        # Mock documents table: select and update chains
-        mock_documents_select = MagicMock()
-        mock_documents_table.select.return_value = mock_documents_select
-        mock_documents_eq = MagicMock()
-        mock_documents_select.eq.return_value = mock_documents_eq
-        mock_documents_eq.execute.return_value = MagicMock(data=[sample_document_data])
-
-        mock_documents_update = MagicMock()
-        mock_documents_table.update.return_value = mock_documents_update
-        mock_documents_update_eq = MagicMock()
-        mock_documents_update.eq.return_value = mock_documents_update_eq
-        mock_documents_update_eq.execute.return_value = MagicMock(data=[sample_document_data])
-
-        # Mock chunks table: select and update chains
-        mock_chunks_select = MagicMock()
-        mock_chunks_table.select.return_value = mock_chunks_select
-        mock_chunks_eq = MagicMock()
-        mock_chunks_select.eq.return_value = mock_chunks_eq
-        mock_chunks_eq.execute.return_value = MagicMock(data=existing_chunks)
-
-        mock_chunks_update = MagicMock()
-        mock_chunks_table.update.return_value = mock_chunks_update
-        mock_chunks_update_eq = MagicMock()
-        mock_chunks_update.eq.return_value = mock_chunks_update_eq
-        mock_chunks_update_eq.execute.return_value = MagicMock(data=existing_chunks)
+        # Complex mock setup for multiple table calls
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+            Mock(data=[sample_document_data]),  # Get document
+            Mock(data=existing_chunks),  # Get existing chunks
+            Mock(data=existing_chunks),  # Get chunks for embedding
+        ]
 
         from app.services.document_management import reprocess_document
 
-        # Mock embedding service and asyncio event loop
+        # Mock embedding service at module level
         with patch('app.services.document_management.get_embedding_service') as mock_get_embed:
-            with patch('app.services.document_management.asyncio') as mock_asyncio:
-                mock_embed = MagicMock()
-                mock_result = MagicMock()
-                mock_result.chunk_id = "chunk_1"
-                mock_result.embedding = [0.1] * 1024
-                mock_get_embed.return_value = mock_embed
+            mock_embed = Mock()
+            mock_result = Mock()
+            mock_result.chunk_id = "chunk_1"
+            mock_result.embedding = [0.1] * 1024
+            mock_embed.generate_embeddings_batch = AsyncMock(return_value=[mock_result])
+            mock_get_embed.return_value = mock_embed
 
-                # Mock the asyncio.get_event_loop().run_until_complete() call
-                mock_loop = MagicMock()
-                mock_loop.run_until_complete.return_value = [mock_result]
-                mock_asyncio.get_event_loop.return_value = mock_loop
-
-                result = reprocess_document(
-                    document_id="doc_test123",
-                    force_reparse=False,  # Don't re-extract text
-                    update_embeddings=True
-                )
+            result = reprocess_document(
+                document_id="doc_test123",
+                force_reparse=False,  # Don't re-extract text
+                update_embeddings=True
+            )
 
         assert result["reprocessed"] is True
         assert result["force_reparse"] is False

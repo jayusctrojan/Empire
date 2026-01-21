@@ -2,9 +2,9 @@
 
 **Title:** Implement Redis Caching for Graph Queries
 
-**Status:** done
+**Status:** pending
 
-**Dependencies:** 104 ✓, 105 ✓, 106 ✓
+**Dependencies:** 104, 105, 106
 
 **Priority:** medium
 

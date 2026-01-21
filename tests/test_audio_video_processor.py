@@ -17,19 +17,12 @@ from app.services.audio_video_processor import (
     get_audio_video_processor
 )
 
-# Check if ffmpeg CLI and ffmpeg-python are available
-try:
-    import ffmpeg
-    FFMPEG_PYTHON_AVAILABLE = True
-except ImportError:
-    FFMPEG_PYTHON_AVAILABLE = False
-
-# Skip all tests if ffmpeg CLI or ffmpeg-python is not installed
+# Skip all tests if ffmpeg is not installed
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(
-        shutil.which("ffmpeg") is None or not FFMPEG_PYTHON_AVAILABLE,
-        reason="ffmpeg or ffmpeg-python not installed - skipping audio/video tests"
+        shutil.which("ffmpeg") is None,
+        reason="ffmpeg not installed - skipping audio/video tests"
     )
 ]
 
@@ -98,8 +91,7 @@ class TestAudioExtraction:
 
             assert result["success"] is True
             assert result["audio_path"].endswith(".wav")
-            # The implementation uses "extracted_audio.wav" as the default filename
-            assert "extracted_audio" in result["audio_path"]
+            assert "test_video" in result["audio_path"]
 
     @pytest.mark.asyncio
     async def test_extract_audio_file_not_found(self):
@@ -112,8 +104,7 @@ class TestAudioExtraction:
 
         assert result["success"] is False
         assert len(result["errors"]) > 0
-        # ffmpeg returns "No such file or directory" for missing files
-        assert "No such file or directory" in result["errors"][0] or "not found" in result["errors"][0].lower()
+        assert "Video file not found" in result["errors"][0]
 
     @pytest.mark.asyncio
     async def test_extract_audio_ffmpeg_error(self, tmp_path):
@@ -121,16 +112,17 @@ class TestAudioExtraction:
         processor = AudioVideoProcessor()
 
         video_path = str(tmp_path / "test_video.mp4")
-        # Create an empty file so ffmpeg can try to open it (but it's invalid)
-        Path(video_path).touch()
 
-        # Call the real implementation - it will fail on an empty/invalid file
-        result = await processor.extract_audio_from_video(
-            video_path=video_path
-        )
+        with patch('app.services.audio_video_processor.FFMPEG_SUPPORT', True), \
+             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg:
+            mock_ffmpeg.probe.side_effect = Exception("FFmpeg error")
 
-        assert result["success"] is False
-        assert len(result["errors"]) > 0
+            result = await processor.extract_audio_from_video(
+                video_path=video_path
+            )
+
+            assert result["success"] is False
+            assert len(result["errors"]) > 0
 
 
 class TestFrameExtraction:
@@ -142,18 +134,12 @@ class TestFrameExtraction:
         processor = AudioVideoProcessor()
 
         video_path = str(tmp_path / "test_video.mp4")
-        output_dir = tmp_path / "frames"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create actual frame files so Path.glob() finds them
-        frame_files = []
-        for i in range(1, 4):
-            frame_path = output_dir / f"frame_{i:06d}.jpg"
-            frame_path.write_bytes(b'\xff\xd8\xff\xe0')  # Minimal JPEG header
-            frame_files.append(frame_path)
+        output_dir = str(tmp_path / "frames")
 
         with patch('app.services.audio_video_processor.FFMPEG_SUPPORT', True), \
-             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg:
+             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg, \
+             patch('os.path.exists', return_value=True), \
+             patch('os.listdir', return_value=["frame_000001.jpg", "frame_000002.jpg", "frame_000003.jpg"]):
 
             # Mock probe
             mock_probe = {
@@ -164,16 +150,15 @@ class TestFrameExtraction:
             }
             mock_ffmpeg.probe.return_value = mock_probe
 
-            # Mock ffmpeg operations - chain them properly
-            mock_stream = MagicMock()
-            mock_ffmpeg.input.return_value = mock_stream
-            mock_ffmpeg.filter.return_value = mock_stream
-            mock_ffmpeg.output.return_value = mock_stream
+            # Mock ffmpeg operations
+            mock_ffmpeg.input.return_value = MagicMock()
+            mock_ffmpeg.filter.return_value = MagicMock()
+            mock_ffmpeg.output.return_value = MagicMock()
             mock_ffmpeg.run = MagicMock()
 
             result = await processor.extract_frames_from_video(
                 video_path=video_path,
-                output_dir=str(output_dir),
+                output_dir=output_dir,
                 frame_interval=10.0,
                 max_frames=3
             )
@@ -183,9 +168,9 @@ class TestFrameExtraction:
             assert result["video_duration"] == 30.0
             assert len(result["frames"]) == 3
 
-            # Check frame structure - service uses "path" key
+            # Check frame structure
             for i, frame in enumerate(result["frames"]):
-                assert "path" in frame
+                assert "frame_path" in frame
                 assert "timestamp_seconds" in frame
                 assert frame["frame_number"] == i + 1
 
@@ -195,36 +180,27 @@ class TestFrameExtraction:
         processor = AudioVideoProcessor()
 
         video_path = str(tmp_path / "test_video.mp4")
-        output_dir = tmp_path / "frames"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create only 10 frame files - max_frames=10 tells ffmpeg to extract only 10
-        # The mocked ffmpeg.run() doesn't actually create files, so we simulate what
-        # ffmpeg would produce with the max_frames limit
-        for i in range(1, 11):  # Only 10 frames
-            frame_path = output_dir / f"frame_{i:06d}.jpg"
-            frame_path.write_bytes(b'\xff\xd8\xff\xe0')  # Minimal JPEG header
 
         with patch('app.services.audio_video_processor.FFMPEG_SUPPORT', True), \
-             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg:
+             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg, \
+             patch('os.path.exists', return_value=True), \
+             patch('os.listdir', return_value=[f"frame_{i:06d}.jpg" for i in range(1, 21)]):
 
             mock_probe = {"format": {"duration": "200.0", "format_name": "mp4"}}
             mock_ffmpeg.probe.return_value = mock_probe
-            mock_stream = MagicMock()
-            mock_ffmpeg.input.return_value = mock_stream
-            mock_ffmpeg.filter.return_value = mock_stream
-            mock_ffmpeg.output.return_value = mock_stream
+            mock_ffmpeg.input.return_value = MagicMock()
+            mock_ffmpeg.filter.return_value = MagicMock()
+            mock_ffmpeg.output.return_value = MagicMock()
             mock_ffmpeg.run = MagicMock()
 
             result = await processor.extract_frames_from_video(
                 video_path=video_path,
-                output_dir=str(output_dir),
                 frame_interval=1.0,
                 max_frames=10
             )
 
             assert result["success"] is True
-            # Should have exactly 10 frames (limited by max_frames in ffmpeg filter)
+            # Should be limited to 10 frames even though 20 were generated
             assert len(result["frames"]) == 10
 
     @pytest.mark.asyncio
@@ -238,8 +214,7 @@ class TestFrameExtraction:
 
         assert result["success"] is False
         assert len(result["errors"]) > 0
-        # ffmpeg returns "No such file or directory" for missing files
-        assert "No such file or directory" in result["errors"][0] or "not found" in result["errors"][0].lower()
+        assert "Video file not found" in result["errors"][0]
 
 
 class TestSonioxTranscription:
@@ -256,19 +231,38 @@ class TestSonioxTranscription:
         # Create fake audio file
         Path(audio_path).touch()
 
-        # Mock Soniox API response - service expects "words" key with word objects
+        # Mock Soniox API response
         mock_response = {
-            "words": [
-                {"text": "This", "start_time": 0.0, "end_time": 0.2, "speaker": "SPEAKER_00"},
-                {"text": "is", "start_time": 0.2, "end_time": 0.4, "speaker": "SPEAKER_00"},
-                {"text": "a", "start_time": 0.4, "end_time": 0.5, "speaker": "SPEAKER_00"},
-                {"text": "test", "start_time": 0.5, "end_time": 1.2, "speaker": "SPEAKER_00"},
-                {"text": "transcription", "start_time": 1.5, "end_time": 2.0, "speaker": "SPEAKER_00"},
-                {"text": "of", "start_time": 2.0, "end_time": 2.1, "speaker": "SPEAKER_00"},
-                {"text": "the", "start_time": 2.1, "end_time": 2.3, "speaker": "SPEAKER_00"},
-                {"text": "audio", "start_time": 2.3, "end_time": 2.6, "speaker": "SPEAKER_00"},
-                {"text": "file.", "start_time": 2.6, "end_time": 3.0, "speaker": "SPEAKER_00"}
-            ]
+            "transcript": "This is a test transcription of the audio file.",
+            "segments": [
+                {
+                    "text": "This is a test",
+                    "start_time": 0.0,
+                    "end_time": 1.2,
+                    "speaker": "SPEAKER_00",
+                    "words": [
+                        {"word": "This", "start": 0.0, "end": 0.2},
+                        {"word": "is", "start": 0.2, "end": 0.4},
+                        {"word": "a", "start": 0.4, "end": 0.5},
+                        {"word": "test", "start": 0.5, "end": 1.2}
+                    ]
+                },
+                {
+                    "text": "transcription of the audio file.",
+                    "start_time": 1.5,
+                    "end_time": 3.0,
+                    "speaker": "SPEAKER_00",
+                    "words": [
+                        {"word": "transcription", "start": 1.5, "end": 2.0},
+                        {"word": "of", "start": 2.0, "end": 2.1},
+                        {"word": "the", "start": 2.1, "end": 2.3},
+                        {"word": "audio", "start": 2.3, "end": 2.6},
+                        {"word": "file.", "start": 2.6, "end": 3.0}
+                    ]
+                }
+            ],
+            "speakers": ["SPEAKER_00"],
+            "duration_seconds": 3.0
         }
 
         with patch('builtins.open', mock_open(read_data=b'fake_audio_data')), \
@@ -278,7 +272,6 @@ class TestSonioxTranscription:
             mock_http_response = Mock()
             mock_http_response.status_code = 200
             mock_http_response.json.return_value = mock_response
-            mock_http_response.raise_for_status = Mock()
 
             mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_http_response)
 
@@ -290,8 +283,7 @@ class TestSonioxTranscription:
 
             assert result["success"] is True
             assert result["transcript"] == "This is a test transcription of the audio file."
-            # All words have same speaker, so they will be in one segment
-            assert len(result["segments"]) == 1
+            assert len(result["segments"]) == 2
             assert len(result["speakers"]) == 1
             assert result["duration_seconds"] == 3.0
             assert len(result["errors"]) == 0
@@ -324,8 +316,7 @@ class TestSonioxTranscription:
 
         assert result["success"] is False
         assert len(result["errors"]) > 0
-        # Error message contains "No such file or directory"
-        assert "No such file or directory" in result["errors"][0] or "not found" in result["errors"][0].lower()
+        assert "Audio file not found" in result["errors"][0]
 
     @pytest.mark.asyncio
     async def test_transcribe_audio_api_error(self, tmp_path):
@@ -451,8 +442,7 @@ class TestClaudeVisionFrameAnalysis:
 
         assert result["success"] is False
         assert len(result["errors"]) > 0
-        # Error message contains "No such file or directory"
-        assert "No such file or directory" in result["errors"][0] or "not found" in result["errors"][0].lower()
+        assert "Frame file not found" in result["errors"][0]
 
 
 class TestBatchFrameAnalysis:
@@ -463,15 +453,15 @@ class TestBatchFrameAnalysis:
         """Test successful batch frame analysis"""
         processor = AudioVideoProcessor()
 
-        # Create mock frames - use "path" key to match service output format
+        # Create mock frames
         frames = [
-            {"path": str(tmp_path / f"frame_{i:03d}.jpg"), "timestamp_seconds": float(i)}
+            {"frame_path": str(tmp_path / f"frame_{i:03d}.jpg"), "timestamp_seconds": float(i)}
             for i in range(1, 6)
         ]
 
         # Create frame files
         for frame in frames:
-            Path(frame["path"]).touch()
+            Path(frame["frame_path"]).touch()
 
         # Mock Anthropic client
         mock_client = Mock()
@@ -500,18 +490,15 @@ class TestBatchFrameAnalysis:
         """Test batch analysis with some failures"""
         processor = AudioVideoProcessor()
 
-        # Use "path" key to match service output format
         frames = [
-            {"path": str(tmp_path / "frame_001.jpg"), "timestamp_seconds": 1.0},
-            {"path": "/nonexistent/frame_002.jpg", "timestamp_seconds": 2.0},
-            {"path": str(tmp_path / "frame_003.jpg"), "timestamp_seconds": 3.0},
+            {"frame_path": str(tmp_path / "frame_001.jpg"), "timestamp_seconds": 1.0},
+            {"frame_path": "/nonexistent/frame_002.jpg", "timestamp_seconds": 2.0},
+            {"frame_path": str(tmp_path / "frame_003.jpg"), "timestamp_seconds": 3.0},
         ]
 
-        # Create only some frame files with valid image data
-        # Create minimal valid JPEG data (empty JPEG header)
-        jpeg_data = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9'
-        Path(frames[0]["path"]).write_bytes(jpeg_data)
-        Path(frames[2]["path"]).write_bytes(jpeg_data)
+        # Create only some frame files
+        Path(frames[0]["frame_path"]).touch()
+        Path(frames[2]["frame_path"]).touch()
 
         mock_client = Mock()
         mock_message = Mock()
@@ -522,16 +509,15 @@ class TestBatchFrameAnalysis:
 
         processor.anthropic_client = mock_client
 
-        # Don't mock builtins.open - let real file access work
-        # The non-existent file will fail with FileNotFoundError
-        results = await processor.analyze_all_frames(frames=frames)
+        with patch('builtins.open', mock_open(read_data=b'fake_image_data')):
+            results = await processor.analyze_all_frames(frames=frames)
 
-        assert len(results) == 3
-        # First and third should succeed
-        assert results[0]["success"] is True
-        assert results[2]["success"] is True
-        # Second should fail
-        assert results[1]["success"] is False
+            assert len(results) == 3
+            # First and third should succeed
+            assert results[0]["success"] is True
+            assert results[2]["success"] is True
+            # Second should fail
+            assert results[1]["success"] is False
 
 
 class TestCompleteVideoProcessing:
@@ -543,54 +529,53 @@ class TestCompleteVideoProcessing:
         processor = AudioVideoProcessor()
         processor.soniox_api_key = "test_api_key"
 
+        # Mock Anthropic client
+        mock_client = Mock()
+        mock_message = Mock()
+        mock_content = Mock()
+        mock_content.text = "Frame shows presentation content"
+        mock_message.content = [mock_content]
+        mock_client.messages.create.return_value = mock_message
+        processor.anthropic_client = mock_client
+
         video_path = str(tmp_path / "test_video.mp4")
 
-        # Mock the processor's own methods instead of underlying libraries
-        async def mock_extract_audio(video_path, output_path=None, sample_rate=16000, channels=1):
-            return {
-                "success": True,
-                "audio_path": str(tmp_path / "audio.wav"),
-                "duration_seconds": 10.0,
-                "format": "wav",
-                "sample_rate": sample_rate,
-                "channels": channels,
-                "errors": []
-            }
+        # Mock Soniox response
+        mock_transcription = {
+            "transcript": "This is the transcription.",
+            "segments": [
+                {
+                    "text": "This is the transcription.",
+                    "start_time": 0.0,
+                    "end_time": 2.0,
+                    "speaker": "SPEAKER_00",
+                    "words": []
+                }
+            ],
+            "speakers": ["SPEAKER_00"],
+            "duration_seconds": 2.0
+        }
 
-        async def mock_extract_frames(video_path, output_dir=None, frame_interval=1.0, max_frames=None):
-            return {
-                "success": True,
-                "frames": [
-                    {"path": str(tmp_path / "frame_001.jpg"), "timestamp_seconds": 0.0, "frame_number": 1},
-                    {"path": str(tmp_path / "frame_002.jpg"), "timestamp_seconds": 5.0, "frame_number": 2}
-                ],
-                "total_frames": 2,
-                "video_duration": 10.0,
-                "errors": []
-            }
+        with patch('app.services.audio_video_processor.FFMPEG_SUPPORT', True), \
+             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg, \
+             patch('os.path.exists', return_value=True), \
+             patch('os.listdir', return_value=["frame_000001.jpg", "frame_000002.jpg"]), \
+             patch('builtins.open', mock_open(read_data=b'fake_data')), \
+             patch('httpx.AsyncClient') as mock_http_client:
 
-        async def mock_transcribe(audio_path, enable_speaker_diarization=True, enable_word_timestamps=True, language="en"):
-            return {
-                "success": True,
-                "transcript": "This is the transcription.",
-                "segments": [
-                    {"text": "This is the transcription.", "start_time": 0.0, "end_time": 2.0, "speaker": "SPEAKER_00", "words": []}
-                ],
-                "speakers": ["SPEAKER_00"],
-                "duration_seconds": 2.0,
-                "errors": []
-            }
+            # Mock ffmpeg
+            mock_probe = {"format": {"duration": "10.0", "format_name": "mp4"}}
+            mock_ffmpeg.probe.return_value = mock_probe
+            mock_ffmpeg.input.return_value = MagicMock()
+            mock_ffmpeg.output.return_value = MagicMock()
+            mock_ffmpeg.filter.return_value = MagicMock()
+            mock_ffmpeg.run = MagicMock()
 
-        async def mock_analyze_all_frames(frames, analysis_prompt=None, max_concurrent=3):
-            return [
-                {"success": True, "timestamp_seconds": 0.0, "analysis": "Frame 1 content", "errors": []},
-                {"success": True, "timestamp_seconds": 5.0, "analysis": "Frame 2 content", "errors": []}
-            ]
-
-        with patch.object(processor, 'extract_audio_from_video', mock_extract_audio), \
-             patch.object(processor, 'extract_frames_from_video', mock_extract_frames), \
-             patch.object(processor, 'transcribe_audio_with_soniox', mock_transcribe), \
-             patch.object(processor, 'analyze_all_frames', mock_analyze_all_frames):
+            # Mock Soniox API
+            mock_http_response = Mock()
+            mock_http_response.status_code = 200
+            mock_http_response.json.return_value = mock_transcription
+            mock_http_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_http_response)
 
             result = await processor.process_video_complete(
                 video_path=video_path,
@@ -623,40 +608,29 @@ class TestCompleteVideoProcessing:
 
         video_path = str(tmp_path / "test_video.mp4")
 
-        # Mock the processor's own methods
-        async def mock_extract_audio(video_path, output_path=None, sample_rate=16000, channels=1):
-            return {
-                "success": True,
-                "audio_path": str(tmp_path / "audio.wav"),
-                "duration_seconds": 5.0,
-                "format": "wav",
-                "sample_rate": sample_rate,
-                "channels": channels,
-                "errors": []
-            }
+        mock_transcription = {
+            "transcript": "Transcription text",
+            "segments": [],
+            "speakers": [],
+            "duration_seconds": 5.0
+        }
 
-        async def mock_extract_frames(video_path, output_dir=None, frame_interval=1.0, max_frames=None):
-            return {
-                "success": True,
-                "frames": [],
-                "total_frames": 0,
-                "video_duration": 5.0,
-                "errors": []
-            }
+        with patch('app.services.audio_video_processor.FFMPEG_SUPPORT', True), \
+             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg, \
+             patch('os.path.exists', return_value=True), \
+             patch('builtins.open', mock_open(read_data=b'fake_data')), \
+             patch('httpx.AsyncClient') as mock_http_client:
 
-        async def mock_transcribe(audio_path, enable_speaker_diarization=True, enable_word_timestamps=True, language="en"):
-            return {
-                "success": True,
-                "transcript": "Transcription text",
-                "segments": [],
-                "speakers": [],
-                "duration_seconds": 5.0,
-                "errors": []
-            }
+            mock_probe = {"format": {"duration": "5.0", "format_name": "mp4"}}
+            mock_ffmpeg.probe.return_value = mock_probe
+            mock_ffmpeg.input.return_value = MagicMock()
+            mock_ffmpeg.output.return_value = MagicMock()
+            mock_ffmpeg.run = MagicMock()
 
-        with patch.object(processor, 'extract_audio_from_video', mock_extract_audio), \
-             patch.object(processor, 'extract_frames_from_video', mock_extract_frames), \
-             patch.object(processor, 'transcribe_audio_with_soniox', mock_transcribe):
+            mock_http_response = Mock()
+            mock_http_response.status_code = 200
+            mock_http_response.json.return_value = mock_transcription
+            mock_http_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_http_response)
 
             result = await processor.process_video_complete(
                 video_path=video_path,
@@ -673,39 +647,28 @@ class TestCompleteVideoProcessing:
         """Test video processing with frame analysis only"""
         processor = AudioVideoProcessor()
 
+        mock_client = Mock()
+        mock_message = Mock()
+        mock_content = Mock()
+        mock_content.text = "Frame content"
+        mock_message.content = [mock_content]
+        mock_client.messages.create.return_value = mock_message
+        processor.anthropic_client = mock_client
+
         video_path = str(tmp_path / "test_video.mp4")
 
-        # Mock the processor's own methods
-        async def mock_extract_audio(video_path, output_path=None, sample_rate=16000, channels=1):
-            return {
-                "success": True,
-                "audio_path": str(tmp_path / "audio.wav"),
-                "duration_seconds": 3.0,
-                "format": "wav",
-                "sample_rate": sample_rate,
-                "channels": channels,
-                "errors": []
-            }
+        with patch('app.services.audio_video_processor.FFMPEG_SUPPORT', True), \
+             patch('app.services.audio_video_processor.ffmpeg', create=True) as mock_ffmpeg, \
+             patch('os.path.exists', return_value=True), \
+             patch('os.listdir', return_value=["frame_001.jpg"]), \
+             patch('builtins.open', mock_open(read_data=b'fake_data')):
 
-        async def mock_extract_frames(video_path, output_dir=None, frame_interval=1.0, max_frames=None):
-            return {
-                "success": True,
-                "frames": [
-                    {"path": str(tmp_path / "frame_001.jpg"), "timestamp_seconds": 0.0, "frame_number": 1}
-                ],
-                "total_frames": 1,
-                "video_duration": 3.0,
-                "errors": []
-            }
-
-        async def mock_analyze_all_frames(frames, analysis_prompt=None, max_concurrent=3):
-            return [
-                {"success": True, "timestamp_seconds": 0.0, "analysis": "Frame content", "errors": []}
-            ]
-
-        with patch.object(processor, 'extract_audio_from_video', mock_extract_audio), \
-             patch.object(processor, 'extract_frames_from_video', mock_extract_frames), \
-             patch.object(processor, 'analyze_all_frames', mock_analyze_all_frames):
+            mock_probe = {"format": {"duration": "3.0", "format_name": "mp4"}}
+            mock_ffmpeg.probe.return_value = mock_probe
+            mock_ffmpeg.input.return_value = MagicMock()
+            mock_ffmpeg.filter.return_value = MagicMock()
+            mock_ffmpeg.output.return_value = MagicMock()
+            mock_ffmpeg.run = MagicMock()
 
             result = await processor.process_video_complete(
                 video_path=video_path,
@@ -715,8 +678,7 @@ class TestCompleteVideoProcessing:
 
             assert result["success"] is True
             assert len(result["frame_analyses"]) > 0
-            # When transcribe=False, transcription should be None (not called)
-            assert result["transcription"] is None
+            assert result["transcription"] == {}
 
 
 class TestSingletonPattern:

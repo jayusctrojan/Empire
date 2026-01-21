@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { ChatView } from '@/components/ChatView'
 import { ProjectsView } from '@/components/ProjectsView'
@@ -6,14 +6,11 @@ import { FileUploadsView } from '@/components/FileUploadsView'
 import { AIStudioView } from '@/components/AIStudioView'
 import { SettingsView } from '@/components/SettingsView'
 import { QuickActions } from '@/components/QuickActions'
-import { SessionPicker, CheckpointBrowser } from '@/components/session'
 import { AuthProvider, ProtectedRoute } from '@/components/auth'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { useAppStore } from '@/stores/app'
-import { useChatStore } from '@/stores/chat'
 import { useKeyboardShortcuts, useMenuEvents } from '@/hooks'
 import { initializeDatabase } from '@/lib/database'
-import type { ResumeSessionResult } from '@/lib/services/sessionApi'
 
 function MainApp() {
   const [dbReady, setDbReady] = useState(false)
@@ -30,62 +27,9 @@ function MainApp() {
     })
   }, [])
 
-  const { activeView, setActiveView } = useAppStore()
-  const { activeConversationId, setActiveConversation } = useChatStore()
+  const { activeView } = useAppStore()
   const [showSearch, setShowSearch] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
-
-  // Session management state (Task 208)
-  const [showSessionPicker, setShowSessionPicker] = useState(false)
-  const [showCheckpointBrowser, setShowCheckpointBrowser] = useState(false)
-  const [checkpointConversationId, setCheckpointConversationId] = useState<string | null>(null)
-
-  // Show session picker on first load if no active conversation
-  useEffect(() => {
-    if (dbReady && !activeConversationId && activeView === 'chats') {
-      // Small delay to let the UI settle
-      const timer = setTimeout(() => {
-        setShowSessionPicker(true)
-      }, 300)
-      return () => clearTimeout(timer)
-    }
-  }, [dbReady, activeConversationId, activeView])
-
-  // Handle session resume
-  const handleSessionResume = useCallback((result: ResumeSessionResult) => {
-    setActiveConversation(result.conversationId)
-    setShowSessionPicker(false)
-    setActiveView('chats')
-  }, [setActiveConversation, setActiveView])
-
-  // Handle new session
-  const handleNewSession = useCallback(() => {
-    setShowSessionPicker(false)
-    setActiveView('chats')
-  }, [setActiveView])
-
-  // Handle checkpoint browser
-  const handleBrowseCheckpoints = useCallback((conversationId: string) => {
-    setCheckpointConversationId(conversationId)
-    setShowCheckpointBrowser(true)
-    setShowSessionPicker(false)
-  }, [])
-
-  // Handle checkpoint restore
-  const handleCheckpointRestore = useCallback((_messagesRestored: number, _tokenCount: number) => {
-    setShowCheckpointBrowser(false)
-    setCheckpointConversationId(null)
-    // The conversation will reload with restored state
-  }, [])
-
-  // Listen for session picker toggle event
-  useEffect(() => {
-    const handleToggleSessionPicker = () => {
-      setShowSessionPicker((prev) => !prev)
-    }
-    window.addEventListener('toggle-session-picker', handleToggleSessionPicker)
-    return () => window.removeEventListener('toggle-session-picker', handleToggleSessionPicker)
-  }, [])
 
   // Global keyboard shortcuts
   useKeyboardShortcuts({
@@ -158,30 +102,6 @@ function MainApp() {
       {/* Quick Actions Modal */}
       {showQuickActions && (
         <QuickActions onClose={() => setShowQuickActions(false)} />
-      )}
-
-      {/* Session Picker Modal (Task 208) */}
-      {showSessionPicker && (
-        <SessionPicker
-          modal
-          onResume={handleSessionResume}
-          onNewSession={handleNewSession}
-          onBrowseCheckpoints={handleBrowseCheckpoints}
-          onClose={() => setShowSessionPicker(false)}
-        />
-      )}
-
-      {/* Checkpoint Browser Modal (Task 208) */}
-      {showCheckpointBrowser && checkpointConversationId && (
-        <CheckpointBrowser
-          modal
-          conversationId={checkpointConversationId}
-          onRestore={handleCheckpointRestore}
-          onClose={() => {
-            setShowCheckpointBrowser(false)
-            setCheckpointConversationId(null)
-          }}
-        />
       )}
     </div>
   )

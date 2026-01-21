@@ -2,5 +2,4 @@ export { useKeyboardShortcuts, KEYBOARD_SHORTCUTS } from './useKeyboardShortcuts
 export { useMenuEvents } from './useMenuEvents'
 export { useTheme } from './useTheme'
 export { useMCP } from './useMCP'
-export { useContextWindow } from './useContextWindow'
 export type { Theme, ResolvedTheme } from './useTheme'

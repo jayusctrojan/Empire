@@ -117,7 +117,7 @@ class AnthropicCircuitBreaker:
         circuit = AnthropicCircuitBreaker("content_summarizer")
         result = await circuit.call(
             client.messages.create,
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-5-20250514",
             max_tokens=1000,
             messages=[...]
         )
@@ -150,7 +150,7 @@ class AnthropicCircuitBreaker:
         self._success_count = 0
         self._last_failure_time: Optional[float] = None
         self._half_open_calls = 0
-        self.__lock: Optional[asyncio.Lock] = None  # Lazy init for Python 3.9 compat
+        self._lock = asyncio.Lock()
 
         # Initialize metrics
         CIRCUIT_STATE.labels(service_name=service_name).set(CircuitState.CLOSED.value)
@@ -161,13 +161,6 @@ class AnthropicCircuitBreaker:
             failure_threshold=failure_threshold,
             recovery_timeout=recovery_timeout,
         )
-
-    @property
-    def _lock(self) -> asyncio.Lock:
-        """Lazily initialize the lock to avoid event loop issues in Python 3.9."""
-        if self.__lock is None:
-            self.__lock = asyncio.Lock()
-        return self.__lock
 
     @property
     def state(self) -> CircuitState:
@@ -412,7 +405,7 @@ class ResilientAnthropicClient:
         )
 
         response = await client.messages.create(
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-5-20250514",
             max_tokens=1000,
             messages=[{"role": "user", "content": "Hello!"}]
         )

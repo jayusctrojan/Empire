@@ -29,7 +29,7 @@ class TestCostCalculator:
     def test_calculate_llm_cost_claude_sonnet(self):
         """Test LLM cost calculation for Claude Sonnet"""
         cost = CostCalculator.calculate_llm_cost(
-            "claude-sonnet-4-5",
+            "claude-3-5-sonnet-20241022",
             input_tokens=1000,
             output_tokens=500
         )
@@ -39,7 +39,7 @@ class TestCostCalculator:
     def test_calculate_llm_cost_claude_haiku(self):
         """Test LLM cost calculation for Claude Haiku"""
         cost = CostCalculator.calculate_llm_cost(
-            "claude-haiku-4-5",
+            "claude-3-5-haiku-20241022",
             input_tokens=2000,
             output_tokens=1000
         )
@@ -211,7 +211,7 @@ class TestMonitoringService:
 
         cost = await monitor.record_llm_call(
             provider="anthropic",
-            model="claude-haiku-4-5",
+            model="claude-3-5-haiku-20241022",
             operation="query_expansion",
             input_tokens=1000,
             output_tokens=500,
@@ -221,7 +221,7 @@ class TestMonitoringService:
 
         # Check cost is calculated correctly
         expected_cost = CostCalculator.calculate_llm_cost(
-            "claude-haiku-4-5", 1000, 500
+            "claude-3-5-haiku-20241022", 1000, 500
         )
         assert cost == expected_cost
 
@@ -335,7 +335,7 @@ class TestMonitoringService:
                 await asyncio.sleep(0.05)
                 llm_stage.cost = await monitor.record_llm_call(
                     provider="anthropic",
-                    model="claude-haiku-4-5",
+                    model="claude-3-5-haiku-20241022",
                     operation="classification",
                     input_tokens=500,
                     output_tokens=250,
@@ -470,7 +470,7 @@ class TestIntegration:
             async with monitor.track_stage("doc-123", ProcessingStage.CLASSIFICATION) as classification:
                 classification.cost = await monitor.record_llm_call(
                     provider="anthropic",
-                    model="claude-haiku-4-5",
+                    model="claude-3-5-haiku-20241022",
                     operation="classification",
                     input_tokens=1000,
                     output_tokens=200,

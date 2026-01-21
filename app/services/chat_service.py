@@ -457,12 +457,12 @@ class ChatService:
             logger.info(
                 "Starting direct Claude stream",
                 message_count=len(messages),
-                model=os.getenv("CHAT_MODEL", "claude-sonnet-4-5")
+                model=os.getenv("CHAT_MODEL", "claude-3-5-sonnet-20241022")
             )
 
             # Stream from Claude
             async with self.anthropic_client.messages.stream(
-                model=os.getenv("CHAT_MODEL", "claude-sonnet-4-5"),
+                model=os.getenv("CHAT_MODEL", "claude-3-5-sonnet-20241022"),
                 max_tokens=4096,
                 messages=messages
             ) as stream:

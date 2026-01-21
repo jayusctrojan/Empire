@@ -44,7 +44,7 @@ class ClassifierConfig:
     """Configuration for query classifier"""
     use_ai_classification: bool = True
     fallback_to_patterns: bool = True
-    model: str = "claude-haiku-4-5"
+    model: str = "claude-3-5-haiku-20241022"
     confidence_threshold: float = 0.7
     cache_classifications: bool = True
     max_tokens: int = 150
@@ -57,7 +57,7 @@ class ClassifierConfig:
         return cls(
             use_ai_classification=os.getenv("CLASSIFIER_USE_AI", "true").lower() == "true",
             fallback_to_patterns=os.getenv("CLASSIFIER_FALLBACK_PATTERNS", "true").lower() == "true",
-            model=os.getenv("CLASSIFIER_MODEL", "claude-haiku-4-5"),
+            model=os.getenv("CLASSIFIER_MODEL", "claude-3-5-haiku-20241022"),
             confidence_threshold=float(os.getenv("CLASSIFIER_CONFIDENCE_THRESHOLD", "0.7")),
             cache_classifications=os.getenv("CLASSIFIER_CACHE", "true").lower() == "true"
         )

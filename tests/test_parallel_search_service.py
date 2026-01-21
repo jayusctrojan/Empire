@@ -101,7 +101,7 @@ class TestParallelSearchService:
                 "insurance plan"
             ],
             strategy="balanced",
-            model_used="claude-haiku-4-5",
+            model_used="claude-3-5-haiku-20241022",
             tokens_used=100,
             duration_ms=500.0
         ))

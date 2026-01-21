@@ -736,7 +736,7 @@ class TestRequestValidation:
         )
 
         # Should fail validation
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_cleanup_request_validation(self, client):
         """Test cleanup request with invalid retention days."""
@@ -749,7 +749,7 @@ class TestRequestValidation:
         )
 
         # Should fail validation
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_cleanup_request_max_retention(self, client):
         """Test cleanup request with max retention days."""
@@ -762,7 +762,7 @@ class TestRequestValidation:
         )
 
         # Should fail validation
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 if __name__ == "__main__":

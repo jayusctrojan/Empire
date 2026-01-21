@@ -19,24 +19,8 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
 
-
-def _local_server_is_available() -> bool:
-    """Check if the local FastAPI server is available."""
-    try:
-        response = requests.get("http://localhost:8000/health", timeout=2)
-        return response.status_code == 200
-    except (requests.ConnectionError, requests.Timeout, requests.RequestException):
-        return False
-
-
-# Mark all tests in this module as integration tests that require a running server
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(
-        not _local_server_is_available(),
-        reason="Local FastAPI server not running on port 8000"
-    ),
-]
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
 
 # Load environment
 load_dotenv()
@@ -112,29 +96,6 @@ async def setup_test_api_key():
 
     return result["api_key"], result["key_id"]
 
-
-# ==================== Pytest Fixtures ====================
-
-@pytest.fixture(scope="module")
-def api_key():
-    """Create and return an admin API key for testing."""
-    key, _ = asyncio.get_event_loop().run_until_complete(setup_test_api_key())
-    yield key
-
-
-@pytest.fixture(scope="module")
-def operation_id():
-    """Placeholder for operation ID - will be set during tests."""
-    return None
-
-
-@pytest.fixture(scope="module")
-def viewer_api_key():
-    """Return an invalid/viewer API key for testing unauthorized access."""
-    return "invalid_viewer_key_for_testing"
-
-
-# ==================== Test Functions ====================
 
 def test_bulk_upload(api_key):
     """Test POST /api/documents/bulk-upload."""

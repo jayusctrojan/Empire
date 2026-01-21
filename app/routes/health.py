@@ -7,15 +7,14 @@ Provides:
 - /api/health/liveness - Kubernetes liveness probe (lightweight)
 - /api/health/readiness - Kubernetes readiness probe (checks critical deps)
 - /api/health/deep - Deep health check for all dependencies
-- /api/health/orchestrator - Service orchestrator status (comprehensive 23-service check)
 """
 
 import os
 import time
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Response, status, Request
+from fastapi import APIRouter, Depends, Response, status
 import structlog
 
 from app.core.health import (
@@ -33,9 +32,6 @@ from app.core.health import (
     is_critical_healthy,
 )
 from app.core.connections import connection_manager, get_connection_manager
-
-if TYPE_CHECKING:
-    from app.core.service_orchestrator import ServiceOrchestrator
 
 logger = structlog.get_logger(__name__)
 
@@ -586,172 +582,3 @@ async def list_dependencies():
         ],
         "timeout_seconds": DEFAULT_TIMEOUT
     }
-
-
-# =============================================================================
-# Service Orchestrator Integration
-# =============================================================================
-
-
-@router.get(
-    "/orchestrator",
-    summary="Service orchestrator health status",
-    description="Comprehensive health check using the service orchestrator (23 services)"
-)
-async def orchestrator_health_check(request: Request, response: Response):
-    """
-    Service orchestrator health check endpoint.
-
-    Uses the service orchestrator for comprehensive health checks across all 23 services:
-    - Required: Supabase, Redis
-    - Important: Neo4j, B2, Celery, Anthropic, LlamaIndex, CrewAI
-    - Optional: Arcade, Soniox, Claude Vision, ffmpeg, OpenAI, LlamaCloud, Ollama
-    - Infrastructure: Prometheus, Grafana, Alertmanager, Node Exporter, Flower
-    - Auth/Email: Clerk, SendGrid, Gmail SMTP
-
-    Includes caching for performance (30-second TTL).
-    """
-    start_time = time.perf_counter()
-
-    # Get service orchestrator from app state
-    service_orchestrator: Optional["ServiceOrchestrator"] = getattr(
-        request.app.state, "service_orchestrator", None
-    )
-
-    if not service_orchestrator:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {
-            "status": "error",
-            "message": "Service orchestrator not initialized",
-            "services": {},
-            "ready": False
-        }
-
-    try:
-        # Run preflight checks (uses caching)
-        preflight_result = await service_orchestrator.check_all_services()
-        total_duration = (time.perf_counter() - start_time) * 1000
-
-        # Convert to response format
-        services_data = {}
-        for service_name, service_status in preflight_result.services.items():
-            services_data[service_name] = {
-                "status": service_status.status,
-                "required": service_status.required,
-                "latency_ms": service_status.latency_ms,
-                "error_message": service_status.error_message
-            }
-
-        # Set response status based on health
-        if not preflight_result.all_required_healthy:
-            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-
-        return {
-            "status": "ok" if preflight_result.ready else ("degraded" if preflight_result.all_required_healthy else "error"),
-            "ready": preflight_result.ready,
-            "all_required_healthy": preflight_result.all_required_healthy,
-            "services": services_data,
-            "startup_time_ms": preflight_result.startup_time_ms,
-            "check_duration_ms": round(total_duration, 2),
-            "service_counts": {
-                "total": len(services_data),
-                "healthy": sum(1 for s in services_data.values() if s["status"] == "running"),
-                "degraded": sum(1 for s in services_data.values() if s["status"] == "degraded"),
-                "error": sum(1 for s in services_data.values() if s["status"] in ["error", "stopped"]),
-                "required": sum(1 for s in services_data.values() if s["required"])
-            }
-        }
-
-    except Exception as e:
-        logger.error("Orchestrator health check failed", error=str(e))
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        return {
-            "status": "error",
-            "message": str(e),
-            "services": {},
-            "ready": False
-        }
-
-
-@router.get(
-    "/orchestrator/degraded",
-    summary="List degraded services",
-    description="Returns list of services that are degraded or unavailable"
-)
-async def list_degraded_services(request: Request):
-    """
-    List all services that are currently degraded or unavailable.
-
-    Useful for quickly identifying issues and planning remediation.
-    """
-    service_orchestrator: Optional["ServiceOrchestrator"] = getattr(
-        request.app.state, "service_orchestrator", None
-    )
-
-    if not service_orchestrator:
-        return {
-            "degraded_services": [],
-            "message": "Service orchestrator not initialized"
-        }
-
-    try:
-        degraded = service_orchestrator.get_degraded_services()
-        fallback_messages = {}
-
-        for service in degraded:
-            fallback_messages[service] = service_orchestrator.get_fallback_message(service)
-
-        return {
-            "degraded_services": degraded,
-            "fallback_messages": fallback_messages,
-            "total_degraded": len(degraded)
-        }
-
-    except Exception as e:
-        logger.error("Failed to get degraded services", error=str(e))
-        return {
-            "degraded_services": [],
-            "error": str(e)
-        }
-
-
-@router.get(
-    "/orchestrator/features",
-    summary="Available features based on service health",
-    description="Returns which features are available based on current service health"
-)
-async def get_available_features(request: Request):
-    """
-    Get available features based on current service health.
-
-    Features are enabled/disabled based on the health of their dependent services.
-    """
-    service_orchestrator: Optional["ServiceOrchestrator"] = getattr(
-        request.app.state, "service_orchestrator", None
-    )
-
-    if not service_orchestrator:
-        return {
-            "features": {},
-            "message": "Service orchestrator not initialized"
-        }
-
-    try:
-        features = service_orchestrator.get_available_features()
-        processing_mode = service_orchestrator.get_processing_mode()
-        embedding_provider = service_orchestrator.get_embedding_provider()
-        agent_mode = service_orchestrator.get_agent_mode()
-
-        return {
-            "features": features,
-            "processing_mode": processing_mode,
-            "embedding_provider": embedding_provider,
-            "agent_mode": agent_mode
-        }
-
-    except Exception as e:
-        logger.error("Failed to get available features", error=str(e))
-        return {
-            "features": {},
-            "error": str(e)
-        }

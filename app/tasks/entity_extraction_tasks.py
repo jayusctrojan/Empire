@@ -94,21 +94,21 @@ def extract_entities_task(
         logger.info(
             "Entity extraction task completed",
             task_id=task_id,
-            topics_count=len(result.extraction_result.topics),
-            entities_count=len(result.extraction_result.entities),
-            facts_count=len(result.extraction_result.facts),
-            relationships_count=len(result.extraction_result.relationships)
+            topics_count=len(result.result.topics),
+            entities_count=len(result.result.entities),
+            facts_count=len(result.result.facts),
+            relationships_count=len(result.result.relationships)
         )
 
         return {
             "success": True,
             "task_id": task_id,
             "extraction": {
-                "topics_count": len(result.extraction_result.topics),
-                "entities_count": len(result.extraction_result.entities),
-                "facts_count": len(result.extraction_result.facts),
-                "relationships_count": len(result.extraction_result.relationships),
-                "stored_in_graph": result.graph_storage_success
+                "topics_count": len(result.result.topics),
+                "entities_count": len(result.result.entities),
+                "facts_count": len(result.result.facts),
+                "relationships_count": len(result.result.relationships),
+                "stored_in_graph": result.stored_in_graph
             },
             "model_used": result.model_used,
             "processing_time_ms": result.processing_time_ms
@@ -185,8 +185,8 @@ def batch_extract_entities(
                 results.append({
                     "task_id": task_data["task_id"],
                     "success": True,
-                    "topics_count": len(result.extraction_result.topics),
-                    "entities_count": len(result.extraction_result.entities)
+                    "topics_count": len(result.result.topics),
+                    "entities_count": len(result.result.entities)
                 })
 
             except Exception as e:

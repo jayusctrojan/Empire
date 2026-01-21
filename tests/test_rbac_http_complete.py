@@ -9,27 +9,12 @@ Prerequisites:
 Run with: python tests/test_rbac_http_complete.py
 """
 import pytest
+
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
+
 import requests
-
-
-def _local_server_is_available() -> bool:
-    """Check if the local FastAPI server is available."""
-    try:
-        response = requests.get("http://localhost:8000/health", timeout=2)
-        return response.status_code == 200
-    except (requests.ConnectionError, requests.Timeout, requests.RequestException):
-        return False
-
-
-# Mark all tests in this module as integration tests that require local server
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.local_server,
-    pytest.mark.skipif(
-        not _local_server_is_available(),
-        reason="Local FastAPI server not running on port 8000"
-    ),
-]
 import json
 import asyncio
 from datetime import datetime, timedelta
@@ -111,30 +96,6 @@ async def setup_test_api_key():
 
     return result["api_key"], result["key_id"]
 
-
-# ==================== Pytest Fixtures ====================
-
-@pytest.fixture(scope="module")
-def auth_key():
-    """Create and return an admin API key for testing."""
-    api_key, _ = asyncio.get_event_loop().run_until_complete(setup_test_api_key())
-    yield api_key
-
-
-@pytest.fixture(scope="module")
-def key_id():
-    """Create and return an API key ID for testing."""
-    _, key_id = asyncio.get_event_loop().run_until_complete(setup_test_api_key())
-    yield key_id
-
-
-@pytest.fixture(scope="module")
-def user_id():
-    """Return the test user ID."""
-    return TEST_USER_EDITOR
-
-
-# ==================== Test Functions ====================
 
 def test_list_roles():
     """Test GET /api/rbac/roles (public endpoint)."""

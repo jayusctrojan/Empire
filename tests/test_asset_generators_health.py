@@ -148,7 +148,7 @@ class TestServiceHealthResponse:
             generators_count=5,
             generators={"AGENT-003": generator_health},
             llm_available=True,
-            llm_model="claude-sonnet-4-5",
+            llm_model="claude-sonnet-4-5-20250514",
             output_base_path="processed/crewai-suggestions",
             supported_departments=["it-engineering", "sales-marketing"],
             supported_asset_types=["skill", "command"],
@@ -182,7 +182,7 @@ class TestHealthEndpoint:
         assert data["version"] == "7.3.0"
         assert data["generators_count"] == 5
         assert data["llm_available"] is True
-        assert data["llm_model"] == "claude-sonnet-4-5"
+        assert data["llm_model"] == "claude-sonnet-4-5-20250514"
 
     @patch.dict('os.environ', {}, clear=True)
     def test_health_endpoint_degraded_no_llm(self, client, mock_generator_service):

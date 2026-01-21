@@ -53,7 +53,7 @@ class ExpansionStrategy(Enum):
 class QueryExpansionConfig:
     """Configuration for query expansion service"""
     # Model configuration
-    model: str = "claude-haiku-4-5"
+    model: str = "claude-3-5-haiku-20241022"
     max_tokens: int = 300
     temperature: float = 0.7
     top_p: float = 0.9

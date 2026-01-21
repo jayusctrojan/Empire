@@ -549,7 +549,7 @@ class DepartmentClassifierTool:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if api_key:
                 self.llm = ChatAnthropic(
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-5-20250514",
                     temperature=0.0,
                     max_tokens=500,
                     api_key=api_key

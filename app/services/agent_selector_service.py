@@ -61,7 +61,7 @@ class AgentCapability(BaseModel):
     agent_name: str
     primary_tasks: List[TaskType]
     secondary_tasks: List[TaskType] = Field(default_factory=list)
-    model: str = "claude-sonnet-4-5"
+    model: str = "claude-3-5-sonnet-20241022"
     description: str = ""
     max_context_tokens: int = 100000
     supports_streaming: bool = True
@@ -128,7 +128,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Query Router",
         primary_tasks=[TaskType.QUERY_ROUTING],
         secondary_tasks=[TaskType.CLASSIFICATION],
-        model="claude-haiku-4-5",
+        model="claude-3-5-haiku-20241022",
         description="Routes queries to appropriate workflow (LangGraph, CrewAI, Simple RAG)",
         cost_tier="low"
     ),
@@ -137,7 +137,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Content Summarizer",
         primary_tasks=[TaskType.SUMMARIZATION],
         secondary_tasks=[TaskType.CONTEXT_SYNTHESIS],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="PDF summary generation with key points extraction"
     ),
     "AGENT-003": AgentCapability(
@@ -145,7 +145,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Entity Extractor",
         primary_tasks=[TaskType.ENTITY_EXTRACTION],
         secondary_tasks=[TaskType.ANALYSIS],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Extracts named entities for knowledge graph population"
     ),
     "AGENT-004": AgentCapability(
@@ -153,7 +153,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Relationship Mapper",
         primary_tasks=[TaskType.RELATIONSHIP_MAPPING],
         secondary_tasks=[TaskType.GRAPH_QUERY],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Maps relationships between entities"
     ),
     "AGENT-005": AgentCapability(
@@ -161,7 +161,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Context Synthesizer",
         primary_tasks=[TaskType.CONTEXT_SYNTHESIS],
         secondary_tasks=[TaskType.SUMMARIZATION, TaskType.ANSWER_GENERATION],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Synthesizes context from multiple sources"
     ),
     "AGENT-006": AgentCapability(
@@ -169,7 +169,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Answer Generator",
         primary_tasks=[TaskType.ANSWER_GENERATION],
         secondary_tasks=[TaskType.WRITING],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Generates final responses with citations"
     ),
     "AGENT-007": AgentCapability(
@@ -177,7 +177,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Citation Validator",
         primary_tasks=[TaskType.CITATION_VALIDATION],
         secondary_tasks=[TaskType.FACT_CHECKING],
-        model="claude-haiku-4-5",
+        model="claude-3-5-haiku-20241022",
         description="Verifies source citations accuracy",
         cost_tier="low"
     ),
@@ -186,7 +186,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Department Classifier",
         primary_tasks=[TaskType.CLASSIFICATION],
         secondary_tasks=[TaskType.QUERY_ROUTING],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Classifies content into 10 business departments"
     ),
     "AGENT-009": AgentCapability(
@@ -194,7 +194,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Senior Research Analyst",
         primary_tasks=[TaskType.RESEARCH, TaskType.ANALYSIS],
         secondary_tasks=[TaskType.ENTITY_EXTRACTION, TaskType.FACT_CHECKING],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Extracts topics, entities, facts with quality assessment"
     ),
     "AGENT-010": AgentCapability(
@@ -202,7 +202,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Content Strategist",
         primary_tasks=[TaskType.SUMMARIZATION, TaskType.WRITING],
         secondary_tasks=[TaskType.CONTEXT_SYNTHESIS],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Generates executive summaries, findings, recommendations"
     ),
     "AGENT-011": AgentCapability(
@@ -210,7 +210,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Fact Checker",
         primary_tasks=[TaskType.FACT_CHECKING],
         secondary_tasks=[TaskType.CITATION_VALIDATION, TaskType.REVIEW],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Verifies claims with confidence scores and citations"
     ),
     "AGENT-012": AgentCapability(
@@ -218,7 +218,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Research Agent",
         primary_tasks=[TaskType.RESEARCH],
         secondary_tasks=[TaskType.ANALYSIS],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Web/academic search, query expansion, source credibility"
     ),
     "AGENT-013": AgentCapability(
@@ -226,7 +226,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Analysis Agent",
         primary_tasks=[TaskType.ANALYSIS],
         secondary_tasks=[TaskType.RESEARCH, TaskType.ENTITY_EXTRACTION],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Pattern detection, statistical analysis, correlations"
     ),
     "AGENT-014": AgentCapability(
@@ -234,7 +234,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Writing Agent",
         primary_tasks=[TaskType.WRITING],
         secondary_tasks=[TaskType.SUMMARIZATION, TaskType.ANSWER_GENERATION],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Report generation, multi-format output, citations"
     ),
     "AGENT-015": AgentCapability(
@@ -242,7 +242,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Review Agent",
         primary_tasks=[TaskType.REVIEW],
         secondary_tasks=[TaskType.FACT_CHECKING, TaskType.CITATION_VALIDATION],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Quality assurance, fact verification, revision loop"
     ),
     "AGENT-016": AgentCapability(
@@ -250,7 +250,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Memory Agent",
         primary_tasks=[TaskType.MEMORY_MANAGEMENT],
         secondary_tasks=[TaskType.CONTEXT_SYNTHESIS],
-        model="claude-haiku-4-5",
+        model="claude-3-5-haiku-20241022",
         description="User context management and personalization",
         cost_tier="low"
     ),
@@ -259,7 +259,7 @@ AGENT_CAPABILITIES: Dict[str, AgentCapability] = {
         agent_name="Graph Query Agent",
         primary_tasks=[TaskType.GRAPH_QUERY],
         secondary_tasks=[TaskType.RELATIONSHIP_MAPPING, TaskType.ENTITY_EXTRACTION],
-        model="claude-sonnet-4-5",
+        model="claude-3-5-sonnet-20241022",
         description="Neo4j graph traversal and Cypher query generation"
     ),
 }

@@ -234,7 +234,7 @@ class TestClassifierClassifyEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_classify_missing_content_returns_422(self, client):
         """Test that missing content returns validation error."""
@@ -243,7 +243,7 @@ class TestClassifierClassifyEndpoint:
             json={}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -298,7 +298,7 @@ class TestClassifierBatchEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_batch_classify_too_many_items_returns_422(self, client):
         """Test that too many items returns validation error."""
@@ -310,7 +310,7 @@ class TestClassifierBatchEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -349,7 +349,7 @@ class TestClassifierKeywordEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -451,18 +451,15 @@ class TestClassifierErrorHandling:
 
     def test_classify_service_error_returns_500(self, client, sample_technical_content):
         """Test that service errors return 500 status."""
-        from app.routes.department_classifier import get_classifier_service
-        from app.main import app
-
         mock_service = MagicMock()
         mock_service.classify_content = AsyncMock(
             side_effect=Exception("Classification service unavailable")
         )
 
-        # Use FastAPI's dependency override system
-        app.dependency_overrides[get_classifier_service] = lambda: mock_service
-
-        try:
+        with patch(
+            "app.routes.department_classifier.get_classifier_service",
+            return_value=mock_service
+        ):
             response = client.post(
                 "/api/classifier/classify",
                 json={
@@ -471,8 +468,6 @@ class TestClassifierErrorHandling:
             )
 
             assert response.status_code == 500
-        finally:
-            app.dependency_overrides.pop(get_classifier_service, None)
 
     def test_invalid_json_returns_422(self, client):
         """Test that invalid JSON returns 422."""
@@ -482,4 +477,4 @@ class TestClassifierErrorHandling:
             headers={"Content-Type": "application/json"}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422

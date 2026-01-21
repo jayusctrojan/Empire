@@ -21,7 +21,6 @@ from datetime import datetime, timedelta
 from enum import Enum
 from io import BytesIO
 
-import logging
 import structlog
 from tenacity import (
     retry,
@@ -33,7 +32,7 @@ from tenacity import (
 )
 from prometheus_client import Counter, Histogram, Gauge
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
-from b2sdk.v2.exception import B2Error, B2ConnectionError, FileNotPresent
+from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeoutError, FileNotPresent
 
 from app.services.b2_storage import get_b2_service, B2StorageService, B2Folder, ProcessingStatus
 from app.core.connections import get_redis
@@ -431,11 +430,12 @@ class ResilientB2StorageService:
             retry=retry_if_exception_type((
                 B2Error,
                 B2ConnectionError,
+                B2RequestTimeoutError,
                 ConnectionError,
                 TimeoutError
             )),
-            before_sleep=before_sleep_log(logger, logging.INFO),
-            reraise=False
+            before_sleep=before_sleep_log(logger, structlog.stdlib.INFO),
+            reraise=True
         )
 
     async def upload_file(
@@ -447,7 +447,7 @@ class ResilientB2StorageService:
         metadata: Optional[dict] = None,
         encrypt: bool = False,
         encryption_password: Optional[str] = None,
-        should_verify_checksum: bool = True
+        verify_checksum: bool = True
     ) -> Dict[str, Any]:
         """
         Upload a file with retry logic and checksum verification.
@@ -460,7 +460,7 @@ class ResilientB2StorageService:
             metadata: File metadata
             encrypt: Whether to encrypt
             encryption_password: Encryption password
-            should_verify_checksum: Whether to verify checksum after upload
+            verify_checksum: Whether to verify checksum after upload
 
         Returns:
             Dict with upload result
@@ -505,7 +505,7 @@ class ResilientB2StorageService:
             result = await _do_upload()
 
             # Verify checksum if requested
-            if should_verify_checksum and local_checksum:
+            if verify_checksum and local_checksum:
                 # B2 stores SHA1 in content_sha1 field
                 remote_checksum = result.get("content_sha1")
                 if remote_checksum:
@@ -584,7 +584,7 @@ class ResilientB2StorageService:
         file_id: str,
         file_name: str,
         destination_path: str,
-        should_verify_checksum: bool = True,
+        verify_checksum: bool = True,
         expected_checksum: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -594,7 +594,7 @@ class ResilientB2StorageService:
             file_id: B2 file ID
             file_name: File name in B2
             destination_path: Local path to save file
-            should_verify_checksum: Whether to verify checksum
+            verify_checksum: Whether to verify checksum
             expected_checksum: Expected SHA1 checksum
 
         Returns:
@@ -622,27 +622,22 @@ class ResilientB2StorageService:
                     destination_path=destination_path
                 )
 
-            await _do_download()
-
-            # Build result dictionary
-            local_checksum = None
-            checksum_verified = False
+            result = await _do_download()
 
             # Verify checksum if requested
-            if should_verify_checksum and os.path.exists(destination_path):
+            if verify_checksum and os.path.exists(destination_path):
                 local_checksum = calculate_sha1_file(destination_path)
 
                 if expected_checksum:
                     verify_checksum(local_checksum, expected_checksum, destination_path)
                     self._stats["checksum_verifications"] += 1
-                    checksum_verified = True
 
-            result = {
-                "success": True,
-                "file_path": destination_path,
-                "checksum": local_checksum,
-                "checksum_verified": checksum_verified
-            }
+                result = {
+                    "success": True,
+                    "file_path": destination_path,
+                    "checksum": local_checksum,
+                    "checksum_verified": expected_checksum is not None
+                }
 
             # Record success metrics
             duration = time.time() - start_time

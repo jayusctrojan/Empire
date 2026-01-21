@@ -39,7 +39,7 @@ def reranking_config_prod():
     """Create test configuration for production (Claude API)"""
     return RerankingConfig(
         provider=RerankingProvider.CLAUDE,
-        model="claude-haiku-4-5",
+        model="claude-3-5-haiku-20241022",
         top_k=10,
         max_input_results=30,
         score_threshold=0.5,
@@ -163,7 +163,7 @@ async def test_rerank_with_claude_provider(reranking_config_prod, sample_search_
 
     # Verify correct model was used
     call_args = mock_anthropic_client.messages.create.call_args
-    assert call_args.kwargs["model"] == "claude-haiku-4-5"
+    assert call_args.kwargs["model"] == "claude-3-5-haiku-20241022"
 
 
 @pytest.mark.asyncio

@@ -123,7 +123,7 @@ class AgentSpec(BaseModel):
     goal: str
     backstory: str
     tools: List[str] = Field(default_factory=list)
-    llm: str = "claude-sonnet-4-5"
+    llm: str = "claude-sonnet-4-5-20250514"
     verbose: bool = True
     allow_delegation: bool = False
 
@@ -221,7 +221,7 @@ class BaseAssetGenerator(ABC):
         async with AgentMetricsContext(
             self.agent_id,
             "generate",
-            model="claude-sonnet-4-5"
+            model="claude-sonnet-4-5-20250514"
         ) as metrics_ctx:
             start_time = datetime.now()
 
@@ -335,7 +335,7 @@ class SkillGeneratorAgent(BaseAssetGenerator):
         if self.llm:
             try:
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-5-20250514",
                     max_tokens=2000,
                     messages=[{
                         "role": "user",
@@ -378,7 +378,7 @@ tags:
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.SKILL_GENERATOR,
-                    "claude-sonnet-4-5",
+                    "claude-sonnet-4-5-20250514",
                     "success",
                     input_tokens,
                     output_tokens
@@ -396,7 +396,7 @@ tags:
 
             except Exception as e:
                 logger.warning("LLM skill generation failed", error=str(e))
-                track_llm_call(AgentID.SKILL_GENERATOR, "claude-sonnet-4-5", "failure")
+                track_llm_call(AgentID.SKILL_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic skill
         skill = SkillSpec(
@@ -450,7 +450,7 @@ class CommandGeneratorAgent(BaseAssetGenerator):
         if self.llm:
             try:
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-5-20250514",
                     max_tokens=1500,
                     messages=[{
                         "role": "user",
@@ -478,7 +478,7 @@ Output ONLY the Markdown content (no code blocks, no explanation):"""
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.COMMAND_GENERATOR,
-                    "claude-sonnet-4-5",
+                    "claude-sonnet-4-5-20250514",
                     "success",
                     input_tokens,
                     output_tokens
@@ -493,7 +493,7 @@ Output ONLY the Markdown content (no code blocks, no explanation):"""
 
             except Exception as e:
                 logger.warning("LLM command generation failed", error=str(e))
-                track_llm_call(AgentID.COMMAND_GENERATOR, "claude-sonnet-4-5", "failure")
+                track_llm_call(AgentID.COMMAND_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic command
         command_name = re.sub(r'[^a-z0-9-]', '-', request.name.lower())
@@ -562,7 +562,7 @@ class AgentGeneratorAgent(BaseAssetGenerator):
         if self.llm:
             try:
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-5-20250514",
                     max_tokens=2000,
                     messages=[{
                         "role": "user",
@@ -590,7 +590,7 @@ backstory: |
 tools:
   - tool_name_1
   - tool_name_2
-llm: claude-sonnet-4-5
+llm: claude-sonnet-4-5-20250514
 verbose: true
 allow_delegation: false
 max_iterations: 10
@@ -603,7 +603,7 @@ memory: true"""
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.AGENT_GENERATOR,
-                    "claude-sonnet-4-5",
+                    "claude-sonnet-4-5-20250514",
                     "success",
                     input_tokens,
                     output_tokens
@@ -620,7 +620,7 @@ memory: true"""
 
             except Exception as e:
                 logger.warning("LLM agent generation failed", error=str(e))
-                track_llm_call(AgentID.AGENT_GENERATOR, "claude-sonnet-4-5", "failure")
+                track_llm_call(AgentID.AGENT_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic agent config
         agent = AgentSpec(
@@ -629,7 +629,7 @@ memory: true"""
             goal=request.description,
             backstory=f"An expert in {request.department} with deep knowledge of {request.name}. Dedicated to delivering high-quality results.",
             tools=["search", "analyze", "report"],
-            llm="claude-sonnet-4-5"
+            llm="claude-sonnet-4-5-20250514"
         )
 
         return yaml.dump(agent.model_dump(), default_flow_style=False, sort_keys=False)
@@ -672,7 +672,7 @@ class PromptGeneratorAgent(BaseAssetGenerator):
         if self.llm:
             try:
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-5-20250514",
                     max_tokens=2000,
                     messages=[{
                         "role": "user",
@@ -723,7 +723,7 @@ tags:
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.PROMPT_GENERATOR,
-                    "claude-sonnet-4-5",
+                    "claude-sonnet-4-5-20250514",
                     "success",
                     input_tokens,
                     output_tokens
@@ -740,7 +740,7 @@ tags:
 
             except Exception as e:
                 logger.warning("LLM prompt generation failed", error=str(e))
-                track_llm_call(AgentID.PROMPT_GENERATOR, "claude-sonnet-4-5", "failure")
+                track_llm_call(AgentID.PROMPT_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic prompt template
         prompt = PromptSpec(
@@ -800,7 +800,7 @@ class WorkflowGeneratorAgent(BaseAssetGenerator):
         if self.llm:
             try:
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5",
+                    model="claude-sonnet-4-5-20250514",
                     max_tokens=3000,
                     messages=[{
                         "role": "user",
@@ -848,7 +848,7 @@ Output ONLY valid JSON (no markdown code blocks, no explanation). Use this struc
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.WORKFLOW_GENERATOR,
-                    "claude-sonnet-4-5",
+                    "claude-sonnet-4-5-20250514",
                     "success",
                     input_tokens,
                     output_tokens
@@ -865,7 +865,7 @@ Output ONLY valid JSON (no markdown code blocks, no explanation). Use this struc
 
             except Exception as e:
                 logger.warning("LLM workflow generation failed", error=str(e))
-                track_llm_call(AgentID.WORKFLOW_GENERATOR, "claude-sonnet-4-5", "failure")
+                track_llm_call(AgentID.WORKFLOW_GENERATOR, "claude-sonnet-4-5-20250514", "failure")
 
         # Fallback: Generate basic workflow
         workflow_name = re.sub(r'[^a-z0-9_]', '_', request.name.lower())

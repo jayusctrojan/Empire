@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Copy, Check, RotateCcw, Trash2, ThumbsUp, ThumbsDown, Sparkles, Info, Lock, LockOpen } from 'lucide-react'
+import { Copy, Check, RotateCcw, Trash2, ThumbsUp, ThumbsDown, Sparkles, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Message, Source } from '@/types'
 import { CitationPopover } from './CitationPopover'
-import { ProtectedMessageIcon } from './ProtectedMessageIndicator'
 
 interface MessageBubbleProps {
   message: Message
@@ -15,10 +14,6 @@ interface MessageBubbleProps {
   onDelete?: () => void
   onRate?: (rating: -1 | 0 | 1, feedback?: string) => void
   onImprove?: () => void
-  /** Toggle message protection status */
-  onToggleProtection?: () => void
-  /** Message position in conversation (0 = first) */
-  position?: number
 }
 
 export function MessageBubble({
@@ -29,17 +24,12 @@ export function MessageBubble({
   onDelete,
   onRate,
   onImprove,
-  onToggleProtection,
-  position,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [showFeedbackInput, setShowFeedbackInput] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
   const [pendingRating, setPendingRating] = useState<-1 | 1 | null>(null)
   const isUser = message.role === 'user'
-
-  // Check if message is system-protected (cannot be toggled by user)
-  const isSystemProtected = position === 0 || message.content.toLowerCase().startsWith('/system')
 
   const handleRating = (rating: -1 | 1) => {
     if (rating === -1) {
@@ -167,16 +157,6 @@ export function MessageBubble({
           isStreaming && 'animate-pulse'
         )}
       >
-        {/* Protection indicator (visible for protected messages) */}
-        {message.isProtected && (
-          <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-white/10">
-            <ProtectedMessageIcon isProtected={true} />
-            <span className="text-xs text-amber-400/80">
-              {isSystemProtected ? 'Auto-protected' : 'Protected'}
-            </span>
-          </div>
-        )}
-
         {/* Message content */}
         <div className="whitespace-pre-wrap break-words">
           {renderContent(message.content, message.sources)}
@@ -304,29 +284,6 @@ export function MessageBubble({
               >
                 <Trash2 className="w-4 h-4" />
               </button>
-            )}
-
-            {/* Protection toggle */}
-            {onToggleProtection && !isSystemProtected && (
-              <>
-                <div className="w-px h-4 bg-empire-border mx-1" />
-                <button
-                  onClick={onToggleProtection}
-                  className={cn(
-                    "p-1.5 rounded-lg transition-colors",
-                    message.isProtected
-                      ? "text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
-                      : "text-empire-text-muted hover:bg-amber-500/20 hover:text-amber-400"
-                  )}
-                  title={message.isProtected ? "Remove protection" : "Protect message"}
-                >
-                  {message.isProtected ? (
-                    <Lock className="w-4 h-4" />
-                  ) : (
-                    <LockOpen className="w-4 h-4" />
-                  )}
-                </button>
-              </>
             )}
 
             {/* KB Mode actions */}

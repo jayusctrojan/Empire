@@ -610,7 +610,7 @@ class TestLLMErrors:
         )
 
         assert exc.error_code == "LLM_CONTEXT_EXCEEDED"
-        assert exc.status_code == 422  # Validation error - context too large
+        assert exc.status_code == 422
         assert exc.retriable is False
         assert exc.details["context_size"] == 250000
 

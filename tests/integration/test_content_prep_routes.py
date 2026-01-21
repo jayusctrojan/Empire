@@ -34,101 +34,81 @@ def mock_content_prep_agent():
     """Mock the ContentPrepAgent."""
     mock_agent = MagicMock()
 
-    # Mock analyze_folder result - must match AnalyzeResponse/ContentSetSummary schema
+    # Mock analyze_folder result
     mock_agent.analyze_folder = AsyncMock(return_value={
         "folder": "pending/courses/",
         "content_sets": [
             {
                 "id": "set-123",
                 "name": "Python Course",
-                "detection_method": "pattern",
-                "files_count": 10,
-                "is_complete": True,
-                "missing_files": [],
-                "processing_status": "pending",
-                "confidence": 0.95
+                "set_type": "course",
+                "file_count": 10,
+                "ordering_confidence": 0.95,
+                "files": []
             }
         ],
         "standalone_files": [],
         "total_files": 10,
-        "detection_mode": "auto",
-        "analysis_time_ms": 100
+        "detection_mode": "auto"
     })
 
-    # Mock list_sets result - must match ContentSetResponse schema (includes files)
+    # Mock list_sets result
     mock_agent.list_sets = AsyncMock(return_value=[
         {
             "id": "set-123",
             "name": "Python Course",
-            "detection_method": "pattern",
-            "files_count": 2,
-            "is_complete": True,
-            "missing_files": [],
-            "processing_status": "pending",
-            "confidence": 0.95,
-            "files": [
-                {"filename": "01-intro.pdf", "sequence": 1, "b2_path": "pending/courses/01-intro.pdf", "estimated_complexity": "low", "size_bytes": 1024},
-                {"filename": "02-basics.pdf", "sequence": 2, "b2_path": "pending/courses/02-basics.pdf", "estimated_complexity": "medium", "size_bytes": 2048}
-            ]
+            "set_type": "course",
+            "status": "pending",
+            "file_count": 10,
+            "ordering_confidence": 0.95,
+            "files": []
         },
         {
             "id": "set-456",
             "name": "JavaScript Guide",
-            "detection_method": "pattern",
-            "files_count": 1,
-            "is_complete": True,
-            "missing_files": [],
-            "processing_status": "processing",
-            "confidence": 0.88,
-            "files": [
-                {"filename": "js-guide.pdf", "sequence": 1, "b2_path": "pending/docs/js-guide.pdf", "estimated_complexity": "medium", "size_bytes": 4096}
-            ]
+            "set_type": "documentation",
+            "status": "processing",
+            "file_count": 5,
+            "ordering_confidence": 0.88,
+            "files": []
         }
     ])
 
-    # Mock get_set result - must match ContentSetResponse/ContentFileResponse schema
+    # Mock get_set result
     mock_agent.get_set = AsyncMock(return_value={
         "id": "set-123",
         "name": "Python Course",
-        "detection_method": "pattern",
-        "files_count": 3,
-        "is_complete": True,
-        "missing_files": [],
-        "processing_status": "pending",
-        "confidence": 0.95,
+        "set_type": "course",
+        "status": "pending",
+        "file_count": 10,
+        "ordering_confidence": 0.95,
         "files": [
-            {"filename": "01-intro.pdf", "sequence": 1, "b2_path": "pending/courses/01-intro.pdf", "estimated_complexity": "low", "size_bytes": 1024},
-            {"filename": "02-basics.pdf", "sequence": 2, "b2_path": "pending/courses/02-basics.pdf", "estimated_complexity": "medium", "size_bytes": 2048},
-            {"filename": "03-advanced.pdf", "sequence": 3, "b2_path": "pending/courses/03-advanced.pdf", "estimated_complexity": "high", "size_bytes": 3072}
+            {"file_id": "f1", "name": "01-intro.pdf", "sequence": 1},
+            {"file_id": "f2", "name": "02-basics.pdf", "sequence": 2},
+            {"file_id": "f3", "name": "03-advanced.pdf", "sequence": 3}
         ]
     })
 
-    # Mock validate_completeness result - must match ValidateResponse schema
+    # Mock validate_completeness result
     mock_agent.validate_completeness = AsyncMock(return_value={
-        "set_id": "set-123",
+        "content_set_id": "set-123",
         "is_complete": True,
         "missing_files": [],
-        "total_files": 3,
-        "gaps_detected": 0,
-        "can_proceed": True,
-        "requires_acknowledgment": False
+        "requires_acknowledgment": False,
+        "validation_details": {"checked_sequences": True}
     })
 
-    # Mock generate_manifest result - must match ManifestResponse schema
+    # Mock generate_manifest result
     mock_agent.generate_manifest = AsyncMock(return_value={
         "manifest_id": "manifest-123",
         "content_set_id": "set-123",
-        "content_set_name": "Python Course",
-        "ordered_files": [
-            {"sequence": 1, "file": "01-intro.pdf", "b2_path": "pending/courses/01-intro.pdf", "dependencies": [], "complexity": "low"},
-            {"sequence": 2, "file": "02-basics.pdf", "b2_path": "pending/courses/02-basics.pdf", "dependencies": ["01-intro.pdf"], "complexity": "medium"},
-            {"sequence": 3, "file": "03-advanced.pdf", "b2_path": "pending/courses/03-advanced.pdf", "dependencies": ["02-basics.pdf"], "complexity": "high"}
+        "processing_queue": [
+            {"file_id": "f1", "order": 1, "dependencies": []},
+            {"file_id": "f2", "order": 2, "dependencies": ["f1"]},
+            {"file_id": "f3", "order": 3, "dependencies": ["f2"]}
         ],
         "total_files": 3,
-        "warnings": [],
-        "estimated_time_seconds": 300,
-        "created_at": "2024-01-15T10:30:00Z",
-        "context": {}
+        "created_at": "2024-01-15T10:30:00Z"
     })
 
     # Mock resolve_order_with_clarification result
@@ -301,9 +281,7 @@ class TestContentPrepAnalyzeEndpoint:
             data = response.json()
             assert "content_sets" in data
             assert "standalone_files" in data
-            assert "analysis_time_ms" in data
-            # Verify content_sets structure
-            assert len(data["content_sets"]) >= 1
+            assert data["total_files"] == 10
 
     def test_analyze_with_pattern_mode(self, client, mock_content_prep_agent):
         """Test analysis with pattern detection mode."""
@@ -404,13 +382,11 @@ class TestContentPrepValidateEndpoint:
     def test_validate_incomplete_set(self, client, mock_content_prep_agent):
         """Test validating an incomplete content set."""
         mock_content_prep_agent.validate_completeness = AsyncMock(return_value={
-            "set_id": "set-123",
+            "content_set_id": "set-123",
             "is_complete": False,
             "missing_files": ["04-conclusion.pdf"],
-            "total_files": 4,
-            "gaps_detected": 1,
-            "can_proceed": True,
-            "requires_acknowledgment": True
+            "requires_acknowledgment": True,
+            "validation_details": {"checked_sequences": True}
         })
 
         with patch(
@@ -463,7 +439,7 @@ class TestContentPrepManifestEndpoint:
             assert response.status_code == 200
             data = response.json()
             assert "manifest_id" in data
-            assert "ordered_files" in data
+            assert "processing_queue" in data
             assert data["total_files"] == 3
 
     def test_generate_manifest_incomplete_without_acknowledgment_returns_400(self, client, mock_content_prep_agent):
@@ -605,7 +581,7 @@ class TestContentPrepCleanupEndpoint:
     def test_trigger_async_cleanup(self, client):
         """Test triggering async cleanup."""
         with patch(
-            "app.tasks.content_prep_tasks.cleanup_old_content_sets"
+            "app.routes.content_prep.cleanup_old_content_sets"
         ) as mock_task:
             mock_result = MagicMock()
             mock_result.id = "task-123"
@@ -661,4 +637,4 @@ class TestContentPrepErrorHandling:
             headers={"Content-Type": "application/json"}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422

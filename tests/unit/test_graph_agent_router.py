@@ -616,8 +616,7 @@ class TestErrorHandling:
             json={},  # Missing required query field
         )
 
-        # FastAPI returns 422 for Pydantic validation errors
-        assert response.status_code == 422
+        assert response.status_code == 422  # Validation error
 
     def test_invalid_expansion_depth(self):
         """Test handling of invalid expansion depth."""
@@ -629,8 +628,7 @@ class TestErrorHandling:
             },
         )
 
-        # FastAPI returns 422 for Pydantic validation errors
-        assert response.status_code == 422
+        assert response.status_code == 422  # Validation error
 
     @patch("app.routes.graph_agent.get_document_structure_service")
     def test_service_exception_handling(self, mock_get_service):

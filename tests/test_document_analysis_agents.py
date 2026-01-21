@@ -793,8 +793,7 @@ class TestAPIEndpoints:
             json={"content": SHORT_CONTENT}
         )
 
-        # FastAPI returns 422 for Pydantic validation errors, or 400 for custom validation
-        assert response.status_code in [400, 422]
+        assert response.status_code == 422  # Validation error
 
     def test_research_endpoint_validation(self, client):
         """Test research endpoint with invalid input"""
@@ -803,8 +802,7 @@ class TestAPIEndpoints:
             json={"content": SHORT_CONTENT}
         )
 
-        # FastAPI returns 422 for Pydantic validation errors, or 400 for custom validation
-        assert response.status_code in [400, 422]
+        assert response.status_code == 422
 
     def test_strategy_endpoint_validation(self, client):
         """Test strategy endpoint with invalid input"""
@@ -813,8 +811,7 @@ class TestAPIEndpoints:
             json={"content": SHORT_CONTENT}
         )
 
-        # FastAPI returns 422 for Pydantic validation errors, or 400 for custom validation
-        assert response.status_code in [400, 422]
+        assert response.status_code == 422
 
     def test_fact_check_endpoint_validation(self, client):
         """Test fact-check endpoint with invalid input"""
@@ -823,8 +820,7 @@ class TestAPIEndpoints:
             json={"content": SHORT_CONTENT}
         )
 
-        # FastAPI returns 422 for Pydantic validation errors, or 400 for custom validation
-        assert response.status_code in [400, 422]
+        assert response.status_code == 422
 
 
 # =============================================================================

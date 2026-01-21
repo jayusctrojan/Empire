@@ -126,20 +126,11 @@ class AgentInteractionResponse(BaseModel):
     priority: int = 0
     requires_response: bool = False
     response_deadline: Optional[datetime] = None
-    is_broadcast: bool = Field(default=False, description="True if to_agent_id is null")
+    is_broadcast: bool = Field(description="True if to_agent_id is null")
 
     # Timestamps
     created_at: datetime
     updated_at: Optional[datetime] = None
-
-    @validator("is_broadcast", pre=True, always=True)
-    def compute_is_broadcast(cls, v, values):
-        """Compute is_broadcast based on to_agent_id being null"""
-        # If value is provided explicitly, use it
-        if v is not None:
-            return v
-        # Otherwise, compute based on to_agent_id
-        return values.get("to_agent_id") is None
 
     class Config:
         from_attributes = True

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Conversation, Message, Source, SourceCitation, CompactionEvent } from '@/types'
+import type { Conversation, Message, Source, SourceCitation } from '@/types'
 
 // Response metadata from KB mode
 export interface KBResponseMetadata {
@@ -31,10 +31,6 @@ interface ChatState {
   // Error state
   error: string | null
 
-  // Compaction state (Feature 011 - Task 204)
-  compactionEvents: CompactionEvent[]
-  isCompacting: boolean
-
   // Actions
   setConversations: (conversations: Conversation[]) => void
   addConversation: (conversation: Conversation) => void
@@ -65,12 +61,6 @@ interface ChatState {
 
   // Error actions
   setError: (error: string | null) => void
-
-  // Compaction actions (Feature 011 - Task 204)
-  setCompacting: (isCompacting: boolean) => void
-  addCompactionEvent: (event: CompactionEvent) => void
-  setCompactionEvents: (events: CompactionEvent[]) => void
-  clearCompactionEvents: () => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -87,8 +77,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamingMetadata: null,
   pendingFiles: [],
   error: null,
-  compactionEvents: [],
-  isCompacting: false,
 
   // Conversation actions
   setConversations: (conversations) => set({ conversations }),
@@ -106,8 +94,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamingContent: '',
       streamingSources: [],
       error: null,
-      compactionEvents: [],
-      isCompacting: false,
     }),
 
   setActiveProject: (id) => set({ activeProjectId: id }),
@@ -230,17 +216,4 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Error actions
   setError: (error) => set({ error }),
-
-  // Compaction actions (Feature 011 - Task 204)
-  setCompacting: (isCompacting) => set({ isCompacting }),
-
-  addCompactionEvent: (event) =>
-    set((state) => ({
-      compactionEvents: [...state.compactionEvents, event],
-      isCompacting: false,
-    })),
-
-  setCompactionEvents: (events) => set({ compactionEvents: events }),
-
-  clearCompactionEvents: () => set({ compactionEvents: [], isCompacting: false }),
 }))

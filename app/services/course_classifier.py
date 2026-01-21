@@ -17,7 +17,7 @@ class CourseClassifier:
 
     def __init__(self):
         self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.model = "claude-haiku-4-5"  # Fast and cheap
+        self.model = "claude-3-5-haiku-20241022"  # Fast and cheap
 
     async def classify_and_extract(self, filename: str, content_preview: str) -> Dict:
         """

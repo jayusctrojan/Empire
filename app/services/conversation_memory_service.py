@@ -7,9 +7,8 @@ Provides context window management and recency-weighted retrieval for personaliz
 
 import logging
 from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from uuid import UUID, uuid4
-import re
 
 try:
     from app.core.database import get_supabase
@@ -17,55 +16,6 @@ except ImportError:
     get_supabase = None
 
 logger = logging.getLogger(__name__)
-
-
-def parse_iso_datetime(value: str) -> datetime:
-    """
-    Parse ISO format datetime string robustly.
-    Handles formats that Python 3.9's fromisoformat() can't parse,
-    such as timestamps with timezone suffixes (+00:00) and variable microsecond precision.
-    """
-    if not value:
-        return None
-
-    try:
-        # First try standard fromisoformat (works in Python 3.11+)
-        return datetime.fromisoformat(value)
-    except ValueError:
-        pass
-
-    # Handle +00:00 timezone suffix (replace with +0000 for strptime)
-    # Also normalize microseconds to 6 digits
-    normalized = value
-
-    # Replace +00:00 or -00:00 style timezone with +0000 style
-    normalized = re.sub(r'([+-])(\d{2}):(\d{2})$', r'\1\2\3', normalized)
-
-    # Try parsing with timezone
-    try:
-        return datetime.strptime(normalized, '%Y-%m-%dT%H:%M:%S.%f%z')
-    except ValueError:
-        pass
-
-    try:
-        return datetime.strptime(normalized, '%Y-%m-%dT%H:%M:%S%z')
-    except ValueError:
-        pass
-
-    # Try without timezone
-    try:
-        return datetime.strptime(value.split('+')[0].split('-')[0][:26], '%Y-%m-%dT%H:%M:%S.%f')
-    except ValueError:
-        pass
-
-    try:
-        return datetime.strptime(value.split('+')[0].split('Z')[0], '%Y-%m-%dT%H:%M:%S')
-    except ValueError:
-        pass
-
-    # Last resort - return None instead of crashing
-    logger.warning(f"Could not parse datetime: {value}")
-    return None
 
 
 class MemoryNode:
@@ -142,11 +92,11 @@ class MemoryNode:
             confidence_score=data.get("confidence_score", 1.0),
             source_type=data.get("source_type", "conversation"),
             importance_score=data.get("importance_score", 0.5),
-            first_mentioned_at=parse_iso_datetime(data["first_mentioned_at"]) if data.get("first_mentioned_at") else None,
-            last_mentioned_at=parse_iso_datetime(data["last_mentioned_at"]) if data.get("last_mentioned_at") else None,
+            first_mentioned_at=datetime.fromisoformat(data["first_mentioned_at"]) if data.get("first_mentioned_at") else None,
+            last_mentioned_at=datetime.fromisoformat(data["last_mentioned_at"]) if data.get("last_mentioned_at") else None,
             mention_count=data.get("mention_count", 1),
             is_active=data.get("is_active", True),
-            expires_at=parse_iso_datetime(data["expires_at"]) if data.get("expires_at") else None,
+            expires_at=datetime.fromisoformat(data["expires_at"]) if data.get("expires_at") else None,
             metadata=data.get("metadata", {})
         )
 
@@ -210,8 +160,8 @@ class MemoryEdge:
             relationship_type=data.get("relationship_type", "related_to"),
             strength=data.get("strength", 1.0),
             directionality=data.get("directionality", "directed"),
-            first_observed_at=parse_iso_datetime(data["first_observed_at"]) if data.get("first_observed_at") else None,
-            last_observed_at=parse_iso_datetime(data["last_observed_at"]) if data.get("last_observed_at") else None,
+            first_observed_at=datetime.fromisoformat(data["first_observed_at"]) if data.get("first_observed_at") else None,
+            last_observed_at=datetime.fromisoformat(data["last_observed_at"]) if data.get("last_observed_at") else None,
             observation_count=data.get("observation_count", 1),
             is_active=data.get("is_active", True),
             metadata=data.get("metadata", {})
@@ -576,23 +526,14 @@ class ConversationMemoryService:
                 return []
 
             # Calculate weighted scores
-            now = datetime.now(timezone.utc)
+            now = datetime.now()
             scored_memories = []
 
             for row in response.data:
                 node = MemoryNode.from_dict(row)
 
                 # Recency score (exponential decay)
-                # Handle timezone comparison - make both aware or both naive
-                last_mentioned = node.last_mentioned_at
-                if last_mentioned is None:
-                    hours_ago = time_decay_hours  # Treat as very old
-                elif last_mentioned.tzinfo is None:
-                    # Naive datetime - assume UTC
-                    last_mentioned = last_mentioned.replace(tzinfo=timezone.utc)
-                    hours_ago = (now - last_mentioned).total_seconds() / 3600
-                else:
-                    hours_ago = (now - last_mentioned).total_seconds() / 3600
+                hours_ago = (now - node.last_mentioned_at).total_seconds() / 3600
                 recency_score = max(0, 1 - (hours_ago / time_decay_hours))
 
                 # Importance score (from node)

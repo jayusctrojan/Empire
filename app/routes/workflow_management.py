@@ -221,64 +221,6 @@ async def list_workflows(
     )
 
 
-# Health check endpoint MUST be defined before /{workflow_id} to avoid route matching issues
-@router.get(
-    "/health",
-    summary="Workflow Service Health",
-    description="Check workflow management service health."
-)
-async def health_check() -> Dict[str, Any]:
-    """Health check for workflow service."""
-    manager = get_workflow_manager()
-
-    try:
-        await manager.initialize()
-        metrics = manager.get_metrics()
-
-        return {
-            "status": "healthy",
-            "storage_backend": manager.state_manager.backend.value,
-            "active_workflows": metrics.get("running", 0),
-            "total_workflows": metrics.get("total_workflows", 0),
-            "shutdown_handler_active": manager.shutdown_handler._enable_shutdown_handler if hasattr(manager.shutdown_handler, '_enable_shutdown_handler') else True,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-
-# Metrics summary endpoint MUST be defined before /{workflow_id}
-@router.get(
-    "/metrics/summary",
-    response_model=WorkflowMetricsResponse,
-    summary="Get Metrics Summary",
-    description="Get aggregated metrics across all workflows."
-)
-async def get_metrics_summary() -> WorkflowMetricsResponse:
-    """Get aggregated workflow metrics."""
-    manager = get_workflow_manager()
-    await manager.initialize()
-
-    metrics = manager.get_metrics()
-
-    return WorkflowMetricsResponse(
-        total_workflows=metrics.get("total_workflows", 0),
-        completed=metrics.get("completed", 0),
-        failed=metrics.get("failed", 0),
-        cancelled=metrics.get("cancelled", 0),
-        running=metrics.get("running", 0),
-        success_rate=metrics.get("success_rate", 0.0),
-        average_duration=metrics.get("average_duration", 0.0),
-        total_tasks=metrics.get("total_tasks", 0),
-        completed_tasks=metrics.get("completed_tasks", 0),
-        failed_tasks=metrics.get("failed_tasks", 0),
-    )
-
-
 @router.get(
     "/{workflow_id}",
     response_model=WorkflowDetailResponse,
@@ -511,8 +453,35 @@ async def complete_workflow_endpoint(
 
 
 # =============================================================================
-# METRICS AND MONITORING ENDPOINTS (Workflow-specific routes)
+# METRICS AND MONITORING ENDPOINTS
 # =============================================================================
+
+@router.get(
+    "/metrics/summary",
+    response_model=WorkflowMetricsResponse,
+    summary="Get Metrics Summary",
+    description="Get aggregated metrics across all workflows."
+)
+async def get_metrics_summary() -> WorkflowMetricsResponse:
+    """Get aggregated workflow metrics."""
+    manager = get_workflow_manager()
+    await manager.initialize()
+
+    metrics = manager.get_metrics()
+
+    return WorkflowMetricsResponse(
+        total_workflows=metrics.get("total_workflows", 0),
+        completed=metrics.get("completed", 0),
+        failed=metrics.get("failed", 0),
+        cancelled=metrics.get("cancelled", 0),
+        running=metrics.get("running", 0),
+        success_rate=metrics.get("success_rate", 0.0),
+        average_duration=metrics.get("average_duration", 0.0),
+        total_tasks=metrics.get("total_tasks", 0),
+        completed_tasks=metrics.get("completed_tasks", 0),
+        failed_tasks=metrics.get("failed_tasks", 0),
+    )
+
 
 @router.get(
     "/{workflow_id}/metrics",
@@ -557,5 +526,34 @@ async def get_cancellation_status(workflow_id: str) -> Dict[str, Any]:
     }
 
 
-# Note: Health check endpoint moved to be defined before /{workflow_id} route
-# to prevent route matching issues (see line 225)
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================
+
+@router.get(
+    "/health",
+    summary="Workflow Service Health",
+    description="Check workflow management service health."
+)
+async def health_check() -> Dict[str, Any]:
+    """Health check for workflow service."""
+    manager = get_workflow_manager()
+
+    try:
+        await manager.initialize()
+        metrics = manager.get_metrics()
+
+        return {
+            "status": "healthy",
+            "storage_backend": manager.state_manager.backend.value,
+            "active_workflows": metrics.get("running", 0),
+            "total_workflows": metrics.get("total_workflows", 0),
+            "shutdown_handler_active": manager.shutdown_handler._enable_shutdown_handler if hasattr(manager.shutdown_handler, '_enable_shutdown_handler') else True,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }

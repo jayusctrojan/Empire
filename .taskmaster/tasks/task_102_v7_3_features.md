@@ -2,9 +2,9 @@
 
 **Title:** Extend Neo4j Schema for Graph Agent
 
-**Status:** done
+**Status:** pending
 
-**Dependencies:** 101 ✓
+**Dependencies:** 101
 
 **Priority:** high
 

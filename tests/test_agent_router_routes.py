@@ -551,7 +551,7 @@ class TestErrorHandling:
                 "/api/router/route",
                 json={"query": ""}  # Empty query should fail validation
             )
-            assert response.status_code == 422  # FastAPI returns 422 for Pydantic validation errors
+            assert response.status_code == 422  # Validation error
 
 
 if __name__ == "__main__":

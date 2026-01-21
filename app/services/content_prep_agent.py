@@ -149,7 +149,7 @@ class ContentPrepAgent:
                     You understand that learning materials must be processed in logical sequence
                     to maintain prerequisite relationships. You detect patterns in file naming,
                     identify content sets, and ensure completeness before processing begins.""",
-                    llm="claude-haiku-4-5",
+                    llm="claude-3-5-haiku-20241022",
                     verbose=True,
                     allow_delegation=False,
                 )

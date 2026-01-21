@@ -2,9 +2,9 @@
 
 **Title:** Implement Customer 360 Service
 
-**Status:** done
+**Status:** pending
 
-**Dependencies:** 101 ✓, 102 ✓, 103 ✓
+**Dependencies:** 101, 102, 103
 
 **Priority:** high
 

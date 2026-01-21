@@ -381,7 +381,7 @@ class TestRAGASMetricsConfiguration:
         from app.services.ragas_evaluation import RAGASEvaluator
 
         # Should support Claude via Anthropic
-        evaluator = RAGASEvaluator(llm_provider="anthropic", model="claude-haiku-4-5")
+        evaluator = RAGASEvaluator(llm_provider="anthropic", model="claude-3-5-haiku-20241022")
 
         assert evaluator.llm_provider == "anthropic"
-        assert evaluator.model == "claude-haiku-4-5"
+        assert evaluator.model == "claude-3-5-haiku-20241022"

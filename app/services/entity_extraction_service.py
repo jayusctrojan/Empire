@@ -63,7 +63,7 @@ class RelationshipType(str, Enum):
 
 
 # Claude Haiku model for fast, cost-effective extraction
-EXTRACTION_MODEL = "claude-haiku-4-5"
+EXTRACTION_MODEL = "claude-3-5-haiku-20241022"
 MAX_EXTRACTION_TOKENS = 4000
 EXTRACTION_TEMPERATURE = 0.2
 

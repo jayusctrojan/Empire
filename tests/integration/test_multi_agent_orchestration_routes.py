@@ -128,7 +128,7 @@ def mock_orchestration_service():
             "agent_id": "AGENT-012",
             "name": "Research Agent",
             "description": "Web/academic search and information gathering",
-            "model": "claude-sonnet-4-5",
+            "model": "claude-sonnet-4-5-20250514",
             "temperature": 0.7,
             "capabilities": ["web_search", "academic_search", "source_credibility"]
         },
@@ -136,7 +136,7 @@ def mock_orchestration_service():
             "agent_id": "AGENT-013",
             "name": "Analysis Agent",
             "description": "Pattern detection and statistical analysis",
-            "model": "claude-sonnet-4-5",
+            "model": "claude-sonnet-4-5-20250514",
             "temperature": 0.5,
             "capabilities": ["pattern_detection", "statistics", "correlations"]
         },
@@ -144,7 +144,7 @@ def mock_orchestration_service():
             "agent_id": "AGENT-014",
             "name": "Writing Agent",
             "description": "Report generation and documentation",
-            "model": "claude-sonnet-4-5",
+            "model": "claude-sonnet-4-5-20250514",
             "temperature": 0.8,
             "capabilities": ["report_generation", "formatting", "citations"]
         },
@@ -152,7 +152,7 @@ def mock_orchestration_service():
             "agent_id": "AGENT-015",
             "name": "Review Agent",
             "description": "Quality assurance and consistency checking",
-            "model": "claude-sonnet-4-5",
+            "model": "claude-sonnet-4-5-20250514",
             "temperature": 0.3,
             "capabilities": ["quality_check", "fact_verification", "grammar_check"]
         }
@@ -282,7 +282,7 @@ class TestOrchestrationWorkflowEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_workflow_short_title_returns_422(self, client):
         """Test that short title returns validation error."""
@@ -294,7 +294,7 @@ class TestOrchestrationWorkflowEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_workflow_short_description_returns_422(self, client):
         """Test that short description returns validation error."""
@@ -306,7 +306,7 @@ class TestOrchestrationWorkflowEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -364,7 +364,7 @@ class TestOrchestrationResearchEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -409,7 +409,7 @@ class TestOrchestrationAnalysisEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -454,7 +454,7 @@ class TestOrchestrationWritingEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -500,7 +500,7 @@ class TestOrchestrationReviewEndpoint:
             }
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # =============================================================================
@@ -600,18 +600,15 @@ class TestOrchestrationErrorHandling:
 
     def test_workflow_service_error_returns_500(self, client):
         """Test that service errors return 500 status."""
-        from app.routes.multi_agent_orchestration import get_orchestration_service
-        from app.main import app
-
         mock_service = MagicMock()
         mock_service.execute_workflow = AsyncMock(
             side_effect=Exception("Orchestration service unavailable")
         )
 
-        # Use FastAPI's dependency override system
-        app.dependency_overrides[get_orchestration_service] = lambda: mock_service
-
-        try:
+        with patch(
+            "app.routes.multi_agent_orchestration.get_orchestration_service",
+            return_value=mock_service
+        ):
             response = client.post(
                 "/api/orchestration/workflow",
                 json={
@@ -621,14 +618,9 @@ class TestOrchestrationErrorHandling:
             )
 
             assert response.status_code == 500
-        finally:
-            app.dependency_overrides.pop(get_orchestration_service, None)
 
     def test_research_service_error_returns_500(self, client):
         """Test that research errors return 500 status."""
-        from app.routes.multi_agent_orchestration import get_orchestration_service
-        from app.main import app
-
         mock_service = MagicMock()
         mock_research_agent = MagicMock()
         mock_research_agent.research = AsyncMock(
@@ -636,10 +628,10 @@ class TestOrchestrationErrorHandling:
         )
         mock_service.research_agent = mock_research_agent
 
-        # Use FastAPI's dependency override system
-        app.dependency_overrides[get_orchestration_service] = lambda: mock_service
-
-        try:
+        with patch(
+            "app.routes.multi_agent_orchestration.get_orchestration_service",
+            return_value=mock_service
+        ):
             response = client.post(
                 "/api/orchestration/research",
                 json={
@@ -648,8 +640,6 @@ class TestOrchestrationErrorHandling:
             )
 
             assert response.status_code == 500
-        finally:
-            app.dependency_overrides.pop(get_orchestration_service, None)
 
     def test_invalid_json_returns_422(self, client):
         """Test that invalid JSON returns 422."""
@@ -659,4 +649,4 @@ class TestOrchestrationErrorHandling:
             headers={"Content-Type": "application/json"}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422

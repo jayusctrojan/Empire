@@ -47,7 +47,7 @@ class LangGraphWorkflows:
     """
 
     def __init__(self, llm_model: str = None):
-        model = llm_model or os.getenv("LANGGRAPH_DEFAULT_MODEL", "claude-haiku-4-5")
+        model = llm_model or os.getenv("LANGGRAPH_DEFAULT_MODEL", "claude-3-5-haiku-20241022")
         self.llm = ChatAnthropic(model=model, temperature=0)
         self.tools = self._setup_tools()
 

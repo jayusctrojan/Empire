@@ -48,7 +48,7 @@ class VisionAnalysisResult:
     detected_objects: Optional[List[str]] = None
     confidence_score: Optional[float] = None
     processing_time_ms: Optional[float] = None
-    model_used: str = "claude-sonnet-4-5"
+    model_used: str = "claude-3-5-sonnet-20241022"
     error: Optional[str] = None
     timestamp: datetime = None
 
@@ -140,7 +140,7 @@ class VisionService:
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-5",
+        model: str = "claude-3-5-sonnet-20241022",
         max_tokens: int = 4096,
         max_retries: int = 3,
         cache_results: bool = True

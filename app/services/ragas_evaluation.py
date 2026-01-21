@@ -43,7 +43,7 @@ class RAGASEvaluator:
         self,
         metrics: Optional[List] = None,
         llm_provider: str = "anthropic",
-        model: str = "claude-haiku-4-5"
+        model: str = "claude-3-5-haiku-20241022"
     ):
         """
         Initialize RAGAS evaluator

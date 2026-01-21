@@ -407,7 +407,7 @@ backstory: |
 tools:
   - search
   - analyze
-llm: claude-sonnet-4-5
+llm: claude-sonnet-4-5-20250514
 verbose: true
 allow_delegation: false
 """)]

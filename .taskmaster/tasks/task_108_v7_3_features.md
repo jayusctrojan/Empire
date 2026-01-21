@@ -2,9 +2,9 @@
 
 **Title:** Implement Query Intent Detection for CKO Chat
 
-**Status:** done
+**Status:** pending
 
-**Dependencies:** 104 ✓, 105 ✓, 106 ✓
+**Dependencies:** 104, 105, 106
 
 **Priority:** medium
 

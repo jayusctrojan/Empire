@@ -224,11 +224,10 @@ class AgentInteractionService:
             crew_response = self.supabase.table("crewai_crews") \
                 .select("agent_ids") \
                 .eq("id", crew_id) \
-                .limit(1) \
+                .single() \
                 .execute()
 
-            crew_data = crew_response.data[0] if crew_response.data else {}
-            total_agents = len(crew_data.get("agent_ids", [])) if crew_data else 0
+            total_agents = len(crew_response.data["agent_ids"]) if crew_response.data and crew_response.data.get("agent_ids") else 0
 
             # Create broadcast interaction
             broadcast_response = self.supabase.table("crewai_agent_interactions").insert({
@@ -727,15 +726,14 @@ class AgentInteractionService:
             conflict_response = self.supabase.table("crewai_agent_interactions") \
                 .select("*") \
                 .eq("id", str(conflict_id)) \
-                .limit(1) \
+                .single() \
                 .execute()
 
             if not conflict_response.data:
                 raise ValueError(f"Conflict {conflict_id} not found")
 
-            # Use first result since we're using limit(1) instead of single()
-            conflict = conflict_response.data[0]
-            resolution_data = conflict.get("resolution_data") or {}
+            conflict = conflict_response.data
+            resolution_data = conflict.get("resolution_data", {})
 
             # Extract state information from conflict
             state_key = resolution_data.get("state_key")
@@ -780,14 +778,14 @@ class AgentInteractionService:
             conflict_response = self.supabase.table("crewai_agent_interactions") \
                 .select("*") \
                 .eq("id", str(conflict_id)) \
-                .limit(1) \
+                .single() \
                 .execute()
 
             if not conflict_response.data:
                 raise ValueError(f"Conflict {conflict_id} not found")
 
-            conflict = conflict_response.data[0]
-            resolution_data = conflict.get("resolution_data") or {}
+            conflict = conflict_response.data
+            resolution_data = conflict.get("resolution_data", {})
 
             # Get both state versions
             current_value = resolution_data.get("current_value", {})
@@ -874,14 +872,14 @@ class AgentInteractionService:
             conflict_response = self.supabase.table("crewai_agent_interactions") \
                 .select("*") \
                 .eq("id", str(conflict_id)) \
-                .limit(1) \
+                .single() \
                 .execute()
 
             if not conflict_response.data:
                 raise ValueError(f"Conflict {conflict_id} not found")
 
-            conflict = conflict_response.data[0]
-            resolution_data = conflict.get("resolution_data") or {}
+            conflict = conflict_response.data
+            resolution_data = conflict.get("resolution_data", {})
 
             # Get previous state
             current_value = resolution_data.get("current_value")
@@ -939,13 +937,13 @@ class AgentInteractionService:
             conflict_response = self.supabase.table("crewai_agent_interactions") \
                 .select("*") \
                 .eq("id", str(conflict_id)) \
-                .limit(1) \
+                .single() \
                 .execute()
 
             if not conflict_response.data:
                 raise ValueError(f"Conflict {conflict_id} not found")
 
-            conflict = conflict_response.data[0]
+            conflict = conflict_response.data
             execution_id = conflict["execution_id"]
 
             # Get the crew to find supervisor/coordinator
@@ -964,12 +962,11 @@ class AgentInteractionService:
             crew_response = self.supabase.table("crewai_crews") \
                 .select("agent_ids") \
                 .eq("id", crew_id) \
-                .limit(1) \
+                .single() \
                 .execute()
 
-            crew_data = crew_response.data[0] if crew_response.data else {}
-            if crew_data.get("agent_ids"):
-                agent_ids = crew_data["agent_ids"]
+            if crew_response.data and crew_response.data.get("agent_ids"):
+                agent_ids = crew_response.data["agent_ids"]
 
                 # For now, escalate to all agents in the crew
                 # In production, you'd have a designated supervisor agent

@@ -117,7 +117,7 @@ class AgentRouterService:
             similarity_threshold: Threshold for semantic cache matching
             use_semantic_cache: Enable semantic similarity caching
         """
-        model_name = model or os.getenv("WORKFLOW_ROUTER_MODEL", "claude-haiku-4-5")
+        model_name = model or os.getenv("WORKFLOW_ROUTER_MODEL", "claude-3-5-haiku-20241022")
         self.llm = ChatAnthropic(model=model_name, temperature=0)
         self.cache_ttl_hours = cache_ttl_hours
         self.similarity_threshold = similarity_threshold

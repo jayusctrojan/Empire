@@ -39,7 +39,7 @@ class TestHealthModels:
         assert DependencyType.DATABASE.value == "database"
         assert DependencyType.CACHE.value == "cache"
         assert DependencyType.STORAGE.value == "storage"
-        assert DependencyType.SERVICE.value == "service"
+        assert DependencyType.EXTERNAL_SERVICE.value == "external_service"
 
     def test_dependency_check_model(self):
         """Test DependencyCheck model creation."""
@@ -343,7 +343,7 @@ class TestLangGraphWorkflows:
 
                 # Create a message with tool calls
                 message_with_tools = AIMessage(content="", tool_calls=[
-                    {"id": "call_123", "name": "VectorSearch", "args": {"query": "test"}}
+                    {"name": "VectorSearch", "args": {"query": "test"}}
                 ])
 
                 state = {

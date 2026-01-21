@@ -386,7 +386,7 @@ class FileValidator:
             if self._is_extension_blocked(file_ext):
                 logger.warning(
                     "BLOCKED: File extension is not allowed",
-                    extra={"file_name": filename, "extension": file_ext}
+                    extra={"filename": filename, "extension": file_ext}
                 )
                 return ValidationResult(
                     is_valid=False,
@@ -414,7 +414,7 @@ class FileValidator:
             if is_dangerous:
                 logger.warning(
                     "BLOCKED: Dangerous file content detected",
-                    extra={"file_name": filename, "reason": danger_reason}
+                    extra={"filename": filename, "reason": danger_reason}
                 )
                 return ValidationResult(
                     is_valid=False,
@@ -432,7 +432,7 @@ class FileValidator:
                 if detected_mime in BLOCKED_MIME_TYPES:
                     logger.warning(
                         "BLOCKED: MIME type is not allowed",
-                        extra={"file_name": filename, "mime": detected_mime}
+                        extra={"filename": filename, "mime": detected_mime}
                     )
                     return ValidationResult(
                         is_valid=False,
@@ -499,7 +499,7 @@ class FileValidator:
             logger.info(
                 "File validation passed",
                 extra={
-                    "file_name": filename,
+                    "filename": filename,
                     "size_kb": file_size / 1024,
                     "extension": file_ext,
                     "mime": detected_mime,

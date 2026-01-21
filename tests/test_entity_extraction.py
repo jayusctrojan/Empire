@@ -80,12 +80,12 @@ def mock_llm_response():
             {"name": "Deep Learning", "type": "TECHNOLOGY", "mentions": ["deep learning"], "relevance_score": 0.9}
         ],
         "facts": [
-            {"statement": "AI is transforming healthcare delivery", "confidence_score": 0.9, "source_text": "AI is transforming healthcare"},
-            {"statement": "Machine Learning analyzes medical images with high accuracy", "confidence_score": 0.85, "source_text": "ML algorithms analyze"}
+            {"statement": "AI is transforming healthcare delivery", "confidence": 0.9, "source_snippet": "AI is transforming healthcare"},
+            {"statement": "Machine Learning analyzes medical images with high accuracy", "confidence": 0.85, "source_snippet": "ML algorithms analyze"}
         ],
         "relationships": [
-            {"source": "Dr. Sarah Chen", "target": "Stanford University", "type": "WORKS_FOR", "description": "Dr. Chen works at Stanford"},
-            {"source": "Deep Learning", "target": "cancer detection", "type": "ENABLES", "description": "Deep learning enables cancer detection"}
+            {"source_entity": "Dr. Sarah Chen", "target_entity": "Stanford University", "relationship_type": "WORKS_FOR", "strength": 0.9},
+            {"source_entity": "Deep Learning", "target_entity": "cancer detection", "relationship_type": "ENABLES", "strength": 0.85}
         ]
     }
 
@@ -95,7 +95,7 @@ def mock_anthropic_client():
     """Create a mock Anthropic client"""
     mock = MagicMock()
     mock.messages = MagicMock()
-    mock.messages.create = AsyncMock()
+    mock.messages.create = MagicMock()
     return mock
 
 
@@ -204,35 +204,38 @@ class TestPydanticModels:
         """Test valid ExtractedFact creation"""
         fact = ExtractedFact(
             statement="AI improves healthcare",
-            confidence_score=0.85,
-            source_text="AI improves healthcare delivery"
+            confidence=0.85,
+            source_snippet="AI improves healthcare delivery"
         )
         assert fact.statement == "AI improves healthcare"
-        assert fact.confidence_score == 0.85
-        assert fact.source_text == "AI improves healthcare delivery"
+        assert fact.confidence == 0.85
+        assert fact.source_snippet == "AI improves healthcare delivery"
 
     def test_extracted_relationship_valid(self):
         """Test valid ExtractedRelationship creation"""
         rel = ExtractedRelationship(
-            source="Dr. Chen",
-            target="Stanford",
-            type="WORKS_FOR",
-            description="Dr. Chen works at Stanford"
+            source_entity="Dr. Chen",
+            target_entity="Stanford",
+            relationship_type=RelationshipType.WORKS_FOR,
+            strength=0.9
         )
-        assert rel.source == "Dr. Chen"
-        assert rel.target == "Stanford"
-        assert rel.type == "WORKS_FOR"
-        assert rel.description == "Dr. Chen works at Stanford"
+        assert rel.source_entity == "Dr. Chen"
+        assert rel.target_entity == "Stanford"
+        assert rel.relationship_type == RelationshipType.WORKS_FOR
+        assert rel.strength == 0.9
 
     def test_extraction_result_valid(self):
         """Test valid ExtractionResult creation"""
         result = ExtractionResult(
+            task_id="test-123",
             topics=[ExtractedTopic(name="AI", relevance_score=0.9)],
             entities=[],
             facts=[],
             relationships=[]
         )
+        assert result.task_id == "test-123"
         assert len(result.topics) == 1
+        assert result.extracted_at is not None
 
 
 # =============================================================================
@@ -285,9 +288,9 @@ class TestEntityExtractionService:
 
         assert result.success is True
         assert result.task_id == "test-123"
-        assert result.extraction_result is not None
-        assert len(result.extraction_result.topics) == 3
-        assert len(result.extraction_result.entities) == 5
+        assert len(result.result.topics) == 3
+        assert len(result.result.entities) == 5
+        assert result.model_used == EXTRACTION_MODEL
 
     @pytest.mark.asyncio
     async def test_extract_entities_with_graph_storage(self, entity_extraction_service, sample_content, mock_llm_response):
@@ -306,37 +309,33 @@ class TestEntityExtractionService:
             store_in_graph=True
         )
 
-        assert result.graph_storage_success is True
+        assert result.stored_in_graph is True
         # Verify Neo4j was called
         entity_extraction_service.neo4j.execute_query.assert_called()
 
     @pytest.mark.asyncio
     async def test_extract_entities_empty_content(self, entity_extraction_service):
         """Test extraction fails with empty content"""
-        result = await entity_extraction_service.extract_entities(
-            task_id="test-empty",
-            title="Empty Test",
-            description="",
-            content="",
-            store_in_graph=False
-        )
-        # Service returns error response instead of raising exception
-        assert result.success is False
-        assert result.error is not None
+        with pytest.raises(EntityExtractionException):
+            await entity_extraction_service.extract_entities(
+                task_id="test-empty",
+                title="Empty Test",
+                description="",
+                content="",
+                store_in_graph=False
+            )
 
     @pytest.mark.asyncio
     async def test_extract_entities_short_content(self, entity_extraction_service):
         """Test extraction fails with too short content"""
-        result = await entity_extraction_service.extract_entities(
-            task_id="test-short",
-            title="Short Test",
-            description="",
-            content="Hello",
-            store_in_graph=False
-        )
-        # Service returns error response instead of raising exception
-        assert result.success is False
-        assert result.error is not None
+        with pytest.raises(EntityExtractionException):
+            await entity_extraction_service.extract_entities(
+                task_id="test-short",
+                title="Short Test",
+                description="",
+                content="Hello",
+                store_in_graph=False
+            )
 
 
 # =============================================================================
@@ -353,32 +352,39 @@ class TestExceptions:
             task_id="task-123"
         )
         assert "Test error" in str(exc)
+        assert exc.task_id == "task-123"
 
     def test_invalid_extraction_result_exception(self):
         """Test InvalidExtractionResultException"""
         exc = InvalidExtractionResultException(
             message="Invalid JSON",
             task_id="task-456",
-            validation_errors=["Parse error"]
+            raw_response="bad json"
         )
         assert "Invalid JSON" in str(exc)
+        assert exc.raw_response == "bad json"
 
     def test_entity_graph_storage_exception(self):
         """Test EntityGraphStorageException"""
         exc = EntityGraphStorageException(
             message="Neo4j error",
             task_id="task-789",
-            entity_count=5
+            entities_attempted=5,
+            entities_stored=3
         )
         assert "Neo4j error" in str(exc)
+        assert exc.entities_attempted == 5
+        assert exc.entities_stored == 3
 
     def test_entity_extraction_timeout_exception(self):
         """Test EntityExtractionTimeoutException"""
         exc = EntityExtractionTimeoutException(
             message="Timeout",
-            task_id="task-timeout"
+            task_id="task-timeout",
+            timeout_seconds=30
         )
         assert "Timeout" in str(exc)
+        assert exc.timeout_seconds == 30
 
 
 # =============================================================================
@@ -463,7 +469,7 @@ class TestCeleryTasks:
         assert batch_extract_entities is not None
         assert extract_entities_for_job is not None
 
-    @patch('app.services.entity_extraction_service.get_entity_extraction_service')
+    @patch('app.tasks.entity_extraction_tasks.get_entity_extraction_service')
     def test_extract_entities_task_success(self, mock_get_service):
         """Test extract_entities_task successful execution"""
         from app.tasks.entity_extraction_tasks import extract_entities_task
@@ -471,11 +477,11 @@ class TestCeleryTasks:
         # Setup mock
         mock_service = MagicMock()
         mock_result = MagicMock()
-        mock_result.extraction_result.topics = [MagicMock(), MagicMock()]
-        mock_result.extraction_result.entities = [MagicMock(), MagicMock(), MagicMock()]
-        mock_result.extraction_result.facts = [MagicMock()]
-        mock_result.extraction_result.relationships = [MagicMock()]
-        mock_result.graph_storage_success = True
+        mock_result.result.topics = [MagicMock(), MagicMock()]
+        mock_result.result.entities = [MagicMock(), MagicMock(), MagicMock()]
+        mock_result.result.facts = [MagicMock()]
+        mock_result.result.relationships = [MagicMock()]
+        mock_result.stored_in_graph = True
         mock_result.model_used = EXTRACTION_MODEL
         mock_result.processing_time_ms = 500
 
@@ -486,15 +492,19 @@ class TestCeleryTasks:
         mock_service.extract_entities = mock_extract
         mock_get_service.return_value = mock_service
 
-        # Call the task using apply() with args - this properly sets up self
-        result = extract_entities_task.apply(
-            args=(
-                "test-task",  # task_id
-                "Test",  # title
-                "This is test content for entity extraction.",  # content
-                ""  # description
-            )
-        ).get()
+        # Call task with mocked self
+        mock_self = MagicMock()
+        mock_self.request.id = "celery-task-123"
+        mock_self.request.retries = 0
+        mock_self.max_retries = 3
+
+        result = extract_entities_task.__wrapped__(
+            mock_self,
+            task_id="test-task",
+            title="Test",
+            content="This is test content for entity extraction.",
+            description=""
+        )
 
         assert result["success"] is True
         assert result["task_id"] == "test-task"
@@ -528,9 +538,9 @@ class TestIntegration:
 
         # Verify result structure
         assert result.success is True
-        assert result.extraction_result is not None
-        assert len(result.extraction_result.topics) > 0
-        assert len(result.extraction_result.entities) > 0
+        assert result.result is not None
+        assert len(result.result.topics) > 0
+        assert len(result.result.entities) > 0
 
         # Verify stats were updated
         stats = entity_extraction_service.get_stats()

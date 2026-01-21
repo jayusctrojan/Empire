@@ -903,7 +903,7 @@ def _extract_image_content(source: Dict, supabase, metadata: Dict) -> Tuple[str,
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
         response = client.messages.create(
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-20250514",
             max_tokens=4096,
             messages=[
                 {
@@ -1033,7 +1033,7 @@ Content:
 Summary:"""
 
         response = client.messages.create(
-            model="claude-haiku-4-5",
+            model="claude-3-5-haiku-20241022",
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}]
         )

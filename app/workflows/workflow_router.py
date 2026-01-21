@@ -41,7 +41,7 @@ class WorkflowRouter:
     """
 
     def __init__(self, model: str = None):
-        model_name = model or os.getenv("WORKFLOW_ROUTER_MODEL", "claude-haiku-4-5")
+        model_name = model or os.getenv("WORKFLOW_ROUTER_MODEL", "claude-3-5-haiku-20241022")
         self.llm = ChatAnthropic(model=model_name, temperature=0)
         logger.info("Workflow router initialized", model=model_name)
 

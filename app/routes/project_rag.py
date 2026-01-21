@@ -136,7 +136,7 @@ class RAGQueryResponse(BaseModel):
                 "global_sources_count": 3,
                 "total_sources": 8,
                 "query_time_ms": 1250.5,
-                "model": "claude-sonnet-4-5",
+                "model": "claude-sonnet-4-20250514",
                 "query_variations": [
                     "What are the key points about insurance claims?",
                     "Insurance claim requirements and process",
@@ -463,7 +463,7 @@ async def project_rag_health(
         project_sources_enabled=True,
         global_kb_enabled=True,
         embedding_model="bge-m3",
-        llm_model="claude-sonnet-4-5"
+        llm_model="claude-sonnet-4-20250514"
     )
 
 
