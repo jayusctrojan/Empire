@@ -18,6 +18,7 @@ import time
 import signal
 import asyncio
 import hashlib
+import threading
 from pathlib import Path
 from enum import Enum
 from datetime import datetime
@@ -762,6 +763,14 @@ class GracefulShutdownHandler:
 
     def install_signal_handlers(self) -> None:
         """Install signal handlers for SIGTERM and SIGINT"""
+        # Signal handlers can only be installed from the main thread
+        if threading.current_thread() is not threading.main_thread():
+            logger.warning(
+                "Cannot install signal handlers from non-main thread",
+                thread_name=threading.current_thread().name
+            )
+            return
+
         for sig in (signal.SIGTERM, signal.SIGINT):
             self._original_handlers[sig] = signal.signal(sig, self._signal_handler)
 

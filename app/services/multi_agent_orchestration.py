@@ -117,7 +117,7 @@ ORCHESTRATION_AGENT_CONFIGS = {
         "agent_id": "AGENT-012",
         "name": "Research Agent",
         "description": "Conducts web and academic research, gathers information from multiple sources",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.2,  # Low temperature for factual research
         "max_tokens": 4000
     },
@@ -125,7 +125,7 @@ ORCHESTRATION_AGENT_CONFIGS = {
         "agent_id": "AGENT-013",
         "name": "Analysis Agent",
         "description": "Detects patterns, performs statistical analysis, identifies insights",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.1,  # Very low for precise analysis
         "max_tokens": 4000
     },
@@ -133,7 +133,7 @@ ORCHESTRATION_AGENT_CONFIGS = {
         "agent_id": "AGENT-014",
         "name": "Writing Agent",
         "description": "Generates reports, documentation, and structured content",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.4,  # Higher for creative writing
         "max_tokens": 6000
     },
@@ -141,7 +141,7 @@ ORCHESTRATION_AGENT_CONFIGS = {
         "agent_id": "AGENT-015",
         "name": "Review Agent",
         "description": "Quality assurance, consistency checking, fact verification",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.0,  # Zero for strict review
         "max_tokens": 4000
     }

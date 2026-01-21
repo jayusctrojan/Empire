@@ -1,15 +1,21 @@
 """
 Empire v7.3 - Connection Manager
 Centralized management of database and service connections
+
+Integrates with ServiceOrchestrator for comprehensive health checks
+and graceful degradation support.
 """
 
 import os
 import redis
 from neo4j import GraphDatabase
 from supabase import create_client, Client
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import structlog
 import httpx
+
+if TYPE_CHECKING:
+    from app.core.service_orchestrator import ServiceOrchestrator
 
 logger = structlog.get_logger(__name__)
 
@@ -31,6 +37,22 @@ class ConnectionManager:
 
         # Connection status tracking
         self.connections_initialized = False
+
+        # Service Orchestrator integration (set during app startup)
+        self._service_orchestrator: Optional["ServiceOrchestrator"] = None
+
+    def set_service_orchestrator(self, orchestrator: "ServiceOrchestrator"):
+        """
+        Set the service orchestrator for enhanced health checks.
+        Called during FastAPI startup after orchestrator initialization.
+        """
+        self._service_orchestrator = orchestrator
+        logger.info("Connection manager integrated with service orchestrator")
+
+    @property
+    def service_orchestrator(self) -> Optional["ServiceOrchestrator"]:
+        """Get the service orchestrator if available"""
+        return self._service_orchestrator
 
     async def initialize(self):
         """Initialize all connections during FastAPI startup"""
@@ -147,11 +169,29 @@ class ConnectionManager:
             logger.error("Failed to initialize Neo4j", error=str(e))
             raise
 
-    async def check_health(self) -> dict:
+    async def check_health(self, use_orchestrator: bool = True) -> dict:
         """
         Check health of all connections and external services
         Returns detailed status for each component
+
+        Args:
+            use_orchestrator: If True and service orchestrator is available,
+                            use cached health checks from orchestrator for better performance
         """
+        # If orchestrator is available and requested, use its cached health data
+        if use_orchestrator and self._service_orchestrator:
+            try:
+                orchestrator_health = await self._service_orchestrator.get_cached_health()
+                if orchestrator_health:
+                    # Map orchestrator service statuses to our format
+                    return {
+                        service_name: status.status if hasattr(status, 'status') else str(status)
+                        for service_name, status in orchestrator_health.items()
+                    }
+            except Exception as e:
+                logger.warning("Failed to get orchestrator health, falling back to direct checks", error=str(e))
+
+        # Fall back to direct health checks
         health_status = {
             "supabase": "unknown",
             "redis": "unknown",
@@ -297,3 +337,51 @@ def get_redis() -> Optional[redis.Redis]:
 def get_neo4j_driver():
     """FastAPI dependency to get Neo4j driver"""
     return connection_manager.neo4j_driver
+
+
+def get_service_orchestrator() -> Optional["ServiceOrchestrator"]:
+    """FastAPI dependency to get the service orchestrator if available"""
+    return connection_manager.service_orchestrator
+
+
+async def check_service_availability(service_name: str) -> bool:
+    """
+    Check if a specific service is available.
+    Uses the service orchestrator if available for cached results.
+
+    Args:
+        service_name: Name of the service to check (e.g., 'neo4j', 'redis', 'supabase')
+
+    Returns:
+        True if the service is healthy/available, False otherwise
+    """
+    if connection_manager.service_orchestrator:
+        try:
+            # Use orchestrator's cached health check
+            status = await connection_manager.service_orchestrator.check_service(service_name)
+            return status.status == "running"
+        except Exception as e:
+            logger.warning(f"Orchestrator check failed for {service_name}", error=str(e))
+
+    # Fall back to direct check
+    health = await connection_manager.check_health(use_orchestrator=False)
+    service_status = health.get(service_name, "unknown")
+    return service_status == "healthy"
+
+
+def is_service_required(service_name: str) -> bool:
+    """
+    Check if a service is required for the application to function.
+    Uses the service orchestrator's configuration.
+
+    Args:
+        service_name: Name of the service to check
+
+    Returns:
+        True if the service is required, False if optional
+    """
+    if connection_manager.service_orchestrator:
+        return service_name in connection_manager.service_orchestrator.REQUIRED_SERVICES
+
+    # Default required services if orchestrator not available
+    return service_name in ["supabase", "redis"]

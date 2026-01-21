@@ -60,7 +60,7 @@ class TestCostEntry:
             amount=0.15,
             quantity=100000,
             unit="tokens",
-            operation="claude-3-5-sonnet-20241022",
+            operation="claude-sonnet-4-5",
             timestamp=datetime.utcnow()
         )
 
@@ -69,7 +69,7 @@ class TestCostEntry:
         assert entry.amount == 0.15
         assert entry.quantity == 100000
         assert entry.unit == "tokens"
-        assert entry.operation == "claude-3-5-sonnet-20241022"
+        assert entry.operation == "claude-sonnet-4-5"
 
     def test_cost_entry_to_dict(self):
         """Test CostEntry.to_dict() method"""
@@ -112,7 +112,7 @@ class TestCostRecording:
                 "amount": 0.15,
                 "quantity": 100000,
                 "unit": "tokens",
-                "operation": "claude-3-5-sonnet-20241022",
+                "operation": "claude-sonnet-4-5",
                 "timestamp": datetime.utcnow().isoformat()
             }]
         )
@@ -123,7 +123,7 @@ class TestCostRecording:
             amount=0.15,
             quantity=100000,
             unit="tokens",
-            operation="claude-3-5-sonnet-20241022"
+            operation="claude-sonnet-4-5"
         )
 
         assert entry is not None
@@ -142,14 +142,14 @@ class TestCostRecording:
                 "amount": 0.0018,  # 500 input * 0.000003 + 100 output * 0.000015
                 "quantity": 600,
                 "unit": "tokens",
-                "operation": "claude-3-5-sonnet-20241022",
+                "operation": "claude-sonnet-4-5",
                 "timestamp": datetime.utcnow().isoformat()
             }]
         )
 
         entry = await service.record_llm_cost(
             service=ServiceProvider.ANTHROPIC,
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             input_tokens=500,
             output_tokens=100
         )
@@ -171,14 +171,14 @@ class TestCostRecording:
                 "amount": 0.0006,  # 500 input * 0.000001 + 100 output * 0.000005
                 "quantity": 600,
                 "unit": "tokens",
-                "operation": "claude-3-5-haiku-20241022",
+                "operation": "claude-haiku-4-5",
                 "timestamp": datetime.utcnow().isoformat()
             }]
         )
 
         entry = await service.record_llm_cost(
             service=ServiceProvider.ANTHROPIC,
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5",
             input_tokens=500,
             output_tokens=100
         )
@@ -223,7 +223,7 @@ class TestCostRecording:
                 "amount": 0.01,
                 "quantity": 1000,
                 "unit": "tokens",
-                "operation": "claude-3-5-haiku-20241022",
+                "operation": "claude-haiku-4-5",
                 "user_id": "user_123",
                 "session_id": "session_456",
                 "timestamp": datetime.utcnow().isoformat()
@@ -236,7 +236,7 @@ class TestCostRecording:
             amount=0.01,
             quantity=1000,
             unit="tokens",
-            operation="claude-3-5-haiku-20241022",
+            operation="claude-haiku-4-5",
             user_id="user_123",
             session_id="session_456"
         )
@@ -260,7 +260,7 @@ class TestMonthlyReports:
                 "service": "anthropic",
                 "category": "api_call",
                 "amount": 150.00,
-                "operation": "claude-3-5-sonnet-20241022"
+                "operation": "claude-sonnet-4-5"
             },
             {
                 "service": "supabase",
@@ -316,7 +316,7 @@ class TestMonthlyReports:
                 "service": "anthropic",
                 "category": "api_call",
                 "amount": 100.00,
-                "operation": "claude-3-5-sonnet-20241022"
+                "operation": "claude-sonnet-4-5"
             }]),
             Mock(data=[]),  # Report summary upsert
             Mock(data=[]),  # Budget configs
@@ -489,16 +489,16 @@ class TestPricingConfiguration:
         """Test Claude pricing configuration"""
         pricing = service.PRICING[ServiceProvider.ANTHROPIC]
 
-        assert "claude-3-5-sonnet-20241022" in pricing
-        assert "claude-3-5-haiku-20241022" in pricing
+        assert "claude-sonnet-4-5" in pricing
+        assert "claude-haiku-4-5" in pricing
 
         # Verify sonnet pricing
-        sonnet = pricing["claude-3-5-sonnet-20241022"]
+        sonnet = pricing["claude-sonnet-4-5"]
         assert sonnet["input"] == 0.000003  # $3 per 1M tokens
         assert sonnet["output"] == 0.000015  # $15 per 1M tokens
 
         # Verify haiku pricing
-        haiku = pricing["claude-3-5-haiku-20241022"]
+        haiku = pricing["claude-haiku-4-5"]
         assert haiku["input"] == 0.000001  # $1 per 1M tokens
         assert haiku["output"] == 0.000005  # $5 per 1M tokens
 

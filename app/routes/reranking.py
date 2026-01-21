@@ -309,7 +309,7 @@ async def list_providers():
         {
             "id": "claude",
             "name": "Claude Haiku",
-            "model": "claude-3-5-haiku-20241022",
+            "model": "claude-haiku-4-5",
             "description": "Fast LLM-based reranking using Claude Haiku",
             "latency": "300-800ms",
             "cost": "$0.25/1M input, $1.25/1M output tokens",
