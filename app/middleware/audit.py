@@ -10,6 +10,7 @@ import structlog
 import time
 from datetime import datetime
 import json
+import ipaddress
 
 from app.core.supabase_client import get_supabase_client
 
@@ -149,21 +150,34 @@ class AuditLoggingMiddleware(BaseHTTPMiddleware):
     def _extract_ip(self, request: Request) -> str:
         """Extract client IP address from request"""
 
+        def is_valid_ip(ip_str: str) -> bool:
+            """Check if string is a valid IP address"""
+            try:
+                ipaddress.ip_address(ip_str)
+                return True
+            except ValueError:
+                return False
+
         # Check for proxy headers
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
             # Take first IP if multiple (client IP)
-            return forwarded.split(",")[0].strip()
+            ip = forwarded.split(",")[0].strip()
+            if is_valid_ip(ip):
+                return ip
 
         real_ip = request.headers.get("x-real-ip")
-        if real_ip:
+        if real_ip and is_valid_ip(real_ip):
             return real_ip
 
         # Fallback to direct client
-        if request.client:
-            return request.client.host
+        if request.client and request.client.host:
+            host = request.client.host
+            if is_valid_ip(host):
+                return host
 
-        return "unknown"
+        # Default to localhost for test clients or unknown sources
+        return "127.0.0.1"
 
     def _determine_event_type(self, request: Request, response: Response) -> str:
         """Determine event type based on request path and response"""

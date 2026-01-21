@@ -1,3 +1,5 @@
 export { MessageBubble } from './MessageBubble'
 export { CitationPopover } from './CitationPopover'
 export { ChatInput } from './ChatInput'
+export { CompactionDivider, CompactionInProgress } from './CompactionDivider'
+export type { CompactionEvent } from './CompactionDivider'

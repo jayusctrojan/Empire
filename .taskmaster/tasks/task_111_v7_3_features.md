@@ -2,9 +2,9 @@
 
 **Title:** Implement Integration Tests for Graph Agent
 
-**Status:** pending
+**Status:** done
 
-**Dependencies:** 107, 108, 109, 110
+**Dependencies:** 107 ✓, 108 ✓, 109 ✓, 110 ✓
 
 **Priority:** medium
 

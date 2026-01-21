@@ -108,7 +108,7 @@ def process_document_upload(
                         "file_hash": file_hash,
                         "original_filename": filename,
                     },
-                    verify_checksum=True
+                    should_verify_checksum=True
                 )
             )
 
@@ -412,7 +412,7 @@ def reprocess_document(
                             file_id=b2_file_id,
                             file_name=b2_file_path,
                             destination_path=local_file_path,
-                            verify_checksum=False  # Skip checksum for reprocessing
+                            should_verify_checksum=False  # Skip checksum for reprocessing
                         )
                     )
 

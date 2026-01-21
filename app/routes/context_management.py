@@ -466,6 +466,190 @@ async def get_default_config():
 # Health Check
 # =============================================================================
 
+# =============================================================================
+# Checkpoint Endpoints (Task 208 - Session Resume & Recovery)
+# =============================================================================
+
+class CheckpointResponse(BaseModel):
+    """Response model for a checkpoint."""
+    id: str
+    conversation_id: str
+    checkpoint_number: int
+    message_count: int
+    token_count: int
+    summary: str
+    created_at: str
+    trigger: str
+
+
+class CheckpointListResponse(BaseModel):
+    """Response for checkpoint list."""
+    success: bool
+    checkpoints: List[CheckpointResponse] = []
+    error: Optional[str] = None
+
+
+class RestoreCheckpointResponse(BaseModel):
+    """Response for checkpoint restore."""
+    success: bool
+    messages_restored: int = 0
+    token_count: int = 0
+    error: Optional[str] = None
+
+
+@router.get("/{conversation_id}/checkpoints", response_model=CheckpointListResponse)
+async def list_checkpoints(
+    conversation_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    List all checkpoints for a conversation.
+
+    Returns checkpoints ordered by checkpoint number (most recent first).
+    """
+    try:
+        from app.services.checkpoint_service import get_checkpoint_service
+
+        service = get_checkpoint_service()
+        checkpoints = await service.get_conversation_checkpoints(
+            conversation_id=conversation_id,
+            user_id=user_id
+        )
+
+        return CheckpointListResponse(
+            success=True,
+            checkpoints=[
+                CheckpointResponse(
+                    id=cp["id"],
+                    conversation_id=cp["conversation_id"],
+                    checkpoint_number=cp["checkpoint_number"],
+                    message_count=cp["message_count"],
+                    token_count=cp["token_count"],
+                    summary=cp.get("summary", ""),
+                    created_at=cp["created_at"],
+                    trigger=cp["trigger"]
+                )
+                for cp in checkpoints
+            ]
+        )
+
+    except Exception as e:
+        logger.error(
+            "list_checkpoints_failed",
+            conversation_id=conversation_id,
+            error=str(e)
+        )
+        return CheckpointListResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@router.post("/{conversation_id}/checkpoints", response_model=CheckpointListResponse)
+async def create_checkpoint(
+    conversation_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Create a manual checkpoint for the conversation.
+
+    Saves the current state of the conversation for later restoration.
+    """
+    try:
+        from app.services.checkpoint_service import get_checkpoint_service
+
+        service = get_checkpoint_service()
+        checkpoint = await service.create_manual_checkpoint(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            trigger="manual"
+        )
+
+        if not checkpoint:
+            return CheckpointListResponse(
+                success=False,
+                error="Failed to create checkpoint"
+            )
+
+        return CheckpointListResponse(
+            success=True,
+            checkpoints=[
+                CheckpointResponse(
+                    id=checkpoint["id"],
+                    conversation_id=checkpoint["conversation_id"],
+                    checkpoint_number=checkpoint["checkpoint_number"],
+                    message_count=checkpoint["message_count"],
+                    token_count=checkpoint["token_count"],
+                    summary=checkpoint.get("summary", ""),
+                    created_at=checkpoint["created_at"],
+                    trigger=checkpoint["trigger"]
+                )
+            ]
+        )
+
+    except Exception as e:
+        logger.error(
+            "create_checkpoint_failed",
+            conversation_id=conversation_id,
+            error=str(e)
+        )
+        return CheckpointListResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@router.post("/{conversation_id}/checkpoints/{checkpoint_id}/restore", response_model=RestoreCheckpointResponse)
+async def restore_checkpoint(
+    conversation_id: str,
+    checkpoint_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Restore the conversation to a previous checkpoint.
+
+    Reverts the conversation state to the checkpoint, removing
+    all messages and changes made after the checkpoint.
+    """
+    try:
+        from app.services.checkpoint_service import get_checkpoint_service
+
+        service = get_checkpoint_service()
+        result = await service.restore_from_checkpoint(
+            conversation_id=conversation_id,
+            checkpoint_id=checkpoint_id,
+            user_id=user_id
+        )
+
+        if not result:
+            return RestoreCheckpointResponse(
+                success=False,
+                error="Failed to restore from checkpoint"
+            )
+
+        return RestoreCheckpointResponse(
+            success=True,
+            messages_restored=result.get("messages_restored", 0),
+            token_count=result.get("token_count", 0)
+        )
+
+    except Exception as e:
+        logger.error(
+            "restore_checkpoint_failed",
+            conversation_id=conversation_id,
+            checkpoint_id=checkpoint_id,
+            error=str(e)
+        )
+        return RestoreCheckpointResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+# =============================================================================
+# Health Check
+# =============================================================================
+
 @router.get("/health")
 async def health_check():
     """
