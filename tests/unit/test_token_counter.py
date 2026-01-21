@@ -307,7 +307,6 @@ class TestTiktokenIntegration:
         # Should either have encoding or None (if tiktoken not installed)
         assert encoding is not None or encoding is None
 
-    @pytest.mark.skip(reason="tiktoken is imported lazily inside method - cannot patch at module level")
     @patch('app.core.token_counter.tiktoken')
     def test_falls_back_on_tiktoken_error(self, mock_tiktoken):
         """Test fallback when tiktoken fails"""

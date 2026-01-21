@@ -15,9 +15,6 @@ import os
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 
-# Skip entire module - requires full env vars (SUPABASE_URL, etc.) that are not available in CI
-pytestmark = pytest.mark.skip(reason="Requires env vars not available in unit test CI - move to integration tests")
-
 
 # ============================================================================
 # Test Fixtures

@@ -33,7 +33,7 @@ from typing import Any, Callable, Coroutine, Dict, Optional, TypeVar, Union
 
 import structlog
 from pydantic import BaseModel, Field
-from prometheus_client import Counter, Gauge, REGISTRY
+from prometheus_client import Counter, Gauge
 
 logger = structlog.get_logger(__name__)
 
@@ -44,43 +44,25 @@ T = TypeVar('T')
 # PROMETHEUS METRICS
 # =============================================================================
 
-def _get_or_create_counter(name: str, description: str, labels: list) -> Counter:
-    """Get existing counter or create new one to avoid duplicate registration errors."""
-    try:
-        return Counter(name, description, labels)
-    except ValueError:
-        # Metric already exists, retrieve it from registry
-        return REGISTRY._names_to_collectors.get(name.replace("_total", ""))
-
-
-def _get_or_create_gauge(name: str, description: str, labels: list) -> Gauge:
-    """Get existing gauge or create new one to avoid duplicate registration errors."""
-    try:
-        return Gauge(name, description, labels)
-    except ValueError:
-        # Metric already exists, retrieve it from registry
-        return REGISTRY._names_to_collectors.get(name)
-
-
-CIRCUIT_STATE_CHANGES = _get_or_create_counter(
+CIRCUIT_STATE_CHANGES = Counter(
     "empire_circuit_breaker_state_changes_total",
     "Total circuit breaker state changes",
     ["service", "from_state", "to_state"]
 )
 
-CIRCUIT_REJECTIONS = _get_or_create_counter(
+CIRCUIT_REJECTIONS = Counter(
     "empire_circuit_breaker_rejections_total",
     "Total requests rejected by circuit breaker",
     ["service"]
 )
 
-CIRCUIT_CURRENT_STATE = _get_or_create_gauge(
+CIRCUIT_CURRENT_STATE = Gauge(
     "empire_circuit_breaker_state",
     "Current circuit breaker state (0=closed, 1=half_open, 2=open)",
     ["service"]
 )
 
-CIRCUIT_FAILURE_COUNT = _get_or_create_gauge(
+CIRCUIT_FAILURE_COUNT = Gauge(
     "empire_circuit_breaker_failures",
     "Current failure count",
     ["service"]

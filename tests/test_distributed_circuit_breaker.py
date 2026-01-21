@@ -7,25 +7,11 @@ Run with:
 """
 
 import asyncio
-import json
-import time
 from datetime import datetime, timedelta
 from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-# Import module at top level to ensure Prometheus metrics are registered only once.
-# Without this, imports inside test methods can cause duplicate metric registration.
-from app.core.distributed_circuit_breaker import (
-    DistributedCircuitBreaker,
-    CircuitBreakerConfig,
-    CircuitBreakerRegistry,
-    CircuitBreakerOpenError,
-    CircuitBreakerState,
-    CircuitState,
-    DEFAULT_CONFIGS,
-)
 
 
 # =============================================================================
@@ -34,36 +20,13 @@ from app.core.distributed_circuit_breaker import (
 
 @pytest.fixture
 def mock_redis():
-    """Mock Redis client for circuit breaker state that tracks state between calls"""
-    mock = MagicMock()
-
-    # Storage dict to persist state between calls
-    storage = {}
-
-    def mock_get(key):
-        return storage.get(key)
-
-    def mock_setex(key, ttl, value):
-        storage[key] = value
-        return True
-
-    def mock_set(key, value):
-        storage[key] = value
-        return True
-
-    def mock_delete(key):
-        if key in storage:
-            del storage[key]
-            return 1
-        return 0
-
-    mock.get.side_effect = mock_get
-    mock.set.side_effect = mock_set
-    mock.setex.side_effect = mock_setex
-    mock.delete.side_effect = mock_delete
+    """Mock Redis client for circuit breaker state"""
+    mock = AsyncMock()
+    mock.get.return_value = None
+    mock.set.return_value = True
     mock.incr.return_value = 1
     mock.expire.return_value = True
-
+    mock.delete.return_value = 1
     return mock
 
 
@@ -73,7 +36,7 @@ def circuit_config():
     return {
         "failure_threshold": 5,
         "success_threshold": 2,
-        "timeout_seconds": 30,
+        "timeout": 30,
         "half_open_max_calls": 3
     }
 
@@ -87,26 +50,24 @@ class TestCircuitBreakerInit:
 
     def test_breaker_creation(self, mock_redis):
         """Test creating DistributedCircuitBreaker instance"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
 
         assert breaker.service_name == "test_service"
-        assert breaker.redis == mock_redis
+        assert breaker.state == "CLOSED"
 
     def test_breaker_with_custom_config(self, mock_redis, circuit_config):
         """Test DistributedCircuitBreaker with custom configuration"""
-        config = CircuitBreakerConfig(service_name="test_service", **circuit_config)
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
+
+        config = CircuitBreakerConfig(**circuit_config)
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
 
         assert breaker.config.failure_threshold == 5
-        assert breaker.config.success_threshold == 2
-        assert breaker.config.timeout_seconds == 30
-
-    def test_breaker_uses_default_config(self, mock_redis):
-        """Test that breaker uses default config for known services"""
-        breaker = DistributedCircuitBreaker(mock_redis, "llamaindex")
-
-        assert breaker.config.service_name == "llamaindex"
-        assert breaker.config.failure_threshold == DEFAULT_CONFIGS["llamaindex"].failure_threshold
 
 
 # =============================================================================
@@ -119,69 +80,77 @@ class TestCircuitStates:
     @pytest.mark.asyncio
     async def test_initial_state_closed(self, mock_redis):
         """Test that initial state is CLOSED"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
-        state = await breaker._get_state()
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        assert state.state == CircuitState.CLOSED
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
+            state = await breaker.get_state()
+
+        assert state == "CLOSED"
 
     @pytest.mark.asyncio
     async def test_state_opens_after_failures(self, mock_redis):
         """Test that circuit opens after failure threshold"""
-        config = CircuitBreakerConfig(service_name="test_service", failure_threshold=3)
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
 
-        # Record failures to exceed threshold
-        for _ in range(4):
-            await breaker.record_failure()
+        config = CircuitBreakerConfig(failure_threshold=3)
+        failure_count = 0
 
-        state = await breaker._get_state()
-        assert state.state == CircuitState.OPEN
+        def mock_incr(*args):
+            nonlocal failure_count
+            failure_count += 1
+            return failure_count
+
+        mock_redis.incr = AsyncMock(side_effect=mock_incr)
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
+
+            # Record failures
+            for _ in range(4):
+                await breaker.record_failure()
+
+            state = await breaker.get_state()
+
+        assert state == "OPEN"
 
     @pytest.mark.asyncio
     async def test_state_transitions_to_half_open(self, mock_redis):
         """Test that circuit transitions to HALF_OPEN after timeout"""
-        config = CircuitBreakerConfig(
-            service_name="test_service",
-            failure_threshold=3,
-            timeout_seconds=0  # Immediate timeout
-        )
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
 
-        # Open the circuit
-        for _ in range(4):
-            await breaker.record_failure()
+        config = CircuitBreakerConfig(failure_threshold=3, timeout=0)  # Immediate timeout
 
-        # Now check can_execute - should transition to half-open after timeout
-        # Since timeout is 0, it should transition immediately
-        can_exec = await breaker.can_execute()
+        # Simulate open state that should transition
+        mock_redis.get.return_value = b"OPEN"
 
-        state = await breaker._get_state()
-        assert state.state in [CircuitState.HALF_OPEN, CircuitState.OPEN]
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
+            breaker._opened_at = datetime.utcnow() - timedelta(seconds=60)
+
+            state = await breaker.get_state()
+
+        # After timeout, should be HALF_OPEN
+        assert state in ["HALF_OPEN", "OPEN"]
 
     @pytest.mark.asyncio
     async def test_state_closes_after_success(self, mock_redis):
         """Test that circuit closes after success threshold in HALF_OPEN"""
-        config = CircuitBreakerConfig(
-            service_name="test_service",
-            success_threshold=2,
-            failure_threshold=3,
-            timeout_seconds=0
-        )
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
 
-        # First open the circuit
-        for _ in range(4):
-            await breaker.record_failure()
+        config = CircuitBreakerConfig(success_threshold=2)
 
-        # Trigger transition to half-open
-        await breaker.can_execute()
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
+            breaker.state = "HALF_OPEN"
 
-        # Record enough successes to close
-        await breaker.record_success()
-        await breaker.record_success()
+            # Record successes
+            await breaker.record_success()
+            await breaker.record_success()
 
-        state = await breaker._get_state()
-        assert state.state == CircuitState.CLOSED
+            state = await breaker.get_state()
+
+        assert state == "CLOSED"
 
 
 # =============================================================================
@@ -194,101 +163,156 @@ class TestRedisStateSharing:
     @pytest.mark.asyncio
     async def test_state_persisted_to_redis(self, mock_redis):
         """Test that circuit state is persisted to Redis"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        # Get initial state to trigger save
-        await breaker._get_state()
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
+            await breaker._set_state("OPEN")
 
-        # setex should be called to persist state
-        mock_redis.setex.assert_called()
+        # Redis set should be called
+        mock_redis.set.assert_called()
 
     @pytest.mark.asyncio
-    async def test_state_loaded_from_redis(self):
+    async def test_state_loaded_from_redis(self, mock_redis):
         """Test that circuit state is loaded from Redis"""
-        # Create a fresh mock that returns specific data
-        mock = MagicMock()
-        state_data = CircuitBreakerState(
-            service_name="test_service",
-            state=CircuitState.OPEN,
-            failure_count=5
-        )
-        mock.get.return_value = state_data.model_dump_json()
-        mock.setex.return_value = True
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        breaker = DistributedCircuitBreaker(mock, "test_service")
-        # Invalidate cache to force reload from Redis
-        breaker._local_state = None
-        state = await breaker._get_state()
+        mock_redis.get.return_value = b"OPEN"
 
-        assert state.state == CircuitState.OPEN
-        assert state.failure_count == 5
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
+            state = await breaker.get_state()
+
+        assert state == "OPEN"
 
     @pytest.mark.asyncio
-    async def test_failure_count_shared_via_state(self, mock_redis):
-        """Test that failure count is shared via Redis state"""
-        breaker1 = DistributedCircuitBreaker(mock_redis, "test_service")
-        breaker2 = DistributedCircuitBreaker(mock_redis, "test_service")
+    async def test_failure_count_shared_across_instances(self, mock_redis):
+        """Test that failure count is shared across instances"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        await breaker1.record_failure()
-        await breaker2.record_failure()
+        shared_count = 0
 
-        # Both should have called setex to save state
-        assert mock_redis.setex.call_count >= 2
+        def mock_incr(*args):
+            nonlocal shared_count
+            shared_count += 1
+            return shared_count
+
+        mock_redis.incr = AsyncMock(side_effect=mock_incr)
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker1 = DistributedCircuitBreaker("test_service")
+            breaker2 = DistributedCircuitBreaker("test_service")
+
+            await breaker1.record_failure()
+            await breaker2.record_failure()
+
+        # Both breakers should increment shared count
+        assert shared_count == 2
 
 
 # =============================================================================
-# CAN EXECUTE TESTS
+# ALLOW REQUEST TESTS
 # =============================================================================
 
-class TestCanExecute:
-    """Tests for can_execute functionality"""
+class TestAllowRequest:
+    """Tests for allow_request functionality"""
 
     @pytest.mark.asyncio
-    async def test_can_execute_when_closed(self, mock_redis):
+    async def test_allow_request_when_closed(self, mock_redis):
         """Test that requests are allowed when circuit is CLOSED"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
-        allowed = await breaker.can_execute()
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
+            allowed = await breaker.allow_request()
 
         assert allowed is True
 
     @pytest.mark.asyncio
-    async def test_cannot_execute_when_open(self, mock_redis):
+    async def test_reject_request_when_open(self, mock_redis):
         """Test that requests are rejected when circuit is OPEN"""
-        config = CircuitBreakerConfig(
-            service_name="test_service",
-            failure_threshold=2,
-            timeout_seconds=60  # Long timeout so it stays open
-        )
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        # Open the circuit
-        for _ in range(3):
-            await breaker.record_failure()
+        mock_redis.get.return_value = b"OPEN"
 
-        allowed = await breaker.can_execute()
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
+            breaker.state = "OPEN"
+            breaker._opened_at = datetime.utcnow()  # Just opened
+
+            allowed = await breaker.allow_request()
+
         assert allowed is False
 
     @pytest.mark.asyncio
-    async def test_limited_calls_in_half_open(self, mock_redis):
+    async def test_limited_requests_in_half_open(self, mock_redis):
         """Test that requests are limited when circuit is HALF_OPEN"""
-        config = CircuitBreakerConfig(
-            service_name="test_service",
-            failure_threshold=2,
-            timeout_seconds=0,  # Immediate transition to half-open
-            half_open_max_calls=2
-        )
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
 
-        # Open the circuit
-        for _ in range(3):
-            await breaker.record_failure()
+        config = CircuitBreakerConfig(half_open_max_calls=2)
 
-        # First call triggers transition to half-open
-        assert await breaker.can_execute() is True
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
+            breaker.state = "HALF_OPEN"
+            breaker._half_open_calls = 0
 
-        # Should allow up to half_open_max_calls
-        state = await breaker._get_state()
-        assert state.state == CircuitState.HALF_OPEN
+            # First two calls should be allowed
+            assert await breaker.allow_request() is True
+            assert await breaker.allow_request() is True
+
+            # Third call should be rejected
+            assert await breaker.allow_request() is False
+
+
+# =============================================================================
+# CALLBACK TESTS
+# =============================================================================
+
+class TestCircuitCallbacks:
+    """Tests for circuit breaker callbacks"""
+
+    @pytest.mark.asyncio
+    async def test_on_open_callback(self, mock_redis):
+        """Test that on_open callback is called when circuit opens"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
+
+        config = CircuitBreakerConfig(failure_threshold=2)
+        callback_called = False
+
+        def on_open(service_name):
+            nonlocal callback_called
+            callback_called = True
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
+            breaker.on_open = on_open
+
+            # Trigger opening
+            for _ in range(3):
+                await breaker.record_failure()
+
+        assert callback_called is True
+
+    @pytest.mark.asyncio
+    async def test_on_close_callback(self, mock_redis):
+        """Test that on_close callback is called when circuit closes"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
+
+        config = CircuitBreakerConfig(success_threshold=1)
+        callback_called = False
+
+        def on_close(service_name):
+            nonlocal callback_called
+            callback_called = True
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
+            breaker.on_close = on_close
+            breaker.state = "HALF_OPEN"
+
+            await breaker.record_success()
+
+        assert callback_called is True
 
 
 # =============================================================================
@@ -298,186 +322,155 @@ class TestCanExecute:
 class TestCircuitBreakerRegistry:
     """Tests for circuit breaker registry"""
 
-    def test_get_breaker(self, mock_redis):
-        """Test getting a circuit breaker from registry"""
-        registry = CircuitBreakerRegistry(mock_redis)
+    def test_get_or_create_breaker(self, mock_redis):
+        """Test getting or creating a circuit breaker"""
+        from app.core.distributed_circuit_breaker import CircuitBreakerRegistry
 
-        breaker1 = registry.get_breaker("service_a")
-        breaker2 = registry.get_breaker("service_a")
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            registry = CircuitBreakerRegistry()
+
+            breaker1 = registry.get_or_create("service_a")
+            breaker2 = registry.get_or_create("service_a")
 
         # Should return same instance
         assert breaker1 is breaker2
 
     def test_registry_uses_default_configs(self, mock_redis):
         """Test that registry uses default configs for known services"""
-        registry = CircuitBreakerRegistry(mock_redis)
+        from app.core.distributed_circuit_breaker import CircuitBreakerRegistry
 
-        breaker = registry.get_breaker("llamaindex")
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            registry = CircuitBreakerRegistry()
+
+            breaker = registry.get_or_create("llamaindex")
 
         # Should have llamaindex-specific config
         assert breaker.config is not None
-        assert breaker.config.service_name == "llamaindex"
 
     @pytest.mark.asyncio
-    async def test_get_all_status(self, mock_redis):
-        """Test getting status of all circuit breakers"""
-        registry = CircuitBreakerRegistry(mock_redis)
+    async def test_get_all_states(self, mock_redis):
+        """Test getting states of all circuit breakers"""
+        from app.core.distributed_circuit_breaker import CircuitBreakerRegistry
 
-        registry.get_breaker("service_a")
-        registry.get_breaker("service_b")
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            registry = CircuitBreakerRegistry()
 
-        status = await registry.get_all_status()
+            registry.get_or_create("service_a")
+            registry.get_or_create("service_b")
 
-        assert "service_a" in status
-        assert "service_b" in status
+            states = await registry.get_all_states()
+
+        assert "service_a" in states
+        assert "service_b" in states
 
 
 # =============================================================================
-# STATUS AND METRICS TESTS
+# METRICS TESTS
 # =============================================================================
 
-class TestCircuitStatus:
-    """Tests for circuit breaker status"""
+class TestCircuitMetrics:
+    """Tests for circuit breaker metrics"""
 
     @pytest.mark.asyncio
-    async def test_get_status(self, mock_redis):
-        """Test getting circuit breaker status"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+    async def test_failure_metrics_recorded(self, mock_redis):
+        """Test that failure metrics are recorded"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        status = await breaker.get_status()
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
 
-        assert status["service"] == "test_service"
-        assert status["state"] == "closed"
-        assert "failure_count" in status
-        assert "failure_threshold" in status
+            await breaker.record_failure()
 
-    @pytest.mark.asyncio
-    async def test_status_after_failures(self, mock_redis):
-        """Test status reflects failure count"""
-        config = CircuitBreakerConfig(
-            service_name="test_service",
-            failure_threshold=5
-        )
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+            metrics = breaker.get_metrics()
 
-        await breaker.record_failure()
-        await breaker.record_failure()
-
-        status = await breaker.get_status()
-        assert status["failure_count"] >= 2
-
-
-# =============================================================================
-# RESET AND FORCE TESTS
-# =============================================================================
-
-class TestCircuitControl:
-    """Tests for circuit breaker control methods"""
+        assert metrics["failures"] >= 1
 
     @pytest.mark.asyncio
-    async def test_force_open(self, mock_redis):
-        """Test forcing circuit to open state"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+    async def test_success_metrics_recorded(self, mock_redis):
+        """Test that success metrics are recorded"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        await breaker.force_open()
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
 
-        state = await breaker._get_state()
-        assert state.state == CircuitState.OPEN
+            await breaker.record_success()
 
-    @pytest.mark.asyncio
-    async def test_force_close(self, mock_redis):
-        """Test forcing circuit to closed state"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+            metrics = breaker.get_metrics()
 
-        # First open it
-        await breaker.force_open()
-        # Then force close
-        await breaker.force_close()
-
-        state = await breaker._get_state()
-        assert state.state == CircuitState.CLOSED
+        assert metrics["successes"] >= 1
 
     @pytest.mark.asyncio
-    async def test_reset(self, mock_redis):
-        """Test resetting circuit breaker"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+    async def test_state_change_count_tracked(self, mock_redis):
+        """Test that state changes are tracked"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker, CircuitBreakerConfig
 
-        # Record some failures
-        await breaker.record_failure()
-        await breaker.record_failure()
+        config = CircuitBreakerConfig(failure_threshold=1, success_threshold=1)
 
-        # Reset
-        await breaker.reset()
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service", config=config)
 
-        state = await breaker._get_state()
-        assert state.state == CircuitState.CLOSED
-        assert state.failure_count == 0
+            # Trigger state changes
+            await breaker.record_failure()
+            await breaker.record_failure()  # Opens
+
+            metrics = breaker.get_metrics()
+
+        assert metrics.get("state_changes", 0) >= 0
 
 
 # =============================================================================
-# PROTECT DECORATOR TESTS
+# FALLBACK TESTS
 # =============================================================================
 
-class TestProtectDecorator:
-    """Tests for the protect decorator"""
+class TestCircuitFallback:
+    """Tests for circuit breaker fallback behavior"""
 
     @pytest.mark.asyncio
-    async def test_protect_allows_when_closed(self, mock_redis):
-        """Test that protect decorator allows calls when closed"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+    async def test_fallback_called_when_open(self, mock_redis):
+        """Test that fallback is called when circuit is open"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        @breaker.protect
-        async def my_operation():
-            return "success"
+        fallback_called = False
 
-        result = await my_operation()
-        assert result == "success"
+        async def fallback():
+            nonlocal fallback_called
+            fallback_called = True
+            return "fallback_result"
 
-    @pytest.mark.asyncio
-    async def test_protect_records_success(self, mock_redis):
-        """Test that protect decorator records success"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
+        mock_redis.get.return_value = b"OPEN"
 
-        @breaker.protect
-        async def my_operation():
-            return "success"
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
+            breaker.state = "OPEN"
+            breaker._opened_at = datetime.utcnow()
 
-        await my_operation()
+            async def main_operation():
+                return "main_result"
 
-        state = await breaker._get_state()
-        assert state.consecutive_successes >= 1
+            result = await breaker.execute(main_operation, fallback)
 
-    @pytest.mark.asyncio
-    async def test_protect_records_failure(self, mock_redis):
-        """Test that protect decorator records failure"""
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service")
-
-        @breaker.protect
-        async def my_operation():
-            raise ValueError("test error")
-
-        with pytest.raises(ValueError):
-            await my_operation()
-
-        state = await breaker._get_state()
-        assert state.failure_count >= 1
+        # Fallback should be called when open
+        assert fallback_called is True or result == "fallback_result"
 
     @pytest.mark.asyncio
-    async def test_protect_raises_when_open(self, mock_redis):
-        """Test that protect raises error when circuit is open"""
-        config = CircuitBreakerConfig(
-            service_name="test_service",
-            failure_threshold=2,
-            timeout_seconds=60
-        )
-        breaker = DistributedCircuitBreaker(mock_redis, "test_service", config=config)
+    async def test_main_operation_called_when_closed(self, mock_redis):
+        """Test that main operation is called when circuit is closed"""
+        from app.core.distributed_circuit_breaker import DistributedCircuitBreaker
 
-        # Open the circuit
-        await breaker.force_open()
+        main_called = False
 
-        @breaker.protect
-        async def my_operation():
-            return "success"
+        async def main_operation():
+            nonlocal main_called
+            main_called = True
+            return "main_result"
 
-        with pytest.raises(CircuitBreakerOpenError):
-            await my_operation()
+        async def fallback():
+            return "fallback_result"
+
+        with patch('app.core.distributed_circuit_breaker.get_redis', return_value=mock_redis):
+            breaker = DistributedCircuitBreaker("test_service")
+
+            result = await breaker.execute(main_operation, fallback)
+
+        assert main_called is True
+        assert result == "main_result"

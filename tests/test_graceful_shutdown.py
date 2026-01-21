@@ -14,9 +14,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Skip entire module - GracefulShutdown API doesn't match test expectations
-pytestmark = pytest.mark.skip(reason="GracefulShutdown module API doesn't match test expectations - needs refactoring")
-
 
 # =============================================================================
 # FIXTURES
@@ -64,7 +61,6 @@ class TestShutdownCoordinatorInit:
         assert coordinator is not None
         assert coordinator.is_shutting_down is False
 
-    @pytest.mark.skip(reason="ShutdownConfig API changed - celery_drain_timeout not in config")
     def test_coordinator_with_custom_timeout(self):
         """Test GracefulShutdown with custom timeout"""
         from app.core.graceful_shutdown import GracefulShutdown, ShutdownConfig
@@ -82,7 +78,6 @@ class TestShutdownCoordinatorInit:
 class TestShutdownSignals:
     """Tests for shutdown signal handling"""
 
-    @pytest.mark.skip(reason="GracefulShutdown API changed - _handle_shutdown_signal not available")
     def test_signal_handler_sets_shutting_down_flag(self):
         """Test that signal handler sets the shutting down flag"""
         from app.core.graceful_shutdown import GracefulShutdown
@@ -94,7 +89,6 @@ class TestShutdownSignals:
 
         assert coordinator.is_shutting_down is True
 
-    @pytest.mark.skip(reason="GracefulShutdown API changed - _handle_shutdown_signal not available")
     def test_multiple_signals_handled_gracefully(self):
         """Test that multiple signals don't cause issues"""
         from app.core.graceful_shutdown import GracefulShutdown
@@ -114,7 +108,6 @@ class TestShutdownSignals:
 # CELERY SHUTDOWN TESTS
 # =============================================================================
 
-@pytest.mark.skip(reason="graceful_shutdown module does not have celery_app attribute")
 class TestCeleryShutdown:
     """Tests for Celery worker shutdown"""
 
@@ -179,7 +172,6 @@ class TestCeleryShutdown:
 # DATABASE CONNECTION SHUTDOWN TESTS
 # =============================================================================
 
-@pytest.mark.skip(reason="graceful_shutdown module does not have get_supabase/get_neo4j_driver attributes")
 class TestDatabaseShutdown:
     """Tests for database connection shutdown"""
 

@@ -14,9 +14,6 @@ from uuid import uuid4
 
 import pytest
 
-# Skip entire module - recovery_tasks module API doesn't match test expectations
-pytestmark = pytest.mark.skip(reason="recovery_tasks module doesn't have expected attributes - needs refactoring")
-
 
 # =============================================================================
 # FIXTURES

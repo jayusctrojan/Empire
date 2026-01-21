@@ -14,9 +14,6 @@ from uuid import uuid4
 
 import pytest
 
-# Skip entire module - OptimisticLockManager class doesn't exist in module
-pytestmark = pytest.mark.skip(reason="OptimisticLockManager not implemented - needs refactoring")
-
 
 # =============================================================================
 # FIXTURES
