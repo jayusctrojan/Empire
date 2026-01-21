@@ -13,10 +13,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Mock the imports that may not exist in test environment
-import sys
-sys.modules['app.core.connections'] = MagicMock()
-sys.modules['app.services.circuit_breaker'] = MagicMock()
+# Note: Previously used sys.modules mocking for app.core.connections and
+# app.services.circuit_breaker, but this caused test isolation issues.
+# These mocks are not needed as tests only import from app.models.preflight.
 
 
 # =============================================================================
