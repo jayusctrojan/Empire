@@ -2,9 +2,9 @@
 
 **Title:** Implement Graph Result Formatter for Chat UI
 
-**Status:** pending
+**Status:** done
 
-**Dependencies:** 107, 108
+**Dependencies:** 107 ✓, 108 ✓
 
 **Priority:** low
 

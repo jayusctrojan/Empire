@@ -183,7 +183,7 @@ class RetrievalEvaluator:
             self.client = AsyncAnthropic(api_key=self.api_key)
 
         # Model for evaluation (Haiku for speed/cost)
-        self.model = "claude-3-5-haiku-20241022"
+        self.model = "claude-haiku-4-5"
 
         # Metrics buffer for batch storage
         self._metrics_buffer: List[StoredMetrics] = []

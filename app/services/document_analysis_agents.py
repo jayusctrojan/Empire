@@ -88,7 +88,7 @@ AGENT_CONFIGS = {
         "agent_id": "AGENT-009",
         "name": "Senior Research Analyst",
         "description": "Extracts topics, entities, facts, and assesses document quality",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.1,  # Low temperature for factual extraction
         "max_tokens": 4000
     },
@@ -96,7 +96,7 @@ AGENT_CONFIGS = {
         "agent_id": "AGENT-010",
         "name": "Content Strategist",
         "description": "Generates executive summaries, findings, and recommendations",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.3,  # Slightly higher for creative synthesis
         "max_tokens": 3000
     },
@@ -104,7 +104,7 @@ AGENT_CONFIGS = {
         "agent_id": "AGENT-011",
         "name": "Fact Checker",
         "description": "Verifies claims, assigns confidence scores, provides citations",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "temperature": 0.0,  # Zero temperature for strict verification
         "max_tokens": 3000
     }

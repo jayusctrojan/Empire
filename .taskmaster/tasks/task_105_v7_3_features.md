@@ -2,9 +2,9 @@
 
 **Title:** Implement Document Structure Service
 
-**Status:** pending
+**Status:** done
 
-**Dependencies:** 101, 102, 103
+**Dependencies:** 101 ✓, 102 ✓, 103 ✓
 
 **Priority:** medium
 

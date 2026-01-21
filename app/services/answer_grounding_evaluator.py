@@ -150,7 +150,7 @@ class AnswerGroundingEvaluator:
             self.client = AsyncAnthropic(api_key=self.api_key)
 
         # Model for evaluation
-        self.model = "claude-3-5-haiku-20241022"
+        self.model = "claude-haiku-4-5"
 
         logger.info(
             "AnswerGroundingEvaluator initialized",

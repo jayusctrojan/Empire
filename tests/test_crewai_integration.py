@@ -11,18 +11,109 @@ To run manually:
 """
 
 import pytest
-
-# Mark all tests in this module as integration tests
-pytestmark = pytest.mark.integration
 import requests
 import json
 from typing import Dict, Any
 
-# Skip all tests in this module when running pytest - they require a live server
-pytestmark = pytest.mark.skip(reason="Requires running FastAPI server at localhost:8000")
+
+def _local_server_is_available() -> bool:
+    """Check if the local FastAPI server is available."""
+    try:
+        response = requests.get("http://localhost:8000/health", timeout=2)
+        return response.status_code == 200
+    except (requests.ConnectionError, requests.Timeout, requests.RequestException):
+        return False
+
+
+# Mark all tests in this module as integration tests that require live server
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _local_server_is_available(),
+        reason="Local FastAPI server not running on port 8000"
+    ),
+]
 
 BASE_URL = "http://localhost:8000"
 
+from uuid import uuid4
+
+
+# ==================== Pytest Fixtures ====================
+
+@pytest.fixture(scope="module")
+def test_id():
+    """Generate a unique test ID for this test run."""
+    return str(uuid4())[:8]
+
+
+@pytest.fixture(scope="module")
+def agent_id(test_id):
+    """Create and return an agent ID for testing."""
+    agent_data = {
+        "agent_name": f"integration_test_agent_{test_id}",
+        "role": "Integration Test Agent",
+        "goal": "Test CrewAI integration",
+        "backstory": f"Created for integration testing - {test_id}",
+        "tools": ["web_search"],
+        "llm_config": {"model": "claude-haiku-4-5", "temperature": 0.7}
+    }
+    response = requests.post(f"{BASE_URL}/api/crewai/agents", json=agent_data)
+    if response.status_code == 201:
+        yield response.json()["id"]
+        # Cleanup
+        requests.delete(f"{BASE_URL}/api/crewai/agents/{response.json()['id']}?hard_delete=true")
+    else:
+        yield None
+
+
+@pytest.fixture(scope="module")
+def agent_ids(test_id):
+    """Create and return a list of agent IDs for testing."""
+    agent_data = {
+        "agent_name": f"integration_test_crew_agent_{test_id}",
+        "role": "Integration Test Crew Agent",
+        "goal": "Be part of test crew",
+        "backstory": f"Created for crew testing - {test_id}",
+        "tools": ["web_search"],
+        "llm_config": {"model": "claude-haiku-4-5", "temperature": 0.7}
+    }
+    response = requests.post(f"{BASE_URL}/api/crewai/agents", json=agent_data)
+    if response.status_code == 201:
+        agent_id = response.json()["id"]
+        yield [agent_id]
+        # Cleanup
+        requests.delete(f"{BASE_URL}/api/crewai/agents/{agent_id}?hard_delete=true")
+    else:
+        yield []
+
+
+@pytest.fixture(scope="module")
+def crew_id(agent_ids, test_id):
+    """Create and return a crew ID for testing."""
+    if not agent_ids:
+        yield None
+        return
+
+    crew_data = {
+        "crew_name": f"integration_test_crew_{test_id}",
+        "description": f"Test crew for integration testing - {test_id}",
+        "agent_ids": agent_ids,
+        "process_type": "sequential",
+        "memory_enabled": False,
+        "verbose": False
+    }
+    response = requests.post(f"{BASE_URL}/api/crewai/crews", json=crew_data)
+    if response.status_code == 201:
+        crew_id = response.json()["id"]
+        yield crew_id
+        # Cleanup
+        requests.delete(f"{BASE_URL}/api/crewai/crews/{crew_id}?hard_delete=true")
+    else:
+        yield None
+
+
+# ==================== Test Functions ====================
 
 def test_health_check():
     """Test Task 35.1: CrewAI health check endpoint"""
@@ -54,14 +145,16 @@ def test_list_workflows():
 def test_create_agent():
     """Test Task 35.1: Create a new agent"""
     print("\n=== Test 3: Create Agent ===")
+    unique_id = str(uuid4())[:8]
+    agent_name = f"test_researcher_{unique_id}"
     agent_data = {
-        "agent_name": f"test_researcher",
+        "agent_name": agent_name,
         "role": "Research Specialist",
         "goal": "Research and analyze documents to extract key insights",
-        "backstory": "An expert researcher with deep knowledge of information extraction",
+        "backstory": f"An expert researcher - {unique_id}",
         "tools": ["web_search", "document_parser"],
         "llm_config": {
-            "model": "claude-3-5-haiku-20241022",
+            "model": "claude-haiku-4-5",
             "temperature": 0.7
         }
     }
@@ -75,7 +168,9 @@ def test_create_agent():
     assert response.status_code == 201
     data = response.json()
     assert "id" in data
-    assert data["agent_name"] == agent_data["agent_name"]
+    assert data["agent_name"] == agent_name
+    # Cleanup
+    requests.delete(f"{BASE_URL}/api/crewai/agents/{data['id']}?hard_delete=true")
     print(f"✅ Agent created with ID: {data['id']}")
     return data
 
@@ -131,8 +226,9 @@ def test_update_agent(agent_id: str):
 def test_create_crew(agent_ids: list):
     """Test Task 35.2: Create a crew"""
     print(f"\n=== Test 7: Create Crew with agents: {agent_ids} ===")
+    unique_crew_name = f"test_research_crew_{uuid4().hex[:8]}"
     crew_data = {
-        "crew_name": "test_research_crew",
+        "crew_name": unique_crew_name,
         "description": "A test crew for document analysis and research",
         "agent_ids": agent_ids,
         "process_type": "sequential",
@@ -151,6 +247,8 @@ def test_create_crew(agent_ids: list):
     assert "id" in data
     assert data["crew_name"] == crew_data["crew_name"]
     print(f"✅ Crew created with ID: {data['id']}")
+    # Cleanup - delete the crew we just created
+    requests.delete(f"{BASE_URL}/api/crewai/crews/{data['id']}?hard_delete=true")
     return data
 
 

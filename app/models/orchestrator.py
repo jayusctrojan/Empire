@@ -323,7 +323,7 @@ class AgentInfo(BaseModel):
                     "summary_determination"
                 ],
                 "description": "Main orchestrator for content analysis",
-                "model": "claude-sonnet-4-5-20250514",
+                "model": "claude-sonnet-4-5",
                 "version": "1.0.0"
             }
         }

@@ -121,7 +121,7 @@ class RAGResponse:
     global_sources_count: int
     total_sources: int
     query_time_ms: float
-    model: str = "claude-sonnet-4-20250514"
+    model: str = "claude-sonnet-4-5"
 
     # Query expansion metadata
     query_variations: List[str] = field(default_factory=list)
@@ -643,7 +643,7 @@ Please answer the question based on the sources above. Include citations [1], [2
         client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
         response = await client.messages.create(
-            model=config.model if hasattr(config, 'model') else "claude-sonnet-4-20250514",
+            model=config.model if hasattr(config, 'model') else "claude-sonnet-4-5",
             max_tokens=config.response_max_tokens,
             temperature=config.temperature,
             messages=[
