@@ -732,6 +732,6 @@ async def health_check() -> HealthResponse:
         status="healthy",
         service="studio_cko_conversation",
         embeddingModel="bge-m3",
-        llmModel="claude-sonnet-4-20250514",
+        llmModel="claude-sonnet-4-5",
         queryExpansionEnabled=True,
     )

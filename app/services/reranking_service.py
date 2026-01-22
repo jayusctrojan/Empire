@@ -39,7 +39,7 @@ class RerankingConfig:
     """Configuration for reranking service"""
     provider: RerankingProvider = RerankingProvider.OLLAMA
     model: str = "bge-reranker-v2-m3"  # Ollama model
-    claude_model: str = "claude-3-5-haiku-20241022"  # Fast & cheap for reranking
+    claude_model: str = "claude-haiku-4-5"  # Fast & cheap for reranking
     base_url: str = "http://localhost:11434"
     top_k: int = 10
     max_input_results: int = 30

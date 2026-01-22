@@ -503,7 +503,7 @@ class DocumentProcessor:
 
             # Call Claude Vision API
             message = self.anthropic_client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-5",
                 max_tokens=2048,
                 messages=[{
                     "role": "user",
@@ -527,7 +527,7 @@ class DocumentProcessor:
             extracted_text = message.content[0].text
             result["content"]["text"] = extracted_text
             result["metadata"]["image_path"] = file_path
-            result["metadata"]["claude_model"] = "claude-3-5-sonnet-20241022"
+            result["metadata"]["claude_model"] = "claude-sonnet-4-5"
 
             return result
 

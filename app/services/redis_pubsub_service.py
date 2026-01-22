@@ -78,10 +78,17 @@ class RedisPubSubService:
         """Connect to Redis and initialize pub/sub"""
         try:
             # Create Redis client (supports both redis:// and rediss://)
+            # Strip query params from URL
+            clean_url = self.redis_url.split("?")[0] if "?" in self.redis_url else self.redis_url
+
+            # For Upstash (rediss://), disable SSL cert verification
+            ssl_cert_reqs = None if clean_url.startswith("rediss://") else "required"
+
             self.redis_client = await aioredis.from_url(
-                self.redis_url,
+                clean_url,
                 encoding="utf-8",
-                decode_responses=True
+                decode_responses=True,
+                ssl_cert_reqs=ssl_cert_reqs
             )
 
             # Test connection

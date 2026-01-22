@@ -84,7 +84,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "pattern_analysis"
             ],
             description="Main orchestrator for content analysis and routing",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -98,7 +98,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "executive_summary"
             ],
             description="PDF summary generation with key points",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -112,7 +112,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "multi_label_support"
             ],
             description="10-department content classification",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -127,7 +127,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "quality_assessment"
             ],
             description="Document research and analysis",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -141,7 +141,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "recommendations"
             ],
             description="Strategy and recommendations",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -155,7 +155,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "citation_provision"
             ],
             description="Fact verification and validation",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -170,7 +170,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "source_credibility"
             ],
             description="Web/academic search and information gathering",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -184,7 +184,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "correlation_finding"
             ],
             description="Pattern detection and statistical analysis",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -198,7 +198,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "citation_management"
             ],
             description="Report generation and documentation",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -212,7 +212,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "revision_loop"
             ],
             description="Quality assurance and consistency checking",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -227,7 +227,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "manifest_generation"
             ],
             description="Content set detection and file ordering",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
         AgentInfo(
@@ -242,7 +242,7 @@ def _get_all_agents() -> List[AgentInfo]:
                 "cypher_generation"
             ],
             description="Knowledge graph operations and queries",
-            model="claude-sonnet-4-5-20250514",
+            model="claude-sonnet-4-5",
             version="1.0.0"
         ),
     ]

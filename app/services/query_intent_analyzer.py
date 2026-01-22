@@ -227,7 +227,7 @@ class QueryIntentAnalyzer:
         self._cache: Dict[str, Tuple[QueryIntent, datetime]] = {}
 
         # Model for classification
-        self.model = "claude-3-5-haiku-20241022"
+        self.model = "claude-haiku-4-5"
 
         logger.info(
             "QueryIntentAnalyzer initialized",

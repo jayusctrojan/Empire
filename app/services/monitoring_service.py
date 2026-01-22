@@ -296,8 +296,8 @@ class CostCalculator:
 
     # Cost per 1K tokens (in dollars)
     LLM_COSTS = {
-        "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
-        "claude-3-5-haiku-20241022": {"input": 0.001, "output": 0.005},
+        "claude-sonnet-4-5": {"input": 0.003, "output": 0.015},
+        "claude-haiku-4-5": {"input": 0.001, "output": 0.005},
         "claude-3-opus-20240229": {"input": 0.015, "output": 0.075},
         "gpt-4o": {"input": 0.005, "output": 0.015},
         "gpt-4o-mini": {"input": 0.00015, "output": 0.0006},

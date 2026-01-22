@@ -14,7 +14,13 @@ import asyncio
 import functools
 import statistics
 import psutil
-from typing import Dict, Any, Optional, List, Callable, TypeVar, ParamSpec
+import sys
+from typing import Dict, Any, Optional, List, Callable, TypeVar
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+else:
+    from typing_extensions import ParamSpec
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
