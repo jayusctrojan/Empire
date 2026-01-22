@@ -1083,12 +1083,20 @@ async def query_health():
     Returns:
         Health status with component availability
     """
+    # Properly await async health check
+    crewai_healthy = False
+    if crewai_service.enabled:
+        try:
+            crewai_healthy = await crewai_service.health_check()
+        except Exception:
+            crewai_healthy = False
+
     return {
         "status": "healthy",
         "langgraph_enabled": True,
         "arcade_enabled": arcade_service.enabled,
         "crewai_enabled": crewai_service.enabled,
-        "crewai_healthy": crewai_service.health_check() if crewai_service.enabled else False,
+        "crewai_healthy": crewai_healthy,
         "workflow_router_enabled": True,
         "available_workflows": ["langgraph", "crewai", "simple"],
         "async_processing": True,
@@ -1096,6 +1104,6 @@ async def query_health():
         "faceted_search_enabled": True,
         # Query Expansion (Claude Haiku)
         "query_expansion_enabled": True,
-        "query_expansion_model": "claude-3-5-haiku-20241022",
+        "query_expansion_model": "claude-haiku-4-5",
         "query_expansion_strategies": ["synonyms", "reformulate", "specific", "broad", "balanced", "question"]
     }

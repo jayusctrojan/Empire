@@ -642,7 +642,7 @@ Content:
 
         try:
             response = await self.llm.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model="claude-haiku-4-5",
                 max_tokens=200,
                 temperature=0.0,
                 messages=[
@@ -655,7 +655,7 @@ Content:
             output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
             track_llm_call(
                 AgentID.DEPARTMENT_CLASSIFIER,
-                "claude-3-5-haiku-20241022",
+                "claude-haiku-4-5",
                 "success",
                 input_tokens,
                 output_tokens
@@ -694,10 +694,10 @@ Content:
 
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse LLM response as JSON", error=str(e))
-            track_llm_call(AgentID.DEPARTMENT_CLASSIFIER, "claude-3-5-haiku-20241022", "failure")
+            track_llm_call(AgentID.DEPARTMENT_CLASSIFIER, "claude-haiku-4-5", "failure")
         except Exception as e:
             logger.error("LLM classification error", error=str(e))
-            track_llm_call(AgentID.DEPARTMENT_CLASSIFIER, "claude-3-5-haiku-20241022", "failure")
+            track_llm_call(AgentID.DEPARTMENT_CLASSIFIER, "claude-haiku-4-5", "failure")
 
         return None
 
@@ -893,7 +893,7 @@ class DepartmentClassifierAgentService:
         async with AgentMetricsContext(
             AgentID.DEPARTMENT_CLASSIFIER,
             "classify",
-            model="claude-3-5-haiku-20241022"
+            model="claude-haiku-4-5"
         ) as metrics_ctx:
             try:
                 result = await self.classifier.classify(content, filename)
