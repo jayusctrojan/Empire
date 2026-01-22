@@ -154,9 +154,11 @@ class TestCircuitBreakerState:
     @pytest.mark.asyncio
     async def test_open_circuit_rejects_calls(self, circuit_breaker):
         """Test open circuit rejects new calls"""
+        import time
         # Force circuit to open state
         circuit_breaker._state = CircuitState.OPEN
-        circuit_breaker._last_failure_time = asyncio.get_event_loop().time()
+        # Use time.time() to match implementation (not asyncio event loop time)
+        circuit_breaker._last_failure_time = time.time()
 
         async def operation():
             return "success"
@@ -226,7 +228,7 @@ class TestCircuitBreakerOperations:
         result = await circuit_breaker.call(operation)
 
         assert result == {"result": "success"}
-        assert circuit_breaker._stats["total_successes"] == 1
+        assert circuit_breaker._stats["successful_calls"] == 1
 
     @pytest.mark.asyncio
     async def test_failed_call_increments_failure_count(self, circuit_breaker):
@@ -238,7 +240,7 @@ class TestCircuitBreakerOperations:
             await circuit_breaker.call(failing_operation, use_fallback=False)
 
         assert circuit_breaker._failure_count >= 1
-        assert circuit_breaker._stats["total_failures"] == 1
+        assert circuit_breaker._stats["failed_calls"] == 1
 
     @pytest.mark.asyncio
     async def test_retries_on_retryable_exception(self, circuit_config, circuit_breaker):
@@ -345,16 +347,18 @@ class TestCircuitBreakerWithFallback:
     @pytest.mark.asyncio
     async def test_uses_fallback_when_circuit_open(self, circuit_breaker, fallback_registry):
         """Test fallback is used when circuit is open"""
+        import time
         # Register fallback
         async def fallback():
             return "fallback_result"
 
         fallback_registry.register("test_service", "default", fallback)
-        circuit_breaker._fallback_registry = fallback_registry
+        # Use correct attribute name (no underscore prefix)
+        circuit_breaker.fallback_registry = fallback_registry
 
-        # Force circuit open
+        # Force circuit open - use time.time() to match implementation
         circuit_breaker._state = CircuitState.OPEN
-        circuit_breaker._last_failure_time = asyncio.get_event_loop().time()
+        circuit_breaker._last_failure_time = time.time()
 
         async def operation():
             return "normal_result"
@@ -367,9 +371,10 @@ class TestCircuitBreakerWithFallback:
     @pytest.mark.asyncio
     async def test_raises_when_no_fallback_and_circuit_open(self, circuit_breaker):
         """Test raises CircuitOpenError when no fallback available"""
-        # Force circuit open
+        import time
+        # Force circuit open - use time.time() to match implementation
         circuit_breaker._state = CircuitState.OPEN
-        circuit_breaker._last_failure_time = asyncio.get_event_loop().time()
+        circuit_breaker._last_failure_time = time.time()
 
         async def operation():
             return "result"
@@ -735,7 +740,8 @@ class TestCircuitBreakerIntegration:
         registry.register_default("retry_fallback_test", fallback)
 
         circuit = CircuitBreaker("retry_fallback_test", config)
-        circuit._fallback_registry = registry
+        # Use correct attribute name (no underscore prefix)
+        circuit.fallback_registry = registry
 
         call_count = 0
 
