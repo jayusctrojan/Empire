@@ -174,6 +174,7 @@ class TestCoordinateEndpoint:
 # ============================================================================
 
 
+@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestClassifyEndpoint:
     """Tests for POST /api/orchestrator/classify."""
 
@@ -236,6 +237,7 @@ class TestClassifyEndpoint:
 # ============================================================================
 
 
+@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestAnalyzeEndpoint:
     """Tests for POST /api/orchestrator/analyze."""
 
