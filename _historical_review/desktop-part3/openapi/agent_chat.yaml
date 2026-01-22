@@ -1,0 +1,1000 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - Agent Chat & Feedback API
+  description: |
+    API endpoints for agent-specific chat interactions and feedback collection.
+    Allows users to select and chat with specific AI agents (CrewAI agents, LangGraph workflows,
+    or specialized agents), provide feedback on agent performance, and improve agent capabilities
+    through user interaction data. Supports agent discovery, conversation management, and
+    feedback-driven agent improvement.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: agents
+    description: Agent discovery and management
+  - name: agent-chat
+    description: Agent-specific chat interactions
+  - name: feedback
+    description: Agent feedback and improvement
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/agents:
+    get:
+      tags:
+        - agents
+      summary: List available agents
+      description: |
+        Retrieve list of all available AI agents with their capabilities, specializations,
+        and current availability. Includes CrewAI agents, LangGraph workflows, and specialized agents.
+      operationId: listAgents
+      parameters:
+        - name: agent_type
+          in: query
+          schema:
+            type: string
+            enum: [crewai, langgraph, specialized, all]
+            default: all
+          description: Filter by agent type
+        - name: capability
+          in: query
+          schema:
+            type: string
+          description: Filter by specific capability (e.g., "document_analysis", "research")
+        - name: department_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 11
+          description: Filter by department specialization
+      responses:
+        '200':
+          description: Agents list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Agent'
+                  total:
+                    type: integer
+              examples:
+                all_agents:
+                  summary: List of all available agents
+                  value:
+                    agents:
+                      - agent_id: "agent-research-1"
+                        name: "Research Specialist"
+                        type: "crewai"
+                        description: "Expert in research, fact-checking, and information synthesis"
+                        capabilities:
+                          - "web_research"
+                          - "fact_checking"
+                          - "source_validation"
+                        specializations:
+                          - "academic_research"
+                          - "market_research"
+                        department_ids: [11]
+                        availability: "available"
+                        average_response_time_ms: 3500
+                        feedback_score: 4.7
+                        total_interactions: 1523
+                      - agent_id: "agent-document-parser"
+                        name: "Document Parser"
+                        type: "langgraph"
+                        description: "Specialized in parsing and extracting structured data from documents"
+                        capabilities:
+                          - "pdf_parsing"
+                          - "entity_extraction"
+                          - "table_extraction"
+                        specializations:
+                          - "legal_documents"
+                          - "financial_reports"
+                        department_ids: [1, 7, 8]
+                        availability: "available"
+                        average_response_time_ms: 2100
+                        feedback_score: 4.9
+                        total_interactions: 3204
+                      - agent_id: "agent-code-analyst"
+                        name: "Code Analyst"
+                        type: "specialized"
+                        description: "Analyzes code, identifies bugs, and suggests improvements"
+                        capabilities:
+                          - "code_review"
+                          - "bug_detection"
+                          - "refactoring_suggestions"
+                        specializations:
+                          - "python"
+                          - "javascript"
+                          - "typescript"
+                        department_ids: [1]
+                        availability: "available"
+                        average_response_time_ms: 1800
+                        feedback_score: 4.8
+                        total_interactions: 892
+                    total: 3
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/agents/{agent_id}:
+    get:
+      tags:
+        - agents
+      summary: Get agent details
+      description: Retrieve detailed information about a specific agent
+      operationId: getAgentById
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent identifier
+          example: "agent-research-1"
+      responses:
+        '200':
+          description: Agent details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetails'
+              examples:
+                research_agent:
+                  summary: Research Specialist agent details
+                  value:
+                    agent_id: "agent-research-1"
+                    name: "Research Specialist"
+                    type: "crewai"
+                    description: "Expert in research, fact-checking, and information synthesis"
+                    capabilities:
+                      - "web_research"
+                      - "fact_checking"
+                      - "source_validation"
+                    specializations:
+                      - "academic_research"
+                      - "market_research"
+                    department_ids: [11]
+                    availability: "available"
+                    configuration:
+                      model: "claude-3-5-sonnet-20241022"
+                      max_iterations: 5
+                      temperature: 0.3
+                      tools: ["perplexity", "arxiv", "google_scholar"]
+                    performance_metrics:
+                      average_response_time_ms: 3500
+                      success_rate: 0.94
+                      feedback_score: 4.7
+                      total_interactions: 1523
+                      total_tokens_used: 1847293
+                    example_prompts:
+                      - "Research the latest developments in quantum computing"
+                      - "Fact-check this claim about climate change"
+                      - "Find academic sources on machine learning ethics"
+                    created_at: "2025-01-01T00:00:00Z"
+                    updated_at: "2025-11-24T13:49:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/agents/{agent_id}/chat:
+    post:
+      tags:
+        - agent-chat
+      summary: Chat with specific agent
+      description: |
+        Send a message to a specific agent and receive a response. Maintains conversation
+        context within a session. Agent selection allows for specialized interactions
+        based on agent capabilities.
+      operationId: chatWithAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent identifier
+          example: "agent-research-1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+                  description: User message to agent
+                  example: "Research the latest AI trends in healthcare"
+                session_id:
+                  type: string
+                  format: uuid
+                  description: Optional session ID for conversation continuity
+                context:
+                  type: object
+                  description: Additional context for agent
+                  properties:
+                    document_ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: Relevant document IDs for context
+                    constraints:
+                      type: object
+                      description: Constraints for agent response
+                      properties:
+                        max_length:
+                          type: integer
+                          description: Maximum response length in words
+                        format:
+                          type: string
+                          enum: [text, markdown, json, structured]
+                          description: Desired response format
+                        include_sources:
+                          type: boolean
+                          default: true
+                          description: Include source citations
+            examples:
+              basic_message:
+                summary: Basic message to research agent
+                value:
+                  message: "Research the latest AI trends in healthcare"
+              with_context:
+                summary: Message with document context
+                value:
+                  message: "Analyze these documents and summarize key findings"
+                  context:
+                    document_ids:
+                      - "550e8400-e29b-41d4-a716-446655440000"
+                      - "660e8400-e29b-41d4-a716-446655440001"
+                    constraints:
+                      max_length: 500
+                      format: "markdown"
+                      include_sources: true
+      responses:
+        '200':
+          description: Agent response received
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentChatResponse'
+              examples:
+                research_response:
+                  summary: Research agent response
+                  value:
+                    agent_id: "agent-research-1"
+                    agent_name: "Research Specialist"
+                    message_id: "msg-550e8400-e29b-41d4-a716-446655440000"
+                    session_id: "session-660e8400-e29b-41d4-a716-446655440001"
+                    response: |
+                      Based on recent research, AI in healthcare is experiencing rapid growth in three key areas:
+
+                      1. **Diagnostic Imaging**: AI models now achieve 95%+ accuracy in detecting certain cancers [1]
+                      2. **Drug Discovery**: AI-powered platforms reduce discovery time by 40% [2]
+                      3. **Personalized Medicine**: ML algorithms optimize treatment plans based on patient data [3]
+
+                      The market is projected to reach $188B by 2030 [4].
+                    sources:
+                      - source_id: "1"
+                        title: "AI in Medical Imaging - Nature Medicine 2024"
+                        url: "https://..."
+                      - source_id: "2"
+                        title: "AI Drug Discovery Report - McKinsey 2024"
+                        url: "https://..."
+                    agent_metadata:
+                      tools_used: ["perplexity", "google_scholar"]
+                      confidence_score: 0.91
+                      processing_time_ms: 3420
+                      tokens_used: 847
+                    conversation_context:
+                      message_count: 1
+                      can_continue: true
+                    timestamp: "2025-11-24T13:49:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/agents/{agent_id}/sessions/{session_id}:
+    get:
+      tags:
+        - agent-chat
+      summary: Get conversation history with agent
+      description: Retrieve full conversation history for a specific session with an agent
+      operationId: getAgentConversation
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent identifier
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Session identifier
+      responses:
+        '200':
+          description: Conversation history retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConversation'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - agent-chat
+      summary: End conversation session
+      description: End an active conversation session with an agent
+      operationId: endAgentSession
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Session ended successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/agents/{agent_id}/feedback:
+    post:
+      tags:
+        - feedback
+      summary: Submit agent feedback
+      description: |
+        Provide feedback on agent performance to improve future interactions.
+        Feedback is used for agent fine-tuning, capability assessment, and user experience optimization.
+      operationId: submitAgentFeedback
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message_id
+                - rating
+              properties:
+                message_id:
+                  type: string
+                  description: ID of the agent message being rated
+                  example: "msg-550e8400-e29b-41d4-a716-446655440000"
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Rating from 1 (poor) to 5 (excellent)
+                  example: 5
+                feedback_type:
+                  type: string
+                  enum: [accuracy, helpfulness, speed, clarity, relevance]
+                  description: Type of feedback
+                  example: "accuracy"
+                comment:
+                  type: string
+                  maxLength: 1000
+                  description: Optional detailed feedback comment
+                  example: "Very accurate research with excellent source citations"
+                issues:
+                  type: array
+                  items:
+                    type: string
+                    enum: [incorrect_info, slow_response, unclear_answer, missing_sources, hallucination, off_topic]
+                  description: Specific issues identified (if any)
+                suggestions:
+                  type: string
+                  maxLength: 500
+                  description: Suggestions for improvement
+            examples:
+              positive_feedback:
+                summary: Positive feedback with high rating
+                value:
+                  message_id: "msg-550e8400-e29b-41d4-a716-446655440000"
+                  rating: 5
+                  feedback_type: "accuracy"
+                  comment: "Very accurate research with excellent source citations"
+              negative_feedback:
+                summary: Negative feedback with issues
+                value:
+                  message_id: "msg-660e8400-e29b-41d4-a716-446655440001"
+                  rating: 2
+                  feedback_type: "accuracy"
+                  comment: "Response contained outdated information"
+                  issues: ["incorrect_info", "missing_sources"]
+                  suggestions: "Use more recent sources and include publication dates"
+      responses:
+        '201':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feedback_id:
+                    type: string
+                    format: uuid
+                  agent_id:
+                    type: string
+                  message_id:
+                    type: string
+                  status:
+                    type: string
+                    enum: [received, under_review, applied]
+                  message:
+                    type: string
+              examples:
+                feedback_received:
+                  summary: Feedback successfully received
+                  value:
+                    feedback_id: "feedback-770e8400-e29b-41d4-a716-446655440002"
+                    agent_id: "agent-research-1"
+                    message_id: "msg-550e8400-e29b-41d4-a716-446655440000"
+                    status: "received"
+                    message: "Thank you for your feedback. It will be used to improve this agent."
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/agents/{agent_id}/feedback:
+    get:
+      tags:
+        - feedback
+      summary: Get agent feedback summary
+      description: Retrieve aggregated feedback statistics for an agent
+      operationId: getAgentFeedback
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent identifier
+        - name: time_range
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, all]
+            default: 30d
+          description: Time range for feedback aggregation
+      responses:
+        '200':
+          description: Feedback summary retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentFeedbackSummary'
+              examples:
+                feedback_stats:
+                  summary: Agent feedback statistics
+                  value:
+                    agent_id: "agent-research-1"
+                    agent_name: "Research Specialist"
+                    time_range: "30d"
+                    overall_rating: 4.7
+                    total_feedback: 342
+                    rating_distribution:
+                      "5": 198
+                      "4": 89
+                      "3": 35
+                      "2": 12
+                      "1": 8
+                    feedback_by_type:
+                      accuracy: 4.8
+                      helpfulness: 4.7
+                      speed: 4.5
+                      clarity: 4.6
+                      relevance: 4.9
+                    common_issues:
+                      - issue: "slow_response"
+                        count: 23
+                        percentage: 6.7
+                      - issue: "missing_sources"
+                        count: 15
+                        percentage: 4.4
+                    improvement_trends:
+                      - metric: "accuracy"
+                        change: "+0.3"
+                        direction: "improving"
+                      - metric: "speed"
+                        change: "-0.1"
+                        direction: "declining"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/agents/feedback/recent:
+    get:
+      tags:
+        - feedback
+      summary: Get recent feedback across all agents
+      description: Retrieve recent feedback submissions for monitoring and improvement
+      operationId: getRecentFeedback
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Maximum number of feedback entries to return
+        - name: rating
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Filter by specific rating
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+          description: Filter by specific agent
+      responses:
+        '200':
+          description: Recent feedback retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feedback:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FeedbackEntry'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    Agent:
+      type: object
+      required:
+        - agent_id
+        - name
+        - type
+        - description
+      properties:
+        agent_id:
+          type: string
+          description: Unique agent identifier
+          example: "agent-research-1"
+        name:
+          type: string
+          description: Human-readable agent name
+          example: "Research Specialist"
+        type:
+          type: string
+          enum: [crewai, langgraph, specialized]
+          description: Agent framework type
+        description:
+          type: string
+          description: Agent purpose and capabilities summary
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: List of agent capabilities
+        specializations:
+          type: array
+          items:
+            type: string
+          description: Domain specializations
+        department_ids:
+          type: array
+          items:
+            type: integer
+          description: Associated department IDs
+        availability:
+          type: string
+          enum: [available, busy, offline]
+          description: Current availability status
+        average_response_time_ms:
+          type: integer
+          description: Average response time in milliseconds
+        feedback_score:
+          type: number
+          format: float
+          minimum: 1.0
+          maximum: 5.0
+          description: Average feedback score (1-5)
+        total_interactions:
+          type: integer
+          description: Total number of interactions
+
+    AgentDetails:
+      allOf:
+        - $ref: '#/components/schemas/Agent'
+        - type: object
+          properties:
+            configuration:
+              type: object
+              description: Agent configuration details
+              properties:
+                model:
+                  type: string
+                max_iterations:
+                  type: integer
+                temperature:
+                  type: number
+                  format: float
+                tools:
+                  type: array
+                  items:
+                    type: string
+            performance_metrics:
+              type: object
+              properties:
+                success_rate:
+                  type: number
+                  format: float
+                total_tokens_used:
+                  type: integer
+            example_prompts:
+              type: array
+              items:
+                type: string
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    AgentChatResponse:
+      type: object
+      required:
+        - agent_id
+        - message_id
+        - response
+      properties:
+        agent_id:
+          type: string
+        agent_name:
+          type: string
+        message_id:
+          type: string
+        session_id:
+          type: string
+          format: uuid
+        response:
+          type: string
+          description: Agent response text
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              source_id:
+                type: string
+              title:
+                type: string
+              url:
+                type: string
+                format: uri
+        agent_metadata:
+          type: object
+          properties:
+            tools_used:
+              type: array
+              items:
+                type: string
+            confidence_score:
+              type: number
+              format: float
+            processing_time_ms:
+              type: integer
+            tokens_used:
+              type: integer
+        conversation_context:
+          type: object
+          properties:
+            message_count:
+              type: integer
+            can_continue:
+              type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    AgentConversation:
+      type: object
+      required:
+        - session_id
+        - agent_id
+        - messages
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+        agent_name:
+          type: string
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              message_id:
+                type: string
+              role:
+                type: string
+                enum: [user, agent]
+              content:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+              metadata:
+                type: object
+        started_at:
+          type: string
+          format: date-time
+        last_message_at:
+          type: string
+          format: date-time
+        message_count:
+          type: integer
+        total_tokens:
+          type: integer
+
+    AgentFeedbackSummary:
+      type: object
+      required:
+        - agent_id
+        - overall_rating
+        - total_feedback
+      properties:
+        agent_id:
+          type: string
+        agent_name:
+          type: string
+        time_range:
+          type: string
+        overall_rating:
+          type: number
+          format: float
+        total_feedback:
+          type: integer
+        rating_distribution:
+          type: object
+          additionalProperties:
+            type: integer
+        feedback_by_type:
+          type: object
+          additionalProperties:
+            type: number
+        common_issues:
+          type: array
+          items:
+            type: object
+            properties:
+              issue:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: number
+                format: float
+        improvement_trends:
+          type: array
+          items:
+            type: object
+            properties:
+              metric:
+                type: string
+              change:
+                type: string
+              direction:
+                type: string
+                enum: [improving, stable, declining]
+
+    FeedbackEntry:
+      type: object
+      required:
+        - feedback_id
+        - agent_id
+        - rating
+      properties:
+        feedback_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+        agent_name:
+          type: string
+        message_id:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        feedback_type:
+          type: string
+        comment:
+          type: string
+        issues:
+          type: array
+          items:
+            type: string
+        suggestions:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_rating:
+              summary: Invalid rating value
+              value:
+                error: "INVALID_RATING"
+                message: "Rating must be between 1 and 5"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing_token:
+              summary: Missing authentication token
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication required. Please provide a valid JWT token."
+                timestamp: "2025-11-24T13:49:00Z"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            agent_not_found:
+              summary: Agent not found
+              value:
+                error: "AGENT_NOT_FOUND"
+                message: "Agent with ID 'agent-xyz' not found"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    RateLimitError:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            rate_limit:
+              summary: Rate limit exceeded
+              value:
+                error: "RATE_LIMIT_EXCEEDED"
+                message: "Too many requests. Please try again in 60 seconds."
+                details:
+                  retry_after_seconds: 60
+                timestamp: "2025-11-24T13:49:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            generic_error:
+              summary: Internal server error
+              value:
+                error: "INTERNAL_SERVER_ERROR"
+                message: "An unexpected error occurred. Please try again later."
+                timestamp: "2025-11-24T13:49:00Z"

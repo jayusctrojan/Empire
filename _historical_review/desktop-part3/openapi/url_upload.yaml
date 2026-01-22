@@ -1,0 +1,626 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - URL/Link Upload API
+  description: |
+    API endpoints for uploading and processing content from URLs including YouTube videos,
+    web articles, and other URL-based sources. Supports automatic content detection,
+    transcript extraction, web scraping, and asynchronous processing via Celery.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: url-upload
+    description: URL content upload and processing
+  - name: url-validation
+    description: URL validation and type detection
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/upload/url:
+    post:
+      tags:
+        - url-upload
+      summary: Upload content from URL
+      description: |
+        Submit a URL for content extraction and processing. Automatically detects content type
+        (YouTube video, web article, PDF, etc.) and routes to appropriate processing service.
+        Returns task ID for tracking processing status via /api/status/{task_id}.
+      operationId: uploadFromUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: URL to process (YouTube, web article, PDF, etc.)
+                  example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                department_id:
+                  type: integer
+                  minimum: 1
+                  maximum: 11
+                  description: Department classification (1-11, optional - will auto-classify if not provided)
+                  example: 11
+                metadata:
+                  type: object
+                  description: Optional metadata to attach to the processed content
+                  properties:
+                    title:
+                      type: string
+                      maxLength: 500
+                      description: Override title (uses extracted title if not provided)
+                    tags:
+                      type: array
+                      items:
+                        type: string
+                      description: Custom tags for categorization
+                    notes:
+                      type: string
+                      maxLength: 2000
+                      description: User notes about this content
+                processing_options:
+                  type: object
+                  description: Processing configuration options
+                  properties:
+                    extract_transcript:
+                      type: boolean
+                      default: true
+                      description: Extract video transcript (YouTube only)
+                    include_comments:
+                      type: boolean
+                      default: false
+                      description: Include video comments (YouTube only)
+                    clean_html:
+                      type: boolean
+                      default: true
+                      description: Remove ads, navigation, footers from web articles
+                    chunk_size:
+                      type: integer
+                      minimum: 100
+                      maximum: 2000
+                      default: 512
+                      description: Text chunk size for embedding generation
+            examples:
+              youtube_video:
+                summary: YouTube video upload
+                value:
+                  url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                  department_id: 11
+                  metadata:
+                    tags: ["research", "ai", "machine-learning"]
+                    notes: "Important research video on neural networks"
+                  processing_options:
+                    extract_transcript: true
+                    include_comments: false
+              web_article:
+                summary: Web article upload
+                value:
+                  url: "https://example.com/article/ai-trends-2024"
+                  processing_options:
+                    clean_html: true
+                    chunk_size: 512
+              pdf_url:
+                summary: PDF from URL
+                value:
+                  url: "https://arxiv.org/pdf/2301.00001.pdf"
+                  department_id: 11
+                  metadata:
+                    title: "Research Paper on Transformers"
+      responses:
+        '202':
+          description: URL upload accepted and processing started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    format: uuid
+                    description: Celery task ID for tracking processing status
+                  url:
+                    type: string
+                    format: uri
+                    description: Original URL submitted
+                  content_type:
+                    type: string
+                    enum: [youtube_video, web_article, pdf, document, unsupported]
+                    description: Detected content type
+                  estimated_processing_time:
+                    type: integer
+                    description: Estimated processing time in seconds
+                  status_url:
+                    type: string
+                    format: uri
+                    description: URL to poll for processing status
+                  message:
+                    type: string
+                    description: Human-readable status message
+              examples:
+                youtube_accepted:
+                  summary: YouTube video processing started
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    content_type: "youtube_video"
+                    estimated_processing_time: 45
+                    status_url: "/api/status/550e8400-e29b-41d4-a716-446655440000"
+                    message: "YouTube video processing started. Extracting transcript..."
+                article_accepted:
+                  summary: Web article processing started
+                  value:
+                    task_id: "660e8400-e29b-41d4-a716-446655440001"
+                    url: "https://example.com/article"
+                    content_type: "web_article"
+                    estimated_processing_time: 15
+                    status_url: "/api/status/660e8400-e29b-41d4-a716-446655440001"
+                    message: "Web article processing started. Extracting content..."
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/upload/url/validate:
+    post:
+      tags:
+        - url-validation
+      summary: Validate URL and detect content type
+      description: |
+        Check if a URL is valid and supported before uploading. Returns content type,
+        estimated processing time, and validation status without starting processing.
+      operationId: validateUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: URL to validate
+                  example: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+            examples:
+              youtube_url:
+                summary: Validate YouTube URL
+                value:
+                  url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+              article_url:
+                summary: Validate article URL
+                value:
+                  url: "https://example.com/article"
+      responses:
+        '200':
+          description: URL validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UrlValidationResult'
+              examples:
+                valid_youtube:
+                  summary: Valid YouTube video
+                  value:
+                    valid: true
+                    url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                    content_type: "youtube_video"
+                    metadata:
+                      title: "Example Video Title"
+                      duration: 213
+                      has_transcript: true
+                    estimated_processing_time: 45
+                    message: "Valid YouTube video with available transcript"
+                valid_article:
+                  summary: Valid web article
+                  value:
+                    valid: true
+                    url: "https://example.com/article/ai-trends"
+                    content_type: "web_article"
+                    metadata:
+                      title: "AI Trends in 2024"
+                      word_count: 1500
+                    estimated_processing_time: 15
+                    message: "Valid web article"
+                invalid_url:
+                  summary: Invalid/unsupported URL
+                  value:
+                    valid: false
+                    url: "https://example.com/unsupported"
+                    content_type: "unsupported"
+                    error: "URL_NOT_ACCESSIBLE"
+                    message: "URL is not accessible or content type is not supported"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/upload/url/batch:
+    post:
+      tags:
+        - url-upload
+      summary: Upload multiple URLs in batch
+      description: |
+        Submit multiple URLs for processing in a single request. Each URL is validated
+        and processed independently. Returns array of task IDs for tracking.
+      operationId: batchUploadFromUrls
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - urls
+              properties:
+                urls:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - url
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                      department_id:
+                        type: integer
+                        minimum: 1
+                        maximum: 11
+                      metadata:
+                        type: object
+                  minItems: 1
+                  maxItems: 20
+                  description: List of URLs to process (max 20)
+                processing_options:
+                  type: object
+                  description: Default processing options for all URLs
+            examples:
+              multiple_videos:
+                summary: Batch upload 3 YouTube videos
+                value:
+                  urls:
+                    - url: "https://www.youtube.com/watch?v=video1"
+                      metadata:
+                        tags: ["research"]
+                    - url: "https://www.youtube.com/watch?v=video2"
+                      metadata:
+                        tags: ["tutorial"]
+                    - url: "https://example.com/article"
+                  processing_options:
+                    extract_transcript: true
+                    clean_html: true
+      responses:
+        '202':
+          description: Batch upload accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        url:
+                          type: string
+                          format: uri
+                        task_id:
+                          type: string
+                          format: uuid
+                        content_type:
+                          type: string
+                        status:
+                          type: string
+                          enum: [accepted, rejected]
+                        message:
+                          type: string
+                  total:
+                    type: integer
+                    description: Total URLs submitted
+                  accepted:
+                    type: integer
+                    description: URLs accepted for processing
+                  rejected:
+                    type: integer
+                    description: URLs rejected (invalid or unsupported)
+              examples:
+                batch_result:
+                  summary: Batch upload results
+                  value:
+                    tasks:
+                      - url: "https://www.youtube.com/watch?v=video1"
+                        task_id: "550e8400-e29b-41d4-a716-446655440000"
+                        content_type: "youtube_video"
+                        status: "accepted"
+                        message: "Processing started"
+                      - url: "https://www.youtube.com/watch?v=video2"
+                        task_id: "660e8400-e29b-41d4-a716-446655440001"
+                        content_type: "youtube_video"
+                        status: "accepted"
+                        message: "Processing started"
+                      - url: "https://invalid-url.com"
+                        task_id: null
+                        content_type: "unsupported"
+                        status: "rejected"
+                        message: "URL not accessible"
+                    total: 3
+                    accepted: 2
+                    rejected: 1
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/upload/url/supported-types:
+    get:
+      tags:
+        - url-validation
+      summary: List supported URL types
+      description: Get list of supported URL types and their capabilities
+      operationId: getSupportedUrlTypes
+      responses:
+        '200':
+          description: Supported URL types retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supported_types:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SupportedUrlType'
+              examples:
+                supported_list:
+                  summary: All supported URL types
+                  value:
+                    supported_types:
+                      - type: "youtube_video"
+                        description: "YouTube videos with transcript extraction"
+                        features:
+                          - "Transcript extraction"
+                          - "Metadata extraction (title, author, duration)"
+                          - "Comment extraction (optional)"
+                        example_urls:
+                          - "https://www.youtube.com/watch?v=..."
+                          - "https://youtu.be/..."
+                      - type: "web_article"
+                        description: "Web articles and blog posts"
+                        features:
+                          - "HTML cleaning (removes ads, nav, footer)"
+                          - "Metadata extraction (title, author, date)"
+                          - "Image extraction (optional)"
+                        example_urls:
+                          - "https://example.com/article"
+                          - "https://blog.example.com/post"
+                      - type: "pdf"
+                        description: "PDF documents from URLs"
+                        features:
+                          - "Text extraction"
+                          - "Page-by-page parsing"
+                          - "Metadata extraction"
+                        example_urls:
+                          - "https://example.com/document.pdf"
+                          - "https://arxiv.org/pdf/..."
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    UrlValidationResult:
+      type: object
+      required:
+        - valid
+        - url
+        - content_type
+      properties:
+        valid:
+          type: boolean
+          description: Whether the URL is valid and supported
+        url:
+          type: string
+          format: uri
+          description: The validated URL
+        content_type:
+          type: string
+          enum: [youtube_video, web_article, pdf, document, unsupported]
+          description: Detected content type
+        metadata:
+          type: object
+          description: Extracted metadata (if accessible)
+          properties:
+            title:
+              type: string
+              description: Content title
+            author:
+              type: string
+              description: Content author/creator
+            duration:
+              type: integer
+              description: Video duration in seconds (YouTube only)
+            word_count:
+              type: integer
+              description: Estimated word count (articles only)
+            has_transcript:
+              type: boolean
+              description: Whether transcript is available (YouTube only)
+            published_date:
+              type: string
+              format: date
+              description: Publication date (if available)
+        estimated_processing_time:
+          type: integer
+          description: Estimated processing time in seconds
+        error:
+          type: string
+          description: Error code if validation failed
+          example: "URL_NOT_ACCESSIBLE"
+        message:
+          type: string
+          description: Human-readable validation message
+
+    SupportedUrlType:
+      type: object
+      required:
+        - type
+        - description
+        - features
+      properties:
+        type:
+          type: string
+          description: Content type identifier
+          example: "youtube_video"
+        description:
+          type: string
+          description: Human-readable description
+          example: "YouTube videos with transcript extraction"
+        features:
+          type: array
+          items:
+            type: string
+          description: List of supported features
+          example: ["Transcript extraction", "Metadata extraction"]
+        example_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Example URL patterns
+          example: ["https://www.youtube.com/watch?v=...", "https://youtu.be/..."]
+        limitations:
+          type: array
+          items:
+            type: string
+          description: Known limitations or constraints
+          example: ["Max video length: 3 hours", "Requires available transcript"]
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "INVALID_URL"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "The provided URL is not valid or not accessible"
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_url:
+              summary: Invalid URL format
+              value:
+                error: "INVALID_URL"
+                message: "The provided URL is not in a valid format"
+                details:
+                  url: "not-a-valid-url"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing_token:
+              summary: Missing authentication token
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication required. Please provide a valid JWT token."
+                timestamp: "2025-11-24T13:49:00Z"
+
+    ValidationError:
+      description: URL validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            unsupported_type:
+              summary: Unsupported content type
+              value:
+                error: "UNSUPPORTED_CONTENT_TYPE"
+                message: "The content type at this URL is not supported for processing"
+                details:
+                  url: "https://example.com/unsupported"
+                  detected_type: "application/octet-stream"
+                timestamp: "2025-11-24T13:49:00Z"
+            url_not_accessible:
+              summary: URL not accessible
+              value:
+                error: "URL_NOT_ACCESSIBLE"
+                message: "The URL could not be accessed. It may be behind a paywall, require authentication, or be unavailable."
+                details:
+                  url: "https://example.com/protected"
+                  status_code: 403
+                timestamp: "2025-11-24T13:49:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            generic_error:
+              summary: Internal server error
+              value:
+                error: "INTERNAL_SERVER_ERROR"
+                message: "An unexpected error occurred. Please try again later."
+                timestamp: "2025-11-24T13:49:00Z"

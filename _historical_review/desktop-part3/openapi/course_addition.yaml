@@ -1,0 +1,1229 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - Course Content Addition API
+  description: |
+    API endpoints for managing educational courses, modules, and lessons within Empire.
+    Supports complete CRUD operations for course structure, content management, progress tracking,
+    and integration with the knowledge base. Enables structured learning paths with hierarchical
+    organization (Course → Module → Lesson → Content).
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: courses
+    description: Course management operations
+  - name: modules
+    description: Course module operations
+  - name: lessons
+    description: Lesson management
+  - name: progress
+    description: Course progress tracking
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/courses:
+    get:
+      tags:
+        - courses
+      summary: List all courses
+      description: Retrieve list of all available courses with metadata and progress
+      operationId: listCourses
+      parameters:
+        - name: department_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 11
+          description: Filter by department
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, archived]
+          description: Filter by course status
+        - name: include_progress
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include user's progress data
+      responses:
+        '200':
+          description: Courses retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  courses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Course'
+                  total:
+                    type: integer
+              examples:
+                courses_list:
+                  summary: List of available courses
+                  value:
+                    courses:
+                      - course_id: "550e8400-e29b-41d4-a716-446655440000"
+                        title: "Machine Learning Fundamentals"
+                        description: "Comprehensive introduction to machine learning concepts and applications"
+                        department_id: 11
+                        department_name: "Research & Development"
+                        status: "published"
+                        difficulty: "intermediate"
+                        estimated_hours: 40
+                        module_count: 8
+                        lesson_count: 45
+                        enrolled_count: 1523
+                        rating: 4.7
+                        created_at: "2025-01-01T00:00:00Z"
+                        updated_at: "2025-11-24T13:49:00Z"
+                      - course_id: "660e8400-e29b-41d4-a716-446655440001"
+                        title: "Python for Data Science"
+                        description: "Learn Python programming for data analysis and visualization"
+                        department_id: 1
+                        department_name: "IT & Engineering"
+                        status: "published"
+                        difficulty: "beginner"
+                        estimated_hours: 30
+                        module_count: 6
+                        lesson_count: 32
+                        enrolled_count: 2847
+                        rating: 4.9
+                        created_at: "2025-01-15T00:00:00Z"
+                        updated_at: "2025-11-20T10:30:00Z"
+                    total: 2
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - courses
+      summary: Create new course
+      description: Create a new course with metadata and initial structure
+      operationId: createCourse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseCreate'
+            examples:
+              new_course:
+                summary: Create ML course
+                value:
+                  title: "Advanced Deep Learning"
+                  description: "Master deep learning architectures and techniques"
+                  department_id: 11
+                  difficulty: "advanced"
+                  estimated_hours: 60
+                  prerequisites:
+                    - "550e8400-e29b-41d4-a716-446655440000"
+                  learning_objectives:
+                    - "Understand neural network architectures"
+                    - "Implement CNNs and RNNs"
+                    - "Apply transfer learning techniques"
+                  tags:
+                    - "deep-learning"
+                    - "neural-networks"
+                    - "ai"
+      responses:
+        '201':
+          description: Course created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/courses/{course_id}:
+    get:
+      tags:
+        - courses
+      summary: Get course details
+      description: Retrieve detailed information about a specific course including modules and lessons
+      operationId: getCourseById
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Course UUID
+        - name: include_content
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include full module and lesson content
+      responses:
+        '200':
+          description: Course details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetails'
+              examples:
+                ml_course:
+                  summary: Machine Learning course details
+                  value:
+                    course_id: "550e8400-e29b-41d4-a716-446655440000"
+                    title: "Machine Learning Fundamentals"
+                    description: "Comprehensive introduction to machine learning concepts and applications"
+                    department_id: 11
+                    department_name: "Research & Development"
+                    status: "published"
+                    difficulty: "intermediate"
+                    estimated_hours: 40
+                    prerequisites:
+                      - course_id: "660e8400-e29b-41d4-a716-446655440001"
+                        title: "Python for Data Science"
+                    learning_objectives:
+                      - "Understand supervised and unsupervised learning"
+                      - "Implement regression and classification algorithms"
+                      - "Evaluate model performance"
+                    modules:
+                      - module_id: "770e8400-e29b-41d4-a716-446655440002"
+                        title: "Introduction to ML"
+                        order: 1
+                        lesson_count: 5
+                        estimated_hours: 4
+                      - module_id: "880e8400-e29b-41d4-a716-446655440003"
+                        title: "Supervised Learning"
+                        order: 2
+                        lesson_count: 8
+                        estimated_hours: 7
+                    tags:
+                      - "machine-learning"
+                      - "data-science"
+                    enrolled_count: 1523
+                    completion_rate: 0.68
+                    rating: 4.7
+                    created_by: "user-abc123"
+                    created_at: "2025-01-01T00:00:00Z"
+                    updated_at: "2025-11-24T13:49:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - courses
+      summary: Update course
+      description: Update course metadata and settings
+      operationId: updateCourse
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseUpdate'
+      responses:
+        '200':
+          description: Course updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - courses
+      summary: Delete course
+      description: Delete a course and all associated modules and lessons (soft delete)
+      operationId: deleteCourse
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Course deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/courses/{course_id}/modules:
+    get:
+      tags:
+        - modules
+      summary: List course modules
+      description: Get all modules for a specific course in order
+      operationId: getCourseModules
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Modules retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Module'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - modules
+      summary: Create course module
+      description: Add a new module to a course
+      operationId: createModule
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModuleCreate'
+            examples:
+              new_module:
+                summary: Create new module
+                value:
+                  title: "Neural Networks Basics"
+                  description: "Introduction to artificial neural networks"
+                  order: 3
+                  estimated_hours: 6
+                  learning_objectives:
+                    - "Understand neuron structure"
+                    - "Learn forward propagation"
+                    - "Implement backpropagation"
+      responses:
+        '201':
+          description: Module created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Module'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/modules/{module_id}:
+    get:
+      tags:
+        - modules
+      summary: Get module details
+      description: Retrieve detailed information about a specific module including lessons
+      operationId: getModuleById
+      parameters:
+        - name: module_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Module details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleDetails'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - modules
+      summary: Update module
+      description: Update module metadata and settings
+      operationId: updateModule
+      parameters:
+        - name: module_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModuleUpdate'
+      responses:
+        '200':
+          description: Module updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Module'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - modules
+      summary: Delete module
+      description: Delete a module and all associated lessons (soft delete)
+      operationId: deleteModule
+      parameters:
+        - name: module_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Module deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/modules/{module_id}/lessons:
+    get:
+      tags:
+        - lessons
+      summary: List module lessons
+      description: Get all lessons for a specific module in order
+      operationId: getModuleLessons
+      parameters:
+        - name: module_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lessons retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lessons:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Lesson'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - lessons
+      summary: Create lesson
+      description: Add a new lesson to a module
+      operationId: createLesson
+      parameters:
+        - name: module_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LessonCreate'
+            examples:
+              new_lesson:
+                summary: Create new lesson
+                value:
+                  title: "Activation Functions"
+                  description: "Learn about different activation functions in neural networks"
+                  order: 1
+                  content_type: "video"
+                  content_url: "https://example.com/videos/activation-functions.mp4"
+                  estimated_minutes: 25
+                  markdown_content: |
+                    # Activation Functions
+
+                    Activation functions introduce non-linearity into neural networks...
+
+                    ## Common Activation Functions:
+                    - Sigmoid
+                    - ReLU
+                    - Tanh
+                  resources:
+                    - type: "pdf"
+                      title: "Activation Functions Cheat Sheet"
+                      url: "https://example.com/resources/activation-cheatsheet.pdf"
+      responses:
+        '201':
+          description: Lesson created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/lessons/{lesson_id}:
+    get:
+      tags:
+        - lessons
+      summary: Get lesson details
+      description: Retrieve detailed information about a specific lesson including content
+      operationId: getLessonById
+      parameters:
+        - name: lesson_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lesson details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDetails'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - lessons
+      summary: Update lesson
+      description: Update lesson content and metadata
+      operationId: updateLesson
+      parameters:
+        - name: lesson_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LessonUpdate'
+      responses:
+        '200':
+          description: Lesson updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - lessons
+      summary: Delete lesson
+      description: Delete a lesson (soft delete)
+      operationId: deleteLesson
+      parameters:
+        - name: lesson_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Lesson deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/courses/{course_id}/enroll:
+    post:
+      tags:
+        - progress
+      summary: Enroll in course
+      description: Enroll the authenticated user in a course
+      operationId: enrollInCourse
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Successfully enrolled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  course_id:
+                    type: string
+                    format: uuid
+                  enrolled_at:
+                    type: string
+                    format: date-time
+                  progress:
+                    type: number
+                    format: float
+                    default: 0.0
+        '409':
+          description: Already enrolled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/courses/{course_id}/progress:
+    get:
+      tags:
+        - progress
+      summary: Get course progress
+      description: Retrieve user's progress for a specific course
+      operationId: getCourseProgress
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Progress retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseProgress'
+              examples:
+                progress_data:
+                  summary: Course progress
+                  value:
+                    course_id: "550e8400-e29b-41d4-a716-446655440000"
+                    course_title: "Machine Learning Fundamentals"
+                    enrolled_at: "2025-11-01T00:00:00Z"
+                    last_accessed: "2025-11-24T13:49:00Z"
+                    overall_progress: 0.45
+                    completed_lessons: 20
+                    total_lessons: 45
+                    time_spent_minutes: 720
+                    modules_progress:
+                      - module_id: "770e8400-e29b-41d4-a716-446655440002"
+                        module_title: "Introduction to ML"
+                        progress: 1.0
+                        completed_lessons: 5
+                        total_lessons: 5
+                      - module_id: "880e8400-e29b-41d4-a716-446655440003"
+                        module_title: "Supervised Learning"
+                        progress: 0.625
+                        completed_lessons: 5
+                        total_lessons: 8
+                    current_lesson:
+                      lesson_id: "990e8400-e29b-41d4-a716-446655440004"
+                      title: "Decision Trees"
+                      module_title: "Supervised Learning"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/lessons/{lesson_id}/complete:
+    post:
+      tags:
+        - progress
+      summary: Mark lesson as complete
+      description: Mark a lesson as completed for the authenticated user
+      operationId: markLessonComplete
+      parameters:
+        - name: lesson_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                time_spent_minutes:
+                  type: integer
+                  description: Time spent on this lesson
+                notes:
+                  type: string
+                  maxLength: 1000
+                  description: Optional user notes
+      responses:
+        '200':
+          description: Lesson marked as complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lesson_id:
+                    type: string
+                    format: uuid
+                  completed_at:
+                    type: string
+                    format: date-time
+                  course_progress:
+                    type: number
+                    format: float
+                    description: Updated overall course progress
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    Course:
+      type: object
+      required:
+        - course_id
+        - title
+        - status
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        department_id:
+          type: integer
+        department_name:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived]
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        estimated_hours:
+          type: integer
+        module_count:
+          type: integer
+        lesson_count:
+          type: integer
+        enrolled_count:
+          type: integer
+        rating:
+          type: number
+          format: float
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CourseDetails:
+      allOf:
+        - $ref: '#/components/schemas/Course'
+        - type: object
+          properties:
+            prerequisites:
+              type: array
+              items:
+                type: object
+                properties:
+                  course_id:
+                    type: string
+                    format: uuid
+                  title:
+                    type: string
+            learning_objectives:
+              type: array
+              items:
+                type: string
+            modules:
+              type: array
+              items:
+                $ref: '#/components/schemas/Module'
+            tags:
+              type: array
+              items:
+                type: string
+            completion_rate:
+              type: number
+              format: float
+            created_by:
+              type: string
+
+    CourseCreate:
+      type: object
+      required:
+        - title
+        - department_id
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        department_id:
+          type: integer
+          minimum: 1
+          maximum: 11
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        estimated_hours:
+          type: integer
+          minimum: 1
+        prerequisites:
+          type: array
+          items:
+            type: string
+            format: uuid
+        learning_objectives:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    CourseUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived]
+        difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        estimated_hours:
+          type: integer
+        learning_objectives:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    Module:
+      type: object
+      required:
+        - module_id
+        - title
+        - order
+      properties:
+        module_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        order:
+          type: integer
+          minimum: 1
+        lesson_count:
+          type: integer
+        estimated_hours:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ModuleDetails:
+      allOf:
+        - $ref: '#/components/schemas/Module'
+        - type: object
+          properties:
+            learning_objectives:
+              type: array
+              items:
+                type: string
+            lessons:
+              type: array
+              items:
+                $ref: '#/components/schemas/Lesson'
+
+    ModuleCreate:
+      type: object
+      required:
+        - title
+        - order
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        order:
+          type: integer
+          minimum: 1
+        estimated_hours:
+          type: integer
+        learning_objectives:
+          type: array
+          items:
+            type: string
+
+    ModuleUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        order:
+          type: integer
+        estimated_hours:
+          type: integer
+        learning_objectives:
+          type: array
+          items:
+            type: string
+
+    Lesson:
+      type: object
+      required:
+        - lesson_id
+        - title
+        - order
+      properties:
+        lesson_id:
+          type: string
+          format: uuid
+        module_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        order:
+          type: integer
+        content_type:
+          type: string
+          enum: [video, text, quiz, interactive, document]
+        estimated_minutes:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LessonDetails:
+      allOf:
+        - $ref: '#/components/schemas/Lesson'
+        - type: object
+          properties:
+            content_url:
+              type: string
+              format: uri
+            markdown_content:
+              type: string
+            resources:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  title:
+                    type: string
+                  url:
+                    type: string
+                    format: uri
+
+    LessonCreate:
+      type: object
+      required:
+        - title
+        - order
+        - content_type
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+        order:
+          type: integer
+          minimum: 1
+        content_type:
+          type: string
+          enum: [video, text, quiz, interactive, document]
+        content_url:
+          type: string
+          format: uri
+        markdown_content:
+          type: string
+        estimated_minutes:
+          type: integer
+        resources:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              title:
+                type: string
+              url:
+                type: string
+
+    LessonUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        order:
+          type: integer
+        content_url:
+          type: string
+        markdown_content:
+          type: string
+        estimated_minutes:
+          type: integer
+        resources:
+          type: array
+          items:
+            type: object
+
+    CourseProgress:
+      type: object
+      required:
+        - course_id
+        - overall_progress
+      properties:
+        course_id:
+          type: string
+          format: uuid
+        course_title:
+          type: string
+        enrolled_at:
+          type: string
+          format: date-time
+        last_accessed:
+          type: string
+          format: date-time
+        overall_progress:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        completed_lessons:
+          type: integer
+        total_lessons:
+          type: integer
+        time_spent_minutes:
+          type: integer
+        modules_progress:
+          type: array
+          items:
+            type: object
+            properties:
+              module_id:
+                type: string
+                format: uuid
+              module_title:
+                type: string
+              progress:
+                type: number
+                format: float
+              completed_lessons:
+                type: integer
+              total_lessons:
+                type: integer
+        current_lesson:
+          type: object
+          properties:
+            lesson_id:
+              type: string
+              format: uuid
+            title:
+              type: string
+            module_title:
+              type: string
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

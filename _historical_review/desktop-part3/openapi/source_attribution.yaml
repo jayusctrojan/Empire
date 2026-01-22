@@ -1,0 +1,860 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - Source Attribution API
+  description: |
+    API endpoints for source attribution and citation management in chat responses.
+    Provides inline citations with page numbers, source metadata extraction, and expandable
+    source context for every AI-generated response. Integrates with LangExtract for accurate
+    metadata extraction and supports >95% citation accuracy requirements.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: citations
+    description: Citation and source attribution operations
+  - name: metadata
+    description: Source metadata extraction and management
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/chat/query:
+    post:
+      tags:
+        - citations
+      summary: Execute query with source attribution
+      description: |
+        Execute a query and return AI response with inline citations and source metadata.
+        Every fact in the response is attributed to specific source documents with page numbers,
+        section references, and confidence scores. Sources are ranked by relevance.
+      operationId: queryWithAttribution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                  description: User query text
+                  example: "What are California insurance requirements?"
+                session_id:
+                  type: string
+                  format: uuid
+                  description: Optional session ID for context continuity
+                attribution_options:
+                  type: object
+                  description: Citation display preferences
+                  properties:
+                    include_page_numbers:
+                      type: boolean
+                      default: true
+                      description: Include page numbers in citations
+                    include_excerpts:
+                      type: boolean
+                      default: true
+                      description: Include text excerpts from sources
+                    min_confidence:
+                      type: number
+                      format: float
+                      minimum: 0.0
+                      maximum: 1.0
+                      default: 0.7
+                      description: Minimum confidence score for citation inclusion
+                    max_sources:
+                      type: integer
+                      minimum: 1
+                      maximum: 20
+                      default: 10
+                      description: Maximum number of sources to return
+            examples:
+              basic_query:
+                summary: Basic query with default attribution
+                value:
+                  query: "What are California insurance requirements?"
+              custom_options:
+                summary: Query with custom attribution options
+                value:
+                  query: "Explain employee benefits policies"
+                  attribution_options:
+                    include_page_numbers: true
+                    include_excerpts: true
+                    min_confidence: 0.8
+                    max_sources: 5
+      responses:
+        '200':
+          description: Query executed with source attribution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttributedResponse'
+              examples:
+                insurance_query:
+                  summary: Insurance query with citations
+                  value:
+                    query: "What are California insurance requirements?"
+                    answer: "California requires minimum liability insurance of $15,000 per person [1], $30,000 per accident [1], and $5,000 property damage [2]. All drivers must carry proof of insurance [3]."
+                    citations:
+                      - citation_id: "1"
+                        document_id: "550e8400-e29b-41d4-a716-446655440000"
+                        document_title: "California Insurance Code 2024"
+                        page_number: 42
+                        section: "Section 16056"
+                        excerpt: "...minimum liability coverage of $15,000 per person and $30,000 per accident..."
+                        confidence_score: 0.95
+                        relevance_score: 0.92
+                        url: "/api/documents/550e8400-e29b-41d4-a716-446655440000"
+                      - citation_id: "2"
+                        document_id: "660e8400-e29b-41d4-a716-446655440001"
+                        document_title: "CA DMV Handbook"
+                        page_number: 18
+                        excerpt: "...property damage coverage of at least $5,000..."
+                        confidence_score: 0.88
+                        relevance_score: 0.85
+                        url: "/api/documents/660e8400-e29b-41d4-a716-446655440001"
+                      - citation_id: "3"
+                        document_id: "770e8400-e29b-41d4-a716-446655440002"
+                        document_title: "Vehicle Code Section 16028"
+                        page_number: 7
+                        excerpt: "...carry proof of financial responsibility at all times..."
+                        confidence_score: 0.91
+                        relevance_score: 0.88
+                    sources_metadata:
+                      total_sources: 3
+                      avg_confidence: 0.91
+                      coverage_score: 0.89
+                    response_metadata:
+                      model: "claude-3-5-sonnet-20241022"
+                      tokens_used: 523
+                      processing_time_ms: 1847
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/citations/{citation_id}/context:
+    get:
+      tags:
+        - citations
+      summary: Get expanded context for citation
+      description: |
+        Retrieve expanded context (surrounding paragraphs) for a specific citation.
+        Includes full page content, neighboring chunks, and related passages.
+      operationId: getCitationContext
+      parameters:
+        - name: citation_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Citation identifier from query response
+          example: "1"
+        - name: context_window
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 5
+            default: 2
+          description: Number of surrounding chunks to include (before/after)
+          example: 2
+        - name: include_full_page
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include full page content
+      responses:
+        '200':
+          description: Citation context retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitationContext'
+              examples:
+                expanded_context:
+                  summary: Expanded citation context
+                  value:
+                    citation_id: "1"
+                    document_id: "550e8400-e29b-41d4-a716-446655440000"
+                    document_title: "California Insurance Code 2024"
+                    page_number: 42
+                    section: "Section 16056"
+                    excerpt: "...minimum liability coverage of $15,000 per person and $30,000 per accident..."
+                    expanded_context:
+                      before: "The Department of Motor Vehicles requires all California drivers to maintain financial responsibility. This can be demonstrated through motor vehicle liability insurance..."
+                      cited_text: "minimum liability coverage of $15,000 per person and $30,000 per accident"
+                      after: "These limits represent the minimum required by law. Drivers may choose to purchase higher coverage limits for additional protection..."
+                    full_page_content: "California Insurance Code Section 16056..."
+                    related_passages:
+                      - passage_id: "550e8400-chunk-2"
+                        text: "Insurance policies must be issued by companies licensed in California..."
+                        relevance_score: 0.78
+                    metadata:
+                      author: "California Legislature"
+                      published_date: "2024-01-01"
+                      source_url: "https://leginfo.legislature.ca.gov/..."
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{document_id}/metadata:
+    get:
+      tags:
+        - metadata
+      summary: Get document metadata
+      description: |
+        Retrieve comprehensive metadata for a document including title, author, date,
+        page count, and extracted structured information. Uses LangExtract for accurate
+        metadata extraction with >95% accuracy.
+      operationId: getDocumentMetadata
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Document metadata retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentMetadata'
+              examples:
+                insurance_doc:
+                  summary: Insurance document metadata
+                  value:
+                    document_id: "550e8400-e29b-41d4-a716-446655440000"
+                    title: "California Insurance Code 2024"
+                    author: "California Legislature"
+                    published_date: "2024-01-01"
+                    page_count: 523
+                    word_count: 145230
+                    file_type: "pdf"
+                    file_size_bytes: 2458624
+                    language: "en"
+                    department_id: 11
+                    department_name: "Research & Development"
+                    extracted_metadata:
+                      sections:
+                        - name: "Liability Insurance Requirements"
+                          page_range: [40, 55]
+                        - name: "Uninsured Motorist Coverage"
+                          page_range: [56, 72]
+                      entities:
+                        - type: "organization"
+                          name: "California Department of Motor Vehicles"
+                          count: 42
+                        - type: "law"
+                          name: "Vehicle Code Section 16028"
+                          count: 18
+                      keywords:
+                        - "liability insurance"
+                        - "financial responsibility"
+                        - "proof of insurance"
+                    citation_count: 127
+                    last_cited: "2025-11-24T13:49:00Z"
+                    source_url: "https://leginfo.legislature.ca.gov/..."
+                    uploaded_at: "2025-11-20T10:30:00Z"
+                    updated_at: "2025-11-24T13:49:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{document_id}/metadata:
+    patch:
+      tags:
+        - metadata
+      summary: Update document metadata
+      description: Manually update or enrich document metadata fields
+      operationId: updateDocumentMetadata
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 500
+                  description: Override document title
+                author:
+                  type: string
+                  maxLength: 200
+                  description: Document author/creator
+                published_date:
+                  type: string
+                  format: date
+                  description: Publication date
+                custom_metadata:
+                  type: object
+                  description: Custom metadata fields
+                  additionalProperties: true
+            examples:
+              update_title:
+                summary: Update document title and author
+                value:
+                  title: "California Insurance Code - Updated 2024 Edition"
+                  author: "CA Legislature"
+                  custom_metadata:
+                    edition: "2024"
+                    revision: "Rev. 3"
+      responses:
+        '200':
+          description: Metadata updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentMetadata'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/citations/validate:
+    post:
+      tags:
+        - citations
+      summary: Validate citation accuracy
+      description: |
+        Verify that a citation accurately represents the source content. Returns accuracy
+        score and identifies potential hallucinations or misattributions.
+      operationId: validateCitation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - document_id
+                - claimed_fact
+                - page_number
+              properties:
+                document_id:
+                  type: string
+                  format: uuid
+                  description: Source document UUID
+                claimed_fact:
+                  type: string
+                  description: Fact or statement to verify
+                  example: "California requires $15,000 liability insurance per person"
+                page_number:
+                  type: integer
+                  minimum: 1
+                  description: Page number where fact appears
+                section:
+                  type: string
+                  description: Optional section reference
+            examples:
+              validate_insurance:
+                summary: Validate insurance requirement fact
+                value:
+                  document_id: "550e8400-e29b-41d4-a716-446655440000"
+                  claimed_fact: "California requires $15,000 liability insurance per person"
+                  page_number: 42
+                  section: "Section 16056"
+      responses:
+        '200':
+          description: Citation validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitationValidation'
+              examples:
+                accurate_citation:
+                  summary: Accurate citation (95%+ match)
+                  value:
+                    valid: true
+                    accuracy_score: 0.97
+                    document_id: "550e8400-e29b-41d4-a716-446655440000"
+                    page_number: 42
+                    section: "Section 16056"
+                    source_excerpt: "...minimum liability coverage of $15,000 per person..."
+                    semantic_similarity: 0.96
+                    factual_alignment: 0.98
+                    validation_notes: "Exact match found in source document"
+                inaccurate_citation:
+                  summary: Inaccurate citation (potential hallucination)
+                  value:
+                    valid: false
+                    accuracy_score: 0.42
+                    document_id: "550e8400-e29b-41d4-a716-446655440000"
+                    page_number: 42
+                    source_excerpt: "...minimum liability coverage of $15,000 per person and $30,000 per accident..."
+                    semantic_similarity: 0.65
+                    factual_alignment: 0.35
+                    validation_notes: "Claimed amount ($25,000) does not match source ($15,000)"
+                    discrepancies:
+                      - "Amount mismatch: claimed $25,000, source states $15,000"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/citations/batch:
+    post:
+      tags:
+        - citations
+      summary: Retrieve multiple citations
+      description: Get detailed information for multiple citations in a single request
+      operationId: getBatchCitations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - citation_ids
+              properties:
+                citation_ids:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  maxItems: 50
+                  description: List of citation IDs (max 50)
+                  example: ["1", "2", "3"]
+                include_context:
+                  type: boolean
+                  default: false
+                  description: Include expanded context for each citation
+            examples:
+              batch_request:
+                summary: Get 3 citations with context
+                value:
+                  citation_ids: ["1", "2", "3"]
+                  include_context: true
+      responses:
+        '200':
+          description: Batch citations retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  citations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CitationContext'
+                  total:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    AttributedResponse:
+      type: object
+      required:
+        - query
+        - answer
+        - citations
+      properties:
+        query:
+          type: string
+          description: Original user query
+        answer:
+          type: string
+          description: AI-generated answer with inline citation markers [1], [2], etc.
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+          description: List of source citations referenced in answer
+        sources_metadata:
+          type: object
+          properties:
+            total_sources:
+              type: integer
+              description: Total number of sources used
+            avg_confidence:
+              type: number
+              format: float
+              description: Average confidence score across all citations
+            coverage_score:
+              type: number
+              format: float
+              description: Percentage of answer covered by citations (0-1)
+        response_metadata:
+          type: object
+          properties:
+            model:
+              type: string
+              description: AI model used for response generation
+            tokens_used:
+              type: integer
+              description: Total tokens consumed
+            processing_time_ms:
+              type: integer
+              description: Response generation time in milliseconds
+
+    Citation:
+      type: object
+      required:
+        - citation_id
+        - document_id
+        - document_title
+      properties:
+        citation_id:
+          type: string
+          description: Unique identifier for this citation (e.g., "1", "2")
+        document_id:
+          type: string
+          format: uuid
+          description: Source document UUID
+        document_title:
+          type: string
+          description: Document title
+        page_number:
+          type: integer
+          minimum: 1
+          description: Page number where content appears
+        section:
+          type: string
+          description: Section or chapter reference
+        excerpt:
+          type: string
+          description: Relevant text excerpt from source
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: AI confidence in citation accuracy (0-1)
+        relevance_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Relevance to user query (0-1)
+        url:
+          type: string
+          format: uri
+          description: API endpoint to retrieve full document
+
+    CitationContext:
+      type: object
+      required:
+        - citation_id
+        - document_id
+        - excerpt
+      properties:
+        citation_id:
+          type: string
+          description: Citation identifier
+        document_id:
+          type: string
+          format: uuid
+        document_title:
+          type: string
+        page_number:
+          type: integer
+        section:
+          type: string
+        excerpt:
+          type: string
+          description: Original cited excerpt
+        expanded_context:
+          type: object
+          properties:
+            before:
+              type: string
+              description: Text before cited excerpt
+            cited_text:
+              type: string
+              description: Exact cited text
+            after:
+              type: string
+              description: Text after cited excerpt
+        full_page_content:
+          type: string
+          description: Complete page content (if requested)
+        related_passages:
+          type: array
+          items:
+            type: object
+            properties:
+              passage_id:
+                type: string
+              text:
+                type: string
+              relevance_score:
+                type: number
+                format: float
+        metadata:
+          type: object
+          properties:
+            author:
+              type: string
+            published_date:
+              type: string
+              format: date
+            source_url:
+              type: string
+              format: uri
+
+    DocumentMetadata:
+      type: object
+      required:
+        - document_id
+        - title
+        - file_type
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        author:
+          type: string
+        published_date:
+          type: string
+          format: date
+        page_count:
+          type: integer
+        word_count:
+          type: integer
+        file_type:
+          type: string
+          enum: [pdf, docx, txt, html, markdown]
+        file_size_bytes:
+          type: integer
+        language:
+          type: string
+        department_id:
+          type: integer
+          minimum: 1
+          maximum: 11
+        department_name:
+          type: string
+        extracted_metadata:
+          type: object
+          description: Structured metadata extracted by LangExtract
+          properties:
+            sections:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  page_range:
+                    type: array
+                    items:
+                      type: integer
+            entities:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  name:
+                    type: string
+                  count:
+                    type: integer
+            keywords:
+              type: array
+              items:
+                type: string
+        citation_count:
+          type: integer
+          description: Total number of times this document has been cited
+        last_cited:
+          type: string
+          format: date-time
+        source_url:
+          type: string
+          format: uri
+        uploaded_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CitationValidation:
+      type: object
+      required:
+        - valid
+        - accuracy_score
+        - document_id
+      properties:
+        valid:
+          type: boolean
+          description: Whether citation is accurate (>0.95 accuracy)
+        accuracy_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Overall accuracy score (0-1)
+        document_id:
+          type: string
+          format: uuid
+        page_number:
+          type: integer
+        section:
+          type: string
+        source_excerpt:
+          type: string
+          description: Actual text from source document
+        semantic_similarity:
+          type: number
+          format: float
+          description: Semantic similarity between claim and source (0-1)
+        factual_alignment:
+          type: number
+          format: float
+          description: Factual accuracy score (0-1)
+        validation_notes:
+          type: string
+          description: Human-readable validation summary
+        discrepancies:
+          type: array
+          items:
+            type: string
+          description: List of identified discrepancies (if invalid)
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "CITATION_NOT_FOUND"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "The requested citation could not be found"
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_citation_id:
+              summary: Invalid citation ID
+              value:
+                error: "INVALID_CITATION_ID"
+                message: "Citation ID must be a valid string identifier"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing_token:
+              summary: Missing authentication token
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication required. Please provide a valid JWT token."
+                timestamp: "2025-11-24T13:49:00Z"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            citation_not_found:
+              summary: Citation not found
+              value:
+                error: "CITATION_NOT_FOUND"
+                message: "Citation with ID '123' not found"
+                timestamp: "2025-11-24T13:49:00Z"
+            document_not_found:
+              summary: Document not found
+              value:
+                error: "DOCUMENT_NOT_FOUND"
+                message: "Document with ID '550e8400-e29b-41d4-a716-446655440000' not found"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            generic_error:
+              summary: Internal server error
+              value:
+                error: "INTERNAL_SERVER_ERROR"
+                message: "An unexpected error occurred. Please try again later."
+                timestamp: "2025-11-24T13:49:00Z"
