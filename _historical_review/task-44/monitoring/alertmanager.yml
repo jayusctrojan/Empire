@@ -1,0 +1,195 @@
+# Alertmanager Configuration for Empire v7.3
+# Handles alert routing, grouping, and notification delivery
+
+global:
+  resolve_timeout: 5m
+  # SMTP configuration for email notifications
+  smtp_from: 'empire-alerts@noreply.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: 'jbajaj08@gmail.com'
+  # IMPORTANT: Set SMTP_PASSWORD environment variable in .env file
+  # For Gmail: Use an App Password (not your regular password)
+  # Create one at: https://myaccount.google.com/apppasswords
+  smtp_auth_password: 'efpo widq plga gkyn'
+  smtp_require_tls: true
+
+# Alert routing configuration
+route:
+  # Default receiver for all alerts
+  receiver: 'email-default'
+
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'component']
+
+  # How long to wait before sending initial notification
+  group_wait: 30s
+
+  # How long to wait before sending update for new alerts in group
+  group_interval: 5m
+
+  # How long to wait before re-sending an alert
+  repeat_interval: 4h
+
+  # Routes for specific alert types
+  routes:
+    # Critical alerts - immediate notification
+    - receiver: 'email-critical'
+      match:
+        severity: critical
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true  # Also send to default receiver
+
+    # Warning alerts - batched notifications
+    - receiver: 'email-warning'
+      match:
+        severity: warning
+      group_wait: 2m
+      repeat_interval: 12h
+
+    # Info alerts - daily digest
+    - receiver: 'email-info'
+      match:
+        severity: info
+      group_wait: 5m
+      repeat_interval: 24h
+
+# Alert receivers (notification destinations)
+receivers:
+  # Default email receiver
+  - name: 'email-default'
+    email_configs:
+      - to: 'jbajaj08@gmail.com'
+        headers:
+          Subject: '[Empire Alert] {{ .GroupLabels.alertname }}'
+        html: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; }
+              .header { background: #f4f4f4; padding: 10px; border-left: 4px solid #333; }
+              .alert { margin: 10px 0; padding: 10px; border-left: 4px solid #ff6b6b; background: #ffe0e0; }
+              .alert.warning { border-left-color: #ffa500; background: #fff3cd; }
+              .alert.info { border-left-color: #17a2b8; background: #d1ecf1; }
+              .details { margin: 10px 0; padding: 10px; background: #f9f9f9; }
+              code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h2>Empire v7.3 Alert Notification</h2>
+              <p><strong>Status:</strong> {{ .Status | toUpper }}</p>
+            </div>
+
+            {{ range .Alerts }}
+            <div class="alert {{ .Labels.severity }}">
+              <h3>{{ .Labels.alertname }}</h3>
+              <p><strong>Severity:</strong> {{ .Labels.severity }}</p>
+              <p><strong>Component:</strong> {{ .Labels.component }}</p>
+              <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
+              <p>{{ .Annotations.description }}</p>
+
+              {{ if .Annotations.runbook }}
+              <div class="details">
+                <strong>Runbook:</strong><br/>
+                <code>{{ .Annotations.runbook }}</code>
+              </div>
+              {{ end }}
+
+              <p><strong>Started:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+              {{ if .EndsAt }}
+              <p><strong>Ended:</strong> {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+              {{ end }}
+            </div>
+            {{ end }}
+
+            <div class="details">
+              <p><strong>View in Prometheus:</strong> http://localhost:9090/alerts</p>
+              <p><strong>View in Grafana:</strong> http://localhost:3000</p>
+            </div>
+          </body>
+          </html>
+
+  # Critical alerts receiver (immediate + SMS if configured)
+  - name: 'email-critical'
+    email_configs:
+      - to: 'jbajaj08@gmail.com'
+        headers:
+          Subject: '🚨 [CRITICAL] Empire Alert: {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+        html: |
+          <!DOCTYPE html>
+          <html>
+          <body style="font-family: Arial; background: #fff0f0;">
+            <div style="background: #d32f2f; color: white; padding: 20px;">
+              <h1>🚨 CRITICAL ALERT</h1>
+              <h2>{{ .GroupLabels.alertname }}</h2>
+            </div>
+            <div style="padding: 20px;">
+              {{ range .Alerts }}
+              <h3>{{ .Annotations.summary }}</h3>
+              <p style="font-size: 16px;">{{ .Annotations.description }}</p>
+              <p><strong>Component:</strong> {{ .Labels.component }}</p>
+              <p><strong>Started:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+              {{ if .Annotations.runbook }}
+              <div style="background: #fffacd; padding: 10px; margin: 10px 0;">
+                <strong>Action Required:</strong><br/>
+                {{ .Annotations.runbook }}
+              </div>
+              {{ end }}
+              {{ end }}
+            </div>
+          </body>
+          </html>
+
+  # Warning alerts receiver
+  - name: 'email-warning'
+    email_configs:
+      - to: 'jbajaj08@gmail.com'
+        headers:
+          Subject: '⚠️ [WARNING] Empire Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <!DOCTYPE html>
+          <html>
+          <body style="font-family: Arial;">
+            <div style="background: #ff9800; color: white; padding: 15px;">
+              <h2>⚠️ WARNING: {{ .GroupLabels.alertname }}</h2>
+            </div>
+            <div style="padding: 15px;">
+              {{ range .Alerts }}
+              <p><strong>{{ .Annotations.summary }}</strong></p>
+              <p>{{ .Annotations.description }}</p>
+              {{ end }}
+            </div>
+          </body>
+          </html>
+
+  # Info alerts receiver (daily digest)
+  - name: 'email-info'
+    email_configs:
+      - to: 'jbajaj08@gmail.com'
+        headers:
+          Subject: 'ℹ️ [INFO] Empire Daily Digest: {{ .GroupLabels.alertname }}'
+        send_resolved: false  # Don't send resolved notifications for info alerts
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # If API is down, don't alert on slow response times
+  - source_match:
+      alertname: 'APIDown'
+    target_match:
+      alertname: 'APISlowResponse'
+    equal: ['instance']
+
+  # If cache service is down, don't alert on low hit rate
+  - source_match:
+      alertname: 'CacheServiceDown'
+    target_match:
+      alertname: 'LowCacheHitRate'
+
+  # If no queries are being processed, don't alert on business metrics
+  - source_match:
+      alertname: 'NoQueriesProcessed'
+    target_match_re:
+      alertname: '.*Cost.*'

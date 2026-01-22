@@ -1,0 +1,16 @@
+# Grafana Dashboard Provider Configuration
+# Auto-loads dashboard JSON files from the dashboards directory
+
+apiVersion: 1
+
+providers:
+  - name: 'Empire Dashboards'
+    orgId: 1
+    folder: 'Empire v7.3'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true
