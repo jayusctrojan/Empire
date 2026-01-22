@@ -1,0 +1,294 @@
+# B2 Production Management Scripts
+
+Scripts for managing the Backblaze B2 production folder structure and asset promotion workflow.
+
+## Scripts
+
+### 1. `setup_b2_production_structure.py`
+
+Creates the complete production folder structure in Backblaze B2.
+
+**What it creates:**
+- Enhanced suggestions structure with 5 asset types (claude-skills, claude-commands, agents, prompts, workflows)
+- Production folders for 10 departments × 5 asset types = 50 folders
+- Global production assets folder (_global/)
+- Versions folder for rollback (_versions/)
+
+**Total:** 66 folders
+
+**Usage:**
+```bash
+python3 scripts/setup_b2_production_structure.py
+```
+
+**Output:**
+```
+✅ B2 Production Structure Setup Complete!
+📊 Created: 66 folders
+```
+
+### 2. `promote_to_production.py`
+
+Interactive tool for promoting approved CrewAI suggestions to production.
+
+**Features:**
+- Lists all approved assets by type
+- Interactive selection (asset type → file → department)
+- Automatic versioned backup of existing production files
+- Metadata tracking (promoted_from, promoted_at, department)
+- Supports both department-specific and global deployments
+
+**Usage:**
+```bash
+python3 scripts/promote_to_production.py
+```
+
+**Interactive Flow:**
+1. Select asset type (claude-skills, claude-commands, agents, prompts, workflows)
+2. View list of approved assets
+3. Select file to promote
+4. Choose destination department (or _global)
+5. Confirm and promote
+
+**Example Session:**
+```
+🎯 Empire v7.2 - Production Promotion Tool
+
+Select asset type to promote:
+   1. claude-skills
+   2. claude-commands
+   3. agents
+   4. prompts
+   5. workflows
+
+Enter number: 1
+
+📋 Approved claude-skills:
+   1. project-management_project-charter-generator.yaml
+      Size: 2048 bytes | Uploaded: 2025-01-02 14:30:00
+   2. sales-marketing_proposal-generator.yaml
+      Size: 3096 bytes | Uploaded: 2025-01-02 15:00:00
+
+Enter file number to promote: 1
+
+✅ Auto-detected department from filename: project-management
+📝 Production filename will be: project-charter-generator.yaml
+
+Use auto-detected department 'project-management'? (yes/no/override): yes
+
+⚠️  About to promote:
+   Source file: project-management_project-charter-generator.yaml
+   Production file: project-charter-generator.yaml
+   Type: claude-skills → claude-skills
+   Destination: production/project-management/claude-skills/
+
+Proceed? (yes/no): yes
+
+💾 Backed up existing version to: production/_versions/project-management/...
+✅ Successfully promoted to production!
+🔗 Production path: production/project-management/claude-skills/project-charter-generator.yaml
+```
+
+### Filename Naming Convention
+
+All CrewAI-generated assets **MUST** include department prefix:
+
+```
+{department}_{asset-name}.{extension}
+```
+
+**Examples:**
+- `sales-marketing_proposal-generator.yaml`
+- `it-engineering_code-review.md`
+- `_global_meeting-summarizer.yaml`
+
+The promotion script will:
+1. Auto-detect department from filename
+2. Remove department prefix in production
+3. Place in correct production folder
+
+**Department Codes:**
+```
+it-engineering, sales-marketing, customer-support,
+operations-hr-supply, finance-accounting, project-management,
+real-estate, private-equity-ma, consulting, personal-continuing-ed,
+_global (cross-department)
+```
+
+See `CREWAI_OUTPUT_GUIDELINES.md` for complete standards.
+
+## Workflow Overview
+
+### 1. CrewAI Generates Suggestions
+
+When CrewAI analyzes course content, it creates suggestions **with department prefix**:
+
+```
+processed/crewai-suggestions/{asset-type}/drafts/{department}_{name}.{ext}
+```
+
+**Example:**
+```
+processed/crewai-suggestions/claude-skills/drafts/sales-marketing_proposal-generator.yaml
+```
+
+### 2. Review and Approve
+
+You review and test the suggestions, then move to approved:
+
+```bash
+# Manual move (or via UI in future)
+mv processed/crewai-suggestions/claude-skills/drafts/sales-marketing_proposal-generator.yaml \
+   processed/crewai-suggestions/claude-skills/approved/sales-marketing_proposal-generator.yaml
+```
+
+### 3. Promote to Production
+
+Run the promotion script:
+
+```bash
+python3 scripts/promote_to_production.py
+```
+
+The script will:
+1. Auto-detect department from filename (`sales-marketing_`)
+2. Remove department prefix (`proposal-generator.yaml`)
+3. Place in correct folder
+
+Assets are copied to:
+```
+production/{department}/{asset-type}/{clean-name}.{ext}
+```
+
+**Example:**
+```
+Input:  sales-marketing_proposal-generator.yaml
+Output: production/sales-marketing/claude-skills/proposal-generator.yaml
+```
+
+### 4. Production Use
+
+Your workflows and systems read from production folders:
+
+**n8n workflows:**
+```javascript
+const skills = await b2.listFiles('production/sales-marketing/claude-skills/');
+```
+
+**Claude Code:**
+```json
+{
+  "skills": {
+    "source": "b2://JB-Course-KB/production/_global/claude-skills/"
+  }
+}
+```
+
+## Folder Structure
+
+```
+JB-Course-KB/
+├── processed/crewai-suggestions/
+│   ├── claude-skills/
+│   │   ├── drafts/           # Generated by CrewAI
+│   │   └── approved/         # Ready for production
+│   ├── claude-commands/
+│   ├── agents/
+│   ├── prompts/              # NEW
+│   └── workflows/            # NEW
+│
+└── production/
+    ├── _global/              # Cross-department assets
+    │   ├── claude-skills/
+    │   ├── claude-commands/
+    │   ├── crewai-agents/
+    │   ├── prompts/
+    │   └── workflows/
+    │
+    ├── _versions/            # Rollback backups
+    │
+    └── {department}/         # 10 departments
+        ├── claude-skills/
+        ├── claude-commands/
+        ├── crewai-agents/
+        ├── prompts/
+        └── workflows/
+```
+
+## Asset Types
+
+| Asset Type | Description | Example Use Case |
+|------------|-------------|------------------|
+| **claude-skills** | YAML skill definitions | Automate tasks in Claude Code |
+| **claude-commands** | Markdown slash commands | Quick actions via `/command` |
+| **crewai-agents** | Agent configurations | Deploy specialized AI agents |
+| **prompts** | AI prompt templates | Consistent AI interactions |
+| **workflows** | n8n workflow JSONs | Automate pipelines |
+
+## Departments
+
+1. `it-engineering`
+2. `sales-marketing`
+3. `customer-support`
+4. `operations-hr-supply`
+5. `finance-accounting`
+6. `project-management`
+7. `real-estate`
+8. `private-equity-ma`
+9. `consulting`
+10. `personal-continuing-ed`
+
+## Versioning & Rollback
+
+Every production update automatically creates a backup:
+
+```
+production/_versions/{department}/{filename}.{timestamp}.backup
+```
+
+**To rollback:**
+```python
+# Copy previous version back to production
+cp production/_versions/sales-marketing/skill.20250102_143000.backup \
+   production/sales-marketing/claude-skills/skill.yaml
+```
+
+## Requirements
+
+```bash
+pip install b2sdk python-dotenv
+```
+
+**Environment Variables (.env):**
+```bash
+B2_APPLICATION_KEY_ID=your_key_id
+B2_APPLICATION_KEY=your_key
+```
+
+## Troubleshooting
+
+**"Source file not found"**
+- Check that file exists in approved/ folder
+- Verify filename spelling
+
+**"Bucket not found"**
+- Verify B2_APPLICATION_KEY_ID and B2_APPLICATION_KEY in .env
+- Check bucket name is "JB-Course-KB"
+
+**"Permission denied"**
+- Ensure B2 application key has write permissions
+- Check folder exists (run setup script first)
+
+## Future Enhancements
+
+- [ ] Web UI for promotion workflow
+- [ ] Automated testing before promotion
+- [ ] Bulk promotion support
+- [ ] Integration with Claude Code for direct loading
+- [ ] Automated rollback on errors
+- [ ] Approval workflow with notifications
+
+---
+
+**Last Updated:** 2025-01-02
+**Empire Version:** v7.2 Enhanced

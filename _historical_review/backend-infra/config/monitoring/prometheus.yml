@@ -1,0 +1,110 @@
+# ==========================================
+# PROMETHEUS CONFIGURATION - EMPIRE v7.2
+# ==========================================
+
+global:
+  # How frequently to scrape targets
+  scrape_interval: 15s
+
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager)
+  external_labels:
+    monitor: 'empire-monitor'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alert_rules.yml"
+
+# Scrape configurations
+scrape_configs:
+  # ==========================================
+  # EMPIRE API METRICS
+  # ==========================================
+  - job_name: 'empire_api'
+    static_configs:
+      - targets: ['host.docker.internal:8000']  # FastAPI app on host
+    metrics_path: '/monitoring/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # ==========================================
+  # PROMETHEUS SELF-MONITORING
+  # ==========================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ==========================================
+  # NODE EXPORTER - SYSTEM METRICS
+  # ==========================================
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # ==========================================
+  # CADVISOR - CONTAINER METRICS
+  # ==========================================
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # ==========================================
+  # REDIS EXPORTER
+  # ==========================================
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+    params:
+      target: ['redis://redis:6379']
+
+  # ==========================================
+  # NEO4J METRICS (if exposed)
+  # ==========================================
+  - job_name: 'neo4j'
+    static_configs:
+      - targets: ['host.docker.internal:2004']  # Neo4j metrics port
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # ==========================================
+  # LLAMAINDEX SERVICE (Render)
+  # ==========================================
+  - job_name: 'llamaindex_service'
+    static_configs:
+      - targets: ['jb-llamaindex.onrender.com']
+    scheme: https
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+    scrape_timeout: 10s
+
+  # ==========================================
+  # CREWAI SERVICE (Render)
+  # ==========================================
+  - job_name: 'crewai_service'
+    static_configs:
+      - targets: ['jb-crewai.onrender.com']
+    scheme: https
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+    scrape_timeout: 10s
+
+  # ==========================================
+  # OLLAMA (Local Embeddings)
+  # ==========================================
+  - job_name: 'ollama'
+    static_configs:
+      - targets: ['host.docker.internal:11434']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s

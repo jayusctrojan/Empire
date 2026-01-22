@@ -1,0 +1,66 @@
+# Empire v7.3 - Production Dependencies
+# FastAPI + Celery + Supabase + Neo4j + Redis
+
+# Core Web Framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.6.0
+pydantic-settings>=2.1.0
+
+# ASGI Server & HTTP
+httpx>=0.26.0
+python-multipart>=0.0.9
+
+# Background Tasks
+celery[redis]>=5.3.6
+redis>=5.0.1
+
+# Database & Storage
+supabase>=2.4.0
+psycopg2-binary>=2.9.9
+neo4j>=5.17.0
+sqlalchemy>=2.0.25
+
+# AI & Embeddings
+anthropic>=0.18.0
+llama-index>=0.10.0
+llama-parse>=0.4.0
+
+# Document Processing
+pypdf>=4.0.0
+python-docx>=1.1.0
+python-pptx>=0.6.23
+pillow>=10.2.0
+opencv-python-headless>=4.9.0
+
+# Audio/Video Processing
+pydub>=0.25.1
+
+# Utilities
+python-dotenv>=1.0.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-dateutil>=2.8.2
+
+# Monitoring & Metrics
+prometheus-client>=0.19.0
+sentry-sdk[fastapi]>=1.40.0
+
+# HTTP Client & API Integration
+requests>=2.31.0
+aiohttp>=3.9.3
+
+# Data Processing
+numpy>=1.26.3
+pandas>=2.2.0
+
+# Testing (dev only, but included for deployment verification)
+pytest>=8.0.0
+pytest-asyncio>=0.23.4
+httpx>=0.26.0
+
+# Security
+cryptography>=42.0.0
+
+# Environment
+gunicorn>=21.2.0  # Alternative ASGI server for production
