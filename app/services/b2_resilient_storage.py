@@ -341,7 +341,7 @@ def calculate_sha1_file(file_path: str) -> str:
     return sha1.hexdigest()
 
 
-def verify_checksum(
+def _verify_checksums_match(
     local_checksum: str,
     remote_checksum: str,
     file_path: str
@@ -436,7 +436,7 @@ class ResilientB2StorageService:
                 TimeoutError
             )),
             before_sleep=before_sleep_log(logger, logging.INFO),
-            reraise=True
+            reraise=False  # Raise RetryError so we can convert to B2RetryExhaustedException
         )
 
     async def upload_file(
@@ -510,7 +510,7 @@ class ResilientB2StorageService:
                 # B2 stores SHA1 in content_sha1 field
                 remote_checksum = result.get("content_sha1")
                 if remote_checksum:
-                    verify_checksum(local_checksum, remote_checksum, filename)
+                    _verify_checksums_match(local_checksum, remote_checksum, filename)
                     result["checksum_verified"] = True
                     self._stats["checksum_verifications"] += 1
 
@@ -630,7 +630,7 @@ class ResilientB2StorageService:
                 local_checksum = calculate_sha1_file(destination_path)
 
                 if expected_checksum:
-                    verify_checksum(local_checksum, expected_checksum, destination_path)
+                    _verify_checksums_match(local_checksum, expected_checksum, destination_path)
                     self._stats["checksum_verifications"] += 1
 
                 result = {

@@ -27,7 +27,7 @@ from app.services.b2_resilient_storage import (
     B2DeadLetterQueue,
     calculate_sha1,
     calculate_sha1_file,
-    verify_checksum,
+    _verify_checksums_match,
     get_resilient_b2_service,
     DEFAULT_MAX_RETRIES,
     DLQ_NAME,
@@ -129,13 +129,13 @@ class TestChecksumFunctions:
     def test_verify_checksum_match(self):
         """Test checksum verification with matching checksums"""
         checksum = "abc123def456"
-        result = verify_checksum(checksum, checksum, "/test/file.txt")
+        result = _verify_checksums_match(checksum, checksum, "/test/file.txt")
         assert result is True
 
     def test_verify_checksum_mismatch(self):
         """Test checksum verification raises exception on mismatch"""
         with pytest.raises(ChecksumMismatchException) as exc_info:
-            verify_checksum("checksum_a", "checksum_b", "/test/file.txt")
+            _verify_checksums_match("checksum_a", "checksum_b", "/test/file.txt")
 
         assert exc_info.value.error_code == "CHECKSUM_MISMATCH"
         assert "checksum_a" in str(exc_info.value.details.get("actual_checksum", ""))
@@ -281,7 +281,6 @@ class TestResilientB2StorageService:
         assert mock_b2_service.upload_file.call_count == 2
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Test mock configuration needs update - tenacity retry decorator conflicts with mock")
     async def test_upload_file_exhausted_retries(self, resilient_service, mock_b2_service, mock_redis, sample_file_content):
         """Test upload adds to DLQ after exhausting retries"""
         # Reduce retries for faster test
@@ -305,10 +304,10 @@ class TestResilientB2StorageService:
         mock_redis.lpush.assert_called()
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Test returns bool but code expects dict - mock return value needs fix")
     async def test_download_file_success(self, resilient_service, mock_b2_service):
         """Test successful file download"""
-        mock_b2_service.download_file.return_value = True
+        # Mock returns dict matching what the service would return
+        mock_b2_service.download_file.return_value = {"success": True, "file_path": "/tmp/test.txt"}
 
         with patch('os.path.exists', return_value=True):
             with patch('app.services.b2_resilient_storage.calculate_sha1_file', return_value="abc123"):
@@ -316,7 +315,7 @@ class TestResilientB2StorageService:
                     file_id="file123",
                     file_name="test.txt",
                     destination_path="/tmp/test.txt",
-                    verify_checksum=False
+                    verify_checksum=True  # Enable checksum verification to get proper result dict
                 )
 
         assert result["success"] is True
@@ -394,8 +393,7 @@ class TestCeleryTasks:
         assert recover_b2_orphaned_files is not None
         assert b2_full_maintenance is not None
 
-    @pytest.mark.skip(reason="Patch location wrong - function imports inside task, need to patch at source module")
-    @patch('app.tasks.b2_maintenance_tasks.get_resilient_b2_service')
+    @patch('app.services.b2_resilient_storage.get_resilient_b2_service')
     def test_process_dlq_task(self, mock_get_service):
         """Test DLQ processing task"""
         from app.tasks.b2_maintenance_tasks import process_b2_dead_letter_queue
@@ -413,14 +411,8 @@ class TestCeleryTasks:
         mock_service.process_dead_letter_queue = mock_process_dlq
         mock_get_service.return_value = mock_service
 
-        # Mock self
-        mock_self = MagicMock()
-        mock_self.request.id = "task-123"
-        mock_self.request.retries = 0
-        mock_self.max_retries = 2
-
-        result = process_b2_dead_letter_queue.__wrapped__(
-            mock_self,
+        # Use run() method to test Celery task directly (standard approach for bound tasks)
+        result = process_b2_dead_letter_queue.run(
             batch_size=10,
             max_retry_count=10
         )
@@ -438,7 +430,6 @@ class TestIntegration:
     """Integration tests with mocked external services"""
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Mock configuration issue - tenacity retry decorator conflicts with AsyncMock")
     async def test_full_upload_flow_with_checksum(self, resilient_service, mock_b2_service, sample_file_content):
         """Test complete upload flow with checksum verification"""
         expected_checksum = calculate_sha1(sample_file_content)
@@ -463,7 +454,6 @@ class TestIntegration:
         assert resilient_service._stats["checksum_verifications"] == 1
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Mock configuration issue - tenacity retry decorator conflicts with AsyncMock")
     async def test_upload_flow_with_checksum_mismatch(self, resilient_service, mock_b2_service, sample_file_content):
         """Test upload detects checksum mismatch"""
         mock_b2_service.upload_file.return_value = {
