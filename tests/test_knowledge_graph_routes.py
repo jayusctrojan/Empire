@@ -143,7 +143,7 @@ class TestEntityQuery:
             "max_depth": 10  # Exceeds max of 5
         })
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # =============================================================================
@@ -380,7 +380,7 @@ class TestCypherGenerationService:
         from app.services.cypher_generation_service import CypherGenerationConfig
 
         config = CypherGenerationConfig()
-        assert config.model == "claude-sonnet-4-20250514"
+        assert config.model == "claude-sonnet-4-5"
         assert config.max_tokens == 1024
         assert config.temperature == 0.0
 

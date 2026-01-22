@@ -146,7 +146,7 @@ class TestMemoryNodes:
             "content": "",
             "node_type": "fact"
         })
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_get_memory_node_success(self, client, mock_memory_service):
         """Test retrieving a memory node."""

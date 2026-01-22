@@ -25,7 +25,7 @@ def classifier_config():
     return ClassifierConfig(
         use_ai_classification=True,
         fallback_to_patterns=True,
-        model="claude-3-5-haiku-20241022",
+        model="claude-haiku-4-5",
         confidence_threshold=0.7,
         cache_classifications=True
     )
@@ -66,12 +66,12 @@ def test_classifier_config_creation():
     """
     config = ClassifierConfig(
         use_ai_classification=True,
-        model="claude-3-5-haiku-20241022",
+        model="claude-haiku-4-5",
         confidence_threshold=0.8
     )
 
     assert config.use_ai_classification is True
-    assert config.model == "claude-3-5-haiku-20241022"
+    assert config.model == "claude-haiku-4-5"
     assert config.confidence_threshold == 0.8
     assert config.fallback_to_patterns is True  # Default
 
@@ -144,7 +144,7 @@ async def test_claude_haiku_prompt_structure(query_classifier, mock_anthropic_cl
     kwargs = call_args[1] if len(call_args) > 1 else call_args.kwargs
     assert "messages" in kwargs
     assert "model" in kwargs
-    assert kwargs["model"] == "claude-3-5-haiku-20241022"
+    assert kwargs["model"] == "claude-haiku-4-5"
 
 
 @pytest.mark.asyncio

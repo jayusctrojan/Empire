@@ -100,7 +100,7 @@ class TestRAGASResultsStorage:
             "total_samples": 32,
             "evaluated_at": datetime.utcnow().isoformat() + "Z",
             "dataset_name": "Empire v7.2 Test Dataset",
-            "model_used": "claude-3-5-haiku-20241022"
+            "model_used": "claude-haiku-4-5"
         }
 
     @patch('app.services.ragas_storage.create_client')

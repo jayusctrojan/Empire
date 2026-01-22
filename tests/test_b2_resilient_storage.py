@@ -19,7 +19,7 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from datetime import datetime
 from io import BytesIO
 
-from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeoutError
+from b2sdk.v2.exception import B2Error, B2ConnectionError
 
 # Import test subjects
 from app.services.b2_resilient_storage import (
@@ -253,7 +253,7 @@ class TestResilientB2StorageService:
         result = await resilient_service.upload_file(
             file_data=file_data,
             filename="test.txt",
-            verify_checksum=False
+            should_verify_checksum=False
         )
 
         assert result["file_id"] == "file123"
@@ -274,7 +274,7 @@ class TestResilientB2StorageService:
         result = await resilient_service.upload_file(
             file_data=file_data,
             filename="test.txt",
-            verify_checksum=False
+            should_verify_checksum=False
         )
 
         assert result["file_id"] == "file123"
@@ -295,7 +295,7 @@ class TestResilientB2StorageService:
             await resilient_service.upload_file(
                 file_data=file_data,
                 filename="test.txt",
-                verify_checksum=False
+                should_verify_checksum=False
             )
 
         assert exc_info.value.error_code == "B2_RETRY_EXHAUSTED"
@@ -314,7 +314,7 @@ class TestResilientB2StorageService:
                     file_id="file123",
                     file_name="test.txt",
                     destination_path="/tmp/test.txt",
-                    verify_checksum=False
+                    should_verify_checksum=False
                 )
 
         assert result["success"] is True
@@ -392,39 +392,48 @@ class TestCeleryTasks:
         assert recover_b2_orphaned_files is not None
         assert b2_full_maintenance is not None
 
-    @patch('app.tasks.b2_maintenance_tasks.get_resilient_b2_service')
-    def test_process_dlq_task(self, mock_get_service):
-        """Test DLQ processing task"""
+    @patch('app.tasks.b2_maintenance_tasks.run_async')
+    @patch('app.services.b2_resilient_storage.get_resilient_b2_service')
+    def test_process_dlq_task(self, mock_get_service, mock_run_async):
+        """Test DLQ processing task using Celery's eager mode"""
+        from app.celery_app import celery_app
         from app.tasks.b2_maintenance_tasks import process_b2_dead_letter_queue
 
-        # Setup mock
+        # Setup mock service
         mock_service = MagicMock()
-
-        async def mock_process_dlq(*args, **kwargs):
-            return {
-                "processed": 5,
-                "succeeded": 3,
-                "failed": 2
-            }
-
-        mock_service.process_dead_letter_queue = mock_process_dlq
         mock_get_service.return_value = mock_service
 
-        # Mock self
-        mock_self = MagicMock()
-        mock_self.request.id = "task-123"
-        mock_self.request.retries = 0
-        mock_self.max_retries = 2
+        # Mock run_async to return the expected result directly
+        mock_run_async.return_value = {
+            "processed": 5,
+            "succeeded": 3,
+            "failed": 2
+        }
 
-        result = process_b2_dead_letter_queue.__wrapped__(
-            mock_self,
-            batch_size=10,
-            max_retry_count=10
-        )
+        # Enable eager mode for testing (tasks run synchronously)
+        celery_app.conf.task_always_eager = True
+        celery_app.conf.task_eager_propagates = True
 
-        assert result["success"] is True
-        assert result["processed"] == 5
-        assert result["succeeded"] == 3
+        try:
+            # Call the task - in eager mode, it runs synchronously
+            result = process_b2_dead_letter_queue.apply(
+                args=[],
+                kwargs={"batch_size": 10, "max_retry_count": 10}
+            )
+
+            # Get the result
+            task_result = result.result
+
+            assert task_result["success"] is True
+            assert task_result["processed"] == 5
+            assert task_result["succeeded"] == 3
+            # task_id will be auto-generated in eager mode
+            assert "task_id" in task_result
+            mock_run_async.assert_called_once()
+        finally:
+            # Restore non-eager mode
+            celery_app.conf.task_always_eager = False
+            celery_app.conf.task_eager_propagates = False
 
 
 # =============================================================================
@@ -451,7 +460,7 @@ class TestIntegration:
         result = await resilient_service.upload_file(
             file_data=file_data,
             filename="test.txt",
-            verify_checksum=True
+            should_verify_checksum=True
         )
 
         assert result["file_id"] == "file123"
@@ -474,7 +483,7 @@ class TestIntegration:
             await resilient_service.upload_file(
                 file_data=file_data,
                 filename="test.txt",
-                verify_checksum=True
+                should_verify_checksum=True
             )
 
     def test_singleton_pattern(self):

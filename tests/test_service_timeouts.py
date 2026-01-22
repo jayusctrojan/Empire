@@ -548,9 +548,9 @@ class TestUtilityFunctions:
         )
 
         assert isinstance(client, httpx.AsyncClient)
-        # Cleanup
+        # Cleanup - use asyncio.run() for proper event loop management
         import asyncio
-        asyncio.get_event_loop().run_until_complete(client.aclose())
+        asyncio.run(client.aclose())
 
     def test_create_timeout_aware_client_uses_correct_timeout(self):
         """Test that create_timeout_aware_client uses service-specific timeout."""
@@ -561,9 +561,9 @@ class TestUtilityFunctions:
 
         assert client.timeout.read == 120.0
         assert client.timeout.connect == 5.0
-        # Cleanup
+        # Cleanup - use asyncio.run() for proper event loop management
         import asyncio
-        asyncio.get_event_loop().run_until_complete(client.aclose())
+        asyncio.run(client.aclose())
 
 
 # =============================================================================
