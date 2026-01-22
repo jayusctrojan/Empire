@@ -1,0 +1,1935 @@
+AI Empire Complete Architecture v7.3 (Local Embeddings + Persistent Memory) - Production-Ready
+Cloud-First AI Architecture with Local BGE-M3 Embeddings and Graphiti Memory System
+
+================================================================================
+DEVELOPMENT ENVIRONMENT & TOOLS
+================================================================================
+
+Primary IDE: Visual Studio Code
+- Claude Code (CLI) - Primary architect for complex development tasks
+- Cline (VS Code extension) - Rapid feature implementation within VS Code
+- Continue.dev (VS Code extension) - Code completion and refactoring
+
+MCP Servers (Model Context Protocol) Available for Development:
+1. Claude Context MCP - Conversation context and project memory across sessions
+2. Chrome DevTools MCP - Browser debugging, DOM inspection, network/performance analysis
+3. Ref MCP - Official documentation reference (FastAPI, Neo4j, Supabase, Anthropic, LlamaIndex, Pydantic)
+4. TaskMaster MCP - AI-powered task management, project planning, complexity analysis, workflow automation
+5. MCP_Docker - GitHub operations (repos, PRs, issues, code search, branch management)
+6. Render MCP - Deployment and service management (web services, databases, logs, metrics, environment variables)
+7. Supabase MCP - Direct PostgreSQL + pgvector operations (tables, queries, indexes, RLS policies)
+8. neo4j MCP - Graph database queries via natural language → Cypher translation
+
+All MCPs integrate seamlessly with Claude Code CLI for direct access to:
+- Databases (PostgreSQL, Neo4j)
+- Documentation (FastAPI, Neo4j, Supabase, etc.)
+- GitHub (code, issues, PRs, branches)
+- Render (deployment, services, logs, metrics, environment configuration)
+- Browser DevTools (frontend debugging)
+- Task Management (project planning and tracking)
+
+================================================================================
+VERSION 7.3 - LOCAL EMBEDDINGS + PERSISTENT MEMORY (November 2025)
+================================================================================
+This version adds LOCAL embedding generation and persistent memory system:
+- ✅ Local BGE-M3 embeddings via Ollama (FREE - saves $50-100/month)
+- ✅ Graphiti MCP Server with temporal knowledge graphs
+- ✅ Complete personal/work memory separation
+- ✅ 322 personal ChatGPT conversations imported
+- ✅ Project-based memory organization (unlimited scalability)
+- ✅ Neo4j Graph Database with natural language queries via Claude Desktop
+- ✅ Chat UI (Gradio/Streamlit) for end-user access
+- ✅ Bi-directional sync between Supabase and Neo4j
+- ✅ BGE-M3 Embeddings (1024-dim with built-in sparse vectors) - NOW LOCAL
+- ✅ Query Expansion with Claude Haiku (15-30% better recall)
+- ✅ BGE-Reranker-v2 on Mac Studio (replacing Cohere, saves $30-50/month)
+- ✅ Adaptive Document-Type Chunking (15-25% better precision)
+- ✅ Optimized Semantic Caching (tiered similarity thresholds)
+- ✅ Hybrid Search (dense + BGE-M3 sparse + ILIKE + fuzzy with RRF)
+- ✅ LightRAG Knowledge Graphs (entity relationships and traversal)
+- ✅ Context Expansion (neighboring chunks with hierarchical structure)
+- ✅ Multi-Modal Processing (images via Claude Vision, audio via Soniox)
+- ✅ Full Observability (Prometheus, Grafana, OpenTelemetry)
+- RESULT: 40-60% better retrieval + DUAL ACCESS MODES + $0 EMBEDDING COSTS
+
+Core Architecture Decisions (v7.2 - PRODUCTION + DEVELOPMENT):
+
+**PRODUCTION ARCHITECTURE:**
+- PRIMARY AI: Claude Sonnet 4.5 API (synthesis) + Claude Haiku (expansion)
+- BACKEND API: FastAPI on Render (https://jb-empire-api.onrender.com) - srv-d44o2dq4d50c73elgupg
+  * Plan: Starter ($7/month)
+  * Region: Oregon
+  * Health Check: /health
+  * API Docs: /docs
+  * TASK 46 DEPLOYED: LangGraph + Arcade.dev Integration (November 2024)
+    - Query Endpoints: /api/query/* (health, auto, adaptive, adaptive/async, auto/async, batch, status, tools)
+    - LangGraph: 5-node adaptive workflow with iterative refinement and conditional branching
+    - Workflow Router: Intelligent routing (LangGraph/CrewAI/Simple RAG based on query classification)
+    - Arcade.dev: External tool integration (Google Search, Slack, GitHub, etc.)
+    - Environment: ARCADE_API_KEY=<from .env>, ARCADE_ENABLED=true, LANGGRAPH_DEFAULT_MODEL=claude-3-5-haiku-20241022
+- TASK PROCESSING: Celery workers on Render - srv-d44oclodl3ps73bg8rmg
+  * Plan: Starter ($7/month)
+  * Concurrency: 2 workers
+  * Tasks: Document processing, embeddings, graph sync, CrewAI workflows
+- CACHE/BROKER: Render Redis (FREE tier) - red-d44og3n5r7bs73b2ctbg
+  * Purpose: Semantic caching + Celery message broker
+  * Access: Internal Render network only
+- PRODUCTION MEMORY: PostgreSQL graph tables (user_memory_nodes, user_memory_edges in Supabase)
+- EMBEDDINGS: BGE-M3 LOCAL via Ollama (FREE - development testing)
+- RERANKING: BGE-Reranker-v2 on Mac Studio (via Tailscale - https://jays-mac-studio.tail64d12f.ts.net/)
+- STORAGE: Supabase PostgreSQL + pgvector + graph tables (<your-project-id>.supabase.co)
+- ORCHESTRATION: CrewAI on Render (https://jb-crewai.onrender.com) - srv-d2n0hh3uibrs73buafo0 - MILESTONE 8
+- MULTI-MODAL: Claude Vision for images, Soniox for audio transcription
+- MONITORING: Prometheus + Grafana dashboards
+- SECURITY: TLS 1.3 enforced across all services (FastAPI, Celery, Supabase, Neo4j, Redis)
+
+**DEVELOPMENT ENVIRONMENT (Mac Studio):**
+- Graphiti MCP Server: Development/testing memory ONLY (NOT production)
+- Neo4j Graph Database: FREE Docker for development testing with TLS enabled
+  * Connection: bolt+ssc://localhost:7687 (TLS) or bolt+ssc://100.119.86.6:7687 (via Tailscale)
+  * Certificates: Self-signed, 365-day validity, mounted at /certificates/bolt/
+  * TLS Mode: OPTIONAL (supports both encrypted and unencrypted connections)
+- Ollama: BGE-M3 embeddings + BGE-Reranker-v2 (local, zero cost)
+- Development testing for models before production deployment
+
+================================================================================
+DUAL-INTERFACE ARCHITECTURE (NEW v7.2)
+================================================================================
+
+Knowledge Access Interfaces:
+├── Interface 1: Chat UI (End Users)
+│   ├── Technology: Gradio/Streamlit on Render
+│   ├── Access: Web-based, team/public access
+│   ├── Features: Simple Q&A, document search, citations
+│   ├── Cost: $15-20/month
+│   └── Best for: General queries, team collaboration
+│
+├── Interface 2: Neo4j MCP (Power Users)
+│   ├── Technology: Neo4j + MCP (Docker)
+│   ├── Access: Claude Desktop + Claude Code
+│   ├── Features: Natural language → Cypher, graph exploration
+│   ├── Cost: $0 (Neo4j Community Edition)
+│   └── Best for: Complex queries, development, analysis
+│
+└── Interface 3: Claude Code Integration (Developers)
+    ├── Technology: Neo4j MCP via Docker
+    ├── Access: Claude Code (VS Code integration)
+    ├── Features: Code generation with graph context
+    ├── Use Cases: Generate code from graph patterns
+    └── Best for: Development workflows, automated code generation
+
+Data Architecture:
+├── Supabase PostgreSQL (Primary Storage)
+│   ├── BGE-M3 vectors (1024-dim)
+│   ├── Document text and metadata
+│   ├── Full-text search indexes
+│   └── $25/month
+│
+├── Neo4j Graph Database (Graph Layer)
+│   ├── Entity nodes and relationships
+│   ├── Document-entity connections
+│   ├── Graph algorithms (PageRank, community detection)
+│   └── Free (Community Edition on Mac Studio)
+│
+└── Synchronization
+    ├── FastAPI service for bi-directional sync
+    ├── 5-minute intervals
+    └── Conflict resolution: Supabase as source of truth
+
+================================================================================
+Render Services (Already Deployed)
+================================================================================
+
+Workspace ID: tea-d1vtdtre5dus73a4rb4g
+
+LlamaIndex Service (Active):
+├── Service ID: srv-d2nl1lre5dus73atm9u0
+├── URL: https://jb-llamaindex.onrender.com
+├── Purpose: Document parsing, indexing, and vector retrieval
+├── Integration:
+│   ├── Parses PDFs, Word docs, contracts, policies
+│   ├── Creates searchable vector indexes
+│   ├── Integrates with Supabase pgvector
+│   ├── Coordinates with Neo4j for entity storage
+│   └── Works with CrewAI for multi-document processing
+├── API Endpoints:
+│   ├── POST /parse - Parse documents
+│   ├── POST /index/create - Create vector index
+│   ├── POST /index/{id}/query - Query index
+│   └── GET /health - Health check
+└── Cost: $7-21/month (Starter to Standard tier)
+
+CrewAI Service (Active):
+├── Service ID: srv-d2n0hh3uibrs73buafo0
+├── URL: https://jb-crewai.onrender.com
+├── Purpose: Multi-agent AI orchestration for complex workflows
+├── Integration:
+│   ├── Coordinates multiple AI agents for complex tasks
+│   ├── Uses LlamaIndex for document retrieval
+│   ├── Queries Neo4j for entity relationships
+│   ├── Synthesizes results with Claude Sonnet
+│   └── Manages parallel document analysis
+├── Agent Types:
+│   ├── Document Parser Agent (uses LlamaIndex)
+│   ├── Entity Extractor Agent (uses Neo4j)
+│   ├── Research Agent (uses hybrid search)
+│   ├── Synthesizer Agent (uses Claude)
+│   └── Quality Validator Agent
+├── API Endpoints:
+│   ├── POST /run-crew - Execute multi-agent task
+│   ├── POST /analyze-documents - Batch document analysis
+│   ├── GET /crew-status/{id} - Check task status
+│   └── GET /health - Health check
+└── Cost: $7-21/month (Starter to Standard tier)
+
+Workflow Integration:
+1. Document Upload → LlamaIndex parses and chunks
+2. LlamaIndex generates embeddings via BGE-M3
+3. Store in Supabase + sync entities to Neo4j
+4. Complex queries → CrewAI orchestrates multi-agent search
+5. CrewAI coordinates: LlamaIndex (retrieval) + Neo4j (graph) + Claude (synthesis)
+
+================================================================================
+Core Infrastructure
+================================================================================
+
+Mac Studio M3 Ultra (96GB) - Development & Local Services Hub
+	•	28-core CPU, 60-core GPU, 32-core Neural Engine
+	•	800 GB/s memory bandwidth
+	•	PRIMARY USE: Development + BGE-Reranker-v2 + Neo4j + Ollama
+	•	Neo4j Graph Database: Running in Docker (~4GB)
+	•	Ollama (BGE-M3 + BGE-Reranker-v2): Local AI models (~8-12GB)
+	•	BGE-Reranker-v2: Production reranking API via Tailscale (~1.5GB)
+	•	Claude Desktop + Claude Code: AI interfaces with MCP integration
+	•	Docker Desktop: Running Neo4j and MCP servers
+	•	Tailscale: Secure connection for production services
+	•	~80GB available for development, testing, caching
+	•	NOT running generative LLMs (APIs are better for generation)
+
+================================================================================
+NEO4J MCP DOCKER CONFIGURATION (NEW v7.2)
+================================================================================
+
+Docker Compose Setup:
+```yaml
+version: '3.8'
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: empire-neo4j
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+      - ./neo4j/import:/import
+      - ./neo4j/plugins:/plugins
+    environment:
+      - NEO4J_AUTH=neo4j/empire-secure-password
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+      - NEO4J_dbms_memory_heap_initial__size=2g
+      - NEO4J_dbms_memory_heap_max__size=4g
+      - NEO4J_dbms_memory_pagecache_size=2g
+    restart: unless-stopped
+
+  neo4j-mcp:
+    image: mcp-neo4j-server:latest
+    container_name: empire-neo4j-mcp
+    ports:
+      - "3000:3000"
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=empire-secure-password
+      - READ_ONLY=true
+    depends_on:
+      - neo4j
+    restart: unless-stopped
+```
+
+MCP Configuration (claude_desktop_config.json):
+```json
+{
+  "mcpServers": {
+    "empire-neo4j": {
+      "command": "docker",
+      "args": ["exec", "-i", "empire-neo4j-mcp", "node", "/app/index.js"],
+      "env": {
+        "MCP_MODE": "empire-knowledge"
+      }
+    }
+  }
+}
+```
+
+Claude Code Integration:
+- Neo4j MCP automatically available in Claude Code
+- Natural language queries translate to Cypher
+- Graph context available for code generation
+- Example: "Generate Python code to process all documents related to RAG optimization"
+
+================================================================================
+GRAPHITI MCP CONFIGURATION (ADDED v7.2 - Nov 2025)
+================================================================================
+
+Developer Memory System with Graphiti:
+├── Technology Stack:
+│   ├── Graphiti Core: Temporal knowledge graph framework
+│   ├── Neo4j Community: Graph database backend (bolt://localhost:7687)
+│   ├── OpenAI API: Embeddings (text-embedding-3-small)
+│   ├── MCP Protocol: Claude Desktop/Code integration
+│   └── Project-Based Memory Groups
+
+├── Memory Architecture:
+│   ├── Naming Convention: project_{projectname}_{aspect}
+│   ├── Empire Project Groups:
+│   │   ├── project_empire - Main project memories
+│   │   ├── project_empire_dev - Development notes
+│   │   ├── project_empire_docs - Documentation
+│   │   ├── project_empire_api - API specifications
+│   │   └── project_empire_notes - Meeting notes
+│   ├── Personal Memory:
+│   │   └── personal - ChatGPT history (332 memories imported)
+│   └── Other Projects:
+│       ├── project_healthtrack - Health industry project
+│       └── project_crypto_dashboard - Fintech project
+
+├── Context Management:
+│   ├── Quick Switch: ./mem empire (changes active context)
+│   ├── Add Project: ./mem add "project-name" --client "Client" --industry "Industry"
+│   ├── List Projects: ./mem (shows all contexts)
+│   └── Auto-updates GROUP_ID in .env for MCP server
+
+├── File Locations (/mem-agent-mcp/):
+│   ├── graphiti-mcp-wrapper.sh - MCP server launcher
+│   ├── memory_context_manager.py - Context switching tool
+│   ├── memory_contexts.json - Project metadata
+│   ├── import_chatgpt_direct.py - Bulk import tool
+│   └── graphiti/mcp_server/.env - API keys & config
+
+└── Benefits:
+    ├── Complete separation of personal vs work memories
+    ├── Scalable to unlimited projects
+    ├── <100ms retrieval with Neo4j indexes
+    ├── Context-aware code generation in Claude Code
+    └── Temporal tracking of knowledge evolution
+
+Cloud AI Infrastructure (PRIMARY)
+	•	Claude Sonnet 4.5 API - Document synthesis ($30-50/month)
+	  - Best-in-class accuracy for business documents (97-99%)
+	  - Superior instruction following for consistent tagging
+	  - Batch API: 90% cost savings
+	  - Prompt caching: 50% additional savings
+	  - Structured outputs: Reliable JSON generation
+	  - Enterprise knowledge: Finance, compliance, legal
+	•	Claude Haiku API - Query expansion ($1.50-9/month)
+	  - Ultra-fast query variation generation
+	  - 4-5 semantic expansions per query
+	  - $0.25 per 1M input tokens
+	  - Sub-100ms latency
+	  - Optional UI toggle for "Enhanced Search"
+	•	LlamaIndex (Render: srv-d2nl1lre5dus73atm9u0) - Document processing ($7-21/month)
+	•	CrewAI (Render: srv-d2n0hh3uibrs73buafo0) - Multi-agent orchestration ($7-21/month)
+	•	Supabase - PostgreSQL + pgvector ($15/month SMALL tier) - UNIFIED DATABASE
+	•	Backblaze B2 - File storage + backups ($10-20/month)
+
+================================================================================
+ADVANCED RAG ARCHITECTURE - FULLY RESTORED
+================================================================================
+
+Hybrid Search System (v7.1 - OPTIMIZED):
+├── Dense Search (BGE-M3 Embeddings)
+│   ├── Supabase pgvector extension
+│   ├── 1024-dim vectors (upgraded from 768-dim)
+│   ├── HNSW index for fast similarity search
+│   ├── Cosine distance measurement
+│   └── 3-5% better retrieval quality
+│
+├── Sparse Search (BGE-M3 Built-in)
+│   ├── BGE-M3 native sparse vectors
+│   ├── Superior to traditional BM25
+│   ├── Stored in JSONB column
+│   └── No separate FTS index needed
+│
+├── ILIKE Search (Pattern Matching)
+│   ├── Case-insensitive substring matching
+│   ├── Keyword concentration scoring
+│   └── Percentage-based relevance
+│
+└── Fuzzy Search (String Similarity)
+    ├── pg_trgm extension
+    ├── word_similarity() function
+    └── Trigram matching for typos
+
+Query Expansion Pipeline (v7.1 - NEW):
+├── Claude Haiku API
+│   ├── Generates 4-5 query variations
+│   ├── Sub-100ms expansion latency
+│   ├── Cost: ~$1.50-9/month
+│   └── UI toggle: "Enhanced Search" mode
+│
+├── Parallel Execution
+│   ├── All variations searched simultaneously
+│   ├── Results merged before reranking
+│   └── 15-30% better recall
+│
+└── Expansion Strategies
+    ├── Synonym expansion for factual queries
+    ├── Step variations for how-to queries
+    └── Concept expansion for analytical queries
+
+Reranking Pipeline (v7.1 - OPTIMIZED):
+├── BGE-Reranker-v2 (Mac Studio)
+│   ├── Replaces Cohere (saves $30-50/month)
+│   ├── 299M parameters, ~1.5GB RAM
+│   ├── Accessed via Tailscale secure connection
+│   ├── 10-20ms latency per batch
+│   └── 25-35% reranking improvement
+│
+├── Reciprocal Rank Fusion (RRF)
+│   ├── Combines rankings from all search methods
+│   ├── Configurable weights (sum to 1.0)
+│   ├── Flexible K parameter (default 60)
+│   └── Production-ready algorithm
+│
+└── Score Combination
+    ├── Weighted averaging
+    ├── Rank-based fusion
+    └── Final relevance scoring
+
+Knowledge Graph Integration (ESSENTIAL):
+├── LightRAG API
+│   ├── Entity extraction from documents
+│   ├── Relationship mapping
+│   ├── Graph traversal queries
+│   ├── Incremental updates
+│   └── Combined with vector search
+│
+├── Use Cases
+│   ├── "Find all documents related to X"
+│   ├── "Show relationships between concepts"
+│   ├── "What entities connect these topics?"
+│   └── "Trace information flow"
+│
+└── Integration
+    ├── Parallel to vector search
+    ├── Results merged with RRF
+    └── Unified query interface
+
+Adaptive Chunking Strategy (v7.1 - NEW):
+├── Document-Type Detection
+│   ├── Claude Vision analyzes document structure
+│   ├── Auto-classifies: contract, technical, narrative, mixed
+│   ├── Preserves tables, images, code blocks
+│   └── Multi-modal aware chunking
+│
+├── Optimized Chunk Sizes
+│   ├── Contracts: 300 tokens, 25% overlap (precision)
+│   ├── Policies: 400 tokens, 20% overlap (balanced)
+│   ├── Technical: 512 tokens, 20% overlap (context)
+│   ├── Transcripts: 300 tokens, speaker-aware
+│   └── Default: 400 tokens, semantic boundaries
+│
+└── Performance Impact
+    ├── 15-25% better semantic coherence
+    ├── Preserves document structure
+    └── One-time preprocessing cost
+
+Context Expansion (ESSENTIAL):
+├── Neighbor Chunk Retrieval
+│   ├── ±1 position lookup
+│   ├── <100ms retrieval time
+│   └── Expands boundary chunks
+│
+├── Section-Based Expansion
+│   ├── Retrieve full document sections
+│   ├── Hierarchical structure mapping
+│   ├── <500ms section retrieval
+│   └── Maintains document context
+│
+└── Smart Chunk Merging
+    ├── Merge tiny chunks (<100 tokens)
+    ├── Preserve semantic boundaries
+    └── Configurable thresholds
+
+Memory System (ESSENTIAL - v7.2 UPDATED Nov 2025):
+
+IMPORTANT: Empire has THREE DISTINCT memory systems:
+1. Developer Memory: Graphiti MCP with Neo4j (local development & Claude Code)
+2. Production User Memory: Supabase graph-based (end-user workflows)
+3. Personal Memory: Separated ChatGPT history (332 conversations imported)
+
+├── Developer Memory: Graphiti MCP with Neo4j (UPDATED Nov 2025)
+│   ├── Purpose: Development memory with Claude Code integration
+│   ├── Technology: Zep Graphiti + Neo4j Graph Database
+│   ├── Integration: Claude Desktop & Claude Code via MCP
+│   ├── Location: Mac Studio local environment (Docker)
+│   ├── Storage: Neo4j Community Edition (bolt://localhost:7687)
+│   ├── Memory Architecture:
+│   │   ├── Project-Based Naming: project_{projectname}_{aspect}
+│   │   ├── Empire Groups:
+│   │   │   ├── project_empire - Main project memories
+│   │   │   ├── project_empire_dev - Development notes
+│   │   │   ├── project_empire_docs - Documentation
+│   │   │   ├── project_empire_api - API specifications
+│   │   │   └── project_empire_notes - Meeting notes
+│   │   ├── Personal Groups:
+│   │   │   └── personal - ChatGPT history (332 memories)
+│   │   └── Other Projects: project_healthtrack, project_crypto_dashboard
+│   ├── Context Management:
+│   │   ├── Switch Command: ./mem empire
+│   │   ├── Manager: memory_context_manager.py
+│   │   ├── Config: memory_contexts.json
+│   │   └── Auto-updates GROUP_ID in .env
+│   ├── Import Tools:
+│   │   ├── import_chatgpt_direct.py - Direct Neo4j import
+│   │   ├── import_chatgpt_to_graphiti.py - Via Graphiti API
+│   │   └── Bulk import capability for project docs
+│   ├── Performance: <100ms retrieval with Neo4j indexes
+│   ├── Scalability: Unlimited projects without restructuring
+│   └── Privacy: Complete separation between personal/work
+│
+├── Production User Memory: Supabase Graph-Based (v7.0)
+│   ├── Purpose: End-user memory in production n8n workflows
+│   ├── Architecture: Three-layer graph system
+│   │   ├── User Memory Graph: facts, preferences, goals, context
+│   │   ├── Document Knowledge Graph: LightRAG entities/relationships
+│   │   └── Hybrid Graph: user memories ↔ document entities
+│   ├── Storage: Supabase PostgreSQL + pgvector
+│   ├── Tables: user_memory_nodes, user_memory_edges, user_document_connections
+│   ├── Embeddings: 768-dim nomic-embed-text vectors
+│   └── Privacy: Row-level security, per-user isolation
+│
+├── Graph-Based Memory Features (Production)
+│   ├── Memory Extraction
+│   │   ├── Automatic extraction via Claude API (1-2 seconds)
+│   │   ├── Types: fact, preference, goal, context, skill, interest
+│   │   ├── Confidence scoring (0.0-1.0)
+│   │   ├── Importance scoring (0.0-1.0)
+│   │   └── Source tracking (explicit, inferred, conversation)
+│   ├── Graph Relationships
+│   │   ├── Relationship types: causes, relates_to, contradicts, supports
+│   │   ├── Edge strength (0.0-1.0)
+│   │   ├── Multi-hop traversal (2 hops default, configurable 1-3)
+│   │   └── Cycle prevention in recursive queries
+│   ├── Memory Retrieval
+│   │   ├── Vector similarity search for seed nodes (threshold 0.7)
+│   │   ├── Graph traversal via recursive CTEs (<100ms)
+│   │   ├── Personalized entity recommendations (<50ms)
+│   │   ├── Top 10 relevant memories with relationship paths
+│   │   └── Total retrieval: <300ms including enrichment
+│   └── Memory Lifecycle
+│       ├── Temporal tracking (first/last mentioned, mention count)
+│       ├── Confidence decay for stale memories (30-day threshold)
+│       ├── Contradiction detection (>0.85 similarity)
+│       └── Optional expiration for time-sensitive facts
+│
+├── LightRAG Integration (Hybrid Graph)
+│   ├── User-document connections table
+│   ├── Link user skills/interests to document entities
+│   ├── Connection types: expert_in, interested_in, worked_on
+│   ├── Enables personalized document recommendations
+│   └── "Show me documents related to my expertise" queries
+│
+└── Performance Characteristics
+    ├── Memory extraction: <3 seconds (typical 3-5 memories)
+    ├── Graph traversal: <100ms (2-hop, 10 seed nodes)
+    ├── Context retrieval: <300ms (complete enrichment)
+    └── Storage: ~3.5KB per memory node (with embedding)
+
+Multi-Modal Processing (NEW - v7.0):
+├── Image Processing
+│   ├── Claude Vision API integration
+│   ├── Formats: JPG, PNG, GIF, BMP, TIFF, WEBP
+│   ├── Text extraction (OCR)
+│   ├── Object detection and description
+│   ├── Caption generation
+│   ├── Descriptive embeddings via nomic-embed-text
+│   └── Cross-modal search (text queries → images)
+│
+├── Audio Processing
+│   ├── Soniox API for transcription
+│   ├── Formats: MP3, WAV, M4A, FLAC
+│   ├── Speaker diarization
+│   ├── Timestamp alignment
+│   ├── Cost: $0.005 per minute
+│   └── Processed as enriched text documents
+│
+└── Video Processing (Future - v8.0)
+    ├── Keyframe extraction (1 per 10 seconds)
+    ├── Audio track transcription
+    └── Synchronized transcript with visual context
+
+Structured Data Support (NEW - v7.0):
+├── CSV/Excel Processing
+│   ├── Formats: CSV, TSV, XLSX, XLS
+│   ├── Automatic schema inference
+│   ├── Column type detection
+│   ├── Relationship discovery
+│   └── Foreign key pattern matching
+│
+├── Storage Architecture
+│   ├── tabular_document_rows table
+│   ├── JSONB format for flexibility
+│   ├── GIN indexing for fast queries
+│   └── Linked to record_manager_v2
+│
+└── Query Interface
+    ├── Natural language to SQL translation
+    ├── Filter, aggregate, join operations
+    ├── Claude API for query generation
+    └── Result set integration with RAG
+
+Semantic Caching (v7.1 - OPTIMIZED):
+├── Redis-Based Cache
+│   ├── Upstash Redis ($10-15/month)
+│   ├── Query embedding storage
+│   ├── Result caching with TTL
+│   └── Automatic invalidation
+│
+├── Tiered Similarity Thresholds
+│   ├── 0.98+: Direct cache hit (identical query)
+│   ├── 0.93-0.97: Return with "similar answer" note
+│   ├── 0.88-0.92: Show as suggestion
+│   └── <0.88: Full pipeline execution
+│
+├── Adaptive Cache Strategy
+│   ├── Policy documents: 24 hour TTL
+│   ├── Product info: 1 hour TTL
+│   ├── Real-time data: 5 minute TTL
+│   ├── Document-based invalidation
+│   └── UI "Refresh" button bypass
+│
+└── Performance Impact
+    ├── Cache hit: <50ms total latency
+    ├── 60-80% hit rate for common queries
+    ├── 50x faster on cache hits
+    └── Significant cost reduction
+
+Observability Stack (NEW - v7.0):
+├── Metrics Collection
+│   ├── Prometheus for metrics scraping
+│   ├── Custom metrics: query latency, search quality, token usage
+│   ├── System metrics: CPU, memory, disk I/O
+│   ├── Cost tracking: per-query and aggregate
+│   └── Self-hosted or cloud ($20-30/month)
+│
+├── Visualization
+│   ├── Grafana dashboards
+│   ├── Real-time query performance
+│   ├── Search quality trends
+│   ├── Cost analytics
+│   └── Error rate monitoring
+│
+├── Distributed Tracing
+│   ├── OpenTelemetry framework
+│   ├── Jaeger for trace storage
+│   ├── End-to-end request tracking
+│   ├── Component-level latency breakdown
+│   └── Debugging production issues
+│
+├── Structured Logging
+│   ├── JSON format for all logs
+│   ├── Elasticsearch for log aggregation (optional)
+│   ├── File-based logging (default)
+│   ├── 90-day retention
+│   └── Full audit trail
+│
+└── Alerting
+    ├── Error rate alerts (>5% for 5 minutes)
+    ├── Latency alerts (P95 >3 seconds)
+    ├── Cost anomaly alerts (>$10/hour)
+    ├── Delivery: Email, Slack, PagerDuty
+    └── Automated incident creation
+
+================================================================================
+Data Architecture - Advanced Implementation
+================================================================================
+
+Supabase PostgreSQL + pgvector (UNIFIED DATABASE):
+
+Key Extensions:
+├── pgvector - Vector similarity search
+├── pg_trgm - Fuzzy text matching
+└── PostgreSQL FTS - Full-text search
+
+Database Schema:
+├── documents_v2
+│   ├── content (TEXT)
+│   ├── metadata (JSONB - unlimited rich metadata)
+│   ├── embedding (VECTOR(1536))
+│   ├── fts (TSVECTOR - full-text search)
+│   └── hierarchical_index (JSONB - section mapping)
+│
+├── record_manager_v2
+│   ├── document tracking
+│   ├── hash-based deduplication
+│   ├── graph_id mapping (LightRAG)
+│   └── version history
+│
+├── tabular_document_rows
+│   ├── Extracted table data
+│   ├── SQL queryable
+│   └── Linked to source documents
+│
+└── metadata_fields
+    ├── Controlled vocabularies
+    ├── Dynamic field definitions
+    └── Query optimization
+
+================================================================================
+NEO4J GRAPH DATABASE SCHEMA (NEW v7.2)
+================================================================================
+
+Node Types:
+├── (:Document)
+│   ├── id: UUID (unique)
+│   ├── title: String
+│   ├── content: Text
+│   ├── embedding: List[Float] (1024-dim BGE-M3)
+│   ├── doc_type: String (contract|policy|technical|transcript)
+│   ├── chunk_size: Integer (adaptive 300-512)
+│   ├── created_at: DateTime
+│   ├── hash: String (SHA-256)
+│   ├── confidence: Float (0.0-1.0)
+│   └── source_url: String
+│
+├── (:Entity)
+│   ├── id: UUID (unique)
+│   ├── name: String (indexed)
+│   ├── type: String (person|org|concept|technology)
+│   ├── description: Text
+│   ├── embedding: List[Float] (1024-dim)
+│   ├── importance: Float (0.0-1.0)
+│   └── first_seen: DateTime
+│
+├── (:Memory)
+│   ├── id: UUID
+│   ├── content: String
+│   ├── type: String (fact|preference|goal|context)
+│   ├── user_id: String
+│   ├── confidence: Float
+│   └── created_at: DateTime
+│
+├── (:Query)
+│   ├── id: UUID
+│   ├── text: String
+│   ├── expanded_queries: List[String] (Claude Haiku)
+│   ├── timestamp: DateTime
+│   ├── cache_hit: Boolean
+│   └── response_time_ms: Integer
+│
+└── (:User)
+    ├── id: UUID
+    ├── email: String
+    └── created_at: DateTime
+
+Relationship Types:
+├── (:Document)-[:CONTAINS {position: Int, confidence: Float}]->(:Entity)
+├── (:Entity)-[:RELATES_TO {strength: Float, type: String}]->(:Entity)
+├── (:Document)-[:CITES {page: Int, section: String}]->(:Document)
+├── (:Query)-[:RETRIEVED {relevance: Float, rank: Int}]->(:Document)
+├── (:Memory)-[:ABOUT]->(:Entity)
+├── (:User)-[:INTERESTED_IN {weight: Float}]->(:Entity)
+├── (:Document)-[:SIMILAR_TO {score: Float}]->(:Document)
+├── (:Query)-[:EXPANDED_TO]->(:Query)
+└── (:User)-[:ASKED]->(:Query)
+
+Indexes:
+├── CREATE INDEX doc_title FOR (d:Document) ON (d.title)
+├── CREATE INDEX entity_name FOR (e:Entity) ON (e.name)
+├── CREATE INDEX entity_type FOR (e:Entity) ON (e.type)
+├── CREATE VECTOR INDEX doc_embedding FOR (d:Document) ON (d.embedding)
+└── CREATE FULLTEXT INDEX doc_content FOR (d:Document) ON (d.content)
+
+Graph Algorithms (via Graph Data Science):
+├── PageRank: Identify important documents/entities
+├── Community Detection: Find related concept clusters
+├── Path Finding: Shortest path between concepts
+├── Similarity: Find similar documents via embeddings
+└── Centrality: Identify key knowledge hubs
+
+Advanced Database Functions:
+
+1. dynamic_hybrid_search_db (438 lines)
+   - Combines all 4 search methods
+   - Dynamic filter handling
+   - RRF score combination
+   - Metadata filtering with $or/$and
+   - Type detection (numeric, timestamp, text)
+
+2. get_chunks_by_ranges() (NEW - v7.0)
+   - Batch context expansion for multiple ranges
+   - Input: JSON array [{doc_id, start, end}]
+   - Returns: chunks with hierarchical_context and graph_entities
+   - Builds parent/child relationships automatically
+   - Links to knowledge graph entities from LightRAG
+   - Performance: <300ms for ≤10 ranges
+
+3. hierarchical_structure_extraction
+   - Document outline extraction
+   - Chunk-to-section mapping
+   - H1-H6 heading relationships
+
+Supabase Edge Functions (HTTP API - NEW v7.0):
+
+1. hybrid-search (TypeScript/Deno)
+   - HTTP wrapper for dynamic_hybrid_search_db
+   - Endpoint: /functions/v1/hybrid-search
+   - CORS support for web clients
+   - JWT authentication via Supabase Auth
+   - Returns: JSON with success/error/results
+
+2. context-expansion (TypeScript/Deno)
+   - HTTP wrapper for get_chunks_by_ranges()
+   - Endpoint: /functions/v1/context-expansion
+   - Batch processing of chunk ranges
+   - Returns: chunks with hierarchical context
+
+3. graph-query (TypeScript/Deno)
+   - Knowledge graph entity and relationship queries
+   - Endpoint: /functions/v1/graph-query
+   - Queries local knowledge_entities/relationships tables
+   - Returns: entity + related relationships
+
+Authentication Levels:
+├── Anon Key: Rate-limited, RLS enforced, client-safe
+├── Service Role Key: Full access, Edge Functions only (server-side)
+└── User JWT: Per-user auth, automatic RLS filtering
+
+Deployment:
+- supabase functions deploy [name]
+- supabase secrets set for API keys
+- Local testing: supabase functions serve
+
+Query Optimization Features (NEW - v7.0):
+
+1. Dynamic Weight Adjustment
+   - Analyzes query characteristics before search
+   - Automatically tunes search method weights
+   - Query type detection:
+     * Exact match (contains "exactly", quotes) → boost ILIKE (40%)
+     * Short queries (<3 words) → boost fuzzy (30%)
+     * Semantic (contains "similar", "like") → boost dense vector (60%)
+     * Long queries (>8 words) → boost sparse BM25 (40%)
+     * Contains numbers/years → boost pattern matching (35%)
+   - Performance: <10ms overhead, 10-15% better results
+   - Tracked in query_performance_log with query_type
+
+2. Natural Language to SQL Translation
+   - LLM-powered SQL generation for tabular data
+   - Enables natural language queries on CSV/Excel uploads
+   - Example queries:
+     * "Show customers from CA with revenue > $100k"
+     * "What's the average revenue by state?"
+     * "List top 10 products by sales"
+   - Implementation:
+     * Detects structured query keywords (show, list, filter, count, avg)
+     * Retrieves table schemas from record_manager_v2
+     * Claude generates PostgreSQL with JSONB operators
+     * Executes read-only SELECT queries
+   - Security: 100-row limit, 30s timeout, no DROP/DELETE/UPDATE
+   - Performance: <3 seconds total (schema + LLM + execution)
+   - Fallback: Reverts to semantic search on SQL errors
+   - Combines: Can merge structured results with semantic search
+
+Performance:
+- Dense search: <50ms (HNSW index)
+- Sparse search: <100ms (GIN index)
+- ILIKE search: <200ms (pattern matching)
+- Fuzzy search: <150ms (trigram)
+- Reranking: <1 second (Cohere API)
+- Context expansion: <500ms (PostgreSQL)
+
+================================================================================
+Document Processing Pipeline - Complete Flow
+================================================================================
+
+Input Sources:
+├── Web UI Upload (Gradio/Streamlit) → FastAPI → Immediate processing
+├── Mountain Duck Upload → B2 pending/courses/ → B2 Monitor (30s poll) → Processing
+├── Backblaze B2 monitoring (30-second polling for Mountain Duck auto-detection)
+├── YouTube URLs
+├── Web Scraping (Firecrawl)
+└── Direct file uploads (n8n webhook)
+
+Dual Upload Architecture (NEW v7.2):
+
+Method 1: Mountain Duck (Direct B2 Upload)
+├── User drags file to /Volumes/Backblaze B2/pending/courses/
+├── B2 Folder Monitor polls every 30 seconds (FastAPI background task)
+├── New file detected → triggers processing workflow automatically
+├── Store metadata in Supabase with upload_source='mountain_duck'
+└── AI auto-classification and intelligent filename generation
+
+Method 2: Web UI (Gradio/Streamlit)
+├── User uploads via browser (drag-drop or file picker)
+├── FastAPI receives file via POST /api/upload/single or /batch
+├── Upload to B2 pending/courses/
+├── Store metadata in Supabase with upload_source='web_ui'
+├── Immediate processing trigger (no 30-second polling delay)
+└── AI auto-classification and intelligent filename generation
+
+Both Methods Converge at Processing Pipeline:
+├── B2 pending/courses/ → AI Classification
+├── Department classification (1 of 10 departments)
+├── Course structure extraction (instructor, modules, lessons)
+├── Intelligent filename generation (proper sorting with M01, L01 format)
+├── Document processing (content extraction, embeddings, storage)
+├── CrewAI analysis (PDF summaries + suggestions)
+└── Move to processed/courses/{department}/
+
+B2 Folder Structure (10 Departments):
+```
+JB-Course-KB/
+├── pending/courses/              # Drop ANY course here (via UI or Mountain Duck)
+├── processing/                   # Temporary processing
+├── processed/
+│   ├── courses/                  # 10 department folders (actual course files)
+│   ├── crewai-summaries/        # 10 department folders (PDF summaries with images)
+│   └── crewai-suggestions/      # 10 department folders (YAML skills + MD commands)
+└── failed/                       # Failed processing attempts
+```
+
+10 Business Departments:
+1. it-engineering - Technology, software, DevOps, data, security, cloud
+2. sales-marketing - Sales, marketing, product strategy, R&D, customer success
+3. customer-support - Technical support, help desk, SLA management
+4. operations-hr-supply - HR, operations, supply chain, procurement, legal & compliance
+5. finance-accounting - FP&A, accounting, tax, audits, financial risk
+6. project-management - Agile, Scrum, PMP, project tools, stakeholder management
+7. real-estate - Property management, CRE, investment, development, leasing
+8. private-equity-ma - M&A, due diligence, PE, valuation, exit strategies
+9. consulting - Management consulting, strategy frameworks, client engagement
+10. personal-continuing-ed - Psychology, NLP, life coaching, mindfulness, wellness
+
+Intelligent File Naming (AI-Powered):
+- Format: {Instructor/Company}-{Course}-M{##}-{Module}-L{##}-{Lesson}.ext
+- Examples:
+  * Grant_Cardone-10X_Sales_System-M01-Prospecting-L01-Cold_Calling.pdf
+  * McKinsey-Strategy_Frameworks-M01-BCG_Matrix.pdf
+  * VirtualCoach-NLP_Practitioner-M05-Anchoring_Techniques.pdf
+- Proper alphabetical sorting (M01, M02... L01, L02...)
+- AI extracts structure using Claude Haiku
+
+CrewAI Outputs:
+1. crewai-summaries/ - PDF with embedded images, frameworks, module tables
+2. crewai-suggestions/ - YAML Claude skills + Markdown slash commands
+
+Mountain Duck Configuration:
+- Protocol: Backblaze B2
+- Credentials: Stored in .env file (NOT in git)
+- Bucket: JB-Course-KB
+- Mount: /Volumes/Backblaze B2/
+
+Processing Services:
+├── MarkItDown MCP → 40+ format conversion to Markdown
+├── LlamaIndex (Render: srv-d2nl1lre5dus73atm9u0) → Document processing & indexing ($7-21/month)
+├── CrewAI (Render: srv-d2n0hh3uibrs73buafo0) → Multi-agent orchestration ($7-21/month)
+├── LangExtract → Gemini-powered extraction for precise grounding ($10-20/month)
+├── Mistral OCR → Complex PDFs only ($20/month)
+├── Soniox → Audio/video transcription ($10-20/month)
+└── Claude Sonnet 4.5 → ALL intelligent processing
+
+Claude Sonnet 4.5 Handles:
+✅ Data extraction from documents
+✅ Entity recognition and tagging
+✅ Document categorization
+✅ Summary generation
+✅ Quality validation
+✅ Structured JSON output
+✅ Context for embedding generation
+
+Advanced Processing Steps:
+
+1. Document Upload
+   ↓
+2. MarkItDown MCP (extract text)
+   ↓
+3. Hash Check (skip if unchanged)
+   ↓
+4. Claude Sonnet 4.5 API
+   - Extract structured data
+   - Identify entities
+   - Generate metadata
+   - Create summaries
+   ↓
+5. Semantic Chunking
+   - Context-aware segmentation
+   - Configurable size/overlap
+   - Preserve boundaries
+   ↓
+6. LightRAG Entity Extraction
+   - Extract entities and relationships
+   - Build knowledge graph
+   - Store graph mappings
+   ↓
+7. Hierarchical Structure Extraction
+   - Document outline (H1-H6)
+   - Section ranges
+   - Chunk-to-section mapping
+   ↓
+8. Embedding Generation
+   - Generate vectors for chunks
+   - Include contextual descriptions
+   - Batch processing
+   ↓
+9. Store in Supabase
+   - Content + vectors
+   - Metadata (rich JSONB)
+   - FTS index
+   - Graph IDs
+   - Hierarchical structure
+   ↓
+10. CrewAI Content Analysis
+    - Extract insights
+    - Identify frameworks
+    - Map to departments
+    - Generate documentation
+    ↓
+11. Upload original to B2
+    ↓
+12. Done! ✅
+
+================================================================================
+Query Workflow - Advanced RAG
+================================================================================
+
+User Question → Chat UI
+  ↓
+mem-agent retrieves context (<100ms local)
+  ↓
+Query Enhancement
+  - Identify query type (keyword vs semantic)
+  - Extract key terms
+  - Determine search strategy
+  ↓
+Dynamic Hybrid Search (Supabase)
+  ├── Dense Search (vector similarity)
+  ├── Sparse Search (BM25/FTS)
+  ├── ILIKE Search (pattern matching)
+  └── Fuzzy Search (typo-tolerant)
+  ↓
+Reciprocal Rank Fusion
+  - Combine results from all 4 methods
+  - Apply configurable weights
+  - Generate unified ranking
+  ↓
+LightRAG Graph Query (if relevant)
+  - Find related entities
+  - Traverse relationships
+  - Retrieve connected nodes
+  ↓
+Merge Vector + Graph Results
+  ↓
+Cohere Rerank v3.5
+  - Re-score all results
+  - Optimize for relevance
+  - Return top-N (default 10)
+  ↓
+Context Expansion
+  - Retrieve neighbor chunks
+  - Expand to full sections
+  - Include parent context
+  ↓
+Claude Sonnet 4.5 Synthesis
+  - Read expanded context
+  - Generate comprehensive answer
+  - Include citations
+  ↓
+Response in 1-3 seconds total ✅
+
+================================================================================
+Storage Architecture
+================================================================================
+
+Storage Type          Location       Purpose                    Backup
+================================================================================
+Memory Store          Mac Studio     mem-agent MCP access       B2 (encrypted)
+Vector Embeddings     Supabase       pgvector semantic search   Built-in + B2
+Sparse Index          Supabase       Full-text search (GIN)     Built-in + B2
+Structured Data       Supabase       PostgreSQL queries         Built-in + B2
+Graph Data           LightRAG API    Entity relationships       API managed
+Raw Files            Backblaze B2    Primary storage            Cross-region
+Cache Layer          Mac Studio      Fast dev access (88GB)     Temporary
+Configurations       GitHub          System settings            Private repo
+
+================================================================================
+Privacy & Security Architecture
+================================================================================
+
+Mac Studio Security:
+- FileVault encryption (always on)
+- mem-agent data encrypted locally
+- Development environment isolation
+- API key vault for cloud services
+- Tailscale VPN for remote access
+- No production data on local machine
+
+Cloud Security:
+- TLS encryption in transit
+- AES-256 encryption at rest
+- Claude API: SOC 2 compliant
+- Supabase: Private PostgreSQL + pgvector
+- Backblaze B2: Client-side encryption
+- Cohere: Enterprise security standards
+- LightRAG: Secure API access
+
+File Upload Security (v7.3):
+- Layer 1: Basic validation (extension whitelist, size limits)
+- Layer 2: Advanced validation (MIME type detection, file header verification)
+- Layer 3: Malware scanning (VirusTotal API with hash-first approach)
+  • Smart hash-first strategy: Hash check (FREE) → Upload only if unknown
+  • 70+ antivirus engines for comprehensive detection
+  • Free tier: 500 uploads/day → ~10,000+ effective scans/day
+  • Graceful degradation if API unavailable
+  • API key: <from .env VIRUSTOTAL_API_KEY>
+
+================================================================================
+AI Model Distribution
+================================================================================
+
+PRIMARY: Claude Sonnet 4.5 API
+	•	Document processing and extraction (97-99% accuracy)
+	•	Entity recognition and tagging
+	•	Summary generation
+	•	Quality validation
+	•	Batch API: 90% cost reduction
+	•	Prompt caching: 50% additional savings
+	•	Cost: $30-50/month for 200 docs/day
+
+ESSENTIAL: Cohere Rerank v3.5
+	•	Search result optimization
+	•	Multi-lingual support
+	•	Dramatically improves relevance
+	•	$1 per 1000 rerank operations
+	•	Cost: ~$20/month for heavy use
+
+ESSENTIAL: LightRAG API
+	•	Knowledge graph construction
+	•	Entity extraction
+	•	Relationship mapping
+	•	Graph traversal queries
+	•	Cost: ~$15/month
+
+ESSENTIAL: CrewAI Content Analyzer (Render)
+	•	Service ID: srv-d2n0hh3uibrs73buafo0
+	•	URL: https://jb-crewai.onrender.com
+	•	Workspace: tea-d1vtdtre5dus73a4rb4g
+	•	Multi-agent AI orchestration for complex workflows
+	•	Analyzes ALL ingested content
+	•	Generates course documentation
+	•	Extracts frameworks and workflows
+	•	Maps content to departments
+	•	Creates implementation guides
+	•	Cost: ~$7-21/month (Starter to Standard tier)
+
+BACKUP: Other APIs as needed
+	•	Mistral OCR for complex PDFs
+	•	Soniox for transcription
+	•	Minimal usage, task-specific
+
+PRECISION EXTRACTION: LlamaIndex + LangExtract
+	•	LlamaIndex (Render): Document processing, indexing & retrieval
+	  - Service ID: srv-d2nl1lre5dus73atm9u0
+	  - URL: https://jb-llamaindex.onrender.com
+	  - Workspace: tea-d1vtdtre5dus73a4rb4g
+	  - Document ingestion and parsing
+	  - Vector index creation and management
+	  - Query interface and retrieval
+	  - Integration with pgvector and Neo4j
+	  - Coordinates with CrewAI for multi-agent processing
+	  - Cost: ~$7-21/month (Starter to Standard tier)
+	•	LangExtract: Gemini-powered extraction ($10-20/month)
+	  - Precise information extraction with schemas
+	  - Entity and relationship extraction
+	  - Cross-validation with LlamaIndex for grounding
+	  - Structured field extraction (dates, IDs, amounts)
+	  - >95% extraction accuracy with confidence scores
+
+LOCAL: Development Only
+	•	Claude Desktop for development
+	•	Testing and experimentation
+
+================================================================================
+Complete n8n Workflow - All Features Integrated
+================================================================================
+
+Milestone 2: Universal Document Processing
+
+Node 1: Document Upload/Trigger
+Node 2: Hash Check (Supabase)
+Node 3: MarkItDown Conversion
+Node 4: Claude Extraction
+Node 5: Semantic Chunking
+
+Milestone 3: Advanced RAG Features
+
+Node 6: LightRAG Entity Extraction
+  - Extract entities from document
+  - Build knowledge graph
+  - Store entity-relationship mappings
+  - Link to document chunks
+
+Node 7: Hierarchical Structure Extraction
+  - Parse document outline (H1-H6)
+  - Map chunks to sections
+  - Store hierarchical index
+  - Enable section-based retrieval
+
+Node 8: Embedding Generation
+  - Generate vectors for all chunks
+  - Include contextual descriptions
+  - Batch processing for efficiency
+  - Store in Supabase pgvector
+
+Node 9: Supabase Storage
+  - Store content + vectors
+  - Store metadata (JSONB)
+  - Create FTS index
+  - Store hierarchical mappings
+  - Link to LightRAG graph IDs
+
+Node 10: CrewAI Analysis
+Node 11: B2 Upload
+Node 12: Done
+
+Milestone 4: Query Processing with Advanced RAG
+
+Node 1: Query Input (Chat UI)
+Node 2: mem-agent Context Retrieval (<100ms)
+
+Node 3: Query Analysis
+  - Determine query type
+  - Extract key terms
+  - Select search strategy weights
+
+Node 4: Dynamic Hybrid Search (Supabase)
+  - Execute 4-method search:
+    * Dense (vector)
+    * Sparse (BM25)
+    * ILIKE (pattern)
+    * Fuzzy (trigram)
+  - Apply RRF to combine results
+  - Return top-30 candidates
+
+Node 5: LightRAG Graph Query
+  - Search knowledge graph
+  - Find related entities
+  - Traverse relationships
+  - Return connected nodes
+
+Node 6: Merge Results
+  - Combine vector + graph results
+  - Deduplicate by document ID
+  - Preserve source attribution
+
+Node 7: Cohere Reranking
+  - Send all results to Cohere
+  - Apply relevance scoring
+  - Return top-10 results
+
+Node 8: Context Expansion
+  - Retrieve neighbor chunks (±1)
+  - Expand to full sections
+  - Include parent context
+  - Smart merging
+
+Node 9: Claude Synthesis
+  - Read expanded context
+  - Generate answer
+  - Include citations
+  - Format response
+
+Node 10: Response to User
+
+Milestone 8: Document Lifecycle Management (NEW - v7.0)
+
+Node 1: Delete Document Webhook (/document/:document_id)
+  - Accept DELETE requests with document_id
+  - Extract deletion metadata (user, reason)
+  - Validate document exists
+
+Node 2-8: Cascade Deletion Sequence
+  - Delete from documents_v2 (vectors)
+  - Delete from tabular_document_rows (structured data)
+  - Delete from knowledge_entities (graph nodes)
+  - Delete from record_manager_v2 (tracking)
+  - Delete from documents (main record)
+  - Delete from Backblaze B2 (source file)
+  - Delete from LightRAG API (knowledge graph)
+
+Node 9: Audit Logging
+  - Record deletion event
+  - Preserve metadata for compliance
+  - Track deletion reason and user
+
+Node 10: Soft Delete Alternative
+  - Mark as deleted (status = 'deleted')
+  - Preserve data for retention period
+  - Auto-cleanup after 90 days
+
+Milestone 9: Batch Operations (NEW - v7.0)
+
+Node 1: Scheduled Trigger (2 AM Daily)
+  - Cron expression: 0 2 * * *
+  - Off-peak processing hours
+
+Node 2: Get Pending Documents
+  - Query processing_status = 'pending'
+  - Include failed docs with retry_count < 3
+  - Limit 100 documents per batch
+
+Node 3: Split Into Batches
+  - Batch size: 10 concurrent documents
+  - Parallel execution with resource limits
+  - Loop until all processed
+
+Node 4: Mark as Processing
+  - Update status to 'processing'
+  - Increment retry_count
+  - Record processing_started_at
+
+Node 5: Execute Document Processing
+  - Call main processing workflow
+  - Pass document metadata
+  - Handle success/failure
+
+Node 6-7: Status Updates
+  - Mark as 'complete' on success
+  - Mark as 'error' on failure
+  - Track processing duration
+
+Node 8: Aggregate Batch Results
+  - Count successful/failed
+  - Calculate processing time
+  - Generate batch summary
+
+Node 9: Log Batch Summary
+  - Store in batch_processing_log table
+  - Track metrics over time
+  - Enable performance analysis
+
+================================================================================
+Performance & Capacity
+================================================================================
+
+API Performance:
+	•	Claude Sonnet 4.5: 1-3 second responses
+	•	Document capacity: 200-500 per day
+	•	Batch processing: Overnight for large volumes
+	•	Accuracy: 97-99% for business documents
+	•	Reliability: 99.9% uptime (Claude API)
+
+Supabase pgvector Performance:
+	•	28x lower latency vs traditional vector DBs
+	•	16x higher throughput
+	•	HNSW indexing for fast similarity search
+	•	Dense search: <50ms
+	•	Sparse search: <100ms
+	•	ILIKE search: <200ms
+	•	Fuzzy search: <150ms
+	•	Combined hybrid: <300ms
+
+Cohere Reranking:
+	•	Reranking latency: <1 second
+	•	Batch size: up to 1000 documents
+	•	Dramatically improves precision
+	•	Essential for production quality
+
+LightRAG Performance:
+	•	Entity extraction: 1-2 seconds
+	•	Graph query: <500ms
+	•	Incremental updates: ~50% faster
+	•	Essential for knowledge discovery
+
+Mac Studio Usage:
+	•	mem-agent: 8GB always running
+	•	Development: VS Code, Docker, testing
+	•	Cache: 88GB available for hot data
+	•	Not for production LLM inference
+
+================================================================================
+Cost Structure - CORRECTED
+================================================================================
+
+One-Time Costs (Already Delivered)
+	•	Mac Studio M3 Ultra (96GB): $3,999
+	•	UPS Battery Backup: $150-200
+	•	Ethernet/accessories: $50
+	•	Total: ~$4,200
+
+Monthly Recurring (v7.2 DUAL-INTERFACE with ALL FEATURES)
+
+Core Infrastructure ($165-220/month):
+	•	Claude Sonnet 4.5 API: $50-80 (with batch + caching + vision)
+	•	Claude Haiku API: $1.50-9 (query expansion)
+	•	Render (n8n): $30 (workflow orchestration)
+	•	CrewAI: $20 (content analysis agent)
+	•	Chat UI (Gradio/Streamlit): $15-20 (end-user interface)
+	•	Supabase: $25 (PostgreSQL + pgvector + FTS)
+	•	Neo4j Community: $0 (graph database on Mac Studio)
+	•	Backblaze B2: $15-25 (file storage)
+
+Advanced Features ($85-130/month):
+	•	LightRAG API: $30-50 (knowledge graph)
+	•	BGE-Reranker-v2: $0 (Mac Studio, was $30-50 Cohere)
+	•	Redis Cache (Upstash): $10-15 (tiered semantic caching)
+	•	LlamaIndex (Render): $15-20 (indexing framework)
+	•	LlamaCloud Free Tier: $0 (LlamaParse - 10K pages/month OCR)
+	•	LangExtract: $10-20 (Gemini-powered extraction)
+	•	Soniox: $10-20 (audio transcription)
+	•	Monitoring Stack: $20-30 (Prometheus/Grafana)
+
+Total v7.2 Production: $350-500/month (includes BOTH interfaces)
+
+Cost Breakdown by Usage (under 10K pages/month, 1000 queries/day):
+	•	Claude Sonnet API: ~$60-80/month (synthesis)
+	•	Claude Haiku API: ~$1.50-9/month (query expansion)
+	•	BGE-Reranker-v2: $0 (Mac Studio, was $30-50 Cohere)
+	•	Core Infrastructure: ~$85-110/month
+	•	Document Processing: ~$25-40/month
+	  - LlamaIndex (Render): $15-20 (indexing framework)
+	  - LlamaCloud Free: $0 (10K pages OCR)
+	  - LangExtract: $10-20 (structured extraction)
+	•	Monitoring & Observability: ~$20-30/month
+	•	Audio Processing: ~$10-20/month (Soniox, usage-based)
+	•	Semantic Caching: ~$10-15/month (Upstash Redis)
+	•	Total: $335-480/month (saved $40-70/month from v7.0)
+
+Value Proposition (v7.1 - STATE-OF-THE-ART):
+	•	40-60% better retrieval quality (BGE-M3 + expansion + reranking)
+	•	BGE-M3 with built-in sparse vectors (better than BM25)
+	•	Query expansion: 15-30% better recall
+	•	<100ms query latency with tiered caching
+	•	Adaptive chunking: 15-25% better precision
+	•	BGE-Reranker-v2: Same quality, 10x faster than Cohere
+	•	Knowledge graph for entity relationships
+	•	Multi-modal support (text, images, audio, structured data)
+	•	Persistent memory via mem-agent MCP
+	•	Full observability stack (metrics, tracing, logging, alerts)
+	•	Production-ready with 99.9% uptime SLA
+	•	Scalable to 1000+ docs/day, 5000+ queries/day
+	•	Lower costs with better performance
+
+Cost Optimization Notes:
+	•	Batch API: 90% savings on document processing
+	•	Prompt caching: 50% additional savings on repeated content
+	•	Semantic cache: 60-80% hit rate reduces API calls
+	•	Combined savings: 70-85% vs. non-optimized approach
+	•	Actual cost: ~$0.35-0.50 per document processed
+	•	Query cost: ~$0.01-0.03 per query (with caching)
+
+================================================================================
+Implementation Status - CORRECTED
+================================================================================
+
+✅ COMPLETED:
+	•	n8n deployed on Render
+	•	CrewAI deployed (ESSENTIAL)
+	•	Supabase database configured with pgvector
+	•	Backblaze B2 integrated
+	•	MarkItDown MCP working
+	•	YouTube processing active
+	•	Article conversion working
+	•	Mac Studio delivered and setup
+	•	mem-agent MCP configured
+
+🔄 IN PROGRESS:
+	•	Claude Sonnet 4.5 API integration in n8n
+	•	Batch processing workflow
+	•	Prompt caching optimization
+
+❌ MISSING (URGENT) - ADVANCED RAG:
+	•	Cohere Reranking integration (ESSENTIAL)
+	•	LightRAG API integration (ESSENTIAL)
+	•	Hybrid search implementation in Supabase
+	•	Context expansion functions
+	•	Hierarchical structure extraction
+	•	Chat UI for knowledge base queries
+	•	RRF score combination logic
+
+⏳ PLANNED:
+	•	Deploy Chat UI (Gradio) - 1-2 days
+	•	Implement dynamic_hybrid_search_db function
+	•	Integrate Cohere Rerank v3.5
+	•	Connect LightRAG API
+	•	Build context expansion functions
+	•	Complete milestone workflows 4-8
+	•	Automated quality checks
+	•	Performance optimization
+
+================================================================================
+Key Architecture Principles (v6.0 CORRECTED)
+================================================================================
+	1	Best of Both Worlds - Simple AI (Claude API) + Sophisticated RAG
+	2	No Compromises - Keep ALL advanced search/reranking features
+	3	Unified Database - Supabase handles data + vectors + FTS
+	4	Knowledge Graphs - LightRAG ESSENTIAL for discovery
+	5	Search Quality - Hybrid search + Cohere reranking NOT optional
+	6	Context Expansion - Essential for quality retrieval
+	7	Cost Effective - $167-240/month for COMPLETE system
+	8	Maintainable - API for processing, advanced DB for retrieval
+	9	Scalability - All components scale independently
+	10	Quality First - Never sacrifice search quality for simplicity
+
+================================================================================
+Why Advanced RAG Features Are ESSENTIAL
+================================================================================
+
+Without Hybrid Search:
+❌ Miss 40% of relevant results (keyword-only queries fail)
+❌ Typos cause complete search failure
+❌ No pattern matching for codes/IDs
+❌ Poor recall on technical terminology
+
+With Hybrid Search:
+✅ 30-50% better search quality
+✅ Handles semantic AND keyword queries
+✅ Typo-tolerant with fuzzy matching
+✅ Pattern matching for structured data
+✅ Multiple strategies cover all query types
+
+Without Cohere Reranking:
+❌ Irrelevant results in top 10
+❌ Good results buried on page 3
+❌ Poor user experience
+❌ Wasted Claude API tokens on bad context
+
+With Cohere Reranking:
+✅ Best results always in top 10
+✅ 40% improvement in precision
+✅ Better user experience
+✅ Efficient use of Claude context
+
+Without LightRAG:
+❌ No relationship discovery
+❌ Miss connected information
+❌ Can't traverse knowledge
+❌ Limited to direct matches
+
+With LightRAG:
+✅ Discover related concepts
+✅ Trace information flows
+✅ Find indirect connections
+✅ Comprehensive knowledge exploration
+
+Without Context Expansion:
+❌ Truncated information
+❌ Missing important context
+❌ Fragmented responses
+❌ Poor answer quality
+
+With Context Expansion:
+✅ Full context maintained
+✅ Coherent information
+✅ Complete answers
+✅ Better synthesis
+
+================================================================================
+Critical Missing Component: Chat UI
+================================================================================
+
+WITHOUT CHAT UI:
+❌ Cannot query ingested documents
+❌ Cannot test RAG pipeline
+❌ Advanced RAG value not demonstrable
+❌ Users cannot interact with knowledge base
+
+WITH CHAT UI (Deploy This Week):
+✅ Query interface for all documents
+✅ Hybrid search + reranking visible
+✅ Knowledge graph exploration
+✅ Source citations
+✅ Cost tracking per query
+✅ Complete system functionality
+
+Deployment: Gradio on Render
+Cost: $7-15/month
+Time: 1-2 days
+Priority: URGENT
+
+================================================================================
+n8n Workflow Architecture Patterns (NEW - v7.0)
+================================================================================
+
+Sub-Workflow Organization:
+├── Main Workflows (Entry Points)
+│   ├── Document Ingestion Workflow
+│   ├── RAG Query Pipeline
+│   ├── Chat Interface Workflow
+│   └── Admin/Management Workflows
+│
+├── Sub-Workflows (Modular Components - NEW v7.0)
+│   ├── Multimodal Processing Sub-Workflow
+│   │   ├── Trigger: HTTP POST /multimodal-process
+│   │   ├── Image processing via Claude Vision
+│   │   ├── Audio transcription via Soniox
+│   │   ├── Result format standardization
+│   │   └── Returns: {status, data, metadata}
+│   │
+│   ├── Knowledge Graph Sub-Workflow
+│   │   ├── Trigger: HTTP POST /kg-process
+│   │   ├── LightRAG API integration
+│   │   ├── Async processing with wait/poll pattern
+│   │   ├── Status checking (max 10 retries)
+│   │   ├── Graph ID mapping to documents
+│   │   └── Returns: {graph_id, status, error}
+│   │
+│   └── Memory Management Sub-Workflow (Future)
+│       ├── Scheduled execution (daily)
+│       ├── Memory pruning logic
+│       ├── Export/backup to B2
+│       └── Analytics generation
+│
+└── Benefits
+    ├── Improved maintainability (isolated concerns)
+    ├── Independent testing
+    ├── Parallel execution
+    ├── Reusability across workflows
+    └── Better error isolation
+
+Asynchronous Processing Patterns (NEW - v7.0):
+
+Wait/Poll Pattern (for long-running operations):
+├── Use Cases
+│   ├── LightRAG knowledge graph processing (30s-2min)
+│   ├── Mistral OCR jobs (10s-60s)
+│   ├── Batch processing operations
+│   └── External API async workflows
+│
+├── Implementation
+│   ├── Initialize polling state (job_id, status, poll_count)
+│   ├── Wait node with configurable interval (5s default)
+│   ├── Status check via HTTP GET
+│   ├── Switch node for status routing (complete/error/pending)
+│   ├── Exponential backoff (1.5x factor, max 30s)
+│   ├── Max retries: 20 (configurable)
+│   └── Timeout handling with graceful degradation
+│
+└── Status States
+    ├── pending (initial)
+    ├── processing (in progress)
+    ├── complete (success)
+    ├── error (failed with details)
+    └── timeout (exceeded max wait time)
+
+Error Handling & Retry Patterns (NEW - v7.0):
+
+Retry Configuration (all critical nodes):
+├── retryOnFail: true
+├── maxTries: 3
+├── waitBetweenTries: 2000ms
+├── backoffFactor: 2 (exponential)
+└── continueOnFail: false (fail explicitly)
+
+Error Classification:
+├── Retryable Errors (auto-retry)
+│   ├── ETIMEDOUT (connection timeout)
+│   ├── ECONNRESET (connection reset)
+│   ├── ENOTFOUND (DNS failure)
+│   ├── 502 Bad Gateway
+│   ├── 503 Service Unavailable
+│   └── 504 Gateway Timeout
+│
+└── Non-Retryable Errors (immediate fail)
+    ├── 400 Bad Request
+    ├── 401 Unauthorized
+    ├── 403 Forbidden
+    ├── 404 Not Found
+    └── 422 Unprocessable Entity
+
+Empty Result Handling:
+├── alwaysOutputData: true (for nodes that may return empty)
+├── Prevents workflow halts on empty queries
+├── Applies to: database lookups, searches, filters
+└── Graceful handling of zero-result scenarios
+
+Document Lifecycle Management (NEW - v7.0):
+
+Document Deletion Workflow:
+├── Trigger: DELETE /document/:id webhook
+├── Authentication: Required (user or admin)
+├── Cascade Operations (in order):
+│   ├── Delete from documents_v2 (vector embeddings)
+│   ├── Delete from tabular_document_rows (structured data)
+│   ├── Delete from LightRAG (knowledge graph)
+│   ├── Delete from Backblaze B2 (object storage)
+│   └── Delete from documents (main record)
+├── Audit Trail
+│   ├── Log to audit_log table
+│   ├── Store: deleted_by, deleted_at, metadata
+│   ├── Retention: 90 days (configurable)
+│   └── Compliance: GDPR right to be forgotten
+└── Response: {success, deleted_id, deleted_at, components_deleted}
+
+Document Versioning:
+├── Version Fields
+│   ├── version_number (integer, auto-increment)
+│   ├── previous_version_id (UUID reference)
+│   ├── is_current_version (boolean)
+│   └── content_hash (SHA-256 for change detection)
+│
+├── Update Detection
+│   ├── Hash comparison on re-ingestion
+│   ├── Automatic versioning when hash changes
+│   ├── Archive old version (is_current_version = false)
+│   └── Create new version with incremented number
+│
+└── Version Management
+    ├── All versions preserved (unless manually purged)
+    ├── Query: current version by default
+    ├── Historical access: query by version_number
+    └── Rollback: set is_current_version on old version
+
+Hash-Based Deduplication (NEW - v7.0):
+├── Implementation
+│   ├── Generate SHA-256 hash of document content
+│   ├── Include: content + filename + file_size + modified_date
+│   ├── Check hash in documents table before processing
+│   ├── Skip if duplicate found
+│   └── Save processing time and storage
+│
+├── Database Fields
+│   ├── content_hash TEXT (unique index)
+│   ├── processing_status VARCHAR(50)
+│   ├── processing_started_at TIMESTAMPTZ
+│   ├── processing_completed_at TIMESTAMPTZ
+│   └── processing_error TEXT
+│
+└── Status Values
+    ├── pending (queued for processing)
+    ├── processing (in progress)
+    ├── complete (successfully processed)
+    ├── error (failed with details)
+    └── duplicate (skipped due to hash match)
+
+Batch Processing Patterns (NEW - v7.0):
+├── splitInBatches node usage
+│   ├── Batch size: 10-100 (configurable)
+│   ├── Reset: false (continue from last position)
+│   └── Progress tracking per batch
+│
+├── Aggregate node after batches
+│   ├── Collect all results
+│   ├── Combine statistics
+│   └── Generate summary report
+│
+└── Use Cases
+    ├── Bulk document uploads
+    ├── Mass reprocessing
+    ├── Periodic maintenance tasks
+    └── Large-scale data migrations
+
+================================================================================
+n8n Node Implementation Patterns (NEW - v7.0 Complete)
+================================================================================
+
+Essential Node Patterns for Production Workflows:
+
+1. Extract From File Node
+├── Purpose: Direct text extraction without external dependencies
+├── Use Cases: PDFs, HTML, simple documents
+└── Fallback: When MarkItDown fails
+
+2. Mistral OCR Upload Pattern
+├── Upload → Wait → Poll → Retrieve
+├── Handles complex PDFs with tables/scans
+├── Async processing with status checking
+└── 10-60 second processing time
+
+3. Cohere Reranking Integration
+├── Hybrid Search (20 results) → Prepare → Rerank API → Map Results
+├── Model: rerank-english-v3.5
+├── Returns top 10 with relevance scores
+└── 20-30% improvement in result ordering
+
+4. Document ID Generation
+├── UUID v4 for unique identifiers
+├── Alternative: SHA-256 content hash
+└── Ensures deduplication and tracking
+
+5. Loop Node Pattern
+├── Process arrays iteratively
+├── Add delays for rate limiting
+├── Check completion conditions
+└── Handle large datasets efficiently
+
+6. Set Node Pattern
+├── Transform and standardize data
+├── Set default values
+├── Type conversion (string/number/boolean)
+└── Dot notation for nested properties
+
+7. Merge Node Pattern
+├── Combine: Merge by key or multiplex
+├── Append: Add results sequentially
+├── Join: Link related data
+└── Handle multiple data sources
+
+Complete Workflow Integration:
+Webhook → Generate ID → Extract/OCR → Set Status → Loop Processing
+→ Hybrid Search → Cohere Rerank → Merge Results → Response
+
+================================================================================
+Migration Path from Simplified to Advanced
+================================================================================
+
+Current State: Simplified v6.0 (no advanced RAG)
+Target State: Complete v6.0 (all advanced RAG features)
+
+Phase 1: Database Functions (Week 1)
+├── Implement dynamic_hybrid_search_db function
+├── Add context expansion functions
+├── Create hierarchical structure extraction
+└── Test all search methods independently
+
+Phase 2: API Integrations (Week 1-2)
+├── Integrate Cohere Rerank v3.5
+├── Connect LightRAG API
+├── Test reranking pipeline
+└── Validate graph queries
+
+Phase 3: n8n Workflows (Week 2)
+├── Update ingestion to extract hierarchy
+├── Add LightRAG entity extraction step
+├── Store all required metadata
+└── Test end-to-end ingestion
+
+Phase 4: Query Pipeline (Week 2-3)
+├── Implement dynamic hybrid search
+├── Add Cohere reranking step
+├── Integrate LightRAG graph queries
+├── Add context expansion
+└── Test complete query flow
+
+Phase 5: Chat UI Deployment (Week 3)
+├── Deploy Gradio interface
+├── Connect to query pipeline
+├── Add cost tracking
+├── Test user experience
+└── Launch to production
+
+Total Time: 2-3 weeks
+Additional Cost: $35-45/month
+Value: Best-in-class RAG system
+
+================================================================================
+Gap Resolution Summary (v7.0 Complete)
+================================================================================
+
+Analysis completed for two comprehensive gap documents:
+1. EMPIRE_v7_GAP_ANALYSIS_WORKING.md (34 gaps)
+2. EMPIRE_v7_vs_TOTAL_RAG_GAP_ANALYSIS.md (32 actionable gaps)
+
+All critical and high-priority gaps have been resolved:
+
+Critical Gaps (14/14 Complete):
+✅ Gap 1.1: Context expansion function with hierarchical context
+✅ Gap 1.2: Supabase Edge Functions for HTTP API access
+✅ Gap 1.3: Tabular data storage with schema inference
+✅ Gap 1.4: Chat history persistence with session tracking
+✅ Gap 1.5: Dynamic metadata fields management
+✅ Gap 1.6: LlamaIndex + LangExtract precision extraction
+✅ Gap 1.7: Multimodal sub-workflow pattern
+✅ Gap 1.8: Knowledge graph sub-workflow pattern
+✅ Gap 1.9: Memory management workflow
+✅ Gap 1.10: Hash-based deduplication
+✅ Gap 1.11: Document status tracking
+✅ Gap 1.12: File update triggers
+✅ Gap 1.13: Document deletion workflow
+✅ Gap 1.14: Batch processing patterns
+
+High-Priority Gaps (8/8 Complete):
+✅ Gap 2.1: Advanced metadata filtering
+✅ Gap 2.2: Wait/poll async patterns
+✅ Gap 2.3: Structured output parsing
+✅ Gap 2.4: Aggregate node patterns
+✅ Gap 2.5: Retry configuration
+✅ Gap 2.6: AlwaysOutputData pattern
+✅ Gap 2.7: Execute workflow triggers
+✅ Gap 2.8: Switch node routing
+
+Medium-Priority Gaps (12/12 Complete):
+✅ All n8n node patterns documented
+✅ Complete SQL schemas provided
+✅ Edge function implementations
+✅ Workflow JSON definitions
+
+Total Implementation Coverage: 100%
+Documentation: 10,000+ lines across all sections
+Production Readiness: Complete
+
+Empire Advantages Over Total RAG:
+✅ Superior AI Stack: Claude Sonnet 4.5 > GPT-4
+✅ Better Memory: Graphiti MCP with Neo4j (temporal knowledge graphs)
+✅ More Efficient: 768-dim embeddings vs 1536-dim
+✅ Advanced Extraction: LlamaIndex + LangExtract (Total RAG lacks)
+✅ Full Observability: Prometheus + Grafana (Total RAG lacks)
+✅ Better Schema: error_logs, processing_queue, audit_log tables
+✅ Cost Tracking: Built-in cost optimization (Total RAG lacks)
+✅ IEEE 830-1998 Compliant SRS: 340+ requirements documented
+
+================================================================================
+MEMORY SYSTEM UPDATES (November 2025) - WITH LOCAL EMBEDDINGS
+================================================================================
+
+Developer Memory System Upgraded to Graphiti with Local Embeddings:
+✅ Replaced mem-agent MCP with Graphiti + Neo4j for developer memory
+✅ LOCAL BGE-M3 EMBEDDINGS via Ollama - $0 cost (was OpenAI API)
+✅ Implemented project-based memory architecture (project_{name}_{aspect})
+✅ Complete separation of personal (322 ChatGPT memories) vs work memories
+✅ ALL 322 personal ChatGPT conversations imported with local embeddings
+✅ Context switching via ./mem command (instant project switching)
+✅ Scalable to unlimited projects without restructuring
+✅ Temporal knowledge graphs tracking information evolution
+✅ Full integration with Claude Code for context-aware development
+✅ MCP Server configured with Ollama embedder integration
+
+Technical Implementation:
+├── Graphiti MCP Server: /mem-agent-mcp/graphiti/mcp_server/
+├── Ollama BGE-M3: 1024-dim embeddings (local, <10ms generation)
+├── Neo4j Backend: bolt://localhost:7687 (<from .env>)
+├── Configuration: config/config.yaml with embedder: "ollama"
+├── Custom Integration: OllamaEmbedder class for Graphiti compatibility
+└── Import Scripts: import_chatgpt_ollama_direct.py for batch processing
+
+Empire Project Memory Structure:
+├── project_empire - Main project memories
+├── project_empire_dev - Development notes and decisions
+├── project_empire_docs - Documentation and specifications
+├── project_empire_api - API endpoints and contracts
+└── project_empire_notes - Meeting notes and discussions
+
+Personal Memory Structure (322 conversations):
+├── Topics: Flight booking, health questions, coding help, etc.
+├── Format: Episodic nodes with content_embedding vectors
+├── Storage: Neo4j with group_id='personal'
+├── Access: Via Graphiti MCP or direct Cypher queries
+└── Privacy: Completely isolated from work memories
+
+Cost Savings Achieved:
+• Embedding Costs: $0 (was ~$0.002 per embedding with OpenAI)
+• Import Savings: $0.64 for 322 conversations
+• Monthly Savings: $50-100 on embedding API costs
+• Performance: <10ms local vs 50-100ms API latency
+• Quality: BGE-M3 often superior for technical content
+
+Key Benefits:
+• Privacy: Personal memories completely isolated from work
+• Cost: ZERO embedding costs with local BGE-M3
+• Speed: <10ms local embeddings vs 50-100ms API
+• Scalability: Add new projects with ./mem add "project-name"
+• Performance: <100ms retrieval with Neo4j indexing
+• Integration: Seamless Claude Code MCP integration
+• Flexibility: Switch contexts instantly without restart
+• Ownership: All data processed locally on Mac Studio
+
+================================================================================
+Last Updated: November 2, 2025
+Version: 7.3 - Local Embeddings + Persistent Memory with Graphiti
+Classification: Confidential - Internal Use
+Implementation Status: Memory System Deployed, RAG Pipeline in Development
+Priority: HIGH - Ready for production implementation
+================================================================================
