@@ -190,7 +190,7 @@ class TestStoreAssetEndpoint:
             }
         )
 
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 422  # FastAPI validation error
 
 
 # =============================================================================
@@ -289,7 +289,7 @@ class TestGetAssetEndpoint:
         """Test validation for invalid UUID"""
         response = client.get("/api/crewai/assets/not-a-uuid")
 
-        assert response.status_code == 422
+        assert response.status_code == 422  # FastAPI validation error
 
 
 # =============================================================================

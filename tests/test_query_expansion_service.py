@@ -22,7 +22,7 @@ from app.services.query_expansion_service import (
 def expansion_config():
     """Create test configuration"""
     return QueryExpansionConfig(
-        model="claude-3-5-haiku-20241022",
+        model="claude-haiku-4-5",
         max_tokens=300,
         temperature=0.7,
         default_num_variations=5,
@@ -66,7 +66,7 @@ class TestQueryExpansionConfig:
     def test_config_defaults(self):
         """Test default configuration values"""
         config = QueryExpansionConfig()
-        assert config.model == "claude-3-5-haiku-20241022"
+        assert config.model == "claude-haiku-4-5"
         assert config.max_tokens == 300
         assert config.temperature == 0.7
         assert config.default_num_variations == 5
@@ -115,7 +115,7 @@ class TestQueryExpansionService:
         assert "California insurance policy" in result.expanded_queries
         assert result.strategy == "balanced"
         assert result.tokens_used == 150
-        assert result.model_used == "claude-3-5-haiku-20241022"
+        assert result.model_used == "claude-haiku-4-5"
 
     @pytest.mark.asyncio
     async def test_expand_query_synonyms_strategy(self, query_expansion_service):

@@ -556,14 +556,11 @@ class TestGraphSyncMonitor:
 
         assert alert_count == 2
 
-    def test_reset_stats(self, monitor):
+    @pytest.mark.asyncio
+    async def test_reset_stats(self, monitor):
         """Test resetting statistics."""
-        asyncio.get_event_loop().run_until_complete(
-            monitor.record_success("op1")
-        )
-        asyncio.get_event_loop().run_until_complete(
-            monitor.record_failure("op2", Exception("Error"))
-        )
+        await monitor.record_success("op1")
+        await monitor.record_failure("op2", Exception("Error"))
 
         monitor.reset_stats("op1")
         stats = monitor.get_stats()
@@ -571,14 +568,11 @@ class TestGraphSyncMonitor:
         assert "op1" not in stats or stats["op1"]["success_count"] == 0
         assert stats["op2"]["failure_count"] == 1
 
-    def test_reset_all_stats(self, monitor):
+    @pytest.mark.asyncio
+    async def test_reset_all_stats(self, monitor):
         """Test resetting all statistics."""
-        asyncio.get_event_loop().run_until_complete(
-            monitor.record_success("op1")
-        )
-        asyncio.get_event_loop().run_until_complete(
-            monitor.record_failure("op2", Exception("Error"))
-        )
+        await monitor.record_success("op1")
+        await monitor.record_failure("op2", Exception("Error"))
 
         monitor.reset_stats()
         stats = monitor.get_stats()

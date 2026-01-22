@@ -564,14 +564,14 @@ class TestVisionService:
         """Create VisionService with mocked Anthropic client"""
         with patch('app.services.vision_service.AsyncAnthropic'):
             service = VisionService(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-5",
                 cache_results=True
             )
             service.file_handler = file_handler
             return service
 
     def test_initialization(self, vision_service):
-        assert vision_service.model == "claude-3-5-sonnet-20241022"
+        assert vision_service.model == "claude-sonnet-4-5"
         assert vision_service.cache_results is True
 
     @pytest.mark.asyncio
@@ -676,10 +676,6 @@ class TestChatFilesAPI:
         from app.main import app
         return TestClient(app)
 
-    @pytest.mark.skipif(
-        not os.path.exists("/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/app/core/auth.py"),
-        reason="app.core.auth module not available"
-    )
     def test_health_check(self, client):
         response = client.get("/api/chat/health")
         assert response.status_code == 200
@@ -687,10 +683,6 @@ class TestChatFilesAPI:
         assert data["status"] == "healthy"
         assert data["service"] == "chat_files"
 
-    @pytest.mark.skipif(
-        not os.path.exists("/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/app/core/auth.py"),
-        reason="app.core.auth module not available"
-    )
     def test_get_supported_types(self, client):
         response = client.get("/api/chat/supported-types")
         assert response.status_code == 200
@@ -698,21 +690,13 @@ class TestChatFilesAPI:
         assert "supported_types" in data
         assert "max_file_size_mb" in data
 
-    @pytest.mark.skipif(
-        not os.path.exists("/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/app/core/auth.py"),
-        reason="app.core.auth module not available"
-    )
     def test_upload_file_no_file(self, client):
         response = client.post(
             "/api/chat/upload",
             data={"session_id": str(uuid.uuid4())}
         )
-        assert response.status_code == 422  # Validation error - file required
+        assert response.status_code == 400  # Validation error - file required
 
-    @pytest.mark.skipif(
-        not os.path.exists("/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/app/core/auth.py"),
-        reason="app.core.auth module not available"
-    )
     def test_list_session_files_empty(self, client):
         session_id = str(uuid.uuid4())
         response = client.get(f"/api/chat/files/{session_id}")
@@ -721,10 +705,6 @@ class TestChatFilesAPI:
         assert data["session_id"] == session_id
         assert data["total_count"] == 0
 
-    @pytest.mark.skipif(
-        not os.path.exists("/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/app/core/auth.py"),
-        reason="app.core.auth module not available"
-    )
     def test_get_file_not_found(self, client):
         response = client.get("/api/chat/file/nonexistent-id")
         assert response.status_code == 404

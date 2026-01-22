@@ -5,6 +5,7 @@ Tests to verify Row-Level Security policies prevent cross-user access
 to memory nodes and edges.
 """
 
+import os
 import pytest
 from uuid import uuid4
 from datetime import datetime
@@ -17,8 +18,36 @@ from app.services.conversation_memory_service import (
 from app.core.supabase_client import get_supabase_client
 
 
+def _database_is_available() -> bool:
+    """Check if the Supabase database is available and properly configured."""
+    try:
+        # Check if required env vars are set
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+        if not supabase_url or not supabase_key:
+            return False
+
+        # Try to get client
+        client = get_supabase_client()
+        if client is None:
+            return False
+
+        # Try a simple query to verify connection
+        result = client.table("user_memory_nodes").select("id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
 # NOTE: These are integration tests that require a real Supabase connection
-# Skip if SUPABASE_URL or SUPABASE_SERVICE_KEY are not configured
+# Skip if database is not properly configured
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _database_is_available(),
+        reason="Supabase database not available or not properly configured for RLS tests"
+    ),
+]
 
 
 @pytest.fixture

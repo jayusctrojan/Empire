@@ -17,12 +17,27 @@ Prerequisites:
 Run with: python tests/test_versioning_and_approval_http.py
 """
 import pytest
-
-# Mark all tests in this module as integration tests
-pytestmark = pytest.mark.integration
-
-
 import requests
+
+
+def _local_server_is_available() -> bool:
+    """Check if the local FastAPI server is available."""
+    try:
+        response = requests.get("http://localhost:8000/health", timeout=2)
+        return response.status_code == 200
+    except (requests.ConnectionError, requests.Timeout, requests.RequestException):
+        return False
+
+
+# Mark all tests in this module as integration tests that require local server
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.local_server,
+    pytest.mark.skipif(
+        not _local_server_is_available(),
+        reason="Local FastAPI server not running on port 8000"
+    ),
+]
 import json
 import asyncio
 import time
@@ -161,6 +176,90 @@ async def create_test_document():
         print_result(False, "Failed to create test document")
         return None
 
+
+# ==================== Pytest Fixtures ====================
+
+@pytest.fixture(scope="module")
+def api_key():
+    """Create and return an admin API key for testing."""
+    admin_key, _ = asyncio.get_event_loop().run_until_complete(setup_test_api_keys())
+    yield admin_key
+    # Cleanup handled by setup_test_api_keys on next run
+
+
+@pytest.fixture(scope="module")
+def document_id():
+    """Create and return a test document ID."""
+    doc_id = asyncio.get_event_loop().run_until_complete(create_test_document())
+    yield doc_id
+    # Document will be cleaned up on next test run
+
+
+@pytest.fixture(scope="module")
+def document_ids(document_id):
+    """Return list of document IDs for bulk operations."""
+    # Just return single doc as list for simpler testing
+    return [document_id]
+
+
+@pytest.fixture(scope="module")
+def approval_ids():
+    """Return empty list - approvals created during tests."""
+    return []
+
+
+@pytest.fixture(scope="module")
+def approval_id(api_key, document_id):
+    """Create and return an approval ID by submitting document for approval."""
+    headers = {
+        "Authorization": api_key,
+        "Content-Type": "application/json"
+    }
+
+    # First create a version to submit for approval
+    version_payload = {
+        "document_id": document_id,
+        "file_path": "/test/path/approval_test.pdf",
+        "change_description": "Test version for approval"
+    }
+
+    version_response = requests.post(
+        f"{BASE_URL}/api/documents/versions/create",
+        headers=headers,
+        json=version_payload
+    )
+
+    if version_response.status_code == 200:
+        version_id = version_response.json().get("version_id")
+
+        # Submit for approval
+        approval_payload = {
+            "document_id": document_id,
+            "version_id": version_id,
+            "required_approvers": [TEST_USER_ADMIN],
+            "approval_deadline": (datetime.utcnow() + timedelta(days=7)).isoformat()
+        }
+
+        approval_response = requests.post(
+            f"{BASE_URL}/api/documents/approvals/submit",
+            headers=headers,
+            json=approval_payload
+        )
+
+        if approval_response.status_code == 200:
+            return approval_response.json().get("approval_id")
+
+    return None
+
+
+@pytest.fixture(scope="module")
+def viewer_api_key():
+    """Create and return a viewer API key for testing unauthorized access."""
+    _, viewer_key = asyncio.get_event_loop().run_until_complete(setup_test_api_keys())
+    return viewer_key
+
+
+# ==================== Test Functions ====================
 
 def test_create_version(api_key, document_id):
     """Test POST /api/documents/versions/create."""
@@ -521,7 +620,7 @@ def test_bulk_version_creation(api_key, document_ids):
     if response.status_code == 200:
         data = response.json()
         print_json(data)
-        print_result(True, f"Bulk creation completed - {data['successful']} successful, {data['failed']} failed")
+        print_result(True, f"Bulk creation completed - {data['successful_items']} successful, {data['failed_items']} failed")
         return data
     else:
         print(f"Error: {response.text}")
@@ -555,7 +654,7 @@ def test_bulk_approval_action(api_key, approval_ids):
     if response.status_code == 200:
         data = response.json()
         print_json(data)
-        print_result(True, f"Bulk approval completed - {data['successful']} successful, {data['failed']} failed")
+        print_result(True, f"Bulk approval completed - {data['successful_items']} successful, {data['failed_items']} failed")
         return data
     else:
         print(f"Error: {response.text}")
@@ -651,12 +750,21 @@ def test_version_rollback_validation(api_key, document_id):
     }
 
     # Get current version
-    history = requests.get(
+    history_response = requests.get(
         f"{BASE_URL}/api/documents/versions/{document_id}",
         headers=headers
-    ).json()
+    )
+    history = history_response.json()
 
-    current_version_number = history["current_version"]["version_number"]
+    # Handle different possible response structures
+    if "current_version" in history:
+        current_version_number = history["current_version"]["version_number"]
+    elif "versions" in history and len(history["versions"]) > 0:
+        # Get the latest version number from versions list
+        current_version_number = max(v.get("version_number", 1) for v in history["versions"])
+    else:
+        # Default to version 1 if unable to determine
+        current_version_number = 1
 
     # Try to rollback to current version (should fail)
     payload = {

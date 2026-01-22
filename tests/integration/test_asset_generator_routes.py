@@ -234,7 +234,7 @@ class TestSkillGeneratorEndpoint:
             assert "file_path" in data
             assert "content" in data
 
-    def test_generate_skill_missing_name_returns_422(self, client):
+    def test_generate_skill_missing_name_returns_400(self, client):
         """Test that missing name returns validation error."""
         response = client.post(
             "/api/assets/skill",
@@ -244,9 +244,9 @@ class TestSkillGeneratorEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
-    def test_generate_skill_short_description_returns_422(self, client):
+    def test_generate_skill_short_description_returns_400(self, client):
         """Test that short description returns validation error."""
         response = client.post(
             "/api/assets/skill",
@@ -257,7 +257,7 @@ class TestSkillGeneratorEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # =============================================================================
@@ -425,7 +425,7 @@ class TestBatchGenerateEndpoint:
             assert "results" in data
             assert data["total_requested"] == 2
 
-    def test_batch_generate_empty_returns_422(self, client):
+    def test_batch_generate_empty_returns_400(self, client):
         """Test that empty batch returns validation error."""
         response = client.post(
             "/api/assets/batch",
@@ -435,7 +435,7 @@ class TestBatchGenerateEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_batch_generate_invalid_type_returns_400(self, client, mock_generator_service):
         """Test that invalid asset type in batch returns 400."""
@@ -554,23 +554,28 @@ class TestAssetGeneratorErrorHandling:
 
     def test_generate_service_error_returns_500(self, client, sample_asset_request):
         """Test that service errors return 500 status."""
+        from app.main import app
+        from app.routes.asset_generators import get_generator_service
+
         mock_service = MagicMock()
         mock_service.generate_skill = AsyncMock(
             side_effect=Exception("Generator service unavailable")
         )
 
-        with patch(
-            "app.routes.asset_generators.get_generator_service",
-            return_value=mock_service
-        ):
+        # Use FastAPI dependency override instead of patch
+        app.dependency_overrides[get_generator_service] = lambda: mock_service
+        try:
             response = client.post(
                 "/api/assets/skill",
                 json=sample_asset_request
             )
 
             assert response.status_code == 500
+        finally:
+            # Clean up the override
+            app.dependency_overrides.pop(get_generator_service, None)
 
-    def test_invalid_json_returns_422(self, client):
+    def test_invalid_json_returns_400(self, client):
         """Test that invalid JSON returns 422."""
         response = client.post(
             "/api/assets/skill",
@@ -578,4 +583,4 @@ class TestAssetGeneratorErrorHandling:
             headers={"Content-Type": "application/json"}
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400

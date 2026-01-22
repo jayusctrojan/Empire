@@ -1,9 +1,15 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useChatStore } from '@/stores/chat'
-import { MessageBubble, ChatInput } from '@/components/chat'
+import { MessageBubble, ChatInput, CompactionDivider, CompactionInProgress } from '@/components/chat'
+import { ContextProgressBar } from '@/components/ContextProgressBar'
 import { queryStream, uploadDocuments, EmpireAPIError } from '@/lib/api'
 import { createConversation, createMessage } from '@/lib/database'
-import type { Message } from '@/types'
+import type { Message, CompactionEvent } from '@/types'
+
+// Union type for interleaved items in the chat
+type ChatItem =
+  | { type: 'message'; data: Message }
+  | { type: 'compaction'; data: CompactionEvent }
 
 export function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -28,7 +34,37 @@ export function ChatView() {
     setError,
     error,
     setActiveConversation,
+    // Compaction state (Feature 011 - Task 204)
+    compactionEvents,
+    isCompacting,
   } = useChatStore()
+
+  // Interleave messages with compaction events by timestamp
+  const chatItems = useMemo((): ChatItem[] => {
+    const items: ChatItem[] = []
+
+    // Convert messages to chat items
+    const messageItems: ChatItem[] = messages.map((m) => ({
+      type: 'message' as const,
+      data: m,
+    }))
+
+    // Convert compaction events to chat items
+    const compactionItems: ChatItem[] = compactionEvents.map((e) => ({
+      type: 'compaction' as const,
+      data: e,
+    }))
+
+    // Merge and sort by timestamp
+    const allItems = [...messageItems, ...compactionItems]
+    allItems.sort((a, b) => {
+      const aTime = a.type === 'message' ? a.data.createdAt : a.data.timestamp
+      const bTime = b.type === 'message' ? b.data.createdAt : b.data.timestamp
+      return new Date(aTime).getTime() - new Date(bTime).getTime()
+    })
+
+    return allItems
+  }, [messages, compactionEvents])
 
   // Handle rating a message
   const handleRateMessage = useCallback((messageId: string, rating: -1 | 0 | 1, feedback?: string) => {
@@ -50,7 +86,7 @@ export function ChatView() {
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent])
+  }, [messages, streamingContent, compactionEvents, isCompacting])
 
   // Handle sending a message
   const handleSendMessage = useCallback(async (content: string, files?: File[]) => {
@@ -244,6 +280,18 @@ export function ChatView() {
         </button>
       </div>
 
+      {/* Context Window Progress Bar - Feature 011 */}
+      {activeConversationId && (
+        <div className="px-4 py-2 border-b border-empire-border bg-empire-card/30">
+          <ContextProgressBar
+            conversationId={activeConversationId}
+            showDetails={true}
+            compact={false}
+            className="max-w-3xl mx-auto"
+          />
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
         <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20">
@@ -257,36 +305,57 @@ export function ChatView() {
           <WelcomeScreen />
         ) : (
           <div className="max-w-3xl mx-auto space-y-6">
-            {messages.map((message, idx) => (
-              <MessageBubble
-                key={message.id}
-                message={
-                  message.id === useChatStore.getState().streamingMessageId
-                    ? { ...message, content: streamingContent || message.content }
-                    : message
-                }
-                isStreaming={
-                  isStreaming &&
-                  message.id === useChatStore.getState().streamingMessageId
-                }
-                isKBMode={isKBMode}
-                onRegenerate={
-                  message.role === 'assistant' && idx === messages.length - 1
-                    ? handleRegenerate
-                    : undefined
-                }
-                onRate={
-                  message.role === 'assistant'
-                    ? (rating, feedback) => handleRateMessage(message.id, rating, feedback)
-                    : undefined
-                }
-                onImprove={
-                  message.role === 'assistant'
-                    ? () => handleImprove(message.id)
-                    : undefined
-                }
-              />
-            ))}
+            {chatItems.map((item, idx) => {
+              if (item.type === 'compaction') {
+                // Render compaction divider
+                return (
+                  <CompactionDivider
+                    key={`compaction-${item.data.id}`}
+                    event={item.data}
+                  />
+                )
+              }
+
+              // Render message
+              const message = item.data
+              const isLastMessage = idx === chatItems.length - 1 ||
+                (idx < chatItems.length - 1 && chatItems.slice(idx + 1).every((i) => i.type === 'compaction'))
+
+              return (
+                <MessageBubble
+                  key={message.id}
+                  message={
+                    message.id === useChatStore.getState().streamingMessageId
+                      ? { ...message, content: streamingContent || message.content }
+                      : message
+                  }
+                  isStreaming={
+                    isStreaming &&
+                    message.id === useChatStore.getState().streamingMessageId
+                  }
+                  isKBMode={isKBMode}
+                  onRegenerate={
+                    message.role === 'assistant' && isLastMessage
+                      ? handleRegenerate
+                      : undefined
+                  }
+                  onRate={
+                    message.role === 'assistant'
+                      ? (rating, feedback) => handleRateMessage(message.id, rating, feedback)
+                      : undefined
+                  }
+                  onImprove={
+                    message.role === 'assistant'
+                      ? () => handleImprove(message.id)
+                      : undefined
+                  }
+                />
+              )
+            })}
+
+            {/* Show compaction in progress indicator */}
+            {isCompacting && <CompactionInProgress />}
+
             <div ref={messagesEndRef} />
           </div>
         )}

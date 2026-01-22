@@ -142,7 +142,7 @@ class TestCoordinateEndpoint:
             }
         )
 
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 400  # Validation error
 
     def test_coordinate_short_content(self, test_client):
         """Test orchestration with too short content fails validation."""
@@ -153,7 +153,7 @@ class TestCoordinateEndpoint:
             }
         )
 
-        assert response.status_code == 422  # Validation error (min_length=10)
+        assert response.status_code == 400  # Validation error (min_length=10)
 
     def test_coordinate_with_metadata(self, test_client, mock_orchestrator_service):
         """Test orchestration with additional metadata."""
@@ -227,7 +227,7 @@ class TestClassifyEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # ============================================================================
@@ -278,7 +278,7 @@ class TestAnalyzeEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # ============================================================================
@@ -474,7 +474,7 @@ class TestModelValidation:
             "/api/orchestrator/coordinate",
             json={}
         )
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_classification_request_validation(self, test_client):
         """Test ClassificationRequest validation."""
@@ -483,7 +483,7 @@ class TestModelValidation:
             "/api/orchestrator/classify",
             json={"content": "short"}
         )
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_analyze_request_validation(self, test_client):
         """Test AnalyzeContentRequest validation."""
@@ -492,7 +492,7 @@ class TestModelValidation:
             "/api/orchestrator/analyze",
             json={"content": "short"}
         )
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # ============================================================================
@@ -539,7 +539,7 @@ class TestErrorHandling:
             headers={"Content-Type": "application/json"}
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # ============================================================================

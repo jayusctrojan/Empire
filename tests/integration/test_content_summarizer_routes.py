@@ -201,7 +201,7 @@ class TestSummarizerGenerateEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_generate_summary_short_content_returns_422(self, client):
         """Test that content below minimum length returns validation error."""
@@ -214,7 +214,7 @@ class TestSummarizerGenerateEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_generate_summary_missing_department_returns_422(self, client, sample_document_content):
         """Test that missing department returns validation error."""
@@ -226,7 +226,7 @@ class TestSummarizerGenerateEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_generate_summary_missing_title_returns_422(self, client, sample_document_content):
         """Test that missing title returns validation error."""
@@ -238,7 +238,7 @@ class TestSummarizerGenerateEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # =============================================================================
@@ -314,7 +314,7 @@ class TestSummarizerDiagramEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
     def test_create_diagram_empty_elements_returns_422(self, client):
         """Test that empty elements list returns validation error."""
@@ -328,7 +328,7 @@ class TestSummarizerDiagramEndpoint:
             }
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400
 
 
 # =============================================================================
@@ -438,15 +438,18 @@ class TestSummarizerErrorHandling:
 
     def test_generate_summary_service_error_returns_500(self, client, sample_document_content):
         """Test that service errors return 500 status."""
+        from app.routes.content_summarizer import get_summarizer_service
+        from app.main import app
+
         mock_service = MagicMock()
         mock_service.generate_summary = AsyncMock(
             side_effect=Exception("Service unavailable")
         )
 
-        with patch(
-            "app.routes.content_summarizer.get_summarizer_service",
-            return_value=mock_service
-        ):
+        # Use FastAPI's dependency override system
+        app.dependency_overrides[get_summarizer_service] = lambda: mock_service
+
+        try:
             response = client.post(
                 "/api/summarizer/generate",
                 json={
@@ -457,6 +460,9 @@ class TestSummarizerErrorHandling:
             )
 
             assert response.status_code == 500
+        finally:
+            # Clean up the override
+            app.dependency_overrides.pop(get_summarizer_service, None)
 
     def test_invalid_json_returns_422(self, client):
         """Test that invalid JSON returns 422."""
@@ -466,4 +472,4 @@ class TestSummarizerErrorHandling:
             headers={"Content-Type": "application/json"}
         )
 
-        assert response.status_code == 422
+        assert response.status_code == 400

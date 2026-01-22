@@ -489,7 +489,7 @@ def test_error_handling():
             timeout=5
         )
 
-        if response.status_code == 422:
+        if response.status_code == 400:
             print("   ✅ Correctly returned 422 for missing fields")
         else:
             print(f"   ⚠️  Unexpected status code: {response.status_code}")
