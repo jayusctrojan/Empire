@@ -16,6 +16,7 @@ import json
 import hashlib
 import time
 import asyncio
+import logging
 from typing import Optional, Dict, Any, List, BinaryIO, Callable
 from datetime import datetime, timedelta
 from enum import Enum
@@ -434,7 +435,7 @@ class ResilientB2StorageService:
                 ConnectionError,
                 TimeoutError
             )),
-            before_sleep=before_sleep_log(logger, structlog.stdlib.INFO),
+            before_sleep=before_sleep_log(logger, logging.INFO),
             reraise=True
         )
 
