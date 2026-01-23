@@ -519,7 +519,7 @@ def assessPDFComplexity(file):
 
 #### 3.1.6.1 Named Entity Recognition
 
-**FR-008:** The system SHALL identify and extract named entities
+**FR-052:** The system SHALL identify and extract named entities
 
 *Priority: High*
 *Categories: People, Organizations, Locations, Dates, Products*
@@ -527,7 +527,7 @@ def assessPDFComplexity(file):
 *Storage: Entity catalog with relationships*
 *Status: Active - All Versions*
 
-**FR-009:** The system SHALL generate rich metadata for documents
+**FR-053:** The system SHALL generate rich metadata for documents
 
 *Priority: Medium*
 *Components: Tags, categories, summaries, key points*
