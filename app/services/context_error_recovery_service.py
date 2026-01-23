@@ -247,10 +247,12 @@ class ContextErrorRecoveryService:
         """
         start_time = time.time()
         ACTIVE_RECOVERIES.inc()
+        lock_acquired = False
 
         try:
             # Acquire recovery lock
-            if not await self._acquire_recovery_lock(conversation_id):
+            lock_acquired = await self._acquire_recovery_lock(conversation_id)
+            if not lock_acquired:
                 return False, "Recovery already in progress for this conversation", None
 
             # Get context and messages
@@ -259,7 +261,6 @@ class ContextErrorRecoveryService:
             )
 
             if not context:
-                await self._release_recovery_lock(conversation_id)
                 return False, "Conversation not found", None
 
             logger.info(
@@ -369,7 +370,9 @@ class ContextErrorRecoveryService:
             )
 
         finally:
-            await self._release_recovery_lock(conversation_id)
+            # Only release the lock if we acquired it
+            if lock_acquired:
+                await self._release_recovery_lock(conversation_id)
             ACTIVE_RECOVERIES.dec()
 
     # ==========================================================================
@@ -532,24 +535,45 @@ Be EXTREMELY concise. Every token counts."""
             removed_tokens += msg.token_count
 
         if removed_ids:
-            # Delete messages
-            supabase.table("context_messages").delete().in_(
-                "id", removed_ids
-            ).execute()
+            try:
+                # Delete messages
+                delete_result = supabase.table("context_messages").delete().in_(
+                    "id", removed_ids
+                ).execute()
 
-            # Update context total tokens
-            new_total = context.total_tokens - removed_tokens
-            supabase.table("conversation_contexts").update({
-                "total_tokens": new_total,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", context.id).execute()
+                # Verify deletion and calculate actual token count from DB for consistency
+                # This guards against partial failures since Supabase doesn't support transactions
+                actual_total = await self._get_current_token_count(context.id)
 
-            logger.info(
-                "Removed non-essential messages",
-                context_id=context.id,
-                removed_count=len(removed_ids),
-                removed_tokens=removed_tokens
-            )
+                # Update context total tokens with verified count
+                supabase.table("conversation_contexts").update({
+                    "total_tokens": actual_total,
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("id", context.id).execute()
+
+                logger.info(
+                    "Removed non-essential messages",
+                    context_id=context.id,
+                    removed_count=len(removed_ids),
+                    removed_tokens=removed_tokens,
+                    verified_total=actual_total
+                )
+            except Exception as e:
+                # On error, recalculate token count to ensure consistency
+                logger.error(
+                    "Error during message removal, recalculating token count",
+                    context_id=context.id,
+                    error=str(e)
+                )
+                try:
+                    actual_total = await self._get_current_token_count(context.id)
+                    supabase.table("conversation_contexts").update({
+                        "total_tokens": actual_total,
+                        "updated_at": datetime.utcnow().isoformat()
+                    }).eq("id", context.id).execute()
+                except Exception:
+                    pass  # Best effort recovery
+                raise
 
         return len(removed_ids)
 

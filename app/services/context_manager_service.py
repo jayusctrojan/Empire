@@ -235,8 +235,15 @@ class ContextManagerService:
 
             message_id = result.data[0]["id"]
 
-            # Update context total tokens
-            new_total = context.total_tokens + token_count
+            # Calculate actual total tokens from database to avoid race conditions
+            # This ensures consistency when multiple messages are added concurrently
+            token_result = supabase.table("context_messages").select(
+                "token_count"
+            ).eq("context_id", context.id).execute()
+
+            new_total = sum(msg["token_count"] for msg in (token_result.data or []))
+
+            # Update context total tokens with calculated value
             supabase.table("conversation_contexts").update({
                 "total_tokens": new_total,
                 "updated_at": datetime.utcnow().isoformat()

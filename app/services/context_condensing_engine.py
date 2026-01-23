@@ -297,10 +297,12 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
         start_time = time.time()
         model = self.fast_model if fast else self.model
         COMPACTION_IN_PROGRESS.inc()
+        lock_acquired = False
 
         try:
             # Acquire compaction lock
-            if not await self._acquire_lock(conversation_id):
+            lock_acquired = await self._acquire_lock(conversation_id)
+            if not lock_acquired:
                 return CompactionResult(
                     session_id=conversation_id,
                     trigger=trigger,
@@ -325,7 +327,6 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
             )
 
             if not context or not messages:
-                await self._release_lock(conversation_id)
                 return CompactionResult(
                     session_id=conversation_id,
                     trigger=trigger,
@@ -373,7 +374,6 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
 
             # Check minimum message requirement
             if len(condensable_messages) < MIN_MESSAGES_FOR_COMPACTION:
-                await self._release_lock(conversation_id)
                 return CompactionResult(
                     session_id=conversation_id,
                     trigger=trigger,
@@ -522,7 +522,9 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
             )
 
         finally:
-            await self._release_lock(conversation_id)
+            # Only release the lock if we acquired it
+            if lock_acquired:
+                await self._release_lock(conversation_id)
             COMPACTION_IN_PROGRESS.dec()
 
     # ===========================================================================

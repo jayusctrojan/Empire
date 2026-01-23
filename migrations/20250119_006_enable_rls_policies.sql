@@ -22,7 +22,8 @@ CREATE POLICY "Users can insert own contexts"
 CREATE POLICY "Users can update own contexts"
     ON public.conversation_contexts
     FOR UPDATE
-    USING (user_id = auth.uid()::VARCHAR);
+    USING (user_id = auth.uid()::VARCHAR)
+    WITH CHECK (user_id = auth.uid()::VARCHAR);
 
 CREATE POLICY "Users can delete own contexts"
     ON public.conversation_contexts
@@ -59,6 +60,12 @@ CREATE POLICY "Users can update own context messages"
     ON public.context_messages
     FOR UPDATE
     USING (
+        context_id IN (
+            SELECT id FROM public.conversation_contexts
+            WHERE user_id = auth.uid()::VARCHAR
+        )
+    )
+    WITH CHECK (
         context_id IN (
             SELECT id FROM public.conversation_contexts
             WHERE user_id = auth.uid()::VARCHAR
@@ -142,7 +149,8 @@ CREATE POLICY "Users can insert own memories"
 CREATE POLICY "Users can update own memories"
     ON public.session_memories
     FOR UPDATE
-    USING (user_id = auth.uid()::VARCHAR);
+    USING (user_id = auth.uid()::VARCHAR)
+    WITH CHECK (user_id = auth.uid()::VARCHAR);
 
 CREATE POLICY "Users can delete own memories"
     ON public.session_memories
