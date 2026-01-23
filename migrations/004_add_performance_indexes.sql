@@ -50,9 +50,17 @@ WHERE status IN ('pending', 'processing');
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_user_id
 ON documents_v2 (user_id);
 
--- Index for document search by title
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_title_trgm
-ON documents_v2 USING gin (title gin_trgm_ops);
+-- Index for document search by title (requires pg_trgm extension)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_documents_title_trgm') THEN
+            EXECUTE 'CREATE INDEX idx_documents_title_trgm ON documents_v2 USING gin (title gin_trgm_ops)';
+        END IF;
+    ELSE
+        RAISE NOTICE 'pg_trgm extension not available, skipping trigram index on documents_v2.title';
+    END IF;
+END $$;
 
 -- Index for document type filtering
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_type
@@ -86,17 +94,24 @@ END $$;
 -- =============================================================================
 
 -- Indexes for knowledge_entities (if table exists)
+-- Note: Cannot use CONCURRENTLY inside DO blocks/transactions
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'knowledge_entities') THEN
         -- Index for entity lookup by type
-        EXECUTE 'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_knowledge_entities_type ON knowledge_entities (entity_type)';
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_knowledge_entities_type') THEN
+            EXECUTE 'CREATE INDEX idx_knowledge_entities_type ON knowledge_entities (entity_type)';
+        END IF;
 
         -- Index for entity name search
-        EXECUTE 'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_knowledge_entities_name ON knowledge_entities (name)';
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_knowledge_entities_name') THEN
+            EXECUTE 'CREATE INDEX idx_knowledge_entities_name ON knowledge_entities (name)';
+        END IF;
 
         -- Index for document association
-        EXECUTE 'CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_knowledge_entities_doc ON knowledge_entities (document_id)';
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_knowledge_entities_doc') THEN
+            EXECUTE 'CREATE INDEX idx_knowledge_entities_doc ON knowledge_entities (document_id)';
+        END IF;
     END IF;
 END $$;
 
@@ -154,10 +169,9 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_active
 ON documents_v2 (id, title, updated_at)
 WHERE status = 'completed' AND deleted_at IS NULL;
 
--- Partial index for recent messages (last 30 days)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_recent
-ON chat_messages (session_id, created_at)
-WHERE created_at > NOW() - INTERVAL '30 days';
+-- Note: Partial index with NOW() becomes stale immediately after creation
+-- Instead, use a regular index on (session_id, created_at) and filter in queries
+-- Partial index for recent messages removed - use idx_chat_messages_session_created instead
 
 -- =============================================================================
 -- COMPOSITE INDEXES FOR COMMON JOINS

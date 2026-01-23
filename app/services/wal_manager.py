@@ -306,29 +306,38 @@ class WriteAheadLog:
         cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
 
         try:
+            # Note: Supabase doesn't support column-to-column comparisons in the API
+            # So we fetch candidates and filter retry_count < max_retries in Python
             result = self.supabase.table("wal_log").select("*").in_(
                 "status", [WALStatus.PENDING.value, WALStatus.IN_PROGRESS.value]
             ).gt(
                 "created_at", cutoff.isoformat()
-            ).lt(
-                "retry_count", "max_retries"
-            ).limit(limit).execute()
+            ).limit(limit * 2).execute()  # Fetch extra to account for filtering
 
-            entries = [
-                WALEntry(
-                    id=row["id"],
-                    operation_type=row["operation_type"],
-                    operation_data=row["operation_data"],
-                    status=WALStatus(row["status"]),
-                    retry_count=row.get("retry_count", 0),
-                    max_retries=row.get("max_retries", 3),
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    idempotency_key=row.get("idempotency_key"),
-                    correlation_id=row.get("correlation_id"),
-                    error=row.get("error")
-                )
-                for row in result.data
-            ]
+            # Filter in application code: retry_count < max_retries
+            entries = []
+            for row in result.data:
+                retry_count = row.get("retry_count", 0)
+                max_retries = row.get("max_retries", 3)
+
+                # Only include entries that haven't exceeded max retries
+                if retry_count < max_retries:
+                    entries.append(WALEntry(
+                        id=row["id"],
+                        operation_type=row["operation_type"],
+                        operation_data=row["operation_data"],
+                        status=WALStatus(row["status"]),
+                        retry_count=retry_count,
+                        max_retries=max_retries,
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                        idempotency_key=row.get("idempotency_key"),
+                        correlation_id=row.get("correlation_id"),
+                        error=row.get("error")
+                    ))
+
+                    # Stop if we have enough entries
+                    if len(entries) >= limit:
+                        break
 
             WAL_PENDING_GAUGE.set(len(entries))
 

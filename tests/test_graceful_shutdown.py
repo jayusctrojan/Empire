@@ -14,8 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Skip entire module - GracefulShutdown API doesn't match test expectations
-pytestmark = pytest.mark.skip(reason="GracefulShutdown module API doesn't match test expectations - needs refactoring")
+from app.core.graceful_shutdown import GracefulShutdown, ShutdownMiddleware, ShutdownConfig, ShutdownReason
 
 
 # =============================================================================
@@ -57,22 +56,20 @@ class TestShutdownCoordinatorInit:
 
     def test_coordinator_creation(self):
         """Test creating GracefulShutdown instance"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
         coordinator = GracefulShutdown()
 
         assert coordinator is not None
         assert coordinator.is_shutting_down is False
 
-    @pytest.mark.skip(reason="ShutdownConfig API changed - celery_drain_timeout not in config")
     def test_coordinator_with_custom_timeout(self):
         """Test GracefulShutdown with custom timeout"""
-        from app.core.graceful_shutdown import GracefulShutdown, ShutdownConfig
-
-        config = ShutdownConfig(celery_drain_timeout=60, connection_close_timeout=15)
+        config = ShutdownConfig(
+            celery_drain_timeout_seconds=60,
+            connection_close_timeout_seconds=15
+        )
         coordinator = GracefulShutdown(config=config)
 
-        assert coordinator.config.celery_drain_timeout == 60
+        assert coordinator.config.celery_drain_timeout_seconds == 60
 
 
 # =============================================================================
@@ -82,29 +79,24 @@ class TestShutdownCoordinatorInit:
 class TestShutdownSignals:
     """Tests for shutdown signal handling"""
 
-    @pytest.mark.skip(reason="GracefulShutdown API changed - _handle_shutdown_signal not available")
-    def test_signal_handler_sets_shutting_down_flag(self):
-        """Test that signal handler sets the shutting down flag"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
+    @pytest.mark.asyncio
+    async def test_prepare_shutdown_sets_shutting_down_flag(self):
+        """Test that prepare_shutdown sets the shutting down flag"""
         coordinator = GracefulShutdown()
 
-        # Simulate signal
-        coordinator._handle_shutdown_signal(signal.SIGTERM, None)
+        # Simulate preparing for shutdown
+        await coordinator.prepare_shutdown(ShutdownReason.SIGTERM)
 
         assert coordinator.is_shutting_down is True
 
-    @pytest.mark.skip(reason="GracefulShutdown API changed - _handle_shutdown_signal not available")
-    def test_multiple_signals_handled_gracefully(self):
-        """Test that multiple signals don't cause issues"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
+    @pytest.mark.asyncio
+    async def test_multiple_prepare_calls_handled_gracefully(self):
+        """Test that multiple prepare calls don't cause issues"""
         coordinator = GracefulShutdown()
 
-        # Multiple signals
-        coordinator._handle_shutdown_signal(signal.SIGTERM, None)
-        coordinator._handle_shutdown_signal(signal.SIGTERM, None)
-        coordinator._handle_shutdown_signal(signal.SIGINT, None)
+        # Multiple prepare calls
+        await coordinator.prepare_shutdown(ShutdownReason.SIGTERM)
+        await coordinator.prepare_shutdown(ShutdownReason.SIGTERM)  # Should be no-op
 
         # Should still be shutting down without errors
         assert coordinator.is_shutting_down is True
@@ -114,19 +106,15 @@ class TestShutdownSignals:
 # CELERY SHUTDOWN TESTS
 # =============================================================================
 
-@pytest.mark.skip(reason="graceful_shutdown module does not have celery_app attribute")
 class TestCeleryShutdown:
     """Tests for Celery worker shutdown"""
 
     @pytest.mark.asyncio
     async def test_celery_workers_paused(self, mock_celery_app):
         """Test that Celery workers are paused during shutdown"""
-        from app.core.graceful_shutdown import GracefulShutdown
+        coordinator = GracefulShutdown(celery_app=mock_celery_app)
 
-        coordinator = GracefulShutdown()
-
-        with patch('app.core.graceful_shutdown.celery_app', mock_celery_app):
-            await coordinator.shutdown_celery(timeout=5)
+        await coordinator.drain_celery_tasks(timeout=5)
 
         # Pool should be paused
         mock_celery_app.control.broadcast.assert_called()
@@ -134,8 +122,6 @@ class TestCeleryShutdown:
     @pytest.mark.asyncio
     async def test_celery_tasks_drained(self, mock_celery_app):
         """Test that in-flight Celery tasks are drained"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
         # Simulate active tasks that complete
         call_count = 0
 
@@ -148,28 +134,22 @@ class TestCeleryShutdown:
 
         mock_celery_app.control.inspect.return_value.active = mock_active
 
-        coordinator = GracefulShutdown()
+        coordinator = GracefulShutdown(celery_app=mock_celery_app)
 
-        with patch('app.core.graceful_shutdown.celery_app', mock_celery_app):
-            await coordinator.shutdown_celery(timeout=10)
+        await coordinator.drain_celery_tasks(timeout=10)
 
         # Should have waited for tasks
         assert call_count >= 2
 
     @pytest.mark.asyncio
-    async def test_celery_purge_on_timeout(self, mock_celery_app):
-        """Test that remaining tasks are purged on timeout"""
-        from app.core.graceful_shutdown import GracefulShutdown
+    async def test_celery_purge_on_drain(self, mock_celery_app):
+        """Test that tasks queue is purged after draining"""
+        # Simulate no active tasks
+        mock_celery_app.control.inspect.return_value.active.return_value = {"worker1": []}
 
-        # Simulate tasks that never complete
-        mock_celery_app.control.inspect.return_value.active.return_value = {
-            "worker1": [{"id": "stuck_task"}]
-        }
+        coordinator = GracefulShutdown(celery_app=mock_celery_app)
 
-        coordinator = GracefulShutdown()
-
-        with patch('app.core.graceful_shutdown.celery_app', mock_celery_app):
-            await coordinator.shutdown_celery(timeout=1)
+        await coordinator.drain_celery_tasks(timeout=5)
 
         # Purge should have been called
         mock_celery_app.control.purge.assert_called()
@@ -179,48 +159,42 @@ class TestCeleryShutdown:
 # DATABASE CONNECTION SHUTDOWN TESTS
 # =============================================================================
 
-@pytest.mark.skip(reason="graceful_shutdown module does not have get_supabase/get_neo4j_driver attributes")
 class TestDatabaseShutdown:
     """Tests for database connection shutdown"""
 
     @pytest.mark.asyncio
-    async def test_supabase_connection_closed(self):
-        """Test that Supabase connection is closed"""
-        from app.core.graceful_shutdown import GracefulShutdown
+    async def test_connection_manager_shutdown(self):
+        """Test that connection manager is shut down"""
+        mock_connection_manager = AsyncMock()
 
-        mock_supabase = MagicMock()
-        coordinator = GracefulShutdown()
+        coordinator = GracefulShutdown(connection_manager=mock_connection_manager)
 
-        with patch('app.core.graceful_shutdown.get_supabase', return_value=mock_supabase):
-            await coordinator.close_connections()
+        await coordinator.close_connections()
 
-        # Connection should be handled
-
-    @pytest.mark.asyncio
-    async def test_neo4j_driver_closed(self, mock_neo4j):
-        """Test that Neo4j driver is closed"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
-        coordinator = GracefulShutdown()
-
-        with patch('app.core.graceful_shutdown.get_neo4j_driver', return_value=mock_neo4j):
-            await coordinator.close_connections()
-
-        # Driver close should be called
-        mock_neo4j.close.assert_called()
+        # Shutdown should be called on connection manager
+        mock_connection_manager.shutdown.assert_called()
 
     @pytest.mark.asyncio
     async def test_redis_connection_closed(self, mock_redis):
         """Test that Redis connection is closed"""
-        from app.core.graceful_shutdown import GracefulShutdown
+        mock_redis.close = MagicMock()
 
-        coordinator = GracefulShutdown()
+        coordinator = GracefulShutdown(redis_client=mock_redis)
 
-        with patch('app.core.graceful_shutdown.get_redis', return_value=mock_redis):
-            await coordinator.close_connections()
+        await coordinator.close_connections()
 
         # Redis close should be called
         mock_redis.close.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_celery_connections_closed(self, mock_celery_app):
+        """Test that Celery connections are closed"""
+        coordinator = GracefulShutdown(celery_app=mock_celery_app)
+
+        await coordinator.close_connections()
+
+        # Celery close should be called
+        mock_celery_app.close.assert_called()
 
 
 # =============================================================================
@@ -233,8 +207,6 @@ class TestBackgroundTaskShutdown:
     @pytest.mark.asyncio
     async def test_background_tasks_cancelled(self):
         """Test that background asyncio tasks are cancelled"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
         coordinator = GracefulShutdown()
 
         # Create some mock tasks
@@ -244,10 +216,10 @@ class TestBackgroundTaskShutdown:
         task1 = asyncio.create_task(long_running())
         task2 = asyncio.create_task(long_running())
 
-        coordinator.register_background_task(task1)
-        coordinator.register_background_task(task2)
+        coordinator.track_background_task(task1)
+        coordinator.track_background_task(task2)
 
-        await coordinator.shutdown_background_tasks()
+        await coordinator.cancel_background_tasks()
 
         # Tasks should be cancelled
         assert task1.cancelled() or task1.done()
@@ -256,18 +228,19 @@ class TestBackgroundTaskShutdown:
     @pytest.mark.asyncio
     async def test_background_task_exceptions_handled(self):
         """Test that exceptions in background tasks are handled"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
         coordinator = GracefulShutdown()
 
         async def failing_task():
             raise Exception("Task error")
 
         task = asyncio.create_task(failing_task())
-        coordinator.register_background_task(task)
+        coordinator.track_background_task(task)
+
+        # Wait a bit for task to fail
+        await asyncio.sleep(0.1)
 
         # Should not raise
-        await coordinator.shutdown_background_tasks()
+        await coordinator.cancel_background_tasks()
 
 
 # =============================================================================
@@ -278,34 +251,36 @@ class TestShutdownProgress:
     """Tests for shutdown progress tracking"""
 
     @pytest.mark.asyncio
-    async def test_progress_updates(self):
-        """Test that shutdown progress is updated"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
+    async def test_progress_tracked_through_phases(self):
+        """Test that shutdown progress is tracked through phases"""
         coordinator = GracefulShutdown()
-        progress_updates = []
 
-        coordinator.on_progress = lambda p: progress_updates.append(p)
+        # Start shutdown
+        await coordinator.prepare_shutdown(ShutdownReason.MANUAL)
 
-        coordinator._update_progress("draining_tasks", 25)
-        coordinator._update_progress("closing_connections", 50)
-        coordinator._update_progress("complete", 100)
-
-        assert len(progress_updates) == 3
-        assert progress_updates[-1]["percentage"] == 100
+        # Check progress phase updated
+        status = coordinator.get_status()
+        assert status["is_shutting_down"] is True
 
     def test_get_shutdown_status(self):
         """Test getting current shutdown status"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
         coordinator = GracefulShutdown()
-        coordinator.is_shutting_down = True
-        coordinator._current_phase = "draining_tasks"
 
         status = coordinator.get_status()
 
+        assert status["is_shutting_down"] is False
+        assert status["phase"] == "running"
+
+    @pytest.mark.asyncio
+    async def test_status_reflects_shutdown_phase(self):
+        """Test that status reflects current shutdown phase"""
+        coordinator = GracefulShutdown()
+
+        await coordinator.prepare_shutdown(ShutdownReason.MANUAL)
+        status = coordinator.get_status()
+
         assert status["is_shutting_down"] is True
-        assert status["phase"] == "draining_tasks"
+        assert status["reason"] == "manual"
 
 
 # =============================================================================
@@ -313,79 +288,81 @@ class TestShutdownProgress:
 # =============================================================================
 
 class TestShutdownMiddleware:
-    """Tests for shutdown middleware"""
+    """Tests for shutdown middleware (ASGI style)"""
 
     @pytest.mark.asyncio
     async def test_middleware_rejects_during_shutdown(self):
         """Test that middleware rejects new requests during shutdown"""
-        from app.core.graceful_shutdown import ShutdownMiddleware, GracefulShutdown
-
         coordinator = GracefulShutdown()
-        coordinator.is_shutting_down = True
+        coordinator._is_shutting_down = True
 
-        app = MagicMock()
+        app = AsyncMock()
         middleware = ShutdownMiddleware(app, coordinator)
 
-        request = MagicMock()
-        request.url.path = "/api/query"
+        # Create ASGI scope
+        scope = {"type": "http", "path": "/api/query"}
+        receive = AsyncMock()
+        send = AsyncMock()
 
-        # Should return 503
-        response = await middleware.dispatch(request, lambda r: None)
+        await middleware(scope, receive, send)
 
-        assert response.status_code == 503
+        # Should return 503 - check that send was called with 503 status
+        send.assert_called()
+        calls = send.call_args_list
+        # First call should be response start with 503
+        assert calls[0][0][0]["status"] == 503
 
     @pytest.mark.asyncio
-    async def test_middleware_allows_health_checks(self):
-        """Test that middleware allows health check requests during shutdown"""
-        from app.core.graceful_shutdown import ShutdownMiddleware, GracefulShutdown
-
+    async def test_middleware_passes_non_http_requests(self):
+        """Test that middleware passes through non-HTTP requests"""
         coordinator = GracefulShutdown()
-        coordinator.is_shutting_down = True
+        coordinator._is_shutting_down = True
 
-        async def call_next(request):
-            response = MagicMock()
-            response.status_code = 200
-            return response
-
-        app = MagicMock()
+        app = AsyncMock()
         middleware = ShutdownMiddleware(app, coordinator)
 
-        request = MagicMock()
-        request.url.path = "/health"
+        # Create non-HTTP scope (e.g., websocket)
+        scope = {"type": "websocket"}
+        receive = AsyncMock()
+        send = AsyncMock()
 
-        response = await middleware.dispatch(request, call_next)
+        await middleware(scope, receive, send)
 
-        # Health check should be allowed
-        assert response.status_code == 200
+        # Should pass through to app
+        app.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_middleware_tracks_active_requests(self):
         """Test that middleware tracks active requests"""
-        from app.core.graceful_shutdown import ShutdownMiddleware, GracefulShutdown
-
         coordinator = GracefulShutdown()
 
-        async def slow_handler(request):
+        request_started = asyncio.Event()
+
+        async def slow_app(scope, receive, send):
+            request_started.set()
             await asyncio.sleep(0.1)
-            response = MagicMock()
-            response.status_code = 200
-            return response
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
 
-        app = MagicMock()
-        middleware = ShutdownMiddleware(app, coordinator)
+        middleware = ShutdownMiddleware(slow_app, coordinator)
 
-        request = MagicMock()
-        request.url.path = "/api/query"
+        scope = {"type": "http", "path": "/api/query"}
+        receive = AsyncMock()
+        send = AsyncMock()
 
         # Start request
-        task = asyncio.create_task(middleware.dispatch(request, slow_handler))
+        task = asyncio.create_task(middleware(scope, receive, send))
 
+        await request_started.wait()
         await asyncio.sleep(0.01)
 
         # Should have active request
-        assert coordinator.active_requests > 0
+        assert len(coordinator._active_requests) > 0
 
         await task
+
+        # Request should be complete
+        assert len(coordinator._active_requests) == 0
 
 
 # =============================================================================
@@ -398,55 +375,48 @@ class TestFullShutdownSequence:
     @pytest.mark.asyncio
     async def test_full_shutdown_order(self, mock_celery_app, mock_redis, mock_neo4j):
         """Test that shutdown happens in correct order"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
         shutdown_order = []
 
-        coordinator = GracefulShutdown()
+        coordinator = GracefulShutdown(
+            celery_app=mock_celery_app,
+            redis_client=mock_redis
+        )
 
-        async def mock_shutdown_celery(timeout):
+        original_drain_celery = coordinator.drain_celery_tasks
+        original_cancel_tasks = coordinator.cancel_background_tasks
+        original_close_connections = coordinator.close_connections
+
+        async def mock_drain_celery(*args, **kwargs):
             shutdown_order.append("celery")
+            return True
 
-        async def mock_shutdown_tasks():
+        async def mock_cancel_tasks():
             shutdown_order.append("tasks")
+            return 0
 
-        async def mock_close_connections():
+        async def mock_close_connections(*args, **kwargs):
             shutdown_order.append("connections")
+            return True
 
-        async def mock_flush_telemetry():
-            shutdown_order.append("telemetry")
-
-        coordinator.shutdown_celery = mock_shutdown_celery
-        coordinator.shutdown_background_tasks = mock_shutdown_tasks
+        coordinator.drain_celery_tasks = mock_drain_celery
+        coordinator.cancel_background_tasks = mock_cancel_tasks
         coordinator.close_connections = mock_close_connections
-        coordinator.flush_telemetry = mock_flush_telemetry
 
-        await coordinator.shutdown()
+        await coordinator.initiate_shutdown()
 
-        # Verify order: Celery first, then tasks, then connections
+        # Verify order: Celery drain before connections close
         assert shutdown_order.index("celery") < shutdown_order.index("connections")
 
     @pytest.mark.asyncio
-    async def test_shutdown_timeout_enforcement(self):
-        """Test that overall shutdown timeout is enforced"""
-        from app.core.graceful_shutdown import GracefulShutdown, ShutdownConfig
+    async def test_shutdown_completes_phases(self):
+        """Test that shutdown completes all phases"""
+        coordinator = GracefulShutdown()
 
-        config = ShutdownConfig(total_timeout=1)
-        coordinator = GracefulShutdown(config=config)
+        progress = await coordinator.initiate_shutdown()
 
-        async def slow_shutdown():
-            await asyncio.sleep(10)
-
-        coordinator.shutdown_celery = slow_shutdown
-
-        # Should complete within timeout (with possible exception)
-        try:
-            await asyncio.wait_for(coordinator.shutdown(), timeout=2)
-        except asyncio.TimeoutError:
-            pass
-
-        # Shutdown should have been initiated
+        # Shutdown should be complete
         assert coordinator.is_shutting_down is True
+        assert progress.phase.value == "complete"
 
 
 # =============================================================================
@@ -457,28 +427,29 @@ class TestTelemetryFlush:
     """Tests for telemetry flushing during shutdown"""
 
     @pytest.mark.asyncio
-    async def test_prometheus_metrics_flushed(self):
-        """Test that Prometheus metrics are flushed"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
+    async def test_data_flush_succeeds(self):
+        """Test that data flush completes without error"""
         coordinator = GracefulShutdown()
 
         # Should not raise
-        await coordinator.flush_telemetry()
+        result = await coordinator.flush_data()
+
+        assert result is True
+        assert coordinator.progress.flushed_data is True
 
     @pytest.mark.asyncio
-    async def test_opentelemetry_spans_flushed(self):
-        """Test that OpenTelemetry spans are flushed"""
-        from app.core.graceful_shutdown import GracefulShutdown
-
-        mock_tracer = MagicMock()
-        mock_tracer.force_flush.return_value = None
-
+    async def test_shutdown_hooks_called(self):
+        """Test that registered shutdown hooks are called"""
         coordinator = GracefulShutdown()
 
-        with patch('app.core.graceful_shutdown.tracer_provider', mock_tracer):
-            await coordinator.flush_telemetry()
+        hook_called = False
 
-        # Force flush should be called
-        if hasattr(mock_tracer, 'force_flush'):
-            mock_tracer.force_flush.assert_called()
+        async def test_hook():
+            nonlocal hook_called
+            hook_called = True
+
+        coordinator.register_shutdown_hook(test_hook)
+
+        await coordinator.flush_data()
+
+        assert hook_called is True

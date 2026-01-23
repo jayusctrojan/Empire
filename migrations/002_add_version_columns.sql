@@ -111,9 +111,9 @@ DECLARE
     result JSONB;
     actual_version INTEGER;
     query TEXT;
-    update_parts TEXT[];
+    set_clause TEXT := '';
     key TEXT;
-    value TEXT;
+    value JSONB;
 BEGIN
     -- Build update query dynamically (simplified for common tables)
     -- Note: In production, use prepared statements or ORM
@@ -142,12 +142,37 @@ BEGIN
         );
     END IF;
 
-    -- Version matches, perform update
+    -- Build SET clause from p_updates JSONB
+    FOR key, value IN SELECT * FROM jsonb_each(p_updates)
+    LOOP
+        IF set_clause != '' THEN
+            set_clause := set_clause || ', ';
+        END IF;
+        -- Format value based on type (text, number, boolean, null)
+        IF jsonb_typeof(value) = 'string' THEN
+            set_clause := set_clause || format('%I = %L', key, value #>> '{}');
+        ELSIF jsonb_typeof(value) = 'null' THEN
+            set_clause := set_clause || format('%I = NULL', key);
+        ELSE
+            set_clause := set_clause || format('%I = %s', key, value);
+        END IF;
+    END LOOP;
+
+    -- Add updated_at to the SET clause
+    IF set_clause != '' THEN
+        set_clause := set_clause || ', ';
+    END IF;
+    set_clause := set_clause || 'updated_at = NOW()';
+
+    -- Version matches, perform update with p_updates
     -- The trigger will auto-increment the version
-    EXECUTE format(
-        'UPDATE %I SET updated_at = NOW() WHERE id = $1 AND version = $2 RETURNING version',
-        p_table_name
-    ) INTO actual_version USING p_id, p_expected_version;
+    query := format(
+        'UPDATE %I SET %s WHERE id = $1 AND version = $2 RETURNING version',
+        p_table_name,
+        set_clause
+    );
+
+    EXECUTE query INTO actual_version USING p_id, p_expected_version;
 
     IF actual_version IS NULL THEN
         -- Concurrent modification occurred
