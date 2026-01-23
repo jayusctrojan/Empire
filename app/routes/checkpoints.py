@@ -94,7 +94,151 @@ class RestoreCheckpointResponse(BaseModel):
 
 
 # =============================================================================
-# Checkpoint Management Endpoints
+# Static Routes (must come before parameterized routes)
+# =============================================================================
+
+@router.get("/health")
+async def health_check():
+    """
+    Health check for checkpoint service.
+    """
+    try:
+        service = get_checkpoint_service()
+
+        return {
+            "status": "healthy",
+            "service": "checkpoints",
+            "max_checkpoints_per_session": service._max_checkpoints,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error("health_check_failed", error=str(e))
+        return {
+            "status": "unhealthy",
+            "service": "checkpoints",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@router.get("/recovery/check", response_model=RecoveryCheckResponseBody)
+async def check_recovery(
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Check if there are any sessions requiring recovery.
+
+    Returns information about the most recent abnormal close checkpoint.
+    """
+    try:
+        service = get_checkpoint_service()
+
+        result = await service.check_for_recovery(user_id)
+
+        if not result.success:
+            raise HTTPException(status_code=500, detail=result.error)
+
+        if not result.has_recovery:
+            return RecoveryCheckResponseBody(
+                success=True,
+                has_recovery=False
+            )
+
+        checkpoint = result.checkpoint
+
+        return RecoveryCheckResponseBody(
+            success=True,
+            has_recovery=True,
+            checkpoint_id=checkpoint.id if checkpoint else None,
+            conversation_id=checkpoint.conversation_id if checkpoint else None,
+            conversation_title=result.conversation_title,
+            created_at=checkpoint.created_at if checkpoint else None,
+            token_count=checkpoint.token_count if checkpoint else None
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "check_recovery_failed",
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/recovery/{checkpoint_id}/restore", response_model=RestoreCheckpointResponse)
+async def restore_from_recovery(
+    checkpoint_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Restore from a recovery checkpoint and clear the recovery flag.
+    """
+    try:
+        service = get_checkpoint_service()
+
+        # Restore the checkpoint
+        restored_data = await service.restore_checkpoint(checkpoint_id, user_id)
+
+        if not restored_data:
+            raise HTTPException(status_code=500, detail="Failed to restore checkpoint")
+
+        # Clear the abnormal close flag
+        await service.clear_recovery_checkpoint(checkpoint_id, user_id)
+
+        return RestoreCheckpointResponse(
+            success=True,
+            conversation_id=restored_data["conversation_id"],
+            messages_count=len(restored_data["messages"]),
+            token_count=restored_data["token_count"],
+            restored_from=checkpoint_id
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "restore_recovery_failed",
+            checkpoint_id=checkpoint_id,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/recovery/{checkpoint_id}/dismiss")
+async def dismiss_recovery(
+    checkpoint_id: str,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Dismiss a recovery checkpoint without restoring.
+
+    This clears the abnormal close flag so it won't appear again.
+    """
+    try:
+        service = get_checkpoint_service()
+
+        success = await service.clear_recovery_checkpoint(checkpoint_id, user_id)
+
+        if not success:
+            raise HTTPException(status_code=404, detail="Recovery checkpoint not found")
+
+        return {"success": True, "dismissed": checkpoint_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "dismiss_recovery_failed",
+            checkpoint_id=checkpoint_id,
+            error=str(e)
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Checkpoint Management Endpoints (parameterized routes)
 # =============================================================================
 
 @router.post("/{conversation_id}", response_model=CheckpointDetailResponse)
@@ -391,151 +535,3 @@ async def restore_from_checkpoint(
             error=str(e)
         )
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# =============================================================================
-# Recovery Endpoints
-# =============================================================================
-
-@router.get("/recovery/check", response_model=RecoveryCheckResponseBody)
-async def check_recovery(
-    user_id: str = Depends(get_current_user)
-):
-    """
-    Check if there are any sessions requiring recovery.
-
-    Returns information about the most recent abnormal close checkpoint.
-    """
-    try:
-        service = get_checkpoint_service()
-
-        result = await service.check_for_recovery(user_id)
-
-        if not result.success:
-            raise HTTPException(status_code=500, detail=result.error)
-
-        if not result.has_recovery:
-            return RecoveryCheckResponseBody(
-                success=True,
-                has_recovery=False
-            )
-
-        checkpoint = result.checkpoint
-
-        return RecoveryCheckResponseBody(
-            success=True,
-            has_recovery=True,
-            checkpoint_id=checkpoint.id if checkpoint else None,
-            conversation_id=checkpoint.conversation_id if checkpoint else None,
-            conversation_title=result.conversation_title,
-            created_at=checkpoint.created_at if checkpoint else None,
-            token_count=checkpoint.token_count if checkpoint else None
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            "check_recovery_failed",
-            error=str(e)
-        )
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/recovery/{checkpoint_id}/restore", response_model=RestoreCheckpointResponse)
-async def restore_from_recovery(
-    checkpoint_id: str,
-    user_id: str = Depends(get_current_user)
-):
-    """
-    Restore from a recovery checkpoint and clear the recovery flag.
-    """
-    try:
-        service = get_checkpoint_service()
-
-        # Restore the checkpoint
-        restored_data = await service.restore_checkpoint(checkpoint_id, user_id)
-
-        if not restored_data:
-            raise HTTPException(status_code=500, detail="Failed to restore checkpoint")
-
-        # Clear the abnormal close flag
-        await service.clear_recovery_checkpoint(checkpoint_id, user_id)
-
-        return RestoreCheckpointResponse(
-            success=True,
-            conversation_id=restored_data["conversation_id"],
-            messages_count=len(restored_data["messages"]),
-            token_count=restored_data["token_count"],
-            restored_from=checkpoint_id
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            "restore_recovery_failed",
-            checkpoint_id=checkpoint_id,
-            error=str(e)
-        )
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/recovery/{checkpoint_id}/dismiss")
-async def dismiss_recovery(
-    checkpoint_id: str,
-    user_id: str = Depends(get_current_user)
-):
-    """
-    Dismiss a recovery checkpoint without restoring.
-
-    This clears the abnormal close flag so it won't appear again.
-    """
-    try:
-        service = get_checkpoint_service()
-
-        success = await service.clear_recovery_checkpoint(checkpoint_id, user_id)
-
-        if not success:
-            raise HTTPException(status_code=404, detail="Recovery checkpoint not found")
-
-        return {"success": True, "dismissed": checkpoint_id}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(
-            "dismiss_recovery_failed",
-            checkpoint_id=checkpoint_id,
-            error=str(e)
-        )
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# =============================================================================
-# Health Endpoint
-# =============================================================================
-
-@router.get("/health")
-async def health_check():
-    """
-    Health check for checkpoint service.
-    """
-    try:
-        service = get_checkpoint_service()
-
-        return {
-            "status": "healthy",
-            "service": "checkpoints",
-            "max_checkpoints_per_session": service._max_checkpoints,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-    except Exception as e:
-        logger.error("health_check_failed", error=str(e))
-        return {
-            "status": "unhealthy",
-            "service": "checkpoints",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }

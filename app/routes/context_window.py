@@ -355,7 +355,8 @@ async def toggle_message_protection(
 @router.websocket("/{conversation_id}/ws")
 async def websocket_context_updates(
     websocket: WebSocket,
-    conversation_id: str
+    conversation_id: str,
+    token: Optional[str] = Query(default=None)
 ):
     """
     WebSocket endpoint for real-time context window updates.
@@ -365,7 +366,34 @@ async def websocket_context_updates(
     - Token counts updated
     - Compaction events
     - Status changes (normal → warning → critical)
+
+    Authentication:
+    - Pass token as query parameter: ws://host/api/context-window/{id}/ws?token=xxx
+    - Token should be a valid JWT or session token
     """
+    # Validate authentication token
+    user_id = None
+    if token:
+        try:
+            from app.middleware.auth import validate_token
+            user_id = await validate_token(token)
+        except Exception as e:
+            logger.warning(
+                "websocket_auth_failed",
+                conversation_id=conversation_id,
+                error=str(e)
+            )
+            await websocket.close(code=4001, reason="Invalid authentication token")
+            return
+
+    if not user_id:
+        logger.warning(
+            "websocket_no_auth",
+            conversation_id=conversation_id
+        )
+        await websocket.close(code=4001, reason="Authentication required")
+        return
+
     await ws_manager.connect(websocket, conversation_id)
 
     try:

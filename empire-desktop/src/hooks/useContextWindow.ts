@@ -54,6 +54,8 @@ export function useContextWindow(options: UseContextWindowOptions = {}): UseCont
 
   const wsRef = useRef<WebSocket | null>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Calculate percentages
   const usedPercent = status
@@ -139,6 +141,16 @@ export function useContextWindow(options: UseContextWindowOptions = {}): UseCont
   const connectWebSocket = useCallback(() => {
     if (!conversationId || !enableWebSocket) return
 
+    // Clear any existing intervals/timeouts before creating new connection
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current)
+      pingIntervalRef.current = null
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+
     // Build WebSocket URL
     const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws'
     const wsBaseUrl = API_BASE_URL.replace(/^https?/, wsProtocol)
@@ -181,8 +193,13 @@ export function useContextWindow(options: UseContextWindowOptions = {}): UseCont
 
       ws.onclose = () => {
         setIsConnected(false)
-        // Attempt reconnect after delay
-        setTimeout(() => {
+        // Clear ping interval on close
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current)
+          pingIntervalRef.current = null
+        }
+        // Attempt reconnect after delay (store timeout ref for cleanup)
+        reconnectTimeoutRef.current = setTimeout(() => {
           if (wsRef.current === ws) {
             connectWebSocket()
           }
@@ -196,15 +213,22 @@ export function useContextWindow(options: UseContextWindowOptions = {}): UseCont
 
       wsRef.current = ws
 
-      // Send periodic pings to keep connection alive
-      const pingInterval = setInterval(() => {
+      // Send periodic pings to keep connection alive (store interval ref for cleanup)
+      pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping' }))
         }
       }, 30000)
 
       return () => {
-        clearInterval(pingInterval)
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current)
+          pingIntervalRef.current = null
+        }
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current)
+          reconnectTimeoutRef.current = null
+        }
         ws.close()
       }
     } catch (err) {
@@ -214,10 +238,22 @@ export function useContextWindow(options: UseContextWindowOptions = {}): UseCont
 
   // Disconnect WebSocket
   const disconnect = useCallback(() => {
+    // Clear ping interval
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current)
+      pingIntervalRef.current = null
+    }
+    // Clear reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+    // Close WebSocket
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
     }
+    // Clear polling interval
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current)
       pollIntervalRef.current = null
