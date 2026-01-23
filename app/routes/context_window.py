@@ -213,6 +213,54 @@ ws_manager = WebSocketConnectionManager()
 
 
 # =============================================================================
+# Static Routes (must come before parameterized routes)
+# =============================================================================
+
+@router.get("/thresholds")
+async def get_context_thresholds():
+    """
+    Get the context window threshold configuration.
+
+    Returns the threshold values used for status indicators:
+    - Normal: < 70% usage
+    - Warning: 70-85% usage
+    - Critical: > 85% usage
+    """
+    return {
+        "normal_max_percent": 70,
+        "warning_max_percent": 85,
+        "critical_min_percent": 85,
+        "reserved_buffer_percent": 5,
+        "default_max_tokens": 200000
+    }
+
+
+@router.get("/health")
+async def health_check():
+    """
+    Health check for context window service.
+    """
+    try:
+        service = get_context_manager()
+
+        return {
+            "status": "healthy",
+            "service": "context_window",
+            "token_counter_available": service.token_counter is not None,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error("health_check_failed", error=str(e))
+        return {
+            "status": "unhealthy",
+            "service": "context_window",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+
+# =============================================================================
 # Context Window Status Endpoints
 # =============================================================================
 
@@ -868,54 +916,6 @@ async def get_recovery_progress(
             percent=0,
             stage="Error"
         )
-
-
-# =============================================================================
-# Utility Endpoints
-# =============================================================================
-
-@router.get("/thresholds")
-async def get_context_thresholds():
-    """
-    Get the context window threshold configuration.
-
-    Returns the threshold values used for status indicators:
-    - Normal: < 70% usage
-    - Warning: 70-85% usage
-    - Critical: > 85% usage
-    """
-    return {
-        "normal_max_percent": 70,
-        "warning_max_percent": 85,
-        "critical_min_percent": 85,
-        "reserved_buffer_percent": 5,
-        "default_max_tokens": 200000
-    }
-
-
-@router.get("/health")
-async def health_check():
-    """
-    Health check for context window service.
-    """
-    try:
-        service = get_context_manager()
-
-        return {
-            "status": "healthy",
-            "service": "context_window",
-            "token_counter_available": service.token_counter is not None,
-            "timestamp": datetime.now().isoformat()
-        }
-
-    except Exception as e:
-        logger.error("health_check_failed", error=str(e))
-        return {
-            "status": "unhealthy",
-            "service": "context_window",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
 
 
 # =============================================================================
