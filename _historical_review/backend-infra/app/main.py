@@ -31,13 +31,13 @@ async def lifespan(app: FastAPI):
     """
     Lifespan context manager for startup and shutdown events
     """
-    # Startup: Initialize connections
+    # Startup: Initialize connections (log status only, not URLs for security)
     print("🚀 Empire v7.3 FastAPI starting...")
-    print(f"📊 Supabase: {os.getenv('SUPABASE_URL')}")
-    print(f"🔴 Redis: {os.getenv('REDIS_URL')}")
-    print(f"🗄️ Neo4j: {os.getenv('NEO4J_URI')}")
-    print(f"📦 LlamaIndex Service: {os.getenv('LLAMAINDEX_SERVICE_URL')}")
-    print(f"🤖 CrewAI Service: {os.getenv('CREWAI_SERVICE_URL')}")
+    print(f"📊 Supabase: {'configured' if os.getenv('SUPABASE_URL') else 'not configured'}")
+    print(f"🔴 Redis: {'configured' if os.getenv('REDIS_URL') else 'not configured'}")
+    print(f"🗄️ Neo4j: {'configured' if os.getenv('NEO4J_URI') else 'not configured'}")
+    print(f"📦 LlamaIndex Service: {'configured' if os.getenv('LLAMAINDEX_SERVICE_URL') else 'not configured'}")
+    print(f"🤖 CrewAI Service: {'configured' if os.getenv('CREWAI_SERVICE_URL') else 'not configured'}")
 
     # TODO: Initialize database connections
     # TODO: Initialize Redis connection
@@ -64,13 +64,36 @@ app = FastAPI(
 )
 
 # CORS Configuration
+# Note: allow_credentials=True requires explicit origins, not wildcards
+_cors_origins = os.getenv("CORS_ORIGINS", "").split(",")
+_cors_origins = [o.strip() for o in _cors_origins if o.strip() and o.strip() != "*"]
+
+if not _cors_origins:
+    # Default safe origins for development
+    _cors_origins = ["http://localhost:3000", "http://localhost:8000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+import re as _re
+
+
+def _normalize_path(path: str) -> str:
+    """
+    Normalize request path to prevent high cardinality metrics.
+    Replaces path parameters with placeholders.
+    """
+    # Replace UUIDs with placeholder
+    path = _re.sub(r'/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '/{id}', path)
+    # Replace numeric IDs with placeholder
+    path = _re.sub(r'/\d+', '/{id}', path)
+    return path
 
 
 # Middleware for request tracking
@@ -81,16 +104,18 @@ async def track_requests(request, call_next):
 
     response = await call_next(request)
 
-    # Record metrics
+    # Record metrics with normalized path to prevent high cardinality
     duration = time.time() - start_time
+    normalized_path = _normalize_path(request.url.path)
+
     REQUEST_LATENCY.labels(
         method=request.method,
-        endpoint=request.url.path
+        endpoint=normalized_path
     ).observe(duration)
 
     REQUEST_COUNT.labels(
         method=request.method,
-        endpoint=request.url.path,
+        endpoint=normalized_path,
         status=response.status_code
     ).inc()
 

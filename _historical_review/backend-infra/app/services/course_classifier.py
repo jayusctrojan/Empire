@@ -16,7 +16,8 @@ class CourseClassifier:
     """Auto-classify courses and extract structural metadata"""
 
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        # Use AsyncAnthropic for proper async/await support
+        self.client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         self.model = "claude-3-5-haiku-20241022"  # Fast and cheap
 
     async def classify_and_extract(self, filename: str, content_preview: str) -> Dict:
@@ -86,7 +87,7 @@ Respond in JSON format:
 }}
 """
 
-        response = self.client.messages.create(
+        response = await self.client.messages.create(
             model=self.model,
             max_tokens=400,
             messages=[{"role": "user", "content": prompt}]
@@ -153,7 +154,7 @@ OR for a corporate course:
 }}
 """
 
-        response = self.client.messages.create(
+        response = await self.client.messages.create(
             model=self.model,
             max_tokens=500,
             messages=[{"role": "user", "content": prompt}]

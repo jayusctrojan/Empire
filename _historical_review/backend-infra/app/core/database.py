@@ -124,13 +124,16 @@ class DatabaseManager:
         """Close all database connections"""
         if self._neo4j:
             self._neo4j.close()
+            self._neo4j = None
             print("👋 Closed Neo4j connection")
 
         if self._redis:
             self._redis.close()
+            self._redis = None
             print("👋 Closed Redis connection")
 
         ***REMOVED*** client doesn't need explicit closing
+        self._supabase = None
         print("👋 All database connections closed")
 
 
