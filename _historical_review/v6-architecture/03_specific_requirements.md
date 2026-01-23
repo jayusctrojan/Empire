@@ -268,11 +268,13 @@ def assessPDFComplexity(file):
 *Priority: Essential*
 *Status: Active - v3.2+*
 
-### 3.1.3 Local AI Processing Requirements (NEW v5.0)
+### 3.1.3 Local AI Processing Requirements (v5.0 ONLY - DEPRECATED in v6.0)
+
+> **⚠️ DEPRECATION NOTICE:** This section describes v5.0 local processing architecture which has been **replaced in v6.0** by Claude API. See Section 3.2 for v6.0 Claude API requirements. Retained for historical reference only.
 
 #### 3.1.3.1 Local LLM Inference
 
-**LLR-001:** The system SHALL run Llama 3.3 70B locally on Mac Studio
+**LLR-001:** ~~The system SHALL run Llama 3.3 70B locally on Mac Studio~~ *[DEPRECATED v6.0 - Replaced by Claude API]*
 
 *Priority: Essential*
 *Hardware: Mac Studio M3 Ultra (96GB)*
@@ -413,11 +415,11 @@ def assessPDFComplexity(file):
 **HR-001:** The system SHALL perform semantic vector searches
 
 *Priority: Essential*
-*Backend: Pinecone vector database*
-*Embeddings: Local nomic-embed generation (v5.0)*
+*Backend: Supabase pgvector (v6.0) | ~~Pinecone~~ (v5.0 deprecated)*
+*Embeddings: Claude API (v6.0) | ~~Local nomic-embed~~ (v5.0 deprecated)*
 *Features: Similarity search, filtering, metadata queries*
 *Performance: <500ms query response time*
-*Status: Active - All Versions*
+*Status: Active - All Versions (backend varies by version)*
 
 **HR-002:** The system SHALL maintain and query knowledge graphs
 
@@ -439,9 +441,9 @@ def assessPDFComplexity(file):
 
 *Priority: Essential*
 *Components: Vector + Keyword + Graph search*
-*Reranking: Local BGE-reranker primary, Cohere fallback (v5.0)*
+*Reranking: Claude API (v6.0) | ~~Local BGE-reranker~~ (v5.0 deprecated)*
 *Optimization: Dynamic weight adjustment based on query type*
-*Status: Active - All Versions*
+*Status: Active - All Versions (reranking method varies by version)*
 
 #### 3.1.5.2 Hash-Based Change Detection
 
@@ -781,12 +783,14 @@ def assessPDFComplexity(file):
 
 ### 3.1.9 Vector Storage Requirements (Cloud-Based)
 
-**FR-117:** The system SHALL store vectors in Pinecone immediately after processing
+> **⚠️ v6.0 UPDATE:** Pinecone has been **replaced by Supabase pgvector** in v6.0 for unified database architecture.
+
+**FR-117:** The system SHALL store vectors in the vector database immediately after processing
 
 *Priority: Essential*
 *Location: Cloud*
-*Note: Pinecone remains cloud-based in v5.0*
-*Status: Active - All Versions*
+*Backend: Supabase pgvector (v6.0) | ~~Pinecone~~ (v5.0 deprecated)*
+*Status: Active - All Versions (backend varies by version)*
 
 **FR-118:** The system SHALL use namespace organization (default: "course_vectors")
 
@@ -815,8 +819,8 @@ def assessPDFComplexity(file):
     "timestamp": "ISO8601",
     "hash": "sha256",
     "contextual_summary": "string",
-    "embedding_model": "nomic-embed-text",  // v5.0
-    "processing_location": "mac_studio"      // v5.0
+    "embedding_model": "text-embedding-3-small",  // v6.0 (was nomic-embed-text in v5.0)
+    "processing_location": "cloud"               // v6.0 (was mac_studio in v5.0)
   }
 }
 ```
