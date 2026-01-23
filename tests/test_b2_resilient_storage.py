@@ -19,7 +19,15 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from datetime import datetime
 from io import BytesIO
 
-from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeoutError
+from b2sdk.v2.exception import B2Error, B2ConnectionError
+
+# B2RequestTimeoutError doesn't exist in all b2sdk versions
+try:
+    from b2sdk.v2.exception import B2RequestTimeoutError
+except ImportError:
+    class B2RequestTimeoutError(B2ConnectionError):
+        """Fallback for B2 timeout errors."""
+        pass
 
 # Import test subjects
 from app.services.b2_resilient_storage import (

@@ -32,7 +32,15 @@ from tenacity import (
 )
 from prometheus_client import Counter, Histogram, Gauge
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
-from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeoutError, FileNotPresent
+from b2sdk.v2.exception import B2Error, B2ConnectionError, FileNotPresent
+
+# B2RequestTimeoutError doesn't exist in all b2sdk versions
+try:
+    from b2sdk.v2.exception import B2RequestTimeoutError
+except ImportError:
+    class B2RequestTimeoutError(B2ConnectionError):
+        """Fallback for B2 timeout errors."""
+        pass
 
 from app.services.b2_storage import get_b2_service, B2StorageService, B2Folder, ProcessingStatus
 from app.core.connections import get_redis

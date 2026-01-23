@@ -484,3 +484,141 @@ def sample_text_file():
     return """This is a sample text file.
 It has multiple lines.
 And some content for testing."""
+
+
+# =============================================================================
+# AGENT INTERACTION & HTTP TEST FIXTURES
+# =============================================================================
+
+@pytest.fixture
+def env():
+    """Fixture for agent interaction tests - provides execution environment."""
+    from uuid import uuid4
+    return {
+        "agent_id": str(uuid4()),
+        "crew_id": str(uuid4()),
+        "execution_id": str(uuid4()),
+        "from_agent_id": str(uuid4()),
+        "to_agent_id": str(uuid4()),
+    }
+
+
+@pytest.fixture
+def context(env):
+    """Fixture for agent interaction context."""
+    from uuid import uuid4
+    return {
+        "interaction_id": str(uuid4()),
+        "execution_id": env["execution_id"],
+        "from_agent_id": env.get("from_agent_id", str(uuid4())),
+        "to_agent_id": env.get("to_agent_id", str(uuid4())),
+        "message_id": str(uuid4()),
+        "state_id": str(uuid4()),
+        "version": 1,
+    }
+
+
+@pytest.fixture
+def api_key():
+    """Mock API key for HTTP endpoint tests."""
+    return "Bearer test_api_key_12345"
+
+
+@pytest.fixture
+def auth_key():
+    """Mock authorization key for RBAC HTTP tests."""
+    return "Bearer admin_auth_key_12345"
+
+
+@pytest.fixture
+def viewer_api_key():
+    """Mock API key with viewer (read-only) permissions."""
+    return "Bearer viewer_api_key_12345"
+
+
+@pytest.fixture
+def key_id():
+    """Mock API key ID for RBAC tests."""
+    from uuid import uuid4
+    return str(uuid4())
+
+
+@pytest.fixture
+def user_id():
+    """Mock user ID for user-related tests."""
+    from uuid import uuid4
+    return str(uuid4())
+
+
+@pytest.fixture
+def document_id():
+    """Mock document ID for versioning tests."""
+    from uuid import uuid4
+    return str(uuid4())
+
+
+@pytest.fixture
+def document_ids():
+    """List of mock document IDs for bulk operations."""
+    from uuid import uuid4
+    return [str(uuid4()) for _ in range(3)]
+
+
+@pytest.fixture
+def approval_id():
+    """Mock approval ID for document approval tests."""
+    from uuid import uuid4
+    return str(uuid4())
+
+
+@pytest.fixture
+def approval_ids():
+    """List of mock approval IDs for bulk approval tests."""
+    from uuid import uuid4
+    return [str(uuid4()) for _ in range(3)]
+
+
+@pytest.fixture
+def operation_id():
+    """Mock operation ID for bulk operation status tests."""
+    from uuid import uuid4
+    return str(uuid4())
+
+
+@pytest.fixture(autouse=True)
+def skip_integration_without_flag(request):
+    """Auto-skip integration tests unless RUN_INTEGRATION_TESTS=true."""
+    import os
+    markers = {mark.name for mark in request.node.iter_markers()}
+    if 'integration' in markers:
+        run_integration = os.environ.get('RUN_INTEGRATION_TESTS', 'false').lower() == 'true'
+        if not run_integration:
+            pytest.skip("Integration test - set RUN_INTEGRATION_TESTS=true to run")
+
+
+@pytest.fixture
+def mock_supabase_client():
+    """Mock Supabase client for database tests."""
+    mock_client = Mock()
+    mock_table = Mock()
+    mock_table.select = Mock(return_value=mock_table)
+    mock_table.insert = Mock(return_value=mock_table)
+    mock_table.update = Mock(return_value=mock_table)
+    mock_table.delete = Mock(return_value=mock_table)
+    mock_table.eq = Mock(return_value=mock_table)
+    mock_table.execute = Mock(return_value=Mock(data=[], count=0))
+    mock_client.table = Mock(return_value=mock_table)
+    mock_client.from_ = Mock(return_value=mock_table)
+    return mock_client
+
+
+@pytest.fixture
+def mock_redis_client():
+    """Mock Redis client for caching tests."""
+    mock_redis = AsyncMock()
+    mock_redis.get = AsyncMock(return_value=None)
+    mock_redis.set = AsyncMock(return_value=True)
+    mock_redis.delete = AsyncMock(return_value=1)
+    mock_redis.exists = AsyncMock(return_value=0)
+    mock_redis.close = AsyncMock()
+    return mock_redis

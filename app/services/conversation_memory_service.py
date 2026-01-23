@@ -287,8 +287,17 @@ class ConversationMemoryService:
             if importance_score is not None:
                 updates["importance_score"] = importance_score
             if increment_mention_count:
-                # Increment mention count using SQL
-                updates["mention_count"] = self.supabase.table("user_memory_nodes").select("mention_count").eq("id", str(node_id)).single().execute().data["mention_count"] + 1
+                # Use SQL increment for atomic operation to avoid race conditions
+                # First do the increment via RPC or raw SQL, then fetch updated value
+                try:
+                    self.supabase.rpc(
+                        "increment_mention_count",
+                        {"node_id": str(node_id)}
+                    ).execute()
+                except Exception:
+                    # Fallback: fetch current value (not atomic, but functional)
+                    current = self.supabase.table("user_memory_nodes").select("mention_count").eq("id", str(node_id)).single().execute()
+                    updates["mention_count"] = (current.data.get("mention_count", 0) if current.data else 0) + 1
 
             response = self.supabase.table("user_memory_nodes") \
                 .update(updates) \
