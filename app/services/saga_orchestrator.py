@@ -556,14 +556,25 @@ def create_document_processing_saga(
     3. Store in vector database
     4. Sync to knowledge graph
     5. Update status
+
+    Args:
+        document_id: ID of the document to process
+        services: Dictionary containing required service instances:
+            - 'parser': Document parser service
+            - 'embedder': Embedding generation service
+            - 'vector_store': Vector database service
+            - 'graph': Knowledge graph service
+        supabase_client: Optional Supabase client for saga persistence
+
+    Returns:
+        Configured Saga instance
+
+    Raises:
+        NotImplementedError: This function is a template and requires implementation
+            with specific service integrations based on your infrastructure.
     """
-    saga = Saga(
-        name="document_processing",
-        correlation_id=document_id,
-        supabase_client=supabase_client
+    raise NotImplementedError(
+        "create_document_processing_saga is a template function. "
+        "Implement with specific service integrations for your document processing pipeline. "
+        "See create_graph_sync_saga for an example implementation."
     )
-
-    # Steps would be added based on services passed
-    # This is a template for extension
-
-    return saga

@@ -145,7 +145,11 @@ activate_venv() {
 # Load environment variables
 load_env() {
     if [ -f "$PROJECT_ROOT/.env" ]; then
-        export $(grep -v '^#' "$PROJECT_ROOT/.env" | xargs)
+        # Use set -a to export variables, safer than word splitting with xargs
+        set -a
+        # shellcheck source=/dev/null
+        source "$PROJECT_ROOT/.env"
+        set +a
         print_success "Environment variables loaded"
     else
         print_warning "No .env file found"
@@ -208,10 +212,11 @@ start_fastapi() {
     fi
 
     # Start uvicorn
+    # shellcheck disable=SC2086
     nohup uvicorn app.main:app \
         --host 0.0.0.0 \
         --port "$PORT" \
-        $RELOAD_FLAG \
+        ${RELOAD_FLAG:+"$RELOAD_FLAG"} \
         --log-level info \
         > "$LOG_DIR/fastapi.log" 2>&1 &
 

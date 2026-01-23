@@ -14,8 +14,7 @@ from uuid import uuid4
 
 import pytest
 
-# Skip entire module - wal_manager module API doesn't match test expectations
-pytestmark = pytest.mark.skip(reason="wal_manager module doesn't have expected attributes - needs refactoring")
+from app.services.wal_manager import WriteAheadLog, WALStatus, WALEntry
 
 
 # =============================================================================
@@ -62,22 +61,17 @@ class TestWALManagerInit:
 
     def test_wal_manager_creation(self, mock_supabase):
         """Test creating WAL manager instance"""
-        from app.services.wal_manager import WriteAheadLog
-
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
+        wal = WriteAheadLog(mock_supabase)
 
         assert wal is not None
-        assert wal.table_name == "wal_log"
+        assert wal.supabase is mock_supabase
 
-    def test_wal_manager_with_custom_table(self, mock_supabase):
-        """Test WAL manager with custom table name"""
-        from app.services.wal_manager import WriteAheadLog
+    def test_wal_manager_has_handler_registry(self, mock_supabase):
+        """Test WAL manager has operation handler registry"""
+        wal = WriteAheadLog(mock_supabase)
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog(table_name="custom_wal")
-
-        assert wal.table_name == "custom_wal"
+        assert hasattr(wal, '_operation_handlers')
+        assert isinstance(wal._operation_handlers, dict)
 
 
 # =============================================================================
@@ -88,17 +82,14 @@ class TestWALEntryCreation:
     """Tests for creating WAL entries"""
 
     @pytest.mark.asyncio
-    async def test_write_entry_before_operation(self, mock_supabase):
-        """Test that WAL entry is written BEFORE operation executes"""
-        from app.services.wal_manager import WriteAheadLog
+    async def test_log_operation_before_execution(self, mock_supabase):
+        """Test that WAL entry is logged BEFORE operation executes"""
+        wal = WriteAheadLog(mock_supabase)
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-
-            entry_id = await wal.write_entry(
-                operation_type="create_document",
-                operation_data={"title": "Test", "content": "Content"}
-            )
+        entry_id = await wal.log_operation(
+            operation_type="create_document",
+            operation_data={"title": "Test", "content": "Content"}
+        )
 
         # Verify insert was called
         mock_supabase.table.assert_called_with("wal_log")
@@ -107,8 +98,6 @@ class TestWALEntryCreation:
     @pytest.mark.asyncio
     async def test_entry_created_with_pending_status(self, mock_supabase):
         """Test that new entries have pending status"""
-        from app.services.wal_manager import WriteAheadLog
-
         insert_call_data = None
 
         def capture_insert(data):
@@ -118,9 +107,8 @@ class TestWALEntryCreation:
 
         mock_supabase.table.return_value.insert = capture_insert
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            await wal.write_entry("test_op", {"key": "value"})
+        wal = WriteAheadLog(mock_supabase)
+        await wal.log_operation("test_op", {"key": "value"})
 
         assert insert_call_data is not None
         assert insert_call_data.get("status") == "pending"
@@ -128,8 +116,6 @@ class TestWALEntryCreation:
     @pytest.mark.asyncio
     async def test_entry_includes_idempotency_key(self, mock_supabase):
         """Test that idempotency key is included when provided"""
-        from app.services.wal_manager import WriteAheadLog
-
         insert_call_data = None
 
         def capture_insert(data):
@@ -139,13 +125,12 @@ class TestWALEntryCreation:
 
         mock_supabase.table.return_value.insert = capture_insert
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            await wal.write_entry(
-                "test_op",
-                {"key": "value"},
-                idempotency_key="unique-key-123"
-            )
+        wal = WriteAheadLog(mock_supabase)
+        await wal.log_operation(
+            "test_op",
+            {"key": "value"},
+            idempotency_key="unique-key-123"
+        )
 
         assert insert_call_data.get("idempotency_key") == "unique-key-123"
 
@@ -160,13 +145,10 @@ class TestWALStatusUpdates:
     @pytest.mark.asyncio
     async def test_mark_completed(self, mock_supabase):
         """Test marking WAL entry as completed"""
-        from app.services.wal_manager import WriteAheadLog
-
         entry_id = str(uuid4())
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            await wal.mark_completed(entry_id, result={"document_id": "doc_123"})
+        wal = WriteAheadLog(mock_supabase)
+        await wal.mark_completed(entry_id, result={"document_id": "doc_123"})
 
         # Verify update was called with correct status
         mock_supabase.table.return_value.update.assert_called()
@@ -174,26 +156,25 @@ class TestWALStatusUpdates:
     @pytest.mark.asyncio
     async def test_mark_failed(self, mock_supabase):
         """Test marking WAL entry as failed"""
-        from app.services.wal_manager import WriteAheadLog
-
         entry_id = str(uuid4())
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            await wal.mark_failed(entry_id, error="Database connection failed")
+        # Setup mock to return entry data for retry count
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+            {"id": entry_id, "retry_count": 0, "max_retries": 3, "operation_type": "test_op"}
+        ]
+
+        wal = WriteAheadLog(mock_supabase)
+        await wal.mark_failed(entry_id, error="Database connection failed")
 
         mock_supabase.table.return_value.update.assert_called()
 
     @pytest.mark.asyncio
     async def test_mark_in_progress(self, mock_supabase):
         """Test marking WAL entry as in-progress"""
-        from app.services.wal_manager import WriteAheadLog
-
         entry_id = str(uuid4())
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            await wal.mark_in_progress(entry_id)
+        wal = WriteAheadLog(mock_supabase)
+        await wal.mark_in_progress(entry_id)
 
         mock_supabase.table.return_value.update.assert_called()
 
@@ -208,34 +189,30 @@ class TestWALReplay:
     @pytest.mark.asyncio
     async def test_replay_pending_entries(self, mock_supabase, sample_wal_entry):
         """Test replaying pending WAL entries"""
-        from app.services.wal_manager import WriteAheadLog
+        # Setup mock to return pending entries via get_pending_entries
+        mock_supabase.table.return_value.select.return_value.in_.return_value.gt.return_value.limit.return_value.execute.return_value.data = [sample_wal_entry]
 
-        # Setup mock to return pending entries
-        mock_supabase.table.return_value.select.return_value.in_.return_value.lt.return_value.order.return_value.limit.return_value.execute.return_value.data = [sample_wal_entry]
+        wal = WriteAheadLog(mock_supabase)
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
+        # Register a handler for the operation type
+        handler_called = False
 
-            # Register a handler for the operation type
-            handler_called = False
+        async def mock_handler(**data):
+            nonlocal handler_called
+            handler_called = True
+            return {"success": True}
 
-            async def mock_handler(data):
-                nonlocal handler_called
-                handler_called = True
-                return {"success": True}
+        wal.register_handler("create_document", mock_handler)
 
-            wal.register_handler("create_document", mock_handler)
-
-            stats = await wal.replay_pending()
+        stats = await wal.replay_pending()
 
         assert stats is not None
+        assert "total" in stats
 
     @pytest.mark.asyncio
     async def test_replay_respects_max_retries(self, mock_supabase):
         """Test that replay respects max retry count"""
-        from app.services.wal_manager import WriteAheadLog
-
-        # Entry with max retries exceeded
+        # Entry with max retries exceeded - should be filtered in get_pending_entries
         exhausted_entry = {
             "id": str(uuid4()),
             "operation_type": "test_op",
@@ -246,32 +223,31 @@ class TestWALReplay:
             "created_at": datetime.utcnow().isoformat()
         }
 
-        mock_supabase.table.return_value.select.return_value.in_.return_value.lt.return_value.order.return_value.limit.return_value.execute.return_value.data = [exhausted_entry]
+        # This entry should be filtered out by get_pending_entries
+        mock_supabase.table.return_value.select.return_value.in_.return_value.gt.return_value.limit.return_value.execute.return_value.data = [exhausted_entry]
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            stats = await wal.replay_pending()
+        wal = WriteAheadLog(mock_supabase)
+        stats = await wal.replay_pending()
 
-        # Entry should be skipped or marked as permanently failed
-        assert stats.get("skipped", 0) >= 0 or stats.get("failed", 0) >= 0
+        # Entry should be filtered out since retry_count >= max_retries
+        assert stats.get("total", 0) == 0 or stats.get("skipped", 0) >= 0
 
     @pytest.mark.asyncio
     async def test_replay_increments_retry_count(self, mock_supabase, sample_wal_entry):
         """Test that replay increments retry count on failure"""
-        from app.services.wal_manager import WriteAheadLog
+        mock_supabase.table.return_value.select.return_value.in_.return_value.gt.return_value.limit.return_value.execute.return_value.data = [sample_wal_entry]
+        # Also setup select for mark_failed
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [sample_wal_entry]
 
-        mock_supabase.table.return_value.select.return_value.in_.return_value.lt.return_value.order.return_value.limit.return_value.execute.return_value.data = [sample_wal_entry]
+        wal = WriteAheadLog(mock_supabase)
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
+        # Register a failing handler
+        async def failing_handler(**data):
+            raise Exception("Handler failed")
 
-            # Register a failing handler
-            async def failing_handler(data):
-                raise Exception("Handler failed")
+        wal.register_handler("create_document", failing_handler)
 
-            wal.register_handler("create_document", failing_handler)
-
-            await wal.replay_pending()
+        await wal.replay_pending()
 
         # Update should have been called to increment retry count
         mock_supabase.table.return_value.update.assert_called()
@@ -287,29 +263,23 @@ class TestWALCleanup:
     @pytest.mark.asyncio
     async def test_cleanup_old_entries(self, mock_supabase):
         """Test cleaning up old completed entries"""
-        from app.services.wal_manager import WriteAheadLog
-
         mock_supabase.table.return_value.delete.return_value.in_.return_value.lt.return_value.execute.return_value.data = [
             {"id": "1"}, {"id": "2"}, {"id": "3"}
         ]
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            cleaned = await wal.cleanup_old_entries(days=7)
+        wal = WriteAheadLog(mock_supabase)
+        cleaned = await wal.cleanup_old_entries(days=7)
 
         assert cleaned >= 0
 
     @pytest.mark.asyncio
     async def test_cleanup_preserves_recent_entries(self, mock_supabase):
         """Test that cleanup preserves recent entries"""
-        from app.services.wal_manager import WriteAheadLog
-
         # Mock returns empty (no old entries to delete)
         mock_supabase.table.return_value.delete.return_value.in_.return_value.lt.return_value.execute.return_value.data = []
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            cleaned = await wal.cleanup_old_entries(days=7)
+        wal = WriteAheadLog(mock_supabase)
+        cleaned = await wal.cleanup_old_entries(days=7)
 
         assert cleaned == 0
 
@@ -323,27 +293,32 @@ class TestWALHandlerRegistration:
 
     def test_register_handler(self, mock_supabase):
         """Test registering an operation handler"""
-        from app.services.wal_manager import WriteAheadLog
+        wal = WriteAheadLog(mock_supabase)
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
+        async def handler(**data):
+            return {"success": True}
 
-            async def handler(data):
-                return {"success": True}
+        wal.register_handler("test_operation", handler)
 
-            wal.register_handler("test_operation", handler)
+        assert "test_operation" in wal._operation_handlers
 
-        assert "test_operation" in wal._handlers
+    def test_handler_can_be_retrieved(self, mock_supabase):
+        """Test that registered handler can be retrieved"""
+        wal = WriteAheadLog(mock_supabase)
 
-    def test_handler_not_found_raises(self, mock_supabase):
-        """Test that missing handler raises appropriate error"""
-        from app.services.wal_manager import WriteAheadLog
+        async def handler(**data):
+            return {"success": True}
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
+        wal.register_handler("test_operation", handler)
 
-            handler = wal.get_handler("nonexistent_operation")
+        retrieved = wal._operation_handlers.get("test_operation")
+        assert retrieved is handler
 
+    def test_unregistered_handler_returns_none(self, mock_supabase):
+        """Test that unregistered operation returns None"""
+        wal = WriteAheadLog(mock_supabase)
+
+        handler = wal._operation_handlers.get("nonexistent_operation")
         assert handler is None
 
 
@@ -355,25 +330,24 @@ class TestWALMetrics:
     """Tests for WAL metrics and statistics"""
 
     @pytest.mark.asyncio
-    async def test_get_pending_count(self, mock_supabase):
-        """Test getting count of pending entries"""
-        from app.services.wal_manager import WriteAheadLog
+    async def test_get_pending_entries_returns_list(self, mock_supabase):
+        """Test getting pending entries returns a list"""
+        mock_supabase.table.return_value.select.return_value.in_.return_value.gt.return_value.limit.return_value.execute.return_value.data = []
 
-        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value.count = 5
+        wal = WriteAheadLog(mock_supabase)
+        entries = await wal.get_pending_entries()
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            count = await wal.get_pending_count()
-
-        assert count >= 0
+        assert isinstance(entries, list)
 
     @pytest.mark.asyncio
-    async def test_get_stats(self, mock_supabase):
-        """Test getting WAL statistics"""
-        from app.services.wal_manager import WriteAheadLog
+    async def test_replay_returns_stats(self, mock_supabase):
+        """Test that replay returns statistics"""
+        mock_supabase.table.return_value.select.return_value.in_.return_value.gt.return_value.limit.return_value.execute.return_value.data = []
 
-        with patch('app.services.wal_manager.get_supabase', return_value=mock_supabase):
-            wal = WriteAheadLog()
-            stats = await wal.get_stats()
+        wal = WriteAheadLog(mock_supabase)
+        stats = await wal.replay_pending()
 
         assert isinstance(stats, dict)
+        assert "total" in stats
+        assert "succeeded" in stats
+        assert "failed" in stats

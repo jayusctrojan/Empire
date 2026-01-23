@@ -190,7 +190,7 @@ async def get_context_for_query(
         raise
     except Exception as e:
         logger.error("get_context_for_query_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred while building context")
 
 
 @router.post("/window/build")
@@ -244,7 +244,7 @@ async def build_context_window(
         raise
     except Exception as e:
         logger.error("build_context_window_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred while building context window")
 
 
 # =============================================================================
@@ -281,7 +281,7 @@ async def get_recent_messages(
 
     except Exception as e:
         logger.error("get_recent_messages_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred while retrieving recent messages")
 
 
 @router.post("/weighted")
@@ -329,7 +329,7 @@ async def get_weighted_memories(
 
     except Exception as e:
         logger.error("get_weighted_memories_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred while retrieving weighted memories")
 
 
 @router.post("/graph/related")
@@ -365,7 +365,7 @@ async def get_graph_related_memories(
 
     except Exception as e:
         logger.error("get_graph_related_memories_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred while retrieving graph-related memories")
 
 
 @router.post("/semantic")
@@ -409,7 +409,7 @@ async def get_semantic_memories(
         raise
     except Exception as e:
         logger.error("get_semantic_memories_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred while performing semantic search")
 
 
 # =============================================================================
@@ -437,7 +437,7 @@ async def count_tokens(
 
     except Exception as e:
         logger.error("count_tokens_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An internal error occurred while counting tokens")
 
 
 @router.get("/config/defaults")
@@ -498,6 +498,6 @@ async def health_check():
         return {
             "status": "unhealthy",
             "service": "context_management",
-            "error": str(e),
+            "error": "Service health check failed",
             "timestamp": datetime.now().isoformat()
         }

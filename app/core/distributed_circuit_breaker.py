@@ -254,7 +254,8 @@ class DistributedCircuitBreaker:
             return self._local_state
 
         try:
-            data = self.redis.get(self._state_key)
+            # Use asyncio.to_thread to run sync Redis operation in thread pool
+            data = await asyncio.to_thread(self.redis.get, self._state_key)
 
             if data:
                 state_dict = json.loads(data)
@@ -288,7 +289,9 @@ class DistributedCircuitBreaker:
         """
         try:
             # State TTL: Keep for 24 hours even if not updated
-            self.redis.setex(
+            # Use asyncio.to_thread to run sync Redis operation in thread pool
+            await asyncio.to_thread(
+                self.redis.setex,
                 self._state_key,
                 86400,  # 24 hours
                 state.model_dump_json()

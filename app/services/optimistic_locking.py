@@ -462,33 +462,48 @@ def with_optimistic_lock(
         @with_optimistic_lock(table="documents_v2", id_param="doc_id")
         async def update_document(doc_id: str, version: int, title: str):
             return {"title": title}
+
+    Note: The decorated function should return a dict of updates to apply.
+    For async functions, ensure the updates are simple dicts (not coroutines).
     """
+    import functools
+
     def decorator(func):
+        @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             # Extract parameters
             from app.core.connections import get_supabase
 
             supabase = get_supabase()
             record_id = kwargs.get(id_param)
-            expected_version = kwargs.get(version_param)
 
             if not record_id:
                 raise ValueError(f"Missing required parameter: {id_param}")
 
-            # Remove version from kwargs to pass to update function
-            if version_param in kwargs:
-                del kwargs[version_param]
+            # Remove version from kwargs (version is handled by update_with_retry)
+            kwargs_copy = kwargs.copy()
+            if version_param in kwargs_copy:
+                del kwargs_copy[version_param]
 
-            # Get updates from the function
-            def get_updates(record):
+            # For async-compatible update function
+            async def get_updates_async(record):
                 # Remove id_param to avoid passing it to function
-                call_kwargs = {k: v for k, v in kwargs.items() if k != id_param}
-                # This is sync - the function should return updates dict directly
-                import asyncio
-                loop = asyncio.get_event_loop()
+                call_kwargs = {k: v for k, v in kwargs_copy.items() if k != id_param}
                 if asyncio.iscoroutinefunction(func):
-                    return loop.run_until_complete(func(*args, **call_kwargs))
+                    return await func(*args, **call_kwargs)
                 return func(*args, **call_kwargs)
+
+            # Sync wrapper for update_with_retry (which expects sync update_fn)
+            def get_updates(record):
+                call_kwargs = {k: v for k, v in kwargs_copy.items() if k != id_param}
+                # For sync functions, call directly
+                if not asyncio.iscoroutinefunction(func):
+                    return func(*args, **call_kwargs)
+                # For async, we need a different approach - use the result already computed
+                raise ValueError(
+                    "Async functions are not supported with with_optimistic_lock decorator. "
+                    "Use update_with_retry directly for async update functions."
+                )
 
             return await update_with_retry(
                 supabase=supabase,
