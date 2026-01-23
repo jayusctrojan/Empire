@@ -152,7 +152,7 @@ This document outlines all tools, MCPs, and development environments available f
 **Connection Details**:
 - **URI**: `bolt://localhost:7687`
 - **Username**: `neo4j`
-- **Password**: `***REMOVED***`
+- **Password**: `<your-password>  # See .env file`
 - **Web Interface**: http://localhost:7474
 
 **Usage Examples**:
@@ -182,7 +182,7 @@ This document outlines all tools, MCPs, and development environments available f
       "run", "-i", "--rm",
       "-e", "NEO4J_URI=bolt://host.docker.internal:7687",
       "-e", "NEO4J_USERNAME=neo4j",
-      "-e", "NEO4J_PASSWORD=***REMOVED***",
+      "-e", "NEO4J_PASSWORD=<your-password>  # See .env file",
       "neo4j/mcp-server-neo4j:latest"
     ]
   }
@@ -785,7 +785,7 @@ All credentials should be in `.env` file (see PRE_DEV_CHECKLIST.md):
 # Databases
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=***REMOVED***
+NEO4J_PASSWORD=<your-password>  # See .env file
 
 SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_SERVICE_KEY=...
@@ -907,7 +907,7 @@ docker-compose restart neo4j
 docker logs empire-neo4j
 ```
 
-##***REMOVED*** Connection Issues:
+##<your-password>  # See .env file Connection Issues:
 1. Verify credentials in `.env`
 2. Check Supabase project status
 3. Test with curl:
