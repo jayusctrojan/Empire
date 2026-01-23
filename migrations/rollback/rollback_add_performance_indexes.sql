@@ -14,9 +14,10 @@
 --
 -- NOTE: Removing indexes will NOT delete data, only slow down queries.
 -- The pg_trgm extension is left intact as other features may use it.
+--
+-- IMPORTANT: DROP INDEX CONCURRENTLY cannot run inside a transaction.
+-- This script must be run outside a transaction block.
 -- ============================================================================
-
-BEGIN;
 
 -- ============================================================================
 -- PHASE 1: DROP DOCUMENT INDEXES
@@ -27,7 +28,7 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_documents_created_at;
 DROP INDEX CONCURRENTLY IF EXISTS idx_documents_doc_type;
 DROP INDEX CONCURRENTLY IF EXISTS idx_documents_embedding_hnsw;
 
-RAISE NOTICE 'Dropped document table indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped document table indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 2: DROP RECORD MANAGER INDEXES
@@ -36,7 +37,7 @@ RAISE NOTICE 'Dropped document table indexes';
 DROP INDEX CONCURRENTLY IF EXISTS idx_record_manager_key_namespace;
 DROP INDEX CONCURRENTLY IF EXISTS idx_record_manager_updated_at;
 
-RAISE NOTICE 'Dropped record manager indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped record manager indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 3: DROP CHAT SESSION/MESSAGE INDEXES
@@ -46,7 +47,7 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_chat_sessions_user_id_updated;
 DROP INDEX CONCURRENTLY IF EXISTS idx_chat_messages_session_timestamp;
 DROP INDEX CONCURRENTLY IF EXISTS idx_chat_messages_role;
 
-RAISE NOTICE 'Dropped chat session/message indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped chat session/message indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 4: DROP KNOWLEDGE GRAPH INDEXES
@@ -58,7 +59,7 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_knowledge_entities_document_id;
 DROP INDEX CONCURRENTLY IF EXISTS idx_knowledge_relationships_source;
 DROP INDEX CONCURRENTLY IF EXISTS idx_knowledge_relationships_target;
 
-RAISE NOTICE 'Dropped knowledge graph indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped knowledge graph indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 5: DROP USER MEMORY GRAPH INDEXES
@@ -69,7 +70,7 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_user_memory_nodes_type;
 DROP INDEX CONCURRENTLY IF EXISTS idx_user_memory_edges_source;
 DROP INDEX CONCURRENTLY IF EXISTS idx_user_memory_edges_target;
 
-RAISE NOTICE 'Dropped user memory graph indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped user memory graph indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 6: DROP PERFORMANCE MONITORING INDEXES
@@ -81,7 +82,7 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_query_perf_log_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS idx_document_feedback_document_created;
 DROP INDEX CONCURRENTLY IF EXISTS idx_document_feedback_user_id;
 
-RAISE NOTICE 'Dropped performance monitoring indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped performance monitoring indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 7: DROP ERROR/AUDIT LOG INDEXES (Task 43.3 specific)
@@ -93,7 +94,7 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_error_logs_timestamp;
 DROP INDEX CONCURRENTLY IF EXISTS idx_error_logs_level;
 DROP INDEX CONCURRENTLY IF EXISTS idx_error_logs_endpoint;
 
-RAISE NOTICE 'Dropped error log indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped error log indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 8: DROP TABULAR DOCUMENT INDEXES
@@ -102,7 +103,7 @@ RAISE NOTICE 'Dropped error log indexes';
 DROP INDEX CONCURRENTLY IF EXISTS idx_tabular_rows_document_id;
 DROP INDEX CONCURRENTLY IF EXISTS idx_tabular_rows_row_number;
 
-RAISE NOTICE 'Dropped tabular document row indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped tabular document row indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 9: DROP USER DOCUMENT CONNECTION INDEXES
@@ -111,12 +112,10 @@ RAISE NOTICE 'Dropped tabular document row indexes';
 DROP INDEX CONCURRENTLY IF EXISTS idx_user_doc_connections_user_id;
 DROP INDEX CONCURRENTLY IF EXISTS idx_user_doc_connections_document_id;
 
-RAISE NOTICE 'Dropped user document connection indexes';
-
-COMMIT;
+DO $$ BEGIN RAISE NOTICE 'Dropped user document connection indexes'; END $$;
 
 -- ============================================================================
--- PHASE 10: VERIFICATION (Run after COMMIT)
+-- PHASE 10: VERIFICATION
 -- ============================================================================
 
 -- Count remaining indexes from Task 43.3

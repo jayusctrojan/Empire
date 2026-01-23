@@ -155,6 +155,12 @@ class Neo4jEntityService:
             logger.error(f"Failed to create entity node: {e}")
             return None
 
+    # Allowlist of valid node types and property keys to prevent injection
+    VALID_NODE_TYPES = frozenset({"Document", "Entity"})
+    VALID_PROPERTY_KEYS = frozenset({
+        "weight", "confidence", "created_at", "source", "context"
+    })
+
     def create_relationship(
         self,
         from_id: str,
@@ -181,14 +187,38 @@ class Neo4jEntityService:
             True if successful, False otherwise
         """
         try:
-            # Build property string
+            # Validate node types against allowlist to prevent Cypher injection
+            if from_type not in self.VALID_NODE_TYPES:
+                logger.error(f"Invalid from_type: {from_type}")
+                return False
+            if to_type not in self.VALID_NODE_TYPES:
+                logger.error(f"Invalid to_type: {to_type}")
+                return False
+
+            # Validate relationship_type is a valid enum value
+            if not isinstance(relationship_type, RelationshipType):
+                logger.error(f"Invalid relationship_type: {relationship_type}")
+                return False
+
+            # Build property string with validated keys only
             props = properties or {}
-            prop_string = ", ".join([f"r.{k} = ${k}" for k in props.keys()])
+            safe_props = {k: v for k, v in props.items() if k in self.VALID_PROPERTY_KEYS}
+            if len(safe_props) != len(props):
+                logger.warning(
+                    f"Some property keys were filtered out: "
+                    f"{set(props.keys()) - set(safe_props.keys())}"
+                )
+            prop_string = ", ".join([f"r.{k} = ${k}" for k in safe_props.keys()])
             set_clause = f"SET {prop_string}" if prop_string else ""
 
+            # Determine the ID property based on node type
+            from_id_prop = "doc_id" if from_type == "Document" else "entity_id"
+            to_id_prop = "doc_id" if to_type == "Document" else "entity_id"
+
+            # Use safe string formatting since node types are validated against allowlist
             query = f"""
-            MATCH (a:{from_type} {{{'doc_id' if from_type == 'Document' else 'entity_id'}: $from_id}})
-            MATCH (b:{to_type} {{{'doc_id' if to_type == 'Document' else 'entity_id'}: $to_id}})
+            MATCH (a:{from_type} {{{from_id_prop}: $from_id}})
+            MATCH (b:{to_type} {{{to_id_prop}: $to_id}})
             MERGE (a)-[r:{relationship_type.value}]->(b)
             {set_clause}
             RETURN true as created
@@ -197,7 +227,7 @@ class Neo4jEntityService:
             params = {
                 "from_id": from_id,
                 "to_id": to_id,
-                **props
+                **safe_props
             }
 
             result = self.connection.execute_query(query, params)

@@ -28,7 +28,7 @@ DROP FUNCTION IF EXISTS refresh_current_month_costs();
 -- Drop the materialized view
 DROP MATERIALIZED VIEW IF EXISTS current_month_costs;
 
-RAISE NOTICE 'Dropped current_month_costs materialized view';
+DO $$ BEGIN RAISE NOTICE 'Dropped current_month_costs materialized view'; END $$;
 
 -- ============================================================================
 -- PHASE 2: DROP HELPER FUNCTIONS
@@ -37,7 +37,7 @@ RAISE NOTICE 'Dropped current_month_costs materialized view';
 DROP FUNCTION IF EXISTS get_current_month_spending(TEXT);
 DROP FUNCTION IF EXISTS get_budget_usage_percent(TEXT);
 
-RAISE NOTICE 'Dropped cost helper functions';
+DO $$ BEGIN RAISE NOTICE 'Dropped cost helper functions'; END $$;
 
 -- ============================================================================
 -- PHASE 3: DROP TRIGGERS
@@ -50,7 +50,7 @@ DROP TRIGGER IF EXISTS trigger_cost_reports_updated_at ON cost_reports;
 DROP FUNCTION IF EXISTS update_budget_configs_updated_at();
 DROP FUNCTION IF EXISTS update_cost_reports_updated_at();
 
-RAISE NOTICE 'Dropped cost tracking triggers';
+DO $$ BEGIN RAISE NOTICE 'Dropped cost tracking triggers'; END $$;
 
 -- ============================================================================
 -- PHASE 4: DROP RLS POLICIES
@@ -71,7 +71,7 @@ DROP POLICY IF EXISTS cost_reports_authenticated_read ON cost_reports;
 -- cost_alerts policies
 DROP POLICY IF EXISTS cost_alerts_service_role_all ON cost_alerts;
 
-RAISE NOTICE 'Dropped cost tracking RLS policies';
+DO $$ BEGIN RAISE NOTICE 'Dropped cost tracking RLS policies'; END $$;
 
 -- ============================================================================
 -- PHASE 5: DROP INDEXES
@@ -100,7 +100,7 @@ DROP INDEX IF EXISTS idx_cost_alerts_service;
 DROP INDEX IF EXISTS idx_cost_alerts_sent_at;
 DROP INDEX IF EXISTS idx_cost_alerts_type;
 
-RAISE NOTICE 'Dropped cost tracking indexes';
+DO $$ BEGIN RAISE NOTICE 'Dropped cost tracking indexes'; END $$;
 
 -- ============================================================================
 -- PHASE 6: DROP TABLES (Order matters due to FK constraints)
@@ -108,19 +108,19 @@ RAISE NOTICE 'Dropped cost tracking indexes';
 
 -- Drop cost_alerts first (references budget_configs)
 DROP TABLE IF EXISTS cost_alerts CASCADE;
-RAISE NOTICE 'Dropped cost_alerts table';
+DO $$ BEGIN RAISE NOTICE 'Dropped cost_alerts table'; END $$;
 
 -- Drop cost_reports
 DROP TABLE IF EXISTS cost_reports CASCADE;
-RAISE NOTICE 'Dropped cost_reports table';
+DO $$ BEGIN RAISE NOTICE 'Dropped cost_reports table'; END $$;
 
 -- Drop budget_configs
 DROP TABLE IF EXISTS budget_configs CASCADE;
-RAISE NOTICE 'Dropped budget_configs table';
+DO $$ BEGIN RAISE NOTICE 'Dropped budget_configs table'; END $$;
 
 -- Drop cost_entries
 DROP TABLE IF EXISTS cost_entries CASCADE;
-RAISE NOTICE 'Dropped cost_entries table';
+DO $$ BEGIN RAISE NOTICE 'Dropped cost_entries table'; END $$;
 
 -- ============================================================================
 -- PHASE 7: REVOKE PERMISSIONS
