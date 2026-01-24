@@ -32,7 +32,7 @@ from tenacity import (
 )
 from prometheus_client import Counter, Histogram, Gauge
 from b2sdk.v2 import InMemoryAccountInfo, B2Api
-from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeoutError, FileNotPresent
+from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeout, FileNotPresent
 
 from app.services.b2_storage import get_b2_service, B2StorageService, B2Folder, ProcessingStatus
 from app.core.connections import get_redis
@@ -430,7 +430,7 @@ class ResilientB2StorageService:
             retry=retry_if_exception_type((
                 B2Error,
                 B2ConnectionError,
-                B2RequestTimeoutError,
+                B2RequestTimeout,
                 ConnectionError,
                 TimeoutError
             )),
