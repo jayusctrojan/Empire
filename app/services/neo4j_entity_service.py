@@ -407,15 +407,17 @@ class Neo4jEntityService:
             True if successful
         """
         try:
+            # Count before delete - after DETACH DELETE, the variable no longer exists
             query = """
-            MATCH (d:Document {doc_id: $doc_id})
+            OPTIONAL MATCH (d:Document {doc_id: $doc_id})
+            WITH d, d IS NOT NULL as existed
             DETACH DELETE d
-            RETURN count(d) as deleted
+            RETURN existed as deleted
             """
 
             result = self.connection.execute_query(query, {"doc_id": doc_id})
 
-            if result and result[0].get("deleted", 0) > 0:
+            if result and result[0].get("deleted", False):
                 logger.info(f"Deleted document node: {doc_id}")
                 return True
 
@@ -436,15 +438,17 @@ class Neo4jEntityService:
             True if successful
         """
         try:
+            # Count before delete - after DETACH DELETE, the variable no longer exists
             query = """
-            MATCH (e:Entity {entity_id: $entity_id})
+            OPTIONAL MATCH (e:Entity {entity_id: $entity_id})
+            WITH e, e IS NOT NULL as existed
             DETACH DELETE e
-            RETURN count(e) as deleted
+            RETURN existed as deleted
             """
 
             result = self.connection.execute_query(query, {"entity_id": entity_id})
 
-            if result and result[0].get("deleted", 0) > 0:
+            if result and result[0].get("deleted", False):
                 logger.info(f"Deleted entity node: {entity_id}")
                 return True
 
