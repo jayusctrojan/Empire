@@ -458,11 +458,12 @@ benchmark_tests:
 - ROI achievement: On track
 
 **Alert Thresholds:**
+(Aligned with config/monitoring/alert_rules.yml)
 - Token speed <25 tok/s: Critical
-- Memory >85%: Warning
-- GPU >90%: Warning
-- Queue >100 docs: Warning
-- Error rate >2%: Critical
+- Memory: >80% Warning, >95% Critical
+- CPU: >80% Warning, >95% Critical
+- Queue: >100 docs Warning, >500 docs Critical
+- Error rate: >1 err/s Warning, >5 err/s Critical
 
 ## 7.9 Implementation Status
 

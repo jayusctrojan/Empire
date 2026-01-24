@@ -146,7 +146,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "(1 - rate(empire_errors_total[5m])) * 100",
+          "expr": "100 * (1 - (sum(rate(empire_errors_total[5m])) / sum(rate(empire_requests_total[5m]))))",
           "refId": "A"
         }
       ],

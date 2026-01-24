@@ -64,10 +64,8 @@ scrape_configs:
   # ==========================================
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis:6379']
+      - targets: ['redis-exporter:9121']
     metrics_path: '/metrics'
-    params:
-      target: ['redis://redis:6379']
 
   # ==========================================
   # NEO4J METRICS (if exposed)

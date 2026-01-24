@@ -80,6 +80,23 @@ services:
       - empire_monitoring
 
   # ==========================================
+  # REDIS EXPORTER - Prometheus metrics for Redis
+  # ==========================================
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: empire_redis_exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - empire_monitoring
+
+  # ==========================================
   # FLOWER - Celery Monitoring UI
   # ==========================================
   flower:
