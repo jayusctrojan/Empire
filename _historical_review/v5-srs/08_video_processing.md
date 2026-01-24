@@ -185,7 +185,9 @@ The v5.0 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 
 **VPR-014: Quality Metrics (Local Model Performance)**
 - **95% transcription accuracy** (Soniox when used)
-- **92% object detection accuracy** (Qwen2.5-VL-7B)
+- **~25-33% mAP** object detection (Qwen2.5-VL-7B on COCO benchmarks)
+  - Note: VLMs excel at scene understanding over precise detection
+  - For high-precision detection, use dedicated YOLO/DETR models
 - **88% scene classification accuracy** (Local)
 - **99% format compatibility** (FFmpeg)
 - **100% privacy preservation** for sensitive content
