@@ -4,10 +4,11 @@
 
 global:
   # The smarthost and SMTP sender used for mail notifications
-  smtp_from: 'empire-alerts@empire.ai'
-  smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_auth_username: 'alerts@empire.ai'
-  smtp_auth_password: 'your-smtp-password'
+  # NOTE: Configure via environment variables or Docker secrets
+  smtp_from: '{{ .Env.SMTP_FROM | default "alerts@example.com" }}'
+  smtp_smarthost: '{{ .Env.SMTP_SMARTHOST | default "smtp.gmail.com:587" }}'
+  smtp_auth_username: '{{ .Env.SMTP_AUTH_USERNAME }}'
+  smtp_auth_password: '{{ .Env.SMTP_AUTH_PASSWORD }}'
 
   # Global timeout settings
   resolve_timeout: 5m

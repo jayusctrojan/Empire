@@ -26,8 +26,13 @@ services:
     container_name: empire-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"  # Redis default port
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+      - "127.0.0.1:6379:6379"  # Bind to localhost only for security
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     volumes:
       - ../../data/redis/data:/data
     healthcheck:

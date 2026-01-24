@@ -526,7 +526,7 @@ Empire v7.2 includes comprehensive monitoring using Prometheus, Grafana, and sup
 #### **Grafana** (Port 3000)
 - Visualization dashboards
 - Custom Empire dashboard pre-configured
-- Credentials: admin/empiregrafana123
+- Credentials: Set via GRAFANA_ADMIN_USER/GRAFANA_ADMIN_PASSWORD in .env
 
 #### **Redis** (Port 6379)
 - Celery task broker
@@ -536,7 +536,7 @@ Empire v7.2 includes comprehensive monitoring using Prometheus, Grafana, and sup
 #### **Flower** (Port 5555)
 - Celery task monitoring UI
 - Worker status and task history
-- Credentials: admin/empireflower123
+- Credentials: Set via FLOWER_BASIC_AUTH in .env
 
 #### **Alertmanager** (Port 9093)
 - Alert routing and notifications
@@ -576,8 +576,8 @@ async def metrics():
 
 ### Access URLs
 - **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/empiregrafana123)
-- **Flower**: http://localhost:5555 (admin/empireflower123)
+- **Grafana**: http://localhost:3000 (credentials in .env)
+- **Flower**: http://localhost:5555 (credentials in .env)
 - **Alertmanager**: http://localhost:9093
 
 ### Environment Variables (Already in .env)
