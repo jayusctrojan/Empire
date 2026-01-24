@@ -27,9 +27,9 @@ from app.routes import sessions, preferences, costs, rbac, documents, users, mon
 from app.routes import health as health_router  # Task 190: Enhanced Health Checks
 from app.routes import feedback as feedback_router  # Task 188: Agent Feedback System
 # from app.routes import preflight as preflight_router  # Service Orchestration: Preflight checks (not yet implemented)
-from app.routes import context_window as context_window_router  # Feature 011: Chat Context Window Management
-from app.routes import checkpoints as checkpoints_router  # Task 206: Automatic Checkpoint System
-from app.routes import session_memory as session_memory_router  # Task 207: Session Memory & Persistence
+# from app.routes import context_window as context_window_router  # Feature 011: Chat Context Window Management (not yet merged)
+# from app.routes import checkpoints as checkpoints_router  # Task 206: Automatic Checkpoint System (not yet merged)
+# from app.routes import session_memory as session_memory_router  # Task 207: Session Memory & Persistence (not yet merged)
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -614,13 +614,13 @@ app.include_router(feedback_router.router)  # Feedback router has /api/feedback 
 # app.include_router(preflight_router.router)  # Preflight router has /api/preflight prefix (not yet implemented)
 
 # Feature 011: Chat Context Window Management - Progress bar and token tracking
-app.include_router(context_window_router.router)  # Context Window router has /api/context-window prefix
+# app.include_router(context_window_router.router)  # Context Window router has /api/context-window prefix (not yet merged)
 
 # Task 206: Automatic Checkpoint System - Session checkpoints and crash recovery
-app.include_router(checkpoints_router.router)  # Checkpoints router has /api/checkpoints prefix
+# app.include_router(checkpoints_router.router)  # Checkpoints router has /api/checkpoints prefix (not yet merged)
 
 # Task 207: Session Memory & Persistence - Long-term session memory and resumption
-app.include_router(session_memory_router.router)  # Session Memory router has /api/session-memory prefix
+# app.include_router(session_memory_router.router)  # Session Memory router has /api/session-memory prefix (not yet merged)
 
 # TODO: Additional routers
 # app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
