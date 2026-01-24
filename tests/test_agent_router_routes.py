@@ -481,6 +481,7 @@ class TestAdminEndpoints:
         """Test clearing expired cache entries."""
         from app.routes.agent_router import router, get_router_service
         from app.services.agent_router_service import AgentRouterService
+        from app.middleware.auth import require_admin
         from fastapi import FastAPI
 
         app = FastAPI()
@@ -492,6 +493,8 @@ class TestAdminEndpoints:
         mock_service.supabase = mock_supabase
 
         app.dependency_overrides[get_router_service] = lambda: mock_service
+        # Mock require_admin to bypass authentication in tests
+        app.dependency_overrides[require_admin] = lambda: {"user_id": "test-admin", "is_admin": True}
 
         async with AsyncClient(
             transport=ASGITransport(app=app),
