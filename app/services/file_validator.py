@@ -587,7 +587,7 @@ class FileValidator:
                     if extension not in ['.txt', '.md', '.csv']:
                         return True, description or f"Blocked: {magic_bytes[:10]}"
                 else:
-                    return True, description or f"Blocked binary signature detected"
+                    return True, description or "Blocked binary signature detected"
 
         # Check for Windows executable (MZ header)
         if file_header[:2] == b'MZ':

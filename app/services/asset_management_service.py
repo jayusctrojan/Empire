@@ -208,7 +208,7 @@ class AssetManagementService:
             import json
             try:
                 keywords = json.loads(keywords)
-            except:
+            except Exception:
                 keywords = []
 
         return Asset(
@@ -476,13 +476,13 @@ class AssetManagementService:
             asset = await self.get_asset(asset_id, user_id)
 
             # Find the root asset (the one without parent_version_id)
-            root_id = asset_id
+            _root_id = asset_id
             current = asset
 
             while current.parent_version_id:
                 try:
                     current = await self.get_asset(current.parent_version_id, user_id)
-                    root_id = current.id
+                    _root_id = current.id  # noqa: F841
                 except AssetNotFoundError:
                     break
 

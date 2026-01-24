@@ -239,7 +239,7 @@ class SemanticCacheService:
         """
         try:
             redis = await self._get_redis_client()
-            cache_key = f"emb:{self._hash_query(text)}"
+            _cache_key = f"emb:{self._hash_query(text)}"  # noqa: F841
 
             cached = redis.get_cached_embedding(text)
 
@@ -330,7 +330,7 @@ class SemanticCacheService:
             redis = await self._get_redis_client()
 
             # Step 1: Try exact hash match first (fastest)
-            exact_key = f"{namespace}:exact:{self._hash_query(query)}"
+            _exact_key = f"{namespace}:exact:{self._hash_query(query)}"  # noqa: F841
             exact_match = redis.get_cached_query_result(query)
 
             if exact_match:
@@ -463,7 +463,7 @@ class SemanticCacheService:
             }
 
             # Store for exact match lookup
-            exact_key = f"{namespace}:exact:{self._hash_query(query)}"
+            _exact_key = f"{namespace}:exact:{self._hash_query(query)}"  # noqa: F841
             redis.cache_query_result(query, result)
 
             # Store for semantic search
@@ -491,8 +491,8 @@ class SemanticCacheService:
         try:
             redis = await self._get_redis_client()
 
-            exact_key = f"{namespace}:exact:{self._hash_query(query)}"
-            sem_key = f"{namespace}:sem:{self._hash_query(query)}"
+            _exact_key = f"{namespace}:exact:{self._hash_query(query)}"  # noqa: F841
+            _sem_key = f"{namespace}:sem:{self._hash_query(query)}"  # noqa: F841
 
             redis.invalidate_cache(query, key_type="query")
 

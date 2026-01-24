@@ -565,7 +565,7 @@ def generate_research_report(self, job_id: int) -> Dict[str, Any]:
         report_record = {
             "job_id": job_id,
             "title": f"Research Report: {job['query'][:100]}",
-            "description": f"Generated report for research query",
+            "description": "Generated report for research query",
             "md_path": md_path,
             "md_url": md_url,
             "pdf_path": pdf_path,

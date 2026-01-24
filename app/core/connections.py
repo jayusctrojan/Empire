@@ -91,7 +91,7 @@ class ConnectionManager:
             self.supabase = create_client(supabase_url, supabase_key)
 
             # Test connection with a simple query
-            _result = self.supabase.table("documents").select("id").limit(1).execute()
+            _result = self.supabase.table("documents").select("id").limit(1).execute()  # noqa: F841
 
             logger.info("Supabase connection established", url=supabase_url)
 
@@ -203,7 +203,7 @@ class ConnectionManager:
         # Check Supabase
         try:
             if self.supabase:
-                _result = self.supabase.table("documents").select("id").limit(1).execute()
+                _result = self.supabase.table("documents").select("id").limit(1).execute()  # noqa: F841
                 health_status["supabase"] = "healthy"
             else:
                 health_status["supabase"] = "not_configured"

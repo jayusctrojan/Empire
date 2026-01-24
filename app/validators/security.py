@@ -23,7 +23,7 @@ PATH_TRAVERSAL_PATTERNS = [
     r'~/',    # Home directory
     r'\x00',  # Null byte
     r'%00',   # URL-encoded null byte
-    r'%2e%2e', # URL-encoded ..
+    r'%2e%2e',  # URL-encoded ..
     r'%252e',  # Double URL-encoded .
     r'\\',    # Backslash (Windows path separator)
 ]

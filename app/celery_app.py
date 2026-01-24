@@ -190,8 +190,8 @@ SOURCE_PRIORITY = {
     "epub": PRIORITY_LOW,         # EPUB = slower processing
 
     # Very slow processing - background priority (transcription required)
-    "audio": PRIORITY_BACKGROUND, # Audio = Soniox transcription (very slow)
-    "video": PRIORITY_BACKGROUND, # Video = transcription (very slow)
+    "audio": PRIORITY_BACKGROUND,  # Audio = Soniox transcription (very slow)
+    "video": PRIORITY_BACKGROUND,  # Video = transcription (very slow)
     "mp3": PRIORITY_BACKGROUND,   # MP3 audio files
     "wav": PRIORITY_BACKGROUND,   # WAV audio files
     "m4a": PRIORITY_BACKGROUND,   # M4A audio files
@@ -254,7 +254,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(task.name)
@@ -274,7 +274,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
             document_id=document_id,
             query_id=query_id,
             user_id=user_id,
-            session_id=_session_id,
+            session_id=task_kwargs.get('session_id'),
             metadata=metadata if metadata else None
         )
     except Exception as e:
@@ -352,7 +352,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, stat
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(task.name)
@@ -433,7 +433,7 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(sender.name)
@@ -516,7 +516,7 @@ def task_retry_handler(sender=None, request=None, reason=None, einfo=None, **kwa
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(sender.name)
@@ -596,7 +596,7 @@ def send_to_dead_letter_queue(failed_task_info: dict):
             print(f"💾 DLQ entry stored in database: {dlq_entry['task_id']}")
             dlq_entry['db_id'] = result.data[0].get('id')
         else:
-            print(f"⚠️ Failed to store DLQ entry in database")
+            print("⚠️ Failed to store DLQ entry in database")
 
     except Exception as db_error:
         # Log error but don't fail - also log to console as backup
@@ -711,7 +711,7 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
                     .eq('id', dlq_db_id) \
                     .execute()
 
-                print(f"💾 Updated DLQ entry status to 'retried'")
+                print("💾 Updated DLQ entry status to 'retried'")
             except Exception as db_error:
                 print(f"⚠️ Failed to update DLQ status: {db_error}")
 

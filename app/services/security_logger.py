@@ -87,7 +87,7 @@ class SecuritySeverity(Enum):
     INFO = "info"         # Normal security events
     WARNING = "warning"   # Potentially suspicious, monitor
     HIGH = "high"         # Security concern, investigate
-    CRITICAL = "critical" # Security incident, immediate action
+    CRITICAL = "critical"  # Security incident, immediate action
 
 
 # ============================================================================

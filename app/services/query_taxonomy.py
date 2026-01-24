@@ -242,7 +242,7 @@ class QueryTaxonomy:
         Returns:
             RoutingDecision with classification and routing
         """
-        query_normalized = self.normalize_query(query)
+        _query_normalized = self.normalize_query(query)  # noqa: F841
 
         # Check for hybrid first (most specific)
         if self.is_hybrid_query(query):

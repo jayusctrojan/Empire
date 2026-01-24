@@ -496,7 +496,7 @@ def reprocess_document(
                         try:
                             import os
                             os.unlink(local_file_path)
-                        except:
+                        except Exception:
                             pass
 
         # Generate new embeddings if update_embeddings
@@ -581,7 +581,7 @@ def reprocess_document(
                 "processing_status": "processing_failed",
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("document_id", document_id).execute()
-        except:
+        except Exception:
             pass
         raise
 

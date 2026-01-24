@@ -372,7 +372,7 @@ class EmailService:
         Returns:
             True if sent successfully
         """
-        subject = f"⏰ Long-Running Task Alert"
+        subject = "⏰ Long-Running Task Alert"
         if filename:
             subject += f": {filename}"
 

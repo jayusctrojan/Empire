@@ -314,7 +314,7 @@ def update_relationships(self, document_id: str) -> Dict[str, Any]:
         relationships_strengthened = 0
 
         for i, entity1 in enumerate(entities):
-            for entity2 in entities[i+1:]:
+            for entity2 in entities[i + 1:]:
                 # Create or strengthen relationship between co-occurring entities
                 result = neo4j_service.create_or_strengthen_relationship(
                     source_id=entity1.get('entity_id'),

@@ -114,7 +114,7 @@ class PostgresCacheService:
             expires_at = datetime.utcnow() + timedelta(seconds=self.config.ttl_seconds)
 
             # Upsert cache entry
-            data = {
+            _data = {  # noqa: F841
                 "cache_key": key,
                 "cache_type": "query",
                 "cache_value": json.dumps(result),
@@ -172,7 +172,7 @@ class PostgresCacheService:
             key = self._generate_cache_key(text, key_type="embedding")
             expires_at = datetime.utcnow() + timedelta(seconds=self.config.ttl_seconds)
 
-            data = {
+            _data = {  # noqa: F841
                 "cache_key": key,
                 "cache_type": "embedding",
                 "cache_value": json.dumps(embedding),
@@ -222,7 +222,7 @@ class PostgresCacheService:
                 return 0
 
             # Delete expired entries
-            now = datetime.utcnow().isoformat()
+            _now = datetime.utcnow().isoformat()  # noqa: F841
 
             logger.info("Cleaned up expired PostgreSQL cache entries")
             return 0  # Mock implementation

@@ -170,7 +170,7 @@ async def lifespan(app: FastAPI):
         # Add shutdown middleware (rejects new requests during graceful shutdown)
         # This must be added after coordinator initialization
         from starlette.middleware.base import BaseHTTPMiddleware
-        shutdown_middleware = ShutdownMiddleware(app, shutdown_coordinator)
+        _shutdown_middleware = ShutdownMiddleware(app, shutdown_coordinator)  # noqa: F841
         # Note: middleware is registered via the ShutdownMiddleware class which wraps the dispatch
         print("🛑 Graceful shutdown coordinator initialized with middleware")
     except Exception as e:

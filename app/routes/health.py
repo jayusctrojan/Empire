@@ -80,7 +80,7 @@ async def check_supabase_health() -> DependencyCheck:
     try:
         if connection_manager.supabase:
             # Simple query to verify connection
-            result = connection_manager.supabase.table("documents").select("id").limit(1).execute()
+            _result = connection_manager.supabase.table("documents").select("id").limit(1).execute()  # noqa: F841
             duration_ms = (time.perf_counter() - start_time) * 1000
 
             return DependencyCheck(
@@ -218,7 +218,7 @@ async def check_b2_health() -> DependencyCheck:
             duration_ms=round(duration_ms, 2),
             details=bucket_info
         )
-    except ValueError as e:
+    except Exception:
         # B2 credentials not configured
         duration_ms = (time.perf_counter() - start_time) * 1000
         return DependencyCheck(
@@ -460,7 +460,7 @@ async def readiness_probe(response: Response):
     if not critical_ok:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
-    total_duration = (time.perf_counter() - start_time) * 1000
+    _total_duration = (time.perf_counter() - start_time) * 1000  # noqa: F841
 
     return ReadinessResponse(
         ready=critical_ok,

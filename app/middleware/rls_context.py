@@ -213,7 +213,7 @@ class RLSContextMiddleware(BaseHTTPMiddleware):
             # Get Supabase client and call the RPC function
             supabase = db_manager.get_supabase()
 
-            result = supabase.rpc(
+            _result = supabase.rpc(  # noqa: F841
                 "set_rls_context",
                 {
                     "p_user_id": user_id,

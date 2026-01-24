@@ -285,7 +285,6 @@ class CrewAIOutputValidator:
             metrics=metrics
         )
 
-
     def validate_writing_output(self, output: str) -> ValidationResult:
         """
         Validate writing/content generation agent output.
@@ -362,7 +361,6 @@ class CrewAIOutputValidator:
             recommendations=recommendations,
             metrics=metrics
         )
-
 
     def validate_review_output(self, output: str) -> ValidationResult:
         """

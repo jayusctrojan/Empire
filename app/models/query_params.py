@@ -106,7 +106,7 @@ class BaseQueryModel(BaseModel):
                     pattern=pattern,
                     query_preview=value[:50]
                 )
-                raise ValueError(f"Query contains disallowed pattern")
+                raise ValueError("Query contains disallowed pattern")
 
         return value
 

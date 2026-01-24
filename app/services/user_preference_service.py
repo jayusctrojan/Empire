@@ -282,7 +282,7 @@ class UserPreferenceService:
             # Filter by category and key
             for node in nodes:
                 if (node.metadata.get("category") == category and
-                    node.metadata.get("key") == key):
+                        node.metadata.get("key") == key):
                     return UserPreference.from_memory_node(node)
 
             return None

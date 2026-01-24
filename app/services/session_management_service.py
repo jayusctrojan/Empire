@@ -175,7 +175,7 @@ class SessionManagementService:
             if self.supabase:
                 response = self.supabase.table("chat_sessions").insert(session.to_dict()).execute()
                 if not response.data:
-                    self.logger.error(f"Failed to create session in Supabase")
+                    self.logger.error("Failed to create session in Supabase")
                     return None
 
             # Cache in Redis with TTL

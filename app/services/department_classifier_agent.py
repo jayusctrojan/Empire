@@ -363,7 +363,7 @@ class KeywordExtractorTool:
         words = re.findall(r'\b\w+\b', content.lower())
         ngrams = []
         for i in range(len(words) - n + 1):
-            ngrams.append(' '.join(words[i:i+n]))
+            ngrams.append(' '.join(words[i:i + n]))
         return ngrams
 
 

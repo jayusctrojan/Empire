@@ -115,7 +115,7 @@ class SupabaseStorage:
                     existing = self.client.table("documents").select("*").eq("file_hash", file_hash).execute()
 
                     if existing.data and len(existing.data) > 0:
-                        existing_doc = existing.data[0]
+                        _existing_doc = existing.data[0]  # noqa: F841
                         # Update with new B2 file ID and URL
                         update_data = {
                             "b2_file_id": file_id,
@@ -492,7 +492,7 @@ class SupabaseStorage:
                 logger.info(f"Stored course metadata for document {document_id}")
                 return result.data[0]
             else:
-                logger.error(f"Failed to store course metadata: No data returned")
+                logger.error("Failed to store course metadata: No data returned")
                 return None
 
         except Exception as e:

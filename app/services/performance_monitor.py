@@ -465,7 +465,7 @@ class PerformanceMonitor:
         if wave_num < total_waves:
             start_key = (job_id, wave_num)
             if start_key in self._wave_start_times:
-                wave_duration = time.time() - self._wave_start_times[start_key]
+                _wave_duration = time.time() - self._wave_start_times[start_key]  # noqa: F841
                 # Next wave start latency approximated as immediate
                 research_wave_transition_latency_seconds.observe(0.1)
                 del self._wave_start_times[start_key]
@@ -781,7 +781,7 @@ def instrument_task_execution(
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             monitor = get_performance_monitor()
-            start_time = time.time()
+            _start_time = time.time()  # noqa: F841
 
             # Extract task info
             task_id = None
@@ -806,7 +806,7 @@ def instrument_task_execution(
 
                 return result
 
-            except Exception as e:
+            except Exception:
                 # Record failure
                 if task_id and job_id:
                     monitor.record_task_complete(task_id, task_type, job_id, success=False)

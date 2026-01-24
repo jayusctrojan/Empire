@@ -234,7 +234,7 @@ class URLValidator:
         domain = parsed.netloc.lower()
         for blocked in self.BLOCKED_DOMAINS:
             if blocked in domain:
-                return False, None, f"URL shorteners are not supported. Please provide the full URL."
+                return False, None, "URL shorteners are not supported. Please provide the full URL."
 
         # Sanitize URL (remove dangerous characters)
         sanitized = self._sanitize_url(url)

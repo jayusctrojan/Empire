@@ -396,7 +396,7 @@ async def _store_embeddings_in_chunks(
                 .execute()
             )
             stored_count += 1
-        except Exception as e:
+        except Exception:
             # Try document_chunks table
             try:
                 await asyncio.to_thread(
@@ -426,7 +426,7 @@ async def _store_single_embedding(
             .execute()
         )
         return True
-    except Exception as e:
+    except Exception:
         # Try document_chunks table
         try:
             await asyncio.to_thread(
@@ -451,7 +451,7 @@ async def _get_document_chunk_ids(supabase_storage, document_id: str) -> List[st
             .execute()
         )
         return [row["id"] for row in result.data] if result.data else []
-    except Exception as e:
+    except Exception:
         # Try document_chunks table
         try:
             result = await asyncio.to_thread(

@@ -91,11 +91,11 @@ class VirusScanner:
 
             # If hash was found in database, use those results (free!)
             if hash_results and hash_results.get("status") != "not_found":
-                logger.info(f"Hash found in VT database - using cached results (saved 1 upload quota)")
+                logger.info("Hash found in VT database - using cached results (saved 1 upload quota)")
                 return is_clean, error_msg, hash_results
 
             # Step 3: Hash not found - need to upload (uses quota)
-            logger.info(f"Hash not found in database - uploading file for analysis (uses quota)")
+            logger.info("Hash not found in database - uploading file for analysis (uses quota)")
 
             # Create VirusTotal client
             async with vt.Client(self.api_key) as client:

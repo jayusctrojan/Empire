@@ -305,7 +305,6 @@ def stop_mountain_duck_monitoring():
     Stop Mountain Duck file monitoring
     Should be called during application shutdown
     """
-    global _poller
     if _poller:
         _poller.stop_watching()
         logger.info("Mountain Duck monitoring stopped")

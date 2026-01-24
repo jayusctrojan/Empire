@@ -291,7 +291,7 @@ class OptimizedDatabaseManager:
             # Try a simple query - use table that exists in current schema
             # Try documents table first, fallback to health check if not found
             try:
-                _result = client.table("documents").select("id").limit(1).execute()
+                _result = client.table("documents").select("id").limit(1).execute()  # noqa: F841
             except Exception:
                 # Table might not exist, just verify client works
                 pass

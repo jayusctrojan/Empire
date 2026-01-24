@@ -417,7 +417,7 @@ class PerformanceProfiler:
 
         # Calculate percentiles
         sorted_durations = sorted(durations)
-        n = len(sorted_durations)
+        _n = len(sorted_durations)  # noqa: F841
 
         def percentile(data: List[float], p: float) -> float:
             if not data:
@@ -488,7 +488,7 @@ class PerformanceProfiler:
                 try:
                     result = await func(*args, **kwargs)
                     success = True
-                except Exception as e:
+                except Exception:
                     success = False
                     raise
                 finally:

@@ -512,10 +512,10 @@ class FeatureFlagManager:
         """
         try:
             # Log deletion in audit table (trigger handles this automatically)
-            result = self.supabase.table("feature_flags")\
+            _result = self.supabase.table("feature_flags")\
                 .delete()\
                 .eq("flag_name", flag_name)\
-                .execute()
+                .execute()  # noqa: F841
 
             # Invalidate cache
             if self.enable_cache and self.redis_cache:

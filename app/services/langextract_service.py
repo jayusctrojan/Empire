@@ -505,6 +505,7 @@ class MetadataStorage:
 # Singleton instance
 _langextract_service_instance = None
 
+
 def get_langextract_service(model_id: str = "gemini-2.0-flash-exp") -> LangExtractService:
     """Get singleton instance of LangExtractService"""
     global _langextract_service_instance
