@@ -85,17 +85,18 @@
 *Priority: High*
 *Status: Active - All Versions*
 
-```python
-# PDF Complexity Assessment Logic
-def assessPDFComplexity(file):
-    criteria = {
+```javascript
+// PDF Complexity Assessment Logic
+function assessPDFComplexity(file) {
+    const criteria = {
         hasComplexTables: checkForComplexTables(file),
         hasDiagrams: checkForDiagrams(file),
         hasFormulas: checkForMathFormulas(file),
-        largeFileSize: file.size > 10485760,  # 10MB
+        largeFileSize: file.size > 10485760,  // 10MB
         hasMultiColumn: checkForMultiColumnLayout(file)
-    }
-    return Object.values(criteria).some(v => v === true)
+    };
+    return Object.values(criteria).some(v => v === true);
+}
 ```
 
 #### 3.1.1.3 Mistral OCR Processing (Complex PDFs Only)

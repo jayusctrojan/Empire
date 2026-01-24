@@ -797,29 +797,29 @@ ai_empire_v5_config:
 
 | Metric | v4.0 Baseline | v5.0 Target | v5.0 Achieved | Notes |
 |--------|---------------|-------------|---------------|-------|
-| **Hardware** |
+| **Hardware** | | | | |
 | RAM | 24GB | 96GB | 96GB | 4x increase |
 | CPU Cores | 10 | 28 | 28 | M3 Ultra |
 | GPU Cores | 16 | 60 | 60 | 3.75x increase |
 | Neural Engine | 16 | 32 | 32 | 2x increase |
-| **Performance** |
+| **Performance** | | | | |
 | LLM Speed | Variable | 32 tok/s | 32-35 tok/s | Consistent |
 | Vision Processing | Cloud API | Local | <5s/image | 100% local |
 | Embeddings | Cloud API | Local | 1000/sec | 100% local |
 | Memory Retrieval | 500ms | <100ms | 50-90ms | 80% faster |
-| **Throughput** |
+| **Throughput** | | | | |
 | Docs/Day | 200 | 500 | 500-600 | 150% increase |
 | Concurrent Workflows | 5 | 10 | 10 | 2x increase |
 | Batch Size | 10 | 50 | 50 | 5x increase |
-| **Efficiency** |
+| **Efficiency** | | | | |
 | Local Processing | 50% | 98% | 98-99% | Near complete |
 | Cache Hit Rate | 60% | 80% | 82% | Exceeded |
 | Memory Usage | 85% | <70% | 65-68% | Optimized |
-| **Cost** |
+| **Cost** | | | | |
 | Monthly Cost | $125-255 | <$195 | $100-150 | 40% reduction |
 | Per Document | $0.10-0.20 | <$0.01 | $0.005 | 95% reduction |
 | API Calls/Day | 1000+ | <100 | 50-80 | 92% reduction |
-| **Reliability** |
+| **Reliability** | | | | |
 | Uptime | 99% | 99.5% | 99.6% | Exceeded |
 | Error Rate | 2% | <1% | 0.8% | Exceeded |
 | Recovery Time | 8 hours | 4 hours | 4-6 hours | On target |

@@ -1,4 +1,4 @@
-AI Empire Complete Architecture v4.2 (Mac Studio Edition)
+AI Empire Complete Architecture v5.0 (Mac Studio Edition)
 Unified Private LLM Server + Cloud Hybrid Architecture
 Core Infrastructure
 Mac Studio M3 Ultra (96GB) - Private AI Powerhouse

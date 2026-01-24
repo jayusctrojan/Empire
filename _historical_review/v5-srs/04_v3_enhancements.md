@@ -519,7 +519,7 @@ metrics:
 ```
 
 *Priority: Essential*
-*Note: Prometheus compatible metrics*
+*Note: Prometheus-compatible metrics*
 *Status: Enhanced - v5.0*
 
 **MFR-002:** The system SHALL implement alerting rules:

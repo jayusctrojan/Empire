@@ -40,7 +40,7 @@
   "content_complete": true,
   "encoding_correct": true,
   "processing_time_ms": 200,  // v5.0 - Even faster
-  "processing_location": "mac_studio",  // v5.0 - Track location
+  "processing_location": "local",  // v5.0 - Track location
   "api_calls_avoided": 3,  // v5.0 - Show savings
   "estimated_cost_saved": 0.02  // v5.0 - Cost avoided
 }

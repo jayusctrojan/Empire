@@ -6,7 +6,7 @@
 
 The AI Empire File Processing System v5.0 operates as a revolutionary LOCAL-FIRST AI powerhouse with Mac Studio M3 Ultra at its core, achieving 98% on-device inference while maintaining enterprise-grade capabilities:
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────┐
 │              AI Empire v5.0 Mac Studio Edition Architecture          │
 ├──────────────────────────────────────────────────────────────────────┤
