@@ -5647,13 +5647,1109 @@
         "status": "cancelled",
         "subtasks": [],
         "updatedAt": "2026-01-17T20:30:07.925Z"
+      },
+      {
+        "id": "201",
+        "title": "Implement Token Counting Service",
+        "description": "Create a service that accurately counts tokens in real-time for all message types in the conversation",
+        "details": "Develop a token counting service that integrates with tiktoken and Anthropic API to provide accurate token counts for different content types. The service should:\n\n1. Count tokens for text, code blocks, and other content types\n2. Support different models with varying token limits\n3. Provide real-time updates as messages are added\n4. Calculate total usage, reserved space, and available space\n\n```python\n# Token counting service implementation\nclass TokenCountingService:\n    def __init__(self, model: str):\n        self.model = model\n        self.max_tokens = self._get_model_context_limit(model)\n        self.reserved_tokens = int(self.max_tokens * 0.2)  # Default 20% reservation\n    \n    def _get_model_context_limit(self, model: str) -> int:\n        # Model-specific context limits\n        limits = {\n            \"claude-3-opus\": 200000,\n            \"claude-3-sonnet\": 180000,\n            \"claude-3-haiku\": 128000,\n            # Add other models as needed\n        }\n        return limits.get(model, 100000)  # Default fallback\n    \n    def count_message_tokens(self, message: ContextMessage) -> int:\n        # Use tiktoken for local estimation\n        try:\n            return self._count_with_tiktoken(message.content, message.role)\n        except Exception:\n            # Fallback to simpler estimation if tiktoken fails\n            return self._estimate_tokens(message.content)\n    \n    def _count_with_tiktoken(self, content: str, role: str) -> int:\n        # Implementation using tiktoken library\n        # This is a simplified version - actual implementation would be model-specific\n        import tiktoken\n        encoding = tiktoken.encoding_for_model(\"cl100k_base\")  # Claude compatible encoding\n        tokens = encoding.encode(content)\n        return len(tokens) + 10  # Add overhead for role formatting\n    \n    def _estimate_tokens(self, content: str) -> int:\n        # Simple fallback estimation (4 chars ~= 1 token)\n        return len(content) // 4 + 1\n    \n    def get_context_status(self, messages: List[ContextMessage]) -> ContextWindowStatus:\n        current_tokens = sum(msg.token_count for msg in messages)\n        available = self.max_tokens - current_tokens - self.reserved_tokens\n        usage_percent = (current_tokens / self.max_tokens) * 100\n        \n        # Determine status based on usage percentage\n        if usage_percent < 70:\n            status = \"normal\"\n        elif usage_percent < 85:\n            status = \"warning\"\n        else:\n            status = \"critical\"\n            \n        # Estimate remaining messages (assuming avg 200 tokens per message)\n        est_remaining = available // 200\n        \n        return ContextWindowStatus(\n            session_id=messages[0].session_id if messages else \"\",\n            current_tokens=current_tokens,\n            max_tokens=self.max_tokens,\n            reserved_tokens=self.reserved_tokens,\n            available_tokens=available,\n            usage_percent=usage_percent,\n            status=status,\n            estimated_messages_remaining=est_remaining,\n            last_updated=datetime.now()\n        )\n```\n\nThe service should be implemented as a singleton that can be accessed throughout the application. It should update token counts whenever messages are added or removed from the conversation.",
+        "testStrategy": "1. Unit tests for token counting accuracy:\n   - Test with various content types (plain text, code blocks, mixed content)\n   - Compare results with Anthropic API token counts for validation\n   - Test edge cases (empty messages, very long messages, non-ASCII characters)\n\n2. Integration tests:\n   - Verify real-time updates when messages are added\n   - Test with different model configurations\n   - Verify status transitions (normal → warning → critical)\n\n3. Performance tests:\n   - Measure token counting speed for large conversations\n   - Ensure counting completes in <100ms for any conversation length\n\n4. Accuracy validation:\n   - Compare token counts with actual API usage\n   - Ensure accuracy is within 5% of actual API usage",
+        "priority": "high",
+        "dependencies": [
+          "211"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create token counter module with tiktoken integration",
+            "description": "Implement the core token counting module that integrates with tiktoken library for accurate token estimation",
+            "dependencies": [],
+            "details": "Create app/core/token_counter.py module that implements the base TokenCountingService class with tiktoken integration. Include model context limits for Claude models and implement the _get_model_context_limit method. Set up proper initialization with model selection and reserved token calculation.",
+            "status": "pending",
+            "testStrategy": "Unit test token counting accuracy with different models. Compare results with actual Anthropic API token counts. Test initialization with various models and verify correct context limits are applied.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement count_tokens() function using tiktoken cl100k_base encoding",
+            "description": "Create the primary token counting function that uses tiktoken's cl100k_base encoding for Claude-compatible token counting",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the count_tokens() function in the TokenCountingService class that uses tiktoken's cl100k_base encoding. Handle different content types including text, code blocks, and mixed content. Add proper error handling and fallback mechanisms if tiktoken fails.",
+            "status": "pending",
+            "testStrategy": "Test with various content types (plain text, code blocks, JSON, markdown). Compare results with Anthropic's official token counting. Test edge cases like empty strings, very long content, and non-ASCII characters.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement count_message_tokens() helper for ContextMessage objects",
+            "description": "Create a specialized method to count tokens in ContextMessage objects, accounting for message role and content",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement the count_message_tokens() method that takes a ContextMessage object and returns the token count. Account for both the message content and the role (user, assistant, system) in the token calculation. Include proper handling for different message formats and content types within messages.",
+            "status": "pending",
+            "testStrategy": "Test with various ContextMessage objects with different roles and content types. Verify correct token counting for system, user, and assistant messages. Test with multi-part messages containing different content formats.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create ContextWindowStatus Pydantic model",
+            "description": "Implement a Pydantic model to represent the current state of the context window including token usage statistics",
+            "dependencies": [
+              1
+            ],
+            "details": "Create the ContextWindowStatus Pydantic model in app/models/context_models.py that includes fields for session_id, current_tokens, max_tokens, reserved_tokens, available_tokens, usage_percent, status (normal/warning/critical), estimated_messages_remaining, and last_updated timestamp. Implement the get_context_status() method in TokenCountingService that returns this model.",
+            "status": "pending",
+            "testStrategy": "Test model validation with various input combinations. Verify correct calculation of derived fields like usage_percent and estimated_messages_remaining. Test status determination logic based on different usage percentages.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add Redis caching for real-time context state updates",
+            "description": "Implement Redis-based caching to store and retrieve context window status for real-time updates",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Add Redis integration to the TokenCountingService to cache context window status. Implement methods to update the cache whenever messages are added or removed. Create functions to retrieve the latest context status from Redis. Use session_id as the key for storing context information. Implement proper serialization/deserialization of ContextWindowStatus objects.",
+            "status": "pending",
+            "testStrategy": "Test Redis cache updates with message additions and removals. Verify cache retrieval returns the correct context status. Test cache expiration and refresh mechanisms. Test concurrent access patterns.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Create unit test file for token counter",
+            "description": "Implement comprehensive unit tests for the token counting service to ensure accuracy and reliability",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Create tests/unit/test_token_counter.py with test cases for all TokenCountingService methods. Include tests for token counting accuracy with different content types, model context limits, and edge cases. Mock Redis dependencies for isolated testing. Test the ContextWindowStatus calculation logic with various message combinations.",
+            "status": "pending",
+            "testStrategy": "Use pytest fixtures to set up test environments. Compare token counting results with expected values. Test with real examples from Anthropic documentation. Include performance tests for large message histories.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Add Prometheus metrics for token usage monitoring",
+            "description": "Implement Prometheus metrics to track token usage and context window utilization",
+            "dependencies": [
+              5
+            ],
+            "details": "Add Prometheus metrics integration to track context_tokens_total and context_usage_percent. Create a metrics registry in the TokenCountingService. Update metrics whenever the context window status changes. Add labels for model type and session_id to enable detailed monitoring. Implement a method to expose metrics for Prometheus scraping.",
+            "status": "pending",
+            "testStrategy": "Test metric registration and updates. Verify correct values are recorded for different scenarios. Test metric exposure endpoint format. Test with different models and session configurations.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T21:00:32.477Z"
+      },
+      {
+        "id": "202",
+        "title": "Develop Context Window Progress Bar UI Component",
+        "description": "Create a visual progress bar component that displays real-time context window usage with color-coded status indicators",
+        "details": "Implement a progress bar UI component that shows the current context window usage. The component should:\n\n1. Display a visual progress bar with color-coded sections\n2. Show numeric token counts on hover\n3. Indicate reserved space for AI responses\n4. Update in real-time as messages are added\n5. Change colors based on usage thresholds\n\n```jsx\n// React component for context window progress bar\nimport React, { useState, useEffect } from 'react';\nimport { Tooltip } from './Tooltip';\n\nconst ContextWindowProgressBar = ({ \n  currentTokens, \n  maxTokens, \n  reservedTokens,\n  status,\n  onThresholdReached = () => {}\n}) => {\n  // Calculate percentages for display\n  const usedPercent = (currentTokens / maxTokens) * 100;\n  const reservedPercent = (reservedTokens / maxTokens) * 100;\n  const availablePercent = 100 - usedPercent - reservedPercent;\n  \n  // Determine color based on status\n  const getStatusColor = (status) => {\n    switch(status) {\n      case 'critical': return 'bg-red-500';\n      case 'warning': return 'bg-yellow-500';\n      case 'normal': return 'bg-green-500';\n      default: return 'bg-green-500';\n    }\n  };\n  \n  // Format token counts for display\n  const formatTokens = (tokens) => {\n    return tokens >= 1000 ? `${(tokens/1000).toFixed(1)}K` : tokens;\n  };\n  \n  // Tooltip content\n  const tooltipContent = (\n    <div className=\"p-2\">\n      <div>Used: {formatTokens(currentTokens)} tokens ({usedPercent.toFixed(1)}%)</div>\n      <div>Reserved: {formatTokens(reservedTokens)} tokens ({reservedPercent.toFixed(1)}%)</div>\n      <div>Available: {formatTokens(maxTokens - currentTokens - reservedTokens)} tokens ({availablePercent.toFixed(1)}%)</div>\n      <div>Total capacity: {formatTokens(maxTokens)} tokens</div>\n    </div>\n  );\n  \n  // Pulse animation when approaching threshold\n  const shouldPulse = status === 'warning' || status === 'critical';\n  \n  return (\n    <Tooltip content={tooltipContent}>\n      <div className=\"w-full h-6 rounded-md overflow-hidden border border-gray-300 flex\">\n        {/* Used tokens section */}\n        <div \n          className={`h-full ${getStatusColor(status)} ${shouldPulse ? 'animate-pulse' : ''}`}\n          style={{ width: `${usedPercent}%` }}\n        />\n        \n        {/* Reserved tokens section */}\n        <div \n          className=\"h-full bg-gray-400 opacity-50\"\n          style={{ width: `${reservedPercent}%` }}\n        />\n        \n        {/* Available tokens section */}\n        <div \n          className=\"h-full bg-gray-200\"\n          style={{ width: `${availablePercent}%` }}\n        />\n      </div>\n      <div className=\"text-xs text-center mt-1\">\n        Context: {formatTokens(currentTokens)} / {formatTokens(maxTokens)} tokens ({usedPercent.toFixed(0)}%)\n      </div>\n    </Tooltip>\n  );\n};\n\nexport default ContextWindowProgressBar;\n```\n\nThe component should be integrated into the chat interface header or footer area and remain visible at all times during the conversation. It should update smoothly as new messages are added without causing UI lag.",
+        "testStrategy": "1. Unit tests:\n   - Test rendering with different token counts and statuses\n   - Verify color changes at different thresholds\n   - Test tooltip content accuracy\n\n2. Integration tests:\n   - Verify real-time updates when messages are added\n   - Test animation triggers at warning/critical thresholds\n   - Verify tooltip displays correct information\n\n3. Visual regression tests:\n   - Capture screenshots at different states (normal, warning, critical)\n   - Ensure consistent rendering across browsers\n\n4. User acceptance testing:\n   - Verify progress bar is easily visible but not distracting\n   - Confirm color coding is intuitive\n   - Test responsiveness on different screen sizes",
+        "priority": "high",
+        "dependencies": [
+          "201"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create ContextProgressBar.tsx component",
+            "description": "Implement the React component for displaying the context window usage progress bar with color-coded sections.",
+            "dependencies": [],
+            "details": "Create the ContextProgressBar.tsx component in empire-desktop/src/components/ directory. Implement the visual progress bar with color-coded sections based on usage thresholds. Include the basic structure with used, reserved, and available token sections as shown in the provided code sample.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify the component renders correctly with different token counts and properly displays the progress bar sections with appropriate widths.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement tooltip functionality for token details",
+            "description": "Add tooltip functionality to display detailed token information when hovering over the progress bar.",
+            "dependencies": [
+              1
+            ],
+            "details": "Enhance the ContextProgressBar component to show numeric token counts on hover using the Tooltip component. Display used tokens, reserved tokens, available tokens, and total capacity in a formatted way. Implement the formatTokens helper function to properly display token counts (e.g., '4.2K' for 4200).",
+            "status": "pending",
+            "testStrategy": "Test tooltip content accuracy with various token values and verify proper formatting of token numbers.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create useContextWindow.ts custom hook",
+            "description": "Develop a custom React hook to manage context window state and calculations.",
+            "dependencies": [],
+            "details": "Create useContextWindow.ts hook in empire-desktop/src/hooks/ directory. The hook should manage the current token count, max tokens, reserved tokens, and calculate percentages. It should also determine the status based on thresholds (green <70%, yellow 70-85%, red >85%) and provide functions to update the token count.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify the hook correctly calculates percentages, determines status based on thresholds, and properly updates state.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement color-coded status display with animations",
+            "description": "Add color-coded status indicators and pulse animations for warning states.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Enhance the ContextProgressBar component to change colors based on usage thresholds (green <70%, yellow 70-85%, red >85%). Implement the getStatusColor function to return appropriate color classes. Add pulse animation effect when the status is 'warning' or 'critical' to draw user attention to approaching limits.",
+            "status": "pending",
+            "testStrategy": "Test color changes at different thresholds and verify animation triggers at warning/critical thresholds.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement GET /context/{conversation_id} API endpoint",
+            "description": "Create a backend API endpoint to retrieve context window information for a specific conversation.",
+            "dependencies": [],
+            "details": "Implement the GET /context/{conversation_id} endpoint in app/routes/context_management.py. The endpoint should return the current token count, max tokens allowed, reserved tokens, and status for the specified conversation. Include proper error handling for invalid conversation IDs.",
+            "status": "pending",
+            "testStrategy": "Create API tests to verify the endpoint returns correct context information and properly handles error cases.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Add WebSocket subscription for real-time updates",
+            "description": "Implement WebSocket functionality to provide real-time context window usage updates.",
+            "dependencies": [
+              3,
+              5
+            ],
+            "details": "Set up WebSocket subscription in the useContextWindow hook to receive real-time updates on context window usage. Implement the necessary backend WebSocket handler to emit events when the context window usage changes. Ensure the progress bar updates smoothly without causing UI lag.",
+            "status": "pending",
+            "testStrategy": "Test WebSocket connection establishment, event handling, and verify real-time updates when messages are added to the conversation.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Integrate progress bar into chat interface and create tests",
+            "description": "Add the context window progress bar to the chat interface and create comprehensive tests.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              6
+            ],
+            "details": "Integrate the ContextProgressBar component into the chat interface header or footer area to remain visible during conversations. Create integration test for context API in tests/integration/test_context_api.py to verify the entire feature works correctly. Ensure the component updates smoothly as new messages are added without causing UI lag.",
+            "status": "pending",
+            "testStrategy": "Create end-to-end tests to verify the progress bar displays correctly in the chat interface and updates appropriately as messages are added. Test with various screen sizes to ensure responsive behavior.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T21:02:36.561Z"
+      },
+      {
+        "id": "203",
+        "title": "Implement Intelligent Context Condensing Engine",
+        "description": "Create a service that automatically summarizes older parts of conversation while preserving essential information",
+        "details": "Develop a context condensing engine that uses AI to intelligently summarize conversation history. The service should:\n\n1. Identify when to trigger summarization based on token thresholds\n2. Preserve key information like code snippets, decisions, and file paths\n3. Use Anthropic API (Claude Haiku) for summarization\n4. Track token reduction metrics\n\n```python\nclass ContextCondensingEngine:\n    def __init__(self, token_service: TokenCountingService):\n        self.token_service = token_service\n        self.default_prompt = self._load_default_prompt()\n        self.anthropic_client = AnthropicClient(api_key=os.environ.get(\"ANTHROPIC_API_KEY\"))\n    \n    def _load_default_prompt(self) -> str:\n        # Load the default summarization prompt from a template file\n        with open(\"templates/summarization_prompt.txt\", \"r\") as f:\n            return f.read()\n    \n    async def should_compact(self, context: ConversationContext) -> bool:\n        # Check if compaction should be triggered based on token usage\n        threshold = context.settings.get(\"auto_compact_threshold\", 0.8)  # Default 80%\n        current_usage = context.total_tokens / context.max_tokens\n        \n        # Don't compact if we recently compacted (cooldown period)\n        if context.last_compaction:\n            cooldown = timedelta(seconds=30)  # 30 second cooldown\n            if datetime.now() - context.last_compaction < cooldown:\n                return False\n        \n        return current_usage >= threshold\n    \n    async def compact_conversation(self, \n                                  context: ConversationContext, \n                                  trigger: str = \"auto\",\n                                  custom_prompt: Optional[str] = None) -> CompactionResult:\n        # Start timing for performance metrics\n        start_time = time.time()\n        \n        # Get pre-compaction token count\n        pre_tokens = context.total_tokens\n        \n        # Identify messages to condense (exclude protected messages)\n        condensable_messages = [\n            msg for msg in context.messages \n            if not msg.is_protected and msg.id not in context.protected_message_ids\n        ]\n        \n        # If we have very few condensable messages, don't bother\n        if len(condensable_messages) < 3:\n            return CompactionResult(\n                session_id=context.session_id,\n                trigger=trigger,\n                pre_tokens=pre_tokens,\n                post_tokens=pre_tokens,\n                reduction_percent=0,\n                messages_condensed=0,\n                summary_preview=\"No condensation performed - too few messages\",\n                duration_ms=0,\n                cost_usd=0,\n                created_at=datetime.now()\n            )\n        \n        # Prepare messages for summarization\n        messages_to_summarize = self._prepare_messages_for_summarization(condensable_messages)\n        \n        # Use custom prompt if provided, otherwise use default\n        prompt = custom_prompt if custom_prompt else self.default_prompt\n        \n        # Call Anthropic API for summarization\n        try:\n            summary = await self._summarize_with_anthropic(\n                messages_to_summarize, \n                prompt\n            )\n            \n            # Create a new summary message\n            summary_message = ContextMessage(\n                id=str(uuid.uuid4()),\n                role=\"assistant\",\n                content=summary,\n                token_count=self.token_service.count_message_tokens(summary),\n                is_protected=False,\n                is_summarized=True,\n                original_message_ids=[msg.id for msg in condensable_messages],\n                created_at=datetime.now(),\n                metadata={\"summary_type\": trigger}\n            )\n            \n            # Replace condensed messages with summary\n            new_messages = [\n                msg for msg in context.messages \n                if msg.id not in [cm.id for cm in condensable_messages]\n            ]\n            new_messages.append(summary_message)\n            \n            # Sort messages by creation time\n            new_messages.sort(key=lambda x: x.created_at)\n            \n            # Update context with new messages\n            context.messages = new_messages\n            context.total_tokens = sum(msg.token_count for msg in new_messages)\n            context.last_compaction = datetime.now()\n            context.compaction_count += 1\n            \n            # Calculate metrics\n            post_tokens = context.total_tokens\n            duration_ms = int((time.time() - start_time) * 1000)\n            reduction_percent = ((pre_tokens - post_tokens) / pre_tokens) * 100 if pre_tokens > 0 else 0\n            \n            # Estimate cost (simplified)\n            cost_usd = (pre_tokens / 1000) * 0.0001  # Simplified cost calculation\n            \n            # Create result\n            result = CompactionResult(\n                session_id=context.session_id,\n                trigger=trigger,\n                pre_tokens=pre_tokens,\n                post_tokens=post_tokens,\n                reduction_percent=reduction_percent,\n                messages_condensed=len(condensable_messages),\n                summary_preview=summary[:100] + \"...\",\n                duration_ms=duration_ms,\n                cost_usd=cost_usd,\n                created_at=datetime.now()\n            )\n            \n            # Log compaction result to database\n            await self._log_compaction(result)\n            \n            return result\n            \n        except Exception as e:\n            # Log error and return failed result\n            logger.error(f\"Compaction failed: {str(e)}\")\n            return CompactionResult(\n                session_id=context.session_id,\n                trigger=trigger,\n                pre_tokens=pre_tokens,\n                post_tokens=pre_tokens,\n                reduction_percent=0,\n                messages_condensed=0,\n                summary_preview=f\"Compaction failed: {str(e)}\",\n                duration_ms=int((time.time() - start_time) * 1000),\n                cost_usd=0,\n                created_at=datetime.now()\n            )\n    \n    async def _summarize_with_anthropic(self, messages: List[dict], prompt: str) -> str:\n        # Format messages for Anthropic API\n        formatted_content = \"\\n\\n\".join([f\"{msg['role']}: {msg['content']}\" for msg in messages])\n        \n        # Call Anthropic API with Claude Haiku for summarization\n        response = await self.anthropic_client.messages.create(\n            model=\"claude-3-haiku-20240307\",\n            max_tokens=4000,\n            messages=[\n                {\"role\": \"user\", \"content\": f\"{prompt}\\n\\nHERE IS THE CONVERSATION TO SUMMARIZE:\\n\\n{formatted_content}\"}\n            ]\n        )\n        \n        return response.content[0].text\n    \n    def _prepare_messages_for_summarization(self, messages: List[ContextMessage]) -> List[dict]:\n        # Convert ContextMessage objects to dict format for API\n        return [\n            {\"role\": msg.role, \"content\": msg.content}\n            for msg in messages\n        ]\n    \n    async def _log_compaction(self, result: CompactionResult) -> None:\n        # Log compaction result to database\n        async with get_db_connection() as conn:\n            await conn.execute(\n                \"\"\"INSERT INTO compaction_logs \n                   (session_id, trigger, pre_tokens, post_tokens, reduction_percent, \n                    messages_condensed, summary_preview, duration_ms, cost_usd, created_at) \n                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\"\"\",\n                result.session_id, result.trigger, result.pre_tokens, result.post_tokens,\n                result.reduction_percent, result.messages_condensed, result.summary_preview,\n                result.duration_ms, result.cost_usd, result.created_at\n            )\n```\n\nThe service should be integrated with the token counting service to monitor token usage and trigger compaction when necessary. It should also provide hooks for manual compaction via the `/compact` command.",
+        "testStrategy": "1. Unit tests:\n   - Test summarization prompt effectiveness with different conversation types\n   - Verify protected messages are never condensed\n   - Test token reduction calculations\n\n2. Integration tests:\n   - Test automatic triggering at configured thresholds\n   - Verify cooldown period prevents rapid successive compactions\n   - Test error handling and recovery\n\n3. Performance tests:\n   - Measure summarization latency for different conversation sizes\n   - Verify summarization completes in <3 seconds\n\n4. Quality tests:\n   - Evaluate summarization quality with different conversation types\n   - Verify key information (code, decisions, file paths) is preserved\n   - Compare token reduction rates across different conversation types",
+        "priority": "high",
+        "dependencies": [
+          "201"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement summarization prompt template",
+            "description": "Create the template file for summarization prompts that will guide the AI in condensing conversation context.",
+            "dependencies": [],
+            "details": "Create the file templates/summarization_prompt.txt with detailed instructions for the AI to preserve important information like code snippets, decisions, and file paths while summarizing conversation history. Include examples of good summaries and specific preservation guidelines.",
+            "status": "pending",
+            "testStrategy": "Test the prompt with various conversation samples to ensure it preserves critical information. Verify it works well with different conversation types (coding discussions, debugging sessions, etc).",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement TokenCountingService integration",
+            "description": "Create the token counting service integration to accurately measure token usage in conversations.",
+            "dependencies": [],
+            "details": "Implement the TokenCountingService class that will be used by the ContextCondensingEngine to count tokens in messages and track overall token usage. Include methods for counting tokens in individual messages and entire conversations using the appropriate tokenizer for Claude models.",
+            "status": "pending",
+            "testStrategy": "Unit test with various message types to verify accurate token counting. Compare results with Anthropic's tokenizer to ensure consistency.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement AnthropicClient wrapper",
+            "description": "Create a wrapper for the Anthropic API client to handle summarization requests.",
+            "dependencies": [],
+            "details": "Implement the AnthropicClient class that will handle communication with the Anthropic API. Include proper error handling, retry logic, and API key management. Ensure it supports both Claude Haiku for fast summarization and Claude Sonnet for higher quality summarization when needed.",
+            "status": "pending",
+            "testStrategy": "Test API integration with mock responses. Verify error handling for API failures, rate limits, and timeout scenarios.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement core ContextCondensingEngine class",
+            "description": "Implement the main engine class that will manage the context condensation process.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Complete the implementation of the ContextCondensingEngine class with methods for checking when compaction should occur (should_compact), performing compaction (compact_conversation), and handling the summarization process. Include logic for preserving protected messages and tracking compaction metrics.\n<info added on 2026-01-20T15:11:47.015Z>\nImplemented the ContextCondensingEngine class at app/services/context_condensing_engine.py with comprehensive functionality including:\n\n- Integration with Anthropic API using Claude Haiku/Sonnet models for conversation summarization\n- Token counting via the existing TokenCounter service to determine when compaction is needed\n- Prometheus metrics tracking (COMPACTION_COUNT, COMPACTION_LATENCY, COMPACTION_REDUCTION, COMPACTION_IN_PROGRESS, COMPACTION_COST)\n- Redis-based locking mechanism to prevent concurrent compaction operations\n- 30-second cooldown period between compaction operations to prevent excessive API usage\n- Progress tracking through Redis for monitoring compaction status\n- Cost calculation for API usage to track expenditure\n- Database operations to apply and store compaction results\n- Methods for should_compact and compact_conversation as specified in the requirements\n</info added on 2026-01-20T15:11:47.015Z>",
+            "status": "pending",
+            "testStrategy": "Unit test the should_compact logic with various token thresholds. Test compact_conversation with mock conversations to verify proper summarization and message handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement database logging for compaction results",
+            "description": "Create the database schema and logging functionality for tracking compaction results.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create the compaction_logs table in the database schema and implement the _log_compaction method to store detailed metrics about each compaction operation. Include fields for session_id, trigger type, pre/post token counts, reduction percentage, duration, and cost estimates.",
+            "status": "pending",
+            "testStrategy": "Test database logging with mock compaction results. Verify all fields are correctly stored and can be retrieved for reporting.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement Celery task for background compaction",
+            "description": "Create a Celery task to handle compaction operations asynchronously.",
+            "dependencies": [
+              4,
+              5
+            ],
+            "details": "Implement the compact_context Celery task in app/tasks/compaction_tasks.py that will run the compaction process in the background. Include progress tracking using Redis and implement a compaction lock mechanism to prevent duplicate compaction operations on the same conversation.",
+            "status": "pending",
+            "testStrategy": "Test the Celery task with mock conversations. Verify lock mechanism prevents duplicate compactions. Test progress tracking updates correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Implement rate limiting and cooldown mechanism",
+            "description": "Add rate limiting logic to prevent excessive compaction operations.",
+            "dependencies": [
+              6
+            ],
+            "details": "Enhance the should_compact method to include a 30-second cooldown period between compaction operations. Implement a Redis-based tracking system to store the timestamp of the last compaction for each conversation and enforce the cooldown period.",
+            "status": "pending",
+            "testStrategy": "Test rate limiting with rapid compaction requests. Verify cooldown period is enforced correctly. Test edge cases like system clock changes.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Implement REST API endpoint for manual compaction",
+            "description": "Create an API endpoint to allow manual triggering of context compaction.",
+            "dependencies": [
+              6,
+              7
+            ],
+            "details": "Implement the POST /context/{conversation_id}/compact endpoint in app/routes/context.py that allows users to manually trigger compaction. Include options for fast compaction (using Claude Haiku) vs. standard compaction (using Claude Sonnet). Return a task ID that can be used to check compaction progress.",
+            "status": "pending",
+            "testStrategy": "Test API endpoint with various request parameters. Verify task creation and progress tracking. Test error handling for invalid conversation IDs.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Implement progress tracking API",
+            "description": "Create an API endpoint to check the progress of ongoing compaction tasks.",
+            "dependencies": [
+              8
+            ],
+            "details": "Implement the GET /tasks/{task_id}/progress endpoint that returns the current progress of a compaction task. Use the Redis-based progress tracking system to provide updates on long-running compaction operations. Include status, percent complete, and estimated time remaining.",
+            "status": "pending",
+            "testStrategy": "Test progress reporting with mock tasks at various stages of completion. Verify accurate progress reporting and proper handling of completed and failed tasks.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "Implement Prometheus metrics for compaction monitoring",
+            "description": "Add Prometheus metrics to track compaction performance and effectiveness.",
+            "dependencies": [
+              5,
+              8
+            ],
+            "details": "Implement Prometheus metrics for monitoring compaction operations, including compaction_count (counter), compaction_latency_seconds (histogram), and compaction_reduction_percent (gauge). Add these metrics to the existing Prometheus monitoring system and create a Grafana dashboard for visualizing compaction performance.",
+            "status": "pending",
+            "testStrategy": "Test metric recording with mock compaction operations. Verify metrics are correctly exposed via the Prometheus endpoint. Test dashboard visualization with sample data.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T15:11:47.398Z"
+      },
+      {
+        "id": "204",
+        "title": "Create Inline Compaction UI with Visual Divider",
+        "description": "Implement the UI components for displaying compaction results inline with a visual divider and collapsible summary section",
+        "details": "Develop UI components that show when compaction has occurred in the conversation. The implementation should:\n\n1. Display a visual divider showing token reduction metrics\n2. Provide a collapsible section with the condensed summary\n3. Allow users to expand/collapse the summary\n4. Show animation during compaction process\n\n```jsx\n// React component for compaction divider\nimport React, { useState } from 'react';\nimport { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/solid';\n\nconst CompactionDivider = ({ \n  preTokens, \n  postTokens, \n  summary,\n  timestamp,\n  isExpanded = false\n}) => {\n  const [expanded, setExpanded] = useState(isExpanded);\n  const reductionPercent = ((preTokens - postTokens) / preTokens * 100).toFixed(0);\n  \n  // Format token counts for display\n  const formatTokens = (tokens) => {\n    return tokens >= 1000 ? `${(tokens/1000).toFixed(1)}K` : tokens;\n  };\n  \n  return (\n    <div className=\"my-4 border-t border-b border-gray-200 py-2\">\n      {/* Divider header with metrics */}\n      <div \n        className=\"flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded\"\n        onClick={() => setExpanded(!expanded)}\n      >\n        {expanded ? \n          <ChevronDownIcon className=\"h-5 w-5 text-gray-500\" /> : \n          <ChevronRightIcon className=\"h-5 w-5 text-gray-500\" />\n        }\n        <div className=\"ml-2 text-sm text-gray-600\">\n          <span className=\"font-medium\">Context condensed</span> ({formatTokens(preTokens)} → {formatTokens(postTokens)} tokens, {reductionPercent}% reduction)\n        </div>\n        <div className=\"ml-auto text-xs text-gray-400\">\n          {new Date(timestamp).toLocaleTimeString()}\n        </div>\n      </div>\n      \n      {/* Collapsible summary section */}\n      {expanded && (\n        <div className=\"mt-2 p-3 bg-gray-50 rounded text-sm border-l-4 border-blue-400\">\n          <div className=\"font-medium mb-2 text-gray-700\">Condensed Summary:</div>\n          <div className=\"whitespace-pre-wrap\">{summary}</div>\n        </div>\n      )}\n    </div>\n  );\n};\n\n// Animation component for compaction in progress\nconst CompactionInProgress = () => {\n  return (\n    <div className=\"my-4 p-4 border border-yellow-200 bg-yellow-50 rounded-md flex items-center\">\n      <div className=\"animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-700 mr-3\"></div>\n      <div className=\"text-sm text-yellow-800\">\n        Condensing conversation context...\n      </div>\n    </div>\n  );\n};\n\nexport { CompactionDivider, CompactionInProgress };\n```\n\nThis component should be inserted into the conversation flow whenever compaction occurs. It should provide a clear visual indication that compaction has happened while allowing users to see what was condensed if needed.",
+        "testStrategy": "1. Unit tests:\n   - Test rendering with different token counts and summaries\n   - Verify expand/collapse functionality works correctly\n   - Test animation component rendering\n\n2. Integration tests:\n   - Verify divider appears after compaction completes\n   - Test interaction with the chat interface\n   - Verify metrics display correctly\n\n3. Visual regression tests:\n   - Capture screenshots of divider in different states\n   - Ensure consistent rendering across browsers\n\n4. User acceptance testing:\n   - Verify divider is noticeable but not disruptive\n   - Test expand/collapse interaction\n   - Confirm summary content is readable and well-formatted",
+        "priority": "medium",
+        "dependencies": [
+          "202",
+          "203"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create CompactionDivider.tsx component",
+            "description": "Implement the base CompactionDivider component with expand/collapse functionality",
+            "dependencies": [],
+            "details": "Create the CompactionDivider.tsx file in empire-desktop/src/components/ directory. Implement the component with props for preTokens, postTokens, summary, timestamp, and isExpanded. Include the expand/collapse toggle functionality with useState hook and appropriate styling for the divider header.",
+            "status": "pending",
+            "testStrategy": "Unit test the component rendering with various prop combinations. Test the expand/collapse functionality works correctly. Verify token formatting logic works for different token counts.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement CompactionInProgress animation component",
+            "description": "Create the animation component that displays during the compaction process",
+            "dependencies": [],
+            "details": "Implement the CompactionInProgress component in the same file as CompactionDivider. Add the loading spinner animation and appropriate styling to indicate that compaction is in progress. Ensure the component is visually distinct from the CompactionDivider component.",
+            "status": "pending",
+            "testStrategy": "Test that the animation renders correctly. Verify the spinner animation works in different browsers. Test accessibility features for users with motion sensitivity.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement token reduction metrics display",
+            "description": "Add functionality to calculate and display token reduction metrics in the divider header",
+            "dependencies": [
+              1
+            ],
+            "details": "Enhance the CompactionDivider component to calculate and display token reduction metrics. Implement the formatTokens function to display large token counts in a readable format (e.g., 1.2K). Calculate and display the reduction percentage. Ensure the metrics are properly aligned in the UI.",
+            "status": "pending",
+            "testStrategy": "Test the token formatting function with various input values. Verify reduction percentage calculation is accurate. Test edge cases like 0 tokens or when reduction is negative.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create collapsible summary section with styling",
+            "description": "Implement the collapsible summary section that displays the condensed content",
+            "dependencies": [
+              1
+            ],
+            "details": "Enhance the CompactionDivider component to display the condensed summary in a collapsible section. Style the summary section with appropriate background, borders, and typography. Ensure the summary text preserves whitespace and formatting. Add proper padding and margins for readability.",
+            "status": "pending",
+            "testStrategy": "Test rendering of different summary content types (plain text, code blocks, etc.). Verify whitespace preservation. Test with very long summaries to ensure proper scrolling behavior.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Add timestamp display and responsive design",
+            "description": "Implement timestamp display and ensure responsive design across different screen sizes",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Add functionality to format and display the timestamp when compaction occurred. Ensure the component layout is responsive and works well on different screen sizes. Implement proper alignment of elements in the header (chevron icon, text, timestamp) using flexbox. Test on mobile and desktop viewports.",
+            "status": "pending",
+            "testStrategy": "Test timestamp formatting with different locales and timezones. Verify responsive behavior on various screen sizes. Test accessibility of the component with screen readers.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Integrate compaction UI into chat message list",
+            "description": "Integrate the CompactionDivider and CompactionInProgress components into the chat message list",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Update the chat message list component to include CompactionDivider and CompactionInProgress components at appropriate positions in the conversation flow. Add logic to determine when to show the compaction in progress animation versus the completed divider. Ensure proper spacing between messages and compaction dividers.",
+            "status": "pending",
+            "testStrategy": "Integration tests to verify divider appears after compaction completes. Test interaction with the chat interface. Verify proper positioning of dividers between message groups. Test with multiple compaction events in a single conversation.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T21:15:40.585Z"
+      },
+      {
+        "id": "205",
+        "title": "Implement Protected Message Handling",
+        "description": "Create functionality to mark and preserve specific messages from being condensed during compaction",
+        "details": "Implement a system to mark certain messages as protected so they are never condensed during compaction. The implementation should:\n\n1. Automatically protect system prompts and initial messages\n2. Allow users to mark additional messages as protected\n3. Provide visual indicators for protected messages\n4. Store protection status in the message metadata\n\n```python\nclass ProtectedMessageService:\n    def __init__(self, db_service):\n        self.db = db_service\n    \n    async def mark_as_protected(self, session_id: str, message_id: str) -> bool:\n        \"\"\"Mark a specific message as protected from compaction\"\"\"\n        try:\n            # Update message protection status\n            async with self.db.transaction() as conn:\n                # Update the message itself\n                await conn.execute(\n                    \"\"\"UPDATE messages \n                       SET is_protected = true \n                       WHERE id = $1 AND session_id = $2\"\"\",\n                    message_id, session_id\n                )\n                \n                # Add to protected_message_ids array in conversation_contexts\n                await conn.execute(\n                    \"\"\"UPDATE conversation_contexts \n                       SET protected_message_ids = array_append(protected_message_ids, $1) \n                       WHERE session_id = $2\"\"\",\n                    message_id, session_id\n                )\n            \n            return True\n        except Exception as e:\n            logger.error(f\"Failed to mark message as protected: {str(e)}\")\n            return False\n    \n    async def unmark_as_protected(self, session_id: str, message_id: str) -> bool:\n        \"\"\"Remove protection from a message\"\"\"\n        try:\n            # Update message protection status\n            async with self.db.transaction() as conn:\n                # Update the message itself\n                await conn.execute(\n                    \"\"\"UPDATE messages \n                       SET is_protected = false \n                       WHERE id = $1 AND session_id = $2\"\"\",\n                    message_id, session_id\n                )\n                \n                # Remove from protected_message_ids array in conversation_contexts\n                await conn.execute(\n                    \"\"\"UPDATE conversation_contexts \n                       SET protected_message_ids = array_remove(protected_message_ids, $1) \n                       WHERE session_id = $2\"\"\",\n                    message_id, session_id\n                )\n            \n            return True\n        except Exception as e:\n            logger.error(f\"Failed to unmark message as protected: {str(e)}\")\n            return False\n    \n    async def get_protected_messages(self, session_id: str) -> List[str]:\n        \"\"\"Get all protected message IDs for a session\"\"\"\n        try:\n            result = await self.db.fetch_one(\n                \"\"\"SELECT protected_message_ids \n                   FROM conversation_contexts \n                   WHERE session_id = $1\"\"\",\n                session_id\n            )\n            \n            return result[\"protected_message_ids\"] if result else []\n        except Exception as e:\n            logger.error(f\"Failed to get protected messages: {str(e)}\")\n            return []\n    \n    def is_system_message(self, message: ContextMessage) -> bool:\n        \"\"\"Check if a message is a system message that should be auto-protected\"\"\"\n        # System messages are always protected\n        if message.role == \"system\":\n            return True\n            \n        # Check if it's the first user message (often contains setup instructions)\n        if message.metadata.get(\"is_first_message\", False):\n            return True\n            \n        # Check for slash commands that set up the conversation\n        if message.role == \"user\" and message.content.startswith(\"/\"):\n            # List of setup commands that should be protected\n            setup_commands = [\"/system\", \"/config\", \"/mode\", \"/project\", \"/setup\"]\n            for cmd in setup_commands:\n                if message.content.startswith(cmd):\n                    return True\n        \n        return False\n```\n\n```jsx\n// React component for protected message indicator\nconst ProtectedMessageIndicator = ({ message, onToggleProtection }) => {\n  const isProtected = message.is_protected;\n  \n  return (\n    <div className=\"message-protection-controls\">\n      <button \n        className={`protection-toggle ${isProtected ? 'active' : ''}`}\n        onClick={() => onToggleProtection(message.id, !isProtected)}\n        title={isProtected ? \"Protected from summarization\" : \"Click to protect\"}\n      >\n        {isProtected ? (\n          <LockClosedIcon className=\"h-4 w-4 text-blue-500\" />\n        ) : (\n          <LockOpenIcon className=\"h-4 w-4 text-gray-400 hover:text-blue-500\" />\n        )}\n      </button>\n    </div>\n  );\n};\n```\n\nThe system should automatically identify and protect system messages and initial setup instructions. It should also provide a way for users to manually mark/unmark messages as protected via the UI or API.",
+        "testStrategy": "1. Unit tests:\n   - Test automatic protection of system messages\n   - Verify protection status is correctly stored and retrieved\n   - Test protection toggle functionality\n\n2. Integration tests:\n   - Verify protected messages are excluded from compaction\n   - Test UI indicator for protected messages\n   - Verify protection status persists across sessions\n\n3. API tests:\n   - Test protection API endpoints\n   - Verify error handling for invalid message IDs\n\n4. User acceptance testing:\n   - Verify protection controls are intuitive\n   - Test protection status is clearly indicated\n   - Confirm protected messages are never condensed",
+        "priority": "medium",
+        "dependencies": [
+          "203"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement toggle_message_protection() in context_manager_service.py",
+            "description": "Create a method to toggle protection status of messages in the context manager service",
+            "dependencies": [],
+            "details": "Add a toggle_message_protection() method to app/services/context_manager_service.py that calls the appropriate methods from ProtectedMessageService. This method should accept session_id and message_id parameters and toggle the current protection status. It should handle both protecting and unprotecting messages based on current state.",
+            "status": "pending",
+            "testStrategy": "Unit test the toggle_message_protection() method with various scenarios including protecting an unprotected message, unprotecting a protected message, and handling edge cases like non-existent messages.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement PATCH endpoint for message protection",
+            "description": "Create API endpoint to toggle protection status of specific messages",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the PATCH /context/{conversation_id}/messages/{message_id}/protect endpoint in the appropriate router file. This endpoint should validate the request, call the toggle_message_protection() method from the context manager service, and return appropriate success/error responses with proper status codes.",
+            "status": "pending",
+            "testStrategy": "Test the API endpoint with valid and invalid requests, verify authentication requirements, and confirm proper error handling for non-existent conversations or messages.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Update summarization service to exclude protected messages",
+            "description": "Modify the summarization logic to filter out protected messages before compaction",
+            "dependencies": [
+              1
+            ],
+            "details": "Update the summarization/compaction service to check the protection status of messages before including them in the summarization process. Implement a filter that excludes any messages marked as protected or that are in the protected_message_ids array of the conversation context. Ensure the summarization logic preserves these messages in their original form.",
+            "status": "pending",
+            "testStrategy": "Test the summarization process with a mix of protected and unprotected messages to verify that protected messages are correctly excluded from summarization while still maintaining conversation coherence.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement automatic protection for system and initial messages",
+            "description": "Add logic to automatically protect system prompts and initial conversation messages",
+            "dependencies": [
+              1
+            ],
+            "details": "Enhance the message creation or processing flow to automatically mark system messages and initial conversation messages as protected. Use the is_system_message() method from ProtectedMessageService to identify messages that should be auto-protected. Update the database schema if needed to support tracking the 'is_first_message' flag in message metadata.",
+            "status": "pending",
+            "testStrategy": "Test automatic protection by creating new conversations with system prompts and initial messages, then verify they are correctly marked as protected. Test edge cases like conversations without explicit system messages.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Create protected message UI indicator component",
+            "description": "Implement the React component for displaying protection status of messages",
+            "dependencies": [],
+            "details": "Implement the ProtectedMessageIndicator React component that displays a lock icon to indicate message protection status. The component should render differently based on the protection status of the message and provide visual feedback when hovering or clicking. Include proper styling for both protected and unprotected states.",
+            "status": "pending",
+            "testStrategy": "Test the component rendering in different states (protected/unprotected), verify proper icon display, and test the click handler functionality. Use React Testing Library to simulate user interactions.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Add protection toggle to message context menu",
+            "description": "Integrate protection toggle functionality into the message context menu in the UI",
+            "dependencies": [
+              2,
+              5
+            ],
+            "details": "Extend the message context menu in the desktop UI to include an option for toggling message protection. Connect the UI action to the API endpoint for toggling protection status. Update the message display to show the protection indicator when a message is protected. Ensure the UI state updates immediately after toggling while also handling potential API failures gracefully.",
+            "status": "pending",
+            "testStrategy": "Test the integration of the protection toggle in the message context menu, verify the API calls are made correctly, and test error handling when the API call fails. Test the UI state updates correctly after toggling protection status.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T15:16:49.765Z"
+      },
+      {
+        "id": "206",
+        "title": "Implement Automatic Checkpoint System",
+        "description": "Create a system that automatically saves conversation checkpoints at key moments to protect against crashes and data loss",
+        "details": "Develop an automatic checkpoint system that saves the conversation state at important moments. The implementation should:\n\n1. Detect important context like code generation and decisions\n2. Save checkpoints before compaction and at regular intervals\n3. Store checkpoints in Supabase with metadata\n4. Implement cleanup to maintain only the most recent checkpoints\n\n```python\nclass CheckpointService:\n    def __init__(self, db_service):\n        self.db = db_service\n        self.checkpoint_limit = 50  # Maximum checkpoints per session\n    \n    async def create_checkpoint(self, \n                               context: ConversationContext, \n                               trigger: str = \"auto\",\n                               label: Optional[str] = None) -> str:\n        \"\"\"Create a new checkpoint of the current conversation state\"\"\"\n        try:\n            # Generate checkpoint ID\n            checkpoint_id = str(uuid.uuid4())\n            \n            # Auto-detect tags based on content\n            auto_tags = await self._detect_content_tags(context.messages)\n            \n            # Generate automatic label if none provided\n            if not label:\n                label = await self._generate_auto_label(context.messages, auto_tags)\n            \n            # Prepare checkpoint data\n            checkpoint = {\n                \"id\": checkpoint_id,\n                \"session_id\": context.session_id,\n                \"user_id\": context.user_id,\n                \"project_id\": context.project_id,\n                \"label\": label,\n                \"trigger\": trigger,\n                \"messages_snapshot\": [msg.dict() for msg in context.messages],\n                \"token_count\": context.total_tokens,\n                \"auto_tags\": auto_tags,\n                \"metadata\": {\n                    \"model\": context.model,\n                    \"compaction_count\": context.compaction_count,\n                },\n                \"created_at\": datetime.now()\n            }\n            \n            # Save checkpoint to database\n            await self.db.execute(\n                \"\"\"INSERT INTO session_checkpoints \n                   (id, session_id, user_id, project_id, label, trigger, \n                    messages_snapshot, token_count, auto_tags, metadata, created_at) \n                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\"\"\",\n                checkpoint_id, context.session_id, context.user_id, context.project_id,\n                label, trigger, json.dumps(checkpoint[\"messages_snapshot\"]),\n                context.total_tokens, auto_tags, json.dumps(checkpoint[\"metadata\"]),\n                checkpoint[\"created_at\"]\n            )\n            \n            # Cleanup old checkpoints if we exceed the limit\n            await self._cleanup_old_checkpoints(context.session_id)\n            \n            return checkpoint_id\n        except Exception as e:\n            logger.error(f\"Failed to create checkpoint: {str(e)}\")\n            return None\n    \n    async def _detect_content_tags(self, messages: List[ContextMessage]) -> List[str]:\n        \"\"\"Detect content types in recent messages to auto-tag the checkpoint\"\"\"\n        tags = set()\n        \n        # Look at the last 5 messages\n        recent_messages = messages[-5:] if len(messages) > 5 else messages\n        \n        for msg in recent_messages:\n            content = msg.content.lower()\n            \n            # Check for code blocks\n            if \"```\" in content:\n                tags.add(\"code\")\n            \n            # Check for file paths\n            if re.search(r'[\\w\\-\\.]+\\.[a-zA-Z]{2,4}', content):\n                tags.add(\"file_reference\")\n            \n            # Check for decision language\n            decision_phrases = [\"decided to\", \"will use\", \"chosen\", \"selected\", \"going with\"]\n            if any(phrase in content for phrase in decision_phrases):\n                tags.add(\"decision\")\n            \n            # Check for error messages\n            error_phrases = [\"error:\", \"exception:\", \"failed:\", \"traceback\"]\n            if any(phrase in content for phrase in error_phrases):\n                tags.add(\"error\")\n                \n            # Check for task completion\n            completion_phrases = [\"completed\", \"finished\", \"done\", \"implemented\", \"fixed\"]\n            if any(phrase in content for phrase in completion_phrases):\n                tags.add(\"task_complete\")\n        \n        return list(tags)\n    \n    async def _generate_auto_label(self, messages: List[ContextMessage], tags: List[str]) -> str:\n        \"\"\"Generate an automatic label based on content and tags\"\"\"\n        # Start with timestamp\n        timestamp = datetime.now().strftime(\"%H:%M:%S\")\n        \n        # If we have tags, use them to create a descriptive label\n        if \"code\" in tags:\n            return f\"Code generated ({timestamp})\"\n        elif \"decision\" in tags:\n            return f\"Decision made ({timestamp})\"\n        elif \"error\" in tags:\n            return f\"Error encountered ({timestamp})\"\n        elif \"task_complete\" in tags:\n            return f\"Task completed ({timestamp})\"\n        else:\n            return f\"Checkpoint ({timestamp})\"\n    \n    async def _cleanup_old_checkpoints(self, session_id: str) -> None:\n        \"\"\"Keep only the most recent checkpoints for a session\"\"\"\n        try:\n            # Count checkpoints for this session\n            count = await self.db.fetch_val(\n                \"\"\"SELECT COUNT(*) FROM session_checkpoints WHERE session_id = $1\"\"\",\n                session_id\n            )\n            \n            # If we're over the limit, delete the oldest ones\n            if count > self.checkpoint_limit:\n                to_delete = count - self.checkpoint_limit\n                await self.db.execute(\n                    \"\"\"DELETE FROM session_checkpoints \n                       WHERE id IN (\n                           SELECT id FROM session_checkpoints \n                           WHERE session_id = $1 \n                           ORDER BY created_at ASC \n                           LIMIT $2\n                       )\"\"\",\n                    session_id, to_delete\n                )\n        except Exception as e:\n            logger.error(f\"Failed to cleanup old checkpoints: {str(e)}\")\n    \n    async def get_checkpoints(self, session_id: str) -> List[dict]:\n        \"\"\"Get all checkpoints for a session\"\"\"\n        try:\n            rows = await self.db.fetch_all(\n                \"\"\"SELECT id, label, trigger, token_count, auto_tags, created_at \n                   FROM session_checkpoints \n                   WHERE session_id = $1 \n                   ORDER BY created_at DESC\"\"\",\n                session_id\n            )\n            \n            return [dict(row) for row in rows]\n        except Exception as e:\n            logger.error(f\"Failed to get checkpoints: {str(e)}\")\n            return []\n    \n    async def restore_checkpoint(self, checkpoint_id: str) -> Optional[ConversationContext]:\n        \"\"\"Restore conversation from a checkpoint\"\"\"\n        try:\n            # Get checkpoint data\n            row = await self.db.fetch_one(\n                \"\"\"SELECT * FROM session_checkpoints WHERE id = $1\"\"\",\n                checkpoint_id\n            )\n            \n            if not row:\n                return None\n            \n            # Parse messages from JSON\n            messages_data = json.loads(row[\"messages_snapshot\"])\n            messages = [ContextMessage(**msg) for msg in messages_data]\n            \n            # Recreate conversation context\n            context = ConversationContext(\n                session_id=row[\"session_id\"],\n                user_id=row[\"user_id\"],\n                project_id=row[\"project_id\"],\n                messages=messages,\n                total_tokens=row[\"token_count\"],\n                max_tokens=messages[0].metadata.get(\"max_tokens\", 100000),  # Default fallback\n                model=json.loads(row[\"metadata\"]).get(\"model\", \"claude-3-haiku\"),\n                protected_message_ids=[msg.id for msg in messages if msg.is_protected],\n                last_compaction=None,  # Reset compaction timestamp\n                compaction_count=json.loads(row[\"metadata\"]).get(\"compaction_count\", 0),\n                created_at=messages[0].created_at if messages else datetime.now(),\n                updated_at=datetime.now()\n            )\n            \n            return context\n        except Exception as e:\n            logger.error(f\"Failed to restore checkpoint: {str(e)}\")\n            return None\n```\n\nThe checkpoint system should run in the background without disrupting the user experience. It should automatically detect important moments to save checkpoints and provide a way to manually create checkpoints via the `/save-progress` or `/checkpoint` commands.",
+        "testStrategy": "1. Unit tests:\n   - Test content tag detection for different message types\n   - Verify automatic label generation\n   - Test checkpoint cleanup functionality\n\n2. Integration tests:\n   - Verify checkpoints are created at important moments\n   - Test checkpoint restoration accuracy\n   - Verify checkpoint limit enforcement\n\n3. Performance tests:\n   - Measure checkpoint creation time for different conversation sizes\n   - Verify no UI lag during checkpoint operations\n\n4. Recovery tests:\n   - Simulate crashes and verify recovery from checkpoints\n   - Test restoration of different conversation states\n   - Verify token counts are preserved during restoration",
+        "priority": "high",
+        "dependencies": [
+          "203",
+          "205",
+          "211"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement create_checkpoint method",
+            "description": "Implement the create_checkpoint method in the CheckpointService class to save conversation state at important moments.",
+            "dependencies": [],
+            "details": "Complete the implementation of the create_checkpoint method in app/services/checkpoint_service.py. This method should generate a unique ID for each checkpoint, detect content tags, generate automatic labels, and save the checkpoint data to the database. Ensure proper error handling and logging.",
+            "status": "pending",
+            "testStrategy": "Unit test the create_checkpoint method with various conversation contexts. Verify checkpoint creation with different triggers and validate the structure of saved checkpoints.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement checkpoint retrieval methods",
+            "description": "Implement get_checkpoints and restore_checkpoint methods in the CheckpointService class.",
+            "dependencies": [
+              1
+            ],
+            "details": "Complete the implementation of get_checkpoints to retrieve all checkpoints for a session and restore_checkpoint to recreate a conversation context from a checkpoint. Ensure proper error handling, data validation, and type conversion when restoring context objects.",
+            "status": "pending",
+            "testStrategy": "Test checkpoint retrieval with various session IDs. Test restoration with valid and invalid checkpoint IDs. Verify the restored context matches the original context structure.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement content tag detection",
+            "description": "Implement the _detect_content_tags method to identify important conversation moments for automatic checkpointing.",
+            "dependencies": [],
+            "details": "Complete the implementation of _detect_content_tags to analyze message content and identify patterns indicating code generation, decisions, file references, errors, and task completions. Use regex and keyword matching to identify these patterns in recent messages.",
+            "status": "pending",
+            "testStrategy": "Test tag detection with various message contents including code blocks, decision statements, error messages, and task completion statements. Verify correct tag assignment for each content type.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement automatic label generation",
+            "description": "Implement the _generate_auto_label method to create descriptive labels for checkpoints based on content tags.",
+            "dependencies": [
+              3
+            ],
+            "details": "Complete the implementation of _generate_auto_label to create meaningful checkpoint labels based on detected content tags and timestamps. Create specific label formats for code generation, decisions, errors, and task completions.",
+            "status": "pending",
+            "testStrategy": "Test label generation with various tag combinations. Verify timestamps are included correctly and labels are descriptive of the checkpoint content.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement checkpoint cleanup",
+            "description": "Implement the _cleanup_old_checkpoints method to maintain only the most recent checkpoints.",
+            "dependencies": [
+              1
+            ],
+            "details": "Complete the implementation of _cleanup_old_checkpoints to enforce the checkpoint limit (50 per session). Query the database to count existing checkpoints and delete the oldest ones when the limit is exceeded. Ensure proper error handling and transaction management.",
+            "status": "pending",
+            "testStrategy": "Test cleanup with various checkpoint counts. Verify oldest checkpoints are removed when limit is exceeded. Test error handling during cleanup operations.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement checkpoint API endpoints",
+            "description": "Create REST API endpoints for manual checkpoint creation and retrieval.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Implement POST /checkpoints/{conversation_id} endpoint for manual checkpoint creation via /save-progress command and GET /checkpoints/{conversation_id} endpoint to list available checkpoints. Include proper request validation, authentication, and response formatting.",
+            "status": "pending",
+            "testStrategy": "Test API endpoints with valid and invalid requests. Verify authentication requirements. Test response formats and error handling for various scenarios.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Implement automatic checkpoint triggers",
+            "description": "Create a system to automatically trigger checkpoints at key moments in conversations.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "Implement automatic checkpoint triggers based on content detection (code generation, decisions) and system events (before compaction, at regular intervals). Create a background task or event listener to monitor conversations and trigger checkpoints when important moments are detected.",
+            "status": "pending",
+            "testStrategy": "Test automatic triggers with simulated conversation events. Verify checkpoints are created at appropriate moments. Test timing of automatic checkpoints relative to compaction events.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Implement checkpoint expiration",
+            "description": "Add a 30-day TTL (Time To Live) for checkpoints to manage storage efficiently.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement checkpoint expiration by adding created_at timestamps and a scheduled task to remove checkpoints older than 30 days. Update the database schema to include TTL constraints if supported, or implement a periodic cleanup job.",
+            "status": "pending",
+            "testStrategy": "Test expiration with checkpoints of various ages. Verify checkpoints older than 30 days are removed. Test the cleanup job scheduling and execution.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Implement crash recovery detection",
+            "description": "Create an endpoint to detect abnormal session terminations and enable recovery.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement GET /recovery/check endpoint to detect if a session was abnormally terminated and needs recovery. This should check for sessions without proper closure events and with recent checkpoints available. Return recovery options if applicable.",
+            "status": "pending",
+            "testStrategy": "Test recovery detection with various session states. Simulate crashes and verify detection. Test recovery options presentation for different checkpoint availability scenarios.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 10,
+            "title": "Implement checkpoint restoration",
+            "description": "Create an endpoint to restore conversation state from a checkpoint.",
+            "dependencies": [
+              2,
+              9
+            ],
+            "details": "Implement POST /recovery/{conversation_id}/restore endpoint to restore a conversation from a specified checkpoint. Handle the restoration process, including rebuilding the conversation context, updating the session state, and notifying the user of the restoration.",
+            "status": "pending",
+            "testStrategy": "Test restoration with various checkpoint types. Verify conversation state is accurately restored. Test user notification and session state updates after restoration.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T21:09:24.428Z"
+      },
+      {
+        "id": "207",
+        "title": "Implement Session Memory & Persistence",
+        "description": "Create a system to store and retrieve conversation summaries across sessions for continuity",
+        "details": "Develop a session memory system that stores conversation summaries in Supabase and retrieves relevant memories when starting new sessions. The implementation should:\n\n1. Save conversation summaries with metadata\n2. Store per-project context memory\n3. Implement relevance-based memory retrieval\n4. Support full session resumption\n\n```python\nclass SessionMemoryService:\n    def __init__(self, db_service, embedding_service):\n        self.db = db_service\n        self.embedding_service = embedding_service\n        self.memory_expiration_days = 30  # Default TTL for memories\n    \n    async def save_session_memory(self, context: ConversationContext) -> str:\n        \"\"\"Save a summary of the current session as a memory\"\"\"\n        try:\n            # Generate a summary of the conversation\n            summary = await self._generate_conversation_summary(context.messages)\n            \n            # Extract key decisions and code references\n            key_decisions = await self._extract_key_decisions(context.messages)\n            code_references = await self._extract_code_references(context.messages)\n            \n            # Generate tags for the memory\n            tags = await self._generate_memory_tags(context.messages, summary)\n            \n            # Generate embedding for semantic search\n            embedding = await self.embedding_service.generate_embedding(summary)\n            \n            # Calculate expiration date\n            expires_at = datetime.now() + timedelta(days=self.memory_expiration_days)\n            \n            # Create memory ID\n            memory_id = str(uuid.uuid4())\n            \n            # Save memory to database\n            await self.db.execute(\n                \"\"\"INSERT INTO session_memories \n                   (id, user_id, project_id, session_id, summary, key_decisions, \n                    code_references, tags, relevance_score, embedding, created_at, expires_at) \n                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)\"\"\",\n                memory_id, context.user_id, context.project_id, context.session_id,\n                summary, json.dumps(key_decisions), json.dumps(code_references),\n                tags, 1.0, embedding, datetime.now(), expires_at\n            )\n            \n            return memory_id\n        except Exception as e:\n            logger.error(f\"Failed to save session memory: {str(e)}\")\n            return None\n    \n    async def _generate_conversation_summary(self, messages: List[ContextMessage]) -> str:\n        \"\"\"Generate a concise summary of the conversation\"\"\"\n        # Use the same summarization engine as the context condensing\n        # This could call the ContextCondensingEngine or implement similar logic\n        # For brevity, we'll assume a simplified implementation here\n        \n        # Format messages for summarization\n        formatted_messages = []\n        for msg in messages:\n            if not msg.is_summarized:  # Skip already summarized messages\n                formatted_messages.append({\n                    \"role\": msg.role,\n                    \"content\": msg.content\n                })\n        \n        # Call Anthropic API for summarization\n        prompt = \"\"\"Summarize this conversation into a concise memory that captures the key points, \n                   decisions, code snippets, and important context. Focus on technical details \n                   that would be useful to remember in future related conversations.\"\"\"\n        \n        # This would call the actual API in production\n        # For brevity, we're returning a placeholder\n        return \"Session summary placeholder\"  # In real implementation, call API\n    \n    async def _extract_key_decisions(self, messages: List[ContextMessage]) -> List[str]:\n        \"\"\"Extract key decisions from the conversation\"\"\"\n        decisions = []\n        \n        # Simple heuristic: Look for decision language in assistant messages\n        decision_phrases = [\"decided to\", \"will use\", \"chosen\", \"selected\", \"going with\"]\n        \n        for msg in messages:\n            if msg.role == \"assistant\":\n                content = msg.content.lower()\n                for phrase in decision_phrases:\n                    if phrase in content:\n                        # Extract the sentence containing the decision\n                        sentences = re.split(r'(?<=[.!?]) +', msg.content)\n                        for sentence in sentences:\n                            if phrase in sentence.lower():\n                                decisions.append(sentence.strip())\n        \n        return decisions\n    \n    async def _extract_code_references(self, messages: List[ContextMessage]) -> List[dict]:\n        \"\"\"Extract code snippets and file references\"\"\"\n        code_refs = []\n        \n        for msg in messages:\n            # Extract code blocks\n            code_blocks = re.findall(r'```([\\w]*)[\\n\\r]([\\s\\S]*?)```', msg.content)\n            for lang, code in code_blocks:\n                if len(code.strip()) > 0:\n                    code_refs.append({\n                        \"type\": \"code_block\",\n                        \"language\": lang.strip() or \"text\",\n                        \"content\": code.strip(),\n                        \"message_id\": msg.id\n                    })\n            \n            # Extract file paths\n            file_paths = re.findall(r'[\\w\\-\\.\\/_]+\\.[a-zA-Z]{2,4}', msg.content)\n            for path in file_paths:\n                code_refs.append({\n                    \"type\": \"file_reference\",\n                    \"path\": path,\n                    \"message_id\": msg.id\n                })\n        \n        return code_refs\n    \n    async def _generate_memory_tags(self, messages: List[ContextMessage], summary: str) -> List[str]:\n        \"\"\"Generate tags for the memory based on content\"\"\"\n        tags = set()\n        \n        # Add project name if available\n        if messages and messages[0].metadata.get(\"project_name\"):\n            tags.add(messages[0].metadata[\"project_name\"])\n        \n        # Check for common programming languages\n        languages = [\"python\", \"javascript\", \"typescript\", \"java\", \"c++\", \"rust\", \"go\"]\n        for lang in languages:\n            if lang in summary.lower():\n                tags.add(lang)\n        \n        # Check for frameworks and technologies\n        frameworks = [\"react\", \"vue\", \"angular\", \"django\", \"flask\", \"express\", \"tensorflow\"]\n        for framework in frameworks:\n            if framework in summary.lower():\n                tags.add(framework)\n        \n        # Add generic tags based on content\n        if \"```\" in summary:\n            tags.add(\"code\")\n        if \"error\" in summary.lower() or \"exception\" in summary.lower():\n            tags.add(\"debugging\")\n        if \"test\" in summary.lower() or \"spec\" in summary.lower():\n            tags.add(\"testing\")\n        \n        return list(tags)\n    \n    async def get_relevant_memories(self, query: str, project_id: Optional[str] = None, limit: int = 3) -> List[dict]:\n        \"\"\"Get relevant memories based on semantic similarity\"\"\"\n        try:\n            # Generate embedding for query\n            query_embedding = await self.embedding_service.generate_embedding(query)\n            \n            # Build SQL query\n            sql = \"\"\"\n                SELECT id, summary, key_decisions, tags, relevance_score, created_at,\n                       1 - (embedding <=> $1) as similarity\n                FROM session_memories\n                WHERE expires_at > NOW()\n            \"\"\"\n            \n            params = [query_embedding]\n            \n            # Add project filter if specified\n            if project_id:\n                sql += \" AND project_id = $2\"\n                params.append(project_id)\n            \n            # Add order and limit\n            sql += \" ORDER BY similarity DESC LIMIT $\" + str(len(params) + 1)\n            params.append(limit)\n            \n            # Execute query\n            rows = await self.db.fetch_all(sql, *params)\n            \n            # Format results\n            memories = []\n            for row in rows:\n                memories.append({\n                    \"id\": row[\"id\"],\n                    \"summary\": row[\"summary\"],\n                    \"key_decisions\": json.loads(row[\"key_decisions\"]),\n                    \"tags\": row[\"tags\"],\n                    \"relevance_score\": row[\"similarity\"],  # Use similarity as relevance\n                    \"created_at\": row[\"created_at\"]\n                })\n            \n            return memories\n        except Exception as e:\n            logger.error(f\"Failed to get relevant memories: {str(e)}\")\n            return []\n    \n    async def resume_session(self, session_id: str) -> Optional[ConversationContext]:\n        \"\"\"Resume a session from its ID\"\"\"\n        try:\n            # Get the conversation context\n            row = await self.db.fetch_one(\n                \"\"\"SELECT * FROM conversation_contexts WHERE session_id = $1\"\"\",\n                session_id\n            )\n            \n            if not row:\n                return None\n            \n            # Parse messages from JSON\n            messages_data = json.loads(row[\"messages\"])\n            messages = [ContextMessage(**msg) for msg in messages_data]\n            \n            # Recreate conversation context\n            context = ConversationContext(\n                session_id=row[\"session_id\"],\n                user_id=row[\"user_id\"],\n                project_id=row[\"project_id\"],\n                messages=messages,\n                total_tokens=row[\"total_tokens\"],\n                max_tokens=row[\"max_tokens\"],\n                model=row[\"model\"],\n                protected_message_ids=row[\"protected_message_ids\"],\n                last_compaction=row[\"last_compaction\"],\n                compaction_count=row[\"compaction_count\"],\n                created_at=row[\"created_at\"],\n                updated_at=datetime.now()  # Update the timestamp\n            )\n            \n            return context\n        except Exception as e:\n            logger.error(f\"Failed to resume session: {str(e)}\")\n            return None\n```\n\nThe session memory service should work in conjunction with the checkpoint system to provide both short-term recovery (checkpoints) and long-term memory (session memories). It should use vector embeddings to enable semantic search for relevant memories.",
+        "testStrategy": "1. Unit tests:\n   - Test memory extraction functions (decisions, code references)\n   - Verify tag generation for different content types\n   - Test embedding generation and similarity search\n\n2. Integration tests:\n   - Verify memory storage and retrieval\n   - Test session resumption functionality\n   - Verify project-specific memory filtering\n\n3. Performance tests:\n   - Measure memory retrieval latency\n   - Test with large numbers of stored memories\n   - Verify embedding search performance\n\n4. User acceptance testing:\n   - Verify memories contain relevant information\n   - Test session resumption user experience\n   - Confirm memory relevance scoring effectiveness",
+        "priority": "medium",
+        "dependencies": [
+          "206",
+          "211"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create SessionMemory Pydantic model",
+            "description": "Implement the SessionMemory Pydantic model in app/models/session_models.py to define the structure for storing session memories.",
+            "dependencies": [],
+            "details": "Create a Pydantic model that includes fields for id, user_id, project_id, session_id, summary, key_decisions, code_references, tags, relevance_score, embedding, created_at, and expires_at. Include validation for required fields and appropriate data types. Add documentation for each field and implement any necessary helper methods.",
+            "status": "pending",
+            "testStrategy": "Unit tests to verify model validation, field types, and serialization/deserialization. Test edge cases like empty fields and maximum field lengths.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement conversation summary generation",
+            "description": "Complete the _generate_conversation_summary method to create concise summaries of conversations.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the _generate_conversation_summary method in SessionMemoryService that processes a list of ContextMessages and generates a meaningful summary. Use the Anthropic API to create summaries that capture key points, decisions, and technical details. Include logic to handle message formatting and API integration. Implement error handling and logging for failed summary generation.",
+            "status": "pending",
+            "testStrategy": "Unit tests with mock messages to verify summary generation. Test with various conversation types (debugging, planning, code review). Integration tests with the actual API to verify quality of summaries.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement memory extraction functions",
+            "description": "Complete the key decisions and code references extraction methods in SessionMemoryService.",
+            "dependencies": [
+              1
+            ],
+            "details": "Finalize the _extract_key_decisions and _extract_code_references methods to accurately identify and extract important information from conversations. Enhance the regex patterns for better code block detection. Improve the decision extraction logic to capture nuanced decision statements. Add support for additional programming languages and file types in the extraction process.",
+            "status": "pending",
+            "testStrategy": "Unit tests with various conversation samples containing different types of decisions and code blocks. Test edge cases like malformed code blocks and ambiguous decision statements.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement memory storage and retrieval",
+            "description": "Complete the save_session_memory and get_relevant_memories methods for storing and retrieving session memories.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Implement the database operations for saving session memories with proper error handling and transaction management. Complete the vector similarity search functionality in get_relevant_memories to retrieve contextually relevant memories. Add caching for frequently accessed memories to improve performance. Implement pagination for memory retrieval results and optimize the SQL queries for performance.",
+            "status": "pending",
+            "testStrategy": "Integration tests with the database to verify storage and retrieval. Performance tests for vector similarity search with large datasets. Unit tests for error handling and edge cases.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement session resumption functionality",
+            "description": "Complete the resume_session method to allow users to continue previous conversations.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement the resume_session method to retrieve and reconstruct a ConversationContext from a session ID. Add validation to ensure the session belongs to the requesting user. Implement error handling for missing or expired sessions. Add logging for session resumption events. Update the session's updated_at timestamp when resumed and track resumption count for analytics.",
+            "status": "pending",
+            "testStrategy": "Integration tests for session resumption with various session states. Unit tests for error handling and context reconstruction. Security tests to verify proper access controls.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement data retention policies",
+            "description": "Add support for different data retention policies based on project type and user preferences.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement configurable retention policies for session memories: project-based (lifetime of project), CKO (lifetime of project), and indefinite (until user deletes). Add database schema updates to support retention policy tracking. Create methods to apply retention policies during memory creation and update. Implement a background job to clean up expired memories based on their retention policy. Add user controls to manage retention preferences.",
+            "status": "pending",
+            "testStrategy": "Unit tests for each retention policy type. Integration tests to verify policy application and memory expiration. System tests to verify the cleanup job correctly removes expired memories while preserving others.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T21:22:12.337Z"
+      },
+      {
+        "id": "208",
+        "title": "Implement Session Resume & Recovery UI",
+        "description": "Create a user interface for browsing, selecting, and resuming from saved sessions and checkpoints",
+        "details": "Develop a UI for session management that allows users to browse and resume previous sessions. The implementation should:\n\n1. Show a session picker on app start\n2. Display recent sessions with previews\n3. Provide a checkpoint browser within sessions\n4. Support session resumption from any checkpoint\n\n```jsx\n// React components for session management UI\nimport React, { useState, useEffect } from 'react';\nimport { format } from 'date-fns';\n\n// Session picker component shown on app start\nconst SessionPicker = ({ onSelectSession, onNewSession }) => {\n  const [sessions, setSessions] = useState([]);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(null);\n  \n  useEffect(() => {\n    // Fetch recent sessions on component mount\n    const fetchSessions = async () => {\n      try {\n        setLoading(true);\n        const response = await fetch('/api/session/recent');\n        if (!response.ok) throw new Error('Failed to fetch sessions');\n        const data = await response.json();\n        setSessions(data);\n      } catch (err) {\n        setError(err.message);\n      } finally {\n        setLoading(false);\n      }\n    };\n    \n    fetchSessions();\n  }, []);\n  \n  if (loading) return <div className=\"p-4 text-center\">Loading recent sessions...</div>;\n  if (error) return <div className=\"p-4 text-center text-red-500\">Error: {error}</div>;\n  \n  return (\n    <div className=\"session-picker p-4 max-w-3xl mx-auto\">\n      <h2 className=\"text-xl font-semibold mb-4\">Resume Session</h2>\n      \n      {sessions.length === 0 ? (\n        <div className=\"text-center py-8\">\n          <p className=\"text-gray-500\">No recent sessions found</p>\n          <button \n            className=\"mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600\"\n            onClick={onNewSession}\n          >\n            Start New Session\n          </button>\n        </div>\n      ) : (\n        <>\n          <div className=\"space-y-4\">\n            {sessions.map(session => (\n              <SessionCard \n                key={session.session_id}\n                session={session}\n                onResume={() => onSelectSession(session.session_id)}\n                onBrowseCheckpoints={() => onBrowseCheckpoints(session.session_id)}\n              />\n            ))}\n          </div>\n          \n          <div className=\"mt-6 text-center\">\n            <button \n              className=\"px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600\"\n              onClick={onNewSession}\n            >\n              Start New Session\n            </button>\n          </div>\n        </>\n      )}\n    </div>\n  );\n};\n\n// Individual session card component\nconst SessionCard = ({ session, onResume, onBrowseCheckpoints }) => {\n  const { \n    session_id, \n    project_name, \n    last_message_preview, \n    updated_at, \n    checkpoint_count,\n    token_count \n  } = session;\n  \n  return (\n    <div className=\"border rounded-lg p-4 hover:shadow-md transition-shadow\">\n      <div className=\"flex items-start\">\n        <div className=\"text-2xl text-blue-500 mr-3\">📁</div>\n        <div className=\"flex-1\">\n          <h3 className=\"font-medium\">{project_name || 'Untitled Project'}</h3>\n          <p className=\"text-sm text-gray-600 mt-1 line-clamp-2\">\n            Last: \"{last_message_preview || 'No messages'}\"\n          </p>\n          <div className=\"flex items-center text-xs text-gray-500 mt-2\">\n            <span>🕐 {formatTimeAgo(updated_at)}</span>\n            <span className=\"mx-2\">•</span>\n            <span>{checkpoint_count} checkpoints</span>\n            <span className=\"mx-2\">•</span>\n            <span>{formatTokens(token_count)} tokens</span>\n          </div>\n        </div>\n      </div>\n      <div className=\"mt-3 flex justify-end space-x-2\">\n        <button \n          className=\"px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100\"\n          onClick={onBrowseCheckpoints}\n        >\n          Browse Checkpoints\n        </button>\n        <button \n          className=\"px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600\"\n          onClick={onResume}\n        >\n          Resume Latest\n        </button>\n      </div>\n    </div>\n  );\n};\n\n// Checkpoint browser component\nconst CheckpointBrowser = ({ sessionId, onSelectCheckpoint, onClose }) => {\n  const [checkpoints, setCheckpoints] = useState([]);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(null);\n  \n  useEffect(() => {\n    // Fetch checkpoints for the session\n    const fetchCheckpoints = async () => {\n      try {\n        setLoading(true);\n        const response = await fetch(`/api/checkpoint/session/${sessionId}`);\n        if (!response.ok) throw new Error('Failed to fetch checkpoints');\n        const data = await response.json();\n        setCheckpoints(data);\n      } catch (err) {\n        setError(err.message);\n      } finally {\n        setLoading(false);\n      }\n    };\n    \n    fetchCheckpoints();\n  }, [sessionId]);\n  \n  if (loading) return <div className=\"p-4 text-center\">Loading checkpoints...</div>;\n  if (error) return <div className=\"p-4 text-center text-red-500\">Error: {error}</div>;\n  \n  return (\n    <div className=\"checkpoint-browser p-4\">\n      <div className=\"flex justify-between items-center mb-4\">\n        <h2 className=\"text-xl font-semibold\">Session Checkpoints</h2>\n        <button \n          className=\"text-gray-500 hover:text-gray-700\"\n          onClick={onClose}\n        >\n          <XIcon className=\"h-5 w-5\" />\n        </button>\n      </div>\n      \n      {checkpoints.length === 0 ? (\n        <div className=\"text-center py-8\">\n          <p className=\"text-gray-500\">No checkpoints found for this session</p>\n        </div>\n      ) : (\n        <div className=\"space-y-3 max-h-96 overflow-y-auto\">\n          {checkpoints.map(checkpoint => (\n            <CheckpointCard \n              key={checkpoint.id}\n              checkpoint={checkpoint}\n              onSelect={() => onSelectCheckpoint(checkpoint.id)}\n            />\n          ))}\n        </div>\n      )}\n    </div>\n  );\n};\n\n// Individual checkpoint card component\nconst CheckpointCard = ({ checkpoint, onSelect }) => {\n  const { \n    id, \n    label, \n    trigger, \n    token_count, \n    auto_tags,\n    created_at \n  } = checkpoint;\n  \n  // Format trigger type for display\n  const getTriggerLabel = (trigger) => {\n    switch(trigger) {\n      case 'auto': return 'Automatic';\n      case 'manual': return 'Manual';\n      case 'pre_compaction': return 'Pre-compaction';\n      case 'important_context': return 'Important context';\n      default: return trigger;\n    }\n  };\n  \n  return (\n    <div className=\"border rounded p-3 hover:bg-gray-50\">\n      <div className=\"flex justify-between\">\n        <div>\n          <h4 className=\"font-medium\">{label}</h4>\n          <div className=\"text-xs text-gray-500 mt-1\">\n            {format(new Date(created_at), 'MMM d, yyyy h:mm a')}\n          </div>\n        </div>\n        <div className=\"text-right text-sm\">\n          <div>{formatTokens(token_count)} tokens</div>\n          <div className=\"text-xs text-gray-500\">{getTriggerLabel(trigger)}</div>\n        </div>\n      </div>\n      \n      {auto_tags.length > 0 && (\n        <div className=\"mt-2 flex flex-wrap gap-1\">\n          {auto_tags.map(tag => (\n            <span \n              key={tag} \n              className=\"px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded-full\"\n            >\n              {tag}\n            </span>\n          ))}\n        </div>\n      )}\n      \n      <div className=\"mt-2 text-right\">\n        <button \n          className=\"px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600\"\n          onClick={onSelect}\n        >\n          Resume from here\n        </button>\n      </div>\n    </div>\n  );\n};\n\n// Helper functions\nconst formatTimeAgo = (timestamp) => {\n  const date = new Date(timestamp);\n  const now = new Date();\n  const diffMinutes = Math.floor((now - date) / (1000 * 60));\n  \n  if (diffMinutes < 1) return 'Just now';\n  if (diffMinutes < 60) return `${diffMinutes} minutes ago`;\n  \n  const diffHours = Math.floor(diffMinutes / 60);\n  if (diffHours < 24) return `${diffHours} hours ago`;\n  \n  return format(date, 'MMM d, yyyy');\n};\n\nconst formatTokens = (tokens) => {\n  return tokens >= 1000 ? `${(tokens/1000).toFixed(1)}K` : tokens;\n};\n\nexport { SessionPicker, CheckpointBrowser };\n```\n\nThe UI should provide a seamless experience for resuming previous sessions and recovering from crashes. It should show relevant information about each session and checkpoint to help users make informed decisions.",
+        "testStrategy": "1. Unit tests:\n   - Test component rendering with different data\n   - Verify formatting functions for time and tokens\n   - Test empty state handling\n\n2. Integration tests:\n   - Verify session data fetching and display\n   - Test checkpoint browser functionality\n   - Verify session resumption flow\n\n3. Visual regression tests:\n   - Capture screenshots of session picker in different states\n   - Test responsive design on different screen sizes\n\n4. User acceptance testing:\n   - Verify session picker appears on app launch\n   - Test session resumption from different checkpoints\n   - Confirm UI is intuitive and easy to navigate",
+        "priority": "medium",
+        "dependencies": [
+          "206",
+          "207"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create SessionPicker.tsx component",
+            "description": "Implement the SessionPicker component that displays recent sessions on app start",
+            "dependencies": [],
+            "details": "Create the SessionPicker.tsx component in empire-desktop/src/components/ that displays a list of recent sessions with previews. The component should handle loading states, empty states, and provide options to resume a session or start a new one. Include the SessionCard subcomponent for displaying individual session information.",
+            "status": "pending",
+            "testStrategy": "Unit tests for component rendering with different data states (loading, empty, populated). Test proper display of session information and formatting functions. Verify callback handling for session selection.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create CheckpointBrowser.tsx component",
+            "description": "Implement the CheckpointBrowser component with timeline view for browsing checkpoints within a session",
+            "dependencies": [
+              1
+            ],
+            "details": "Create the CheckpointBrowser.tsx component in empire-desktop/src/components/ that displays checkpoints for a selected session in a timeline view. Include the CheckpointCard subcomponent for displaying individual checkpoint details. Implement sorting, filtering, and selection of checkpoints for resumption.",
+            "status": "pending",
+            "testStrategy": "Unit tests for checkpoint rendering, timeline visualization, and checkpoint selection. Test empty state handling and proper display of checkpoint metadata like trigger type and tags.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create sessionApi.ts client",
+            "description": "Implement the API client for session management operations",
+            "dependencies": [],
+            "details": "Create sessionApi.ts in empire-desktop/src/services/ that provides methods for fetching sessions, checkpoints, and handling session resumption. Implement proper error handling, request cancellation, and response parsing. Include TypeScript interfaces for session and checkpoint data structures.",
+            "status": "pending",
+            "testStrategy": "Unit tests for API client methods with mocked responses. Test error handling for network failures and invalid responses. Verify proper request formation and parameter handling.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement GET /sessions endpoint",
+            "description": "Create backend endpoint for retrieving recent sessions with pagination and filtering",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement the GET /sessions endpoint that returns a list of recent sessions with pagination support. Include metadata like project name, last message preview, updated timestamp, checkpoint count, and token count. Support filtering by date range and sorting options.",
+            "status": "pending",
+            "testStrategy": "Unit tests for endpoint with various query parameters. Integration tests to verify database queries and response formatting. Test pagination behavior and sorting options.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement GET /sessions/picker endpoint",
+            "description": "Create optimized endpoint for the session picker shown at app launch",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Implement the GET /sessions/picker endpoint optimized for quick loading at app launch. This should return a limited set of the most recent sessions with minimal data needed for the picker UI. Include caching headers to improve performance on subsequent app launches.",
+            "status": "pending",
+            "testStrategy": "Performance tests to verify quick loading times. Unit tests for response format and caching behavior. Integration tests with the SessionPicker component.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement POST /sessions/{session_id}/resume endpoint",
+            "description": "Create endpoint for resuming a session from a specific checkpoint",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement the POST /sessions/{session_id}/resume endpoint that handles session resumption from a specific checkpoint. Support optional checkpoint_id parameter to resume from a specific point. Handle session state restoration including conversation history, context, and any associated resources.",
+            "status": "pending",
+            "testStrategy": "Unit tests for resumption logic with various checkpoint scenarios. Integration tests for full resumption flow. Test error handling for invalid session or checkpoint IDs.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Implement conflict detection for sessions",
+            "description": "Add last-write-wins conflict resolution for sessions updated in multiple locations",
+            "dependencies": [
+              6
+            ],
+            "details": "Implement conflict detection and resolution for sessions that may have been updated in multiple locations. Use a timestamp-based last-write-wins strategy. Add version tracking to session objects and include conflict detection in the resume endpoint. Provide clear error messages when conflicts are detected.",
+            "status": "pending",
+            "testStrategy": "Unit tests for conflict detection logic with various timestamp scenarios. Integration tests simulating concurrent updates from different clients. Test conflict resolution behavior and error reporting.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Add session conflict notification UI",
+            "description": "Implement UI notification for when a session has been updated elsewhere",
+            "dependencies": [
+              1,
+              7
+            ],
+            "details": "Create a notification component that appears when a session conflict is detected. The notification should inform the user that the session has been updated elsewhere and provide options to either use the latest version or continue with the current version. Include visual indicators for conflicted sessions in the session picker.",
+            "status": "pending",
+            "testStrategy": "Unit tests for notification component rendering and interaction. Integration tests with the conflict detection system. Test user flow for both conflict resolution options.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 9,
+            "title": "Integrate session picker into app launch flow",
+            "description": "Add the session picker to the application startup sequence",
+            "dependencies": [
+              1,
+              5
+            ],
+            "details": "Integrate the SessionPicker component into the application startup flow. Show the session picker when the app launches, unless the user has disabled this feature. Handle the transition from session selection to either resuming a session or starting a new one. Implement persistence of the user's preference for showing the picker on startup.",
+            "status": "pending",
+            "testStrategy": "Integration tests for the complete app launch flow. Test session selection and resumption from the picker. Verify proper handling of user preferences for showing the picker on startup.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T21:31:44.631Z"
+      },
+      {
+        "id": "209",
+        "title": "Implement Compact Command & API",
+        "description": "Create a command and API endpoint for manual control over context condensing",
+        "details": "Implement a `/compact` command and corresponding API endpoint that allows users to manually trigger context condensing. The implementation should:\n\n1. Support basic and force modes\n2. Return metrics about the compaction\n3. Implement rate limiting\n4. Provide programmatic access via API\n\n```python\n# FastAPI route handlers for compact command\nfrom fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request\nfrom pydantic import BaseModel\nfrom typing import Optional\nimport time\n\nrouter = APIRouter(prefix=\"/api/context\", tags=[\"context\"])\n\n# Rate limiting with a simple in-memory store\n# In production, use Redis or similar for distributed rate limiting\ncompaction_timestamps = {}\n\nclass CompactRequest(BaseModel):\n    session_id: str\n    force: bool = False\n    custom_prompt: Optional[str] = None\n\nclass CompactResponse(BaseModel):\n    success: bool\n    message: str\n    pre_tokens: Optional[int] = None\n    post_tokens: Optional[int] = None\n    reduction_percent: Optional[float] = None\n    duration_ms: Optional[int] = None\n\n@router.post(\"/compact\", response_model=CompactResponse)\nasync def compact_context(request: CompactRequest, \n                         background_tasks: BackgroundTasks,\n                         context_service = Depends(get_context_service),\n                         condensing_engine = Depends(get_condensing_engine)):\n    \"\"\"Manually trigger context compaction\"\"\"\n    # Check rate limiting (30 second cooldown)\n    current_time = time.time()\n    last_compaction = compaction_timestamps.get(request.session_id, 0)\n    \n    if current_time - last_compaction < 30 and not request.force:\n        cooldown_remaining = int(30 - (current_time - last_compaction))\n        return CompactResponse(\n            success=False,\n            message=f\"Rate limited. Please wait {cooldown_remaining} seconds before compacting again.\"\n        )\n    \n    # Get the conversation context\n    context = await context_service.get_context(request.session_id)\n    if not context:\n        raise HTTPException(status_code=404, detail=\"Session not found\")\n    \n    # Check if compaction is needed\n    threshold = context.settings.get(\"auto_compact_threshold\", 0.8)  # Default 80%\n    current_usage = context.total_tokens / context.max_tokens\n    \n    if current_usage < threshold and not request.force:\n        return CompactResponse(\n            success=False,\n            message=f\"Context usage ({current_usage:.1%}) is below the threshold ({threshold:.1%}). Use 'force' option to compact anyway.\"\n        )\n    \n    # Update rate limit timestamp\n    compaction_timestamps[request.session_id] = current_time\n    \n    # Perform compaction\n    try:\n        result = await condensing_engine.compact_conversation(\n            context=context,\n            trigger=\"manual\",\n            custom_prompt=request.custom_prompt\n        )\n        \n        # Update context in database (in background)\n        background_tasks.add_task(\n            context_service.update_context,\n            context\n        )\n        \n        return CompactResponse(\n            success=True,\n            message=\"Context compacted successfully\",\n            pre_tokens=result.pre_tokens,\n            post_tokens=result.post_tokens,\n            reduction_percent=result.reduction_percent,\n            duration_ms=result.duration_ms\n        )\n    except Exception as e:\n        return CompactResponse(\n            success=False,\n            message=f\"Compaction failed: {str(e)}\"\n        )\n\n# Command handler for /compact slash command\nasync def handle_compact_command(message: str, session_id: str, context_service, condensing_engine):\n    \"\"\"Handle /compact command from chat interface\"\"\"\n    # Parse command options\n    force = \"--force\" in message or \"-f\" in message\n    \n    # Create request object\n    request = CompactRequest(\n        session_id=session_id,\n        force=force\n    )\n    \n    # Call the API handler\n    response = await compact_context(\n        request=request,\n        background_tasks=BackgroundTasks(),\n        context_service=context_service,\n        condensing_engine=condensing_engine\n    )\n    \n    # Format response for chat\n    if response.success:\n        return f\"✅ Context compacted: {response.pre_tokens:,} → {response.post_tokens:,} tokens ({response.reduction_percent:.1f}% reduction) in {response.duration_ms/1000:.2f}s\"\n    else:\n        return f\"❌ {response.message}\"\n```\n\n```javascript\n// Client-side function to call compact API\nasync function compactContext(sessionId, force = false) {\n  try {\n    const response = await fetch('/api/context/compact', {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n      },\n      body: JSON.stringify({\n        session_id: sessionId,\n        force: force\n      })\n    });\n    \n    const result = await response.json();\n    \n    if (!response.ok) {\n      throw new Error(result.message || 'Failed to compact context');\n    }\n    \n    return result;\n  } catch (error) {\n    console.error('Error compacting context:', error);\n    throw error;\n  }\n}\n\n// Command handler for chat interface\nfunction handleSlashCommand(command, args) {\n  if (command === '/compact') {\n    const force = args.includes('--force') || args.includes('-f');\n    \n    // Show compaction in progress indicator\n    showCompactionInProgress();\n    \n    // Call API\n    compactContext(currentSessionId, force)\n      .then(result => {\n        if (result.success) {\n          // Show compaction divider with results\n          showCompactionDivider({\n            preTokens: result.pre_tokens,\n            postTokens: result.post_tokens,\n            timestamp: new Date()\n          });\n        } else {\n          // Show error message\n          showErrorMessage(result.message);\n        }\n      })\n      .catch(error => {\n        showErrorMessage(error.message);\n      })\n      .finally(() => {\n        // Hide progress indicator\n        hideCompactionInProgress();\n      });\n    \n    return true; // Command handled\n  }\n  \n  return false; // Command not handled\n}\n```\n\nThe implementation should provide both a user-friendly command interface and a programmatic API for triggering compaction. It should include appropriate rate limiting to prevent abuse and provide clear feedback about the compaction results.",
+        "testStrategy": "1. Unit tests:\n   - Test command parsing with different options\n   - Verify rate limiting functionality\n   - Test response formatting\n\n2. Integration tests:\n   - Test API endpoint with various request parameters\n   - Verify command handler integration with chat interface\n   - Test error handling and recovery\n\n3. Performance tests:\n   - Measure API response time\n   - Test with different conversation sizes\n\n4. User acceptance testing:\n   - Verify command works as expected in chat interface\n   - Test force option functionality\n   - Confirm metrics display is clear and informative",
+        "priority": "medium",
+        "dependencies": [
+          "203",
+          "204"
+        ],
+        "status": "in-progress",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement slash command parser for /compact command",
+            "description": "Create a command parser that handles the /compact command and its various flags from the chat interface.",
+            "dependencies": [],
+            "details": "Implement the handle_compact_command function that parses the /compact command from the chat interface. This should extract flags like --force and --fast from the message string, create a CompactRequest object with the appropriate parameters, and call the compact_context API handler. The function should properly format the response for display in the chat interface.",
+            "status": "pending",
+            "testStrategy": "Unit test the command parser with different input combinations (no flags, with --force, with --fast, with both flags). Verify that the parser correctly identifies and extracts all command options.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement force mode and threshold logic",
+            "description": "Add logic to handle the --force flag that allows compaction even when below the threshold.",
+            "dependencies": [
+              1
+            ],
+            "details": "Modify the compact_context API handler to check if the current context usage is below the compaction threshold. If it is below threshold and force=False, return an appropriate message. If force=True, proceed with compaction regardless of the current usage. Include the current usage percentage and threshold in the response message for clarity.",
+            "status": "pending",
+            "testStrategy": "Test compaction requests both above and below threshold with and without the force flag. Verify that compaction is only prevented when below threshold AND force is not set.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement fast mode with Haiku model option",
+            "description": "Add support for a --fast flag that uses a smaller, faster model for compaction.",
+            "dependencies": [
+              1
+            ],
+            "details": "Extend the CompactRequest model to include a 'fast' boolean parameter. Update the compact_context handler to pass this parameter to the condensing_engine. Modify the condensing_engine to use a smaller, faster model (Haiku) when the fast option is enabled. This should reduce compaction time from 30+ seconds to 5-10 seconds, with a potential trade-off in quality.",
+            "status": "pending",
+            "testStrategy": "Compare compaction performance and quality between standard and fast modes. Measure and verify the time difference between the two approaches. Test edge cases where fast compaction might produce suboptimal results.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement rate limiting with cooldown period",
+            "description": "Add rate limiting to prevent abuse of the compaction feature with a 30-second cooldown.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement rate limiting in the compact_context API handler using an in-memory store (compaction_timestamps) to track the last compaction time for each session. If a request comes in less than 30 seconds after the previous compaction, return an error message with the remaining cooldown time, unless force=True. Update the timestamp after successful compaction. For production, add a comment about using Redis or similar for distributed rate limiting.",
+            "status": "pending",
+            "testStrategy": "Test rapid successive compaction requests and verify that the rate limit is enforced. Test that the cooldown message correctly shows the remaining time. Verify that the force flag bypasses rate limiting.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement compaction history endpoint",
+            "description": "Create a GET endpoint to retrieve the compaction history for a conversation.",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement a new GET /api/context/{conversation_id}/compact/history endpoint that returns the history of compaction operations for a specific conversation. This should include timestamps, before/after token counts, reduction percentages, and whether it was automatic or manual. Store compaction records in the database after each compaction operation. The endpoint should support pagination with skip/limit parameters and sorting by timestamp.",
+            "status": "pending",
+            "testStrategy": "Test the endpoint with conversations that have multiple compaction events. Verify pagination works correctly. Test with conversations that have no compaction history. Verify the response format includes all required fields.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T21:37:02.149Z"
+      },
+      {
+        "id": "210",
+        "title": "Implement Automatic Error Recovery",
+        "description": "Create a system that automatically detects and recovers from context window overflow errors",
+        "details": "Implement an error recovery system that detects context window overflow errors from API responses and automatically triggers context reduction. The implementation should:\n\n1. Detect overflow errors from API responses\n2. Trigger aggressive context reduction\n3. Retry failed requests automatically\n4. Preserve conversation state during recovery\n\n```python\nclass ContextErrorRecoveryService:\n    def __init__(self, context_service, condensing_engine):\n        self.context_service = context_service\n        self.condensing_engine = condensing_engine\n        self.max_retry_attempts = 3\n    \n    async def handle_api_error(self, error, session_id: str) -> tuple[bool, str]:\n        \"\"\"Handle API errors, attempting recovery for context overflow\"\"\"\n        # Check if this is a context overflow error\n        if self._is_context_overflow_error(error):\n            return await self._recover_from_overflow(session_id)\n        else:\n            # Not a context overflow error, can't recover\n            return False, f\"API error: {str(error)}\"\n    \n    def _is_context_overflow_error(self, error) -> bool:\n        \"\"\"Determine if an error is due to context window overflow\"\"\"\n        error_str = str(error).lower()\n        \n        # Check for common overflow error patterns from different APIs\n        overflow_patterns = [\n            \"context window full\",\n            \"maximum context length\",\n            \"too many tokens\",\n            \"context overflow\",\n            \"input too long\",\n            \"exceeds token limit\"\n        ]\n        \n        return any(pattern in error_str for pattern in overflow_patterns)\n    \n    async def _recover_from_overflow(self, session_id: str) -> tuple[bool, str]:\n        \"\"\"Attempt to recover from context overflow by reducing context\"\"\"\n        # Get the current context\n        context = await self.context_service.get_context(session_id)\n        if not context:\n            return False, \"Session not found\"\n        \n        # Log the recovery attempt\n        logger.info(f\"Attempting context overflow recovery for session {session_id}\")\n        \n        # Try multiple recovery attempts with increasing aggressiveness\n        for attempt in range(1, self.max_retry_attempts + 1):\n            # Calculate reduction percentage based on attempt number\n            # First attempt: 25%, Second: 40%, Third: 60%\n            reduction_percent = 25 + (attempt - 1) * 15\n            \n            try:\n                # Create checkpoint before aggressive reduction\n                checkpoint_service = get_checkpoint_service()\n                checkpoint_id = await checkpoint_service.create_checkpoint(\n                    context=context,\n                    trigger=\"error_recovery\",\n                    label=f\"Pre-recovery checkpoint (attempt {attempt})\"\n                )\n                \n                # Perform aggressive context reduction\n                result = await self._reduce_context_aggressively(\n                    context=context,\n                    reduction_percent=reduction_percent\n                )\n                \n                # Update context in database\n                await self.context_service.update_context(context)\n                \n                # Log success\n                logger.info(\n                    f\"Context recovery successful on attempt {attempt}. \"\n                    f\"Reduced from {result.pre_tokens} to {result.post_tokens} tokens \"\n                    f\"({result.reduction_percent:.1f}% reduction)\"\n                )\n                \n                return True, (\n                    f\"Recovered from context overflow (attempt {attempt}). \"\n                    f\"Reduced context by {result.reduction_percent:.1f}%.\"\n                )\n                \n            except Exception as e:\n                logger.error(f\"Recovery attempt {attempt} failed: {str(e)}\")\n                # Continue to next attempt\n        \n        # If we get here, all recovery attempts failed\n        return False, \"Failed to recover from context overflow after multiple attempts\"\n    \n    async def _reduce_context_aggressively(self, context: ConversationContext, reduction_percent: float) -> CompactionResult:\n        \"\"\"Aggressively reduce context size by the specified percentage\"\"\"\n        # Use custom prompt for aggressive reduction\n        aggressive_prompt = \"\"\"\n        You are a context reduction specialist. Your task is to aggressively condense this conversation \n        to fit within a smaller context window. This is an emergency reduction to recover from a context overflow error.\n        \n        IMPORTANT: Preserve ONLY the most critical information:\n        1. Code snippets that were created or modified\n        2. Key decisions and their rationale\n        3. Current task or problem being solved\n        4. Critical error messages\n        \n        Be extremely concise. Remove all pleasantries, explanations, and non-essential content.\n        Prioritize recent messages over older ones.\n        \n        FORMAT YOUR RESPONSE AS A BRIEF SUMMARY FOLLOWED BY KEY POINTS.\n        \"\"\"\n        \n        # Perform compaction with aggressive prompt\n        result = await self.condensing_engine.compact_conversation(\n            context=context,\n            trigger=\"error_recovery\",\n            custom_prompt=aggressive_prompt\n        )\n        \n        # If we didn't achieve the target reduction, force more aggressive reduction\n        if result.reduction_percent < reduction_percent:\n            # Calculate how many more tokens we need to remove\n            target_tokens = int(result.pre_tokens * (1 - reduction_percent / 100))\n            current_tokens = result.post_tokens\n            \n            if current_tokens > target_tokens:\n                # We need to remove more messages\n                # Start by identifying non-essential messages (not code, not errors, etc.)\n                non_essential_messages = [\n                    msg for msg in context.messages \n                    if not msg.is_protected \n                    and not self._is_essential_message(msg)\n                ]\n                \n                # Sort by oldest first\n                non_essential_messages.sort(key=lambda x: x.created_at)\n                \n                # Remove messages until we reach target\n                for msg in non_essential_messages:\n                    if current_tokens <= target_tokens:\n                        break\n                        \n                    # Remove this message\n                    context.messages = [m for m in context.messages if m.id != msg.id]\n                    current_tokens -= msg.token_count\n                \n                # Update total tokens\n                context.total_tokens = sum(msg.token_count for msg in context.messages)\n                \n                # Update result metrics\n                result.post_tokens = context.total_tokens\n                result.reduction_percent = ((result.pre_tokens - result.post_tokens) / result.pre_tokens) * 100\n        \n        return result\n    \n    def _is_essential_message(self, message: ContextMessage) -> bool:\n        \"\"\"Determine if a message contains essential information that should be preserved\"\"\"\n        content = message.content.lower()\n        \n        # Check for code blocks\n        if \"```\" in content:\n            return True\n            \n        # Check for error messages\n        error_indicators = [\"error:\", \"exception:\", \"traceback\", \"failed:\"]\n        if any(indicator in content for indicator in error_indicators):\n            return True\n            \n        # Check for file paths\n        if re.search(r'[\\w\\-\\.]+\\.[a-zA-Z]{2,4}', content):\n            return True\n            \n        # Check for decision language\n        decision_phrases = [\"decided to\", \"will use\", \"chosen\", \"selected\"]\n        if any(phrase in content for phrase in decision_phrases):\n            return True\n            \n        return False\n```\n\n```javascript\n// Client-side error handling and recovery\nasync function sendMessageWithRecovery(message, sessionId, retryCount = 0) {\n  const maxRetries = 3;\n  \n  try {\n    const response = await sendMessage(message, sessionId);\n    return response;\n  } catch (error) {\n    // Check if this is a context overflow error\n    if (isContextOverflowError(error) && retryCount < maxRetries) {\n      // Show recovery message to user\n      showRecoveryMessage(`Context window full. Attempting recovery (${retryCount + 1}/${maxRetries})...`);\n      \n      // Call recovery API\n      try {\n        const recoveryResult = await fetch('/api/context/recover', {\n          method: 'POST',\n          headers: {\n            'Content-Type': 'application/json',\n          },\n          body: JSON.stringify({\n            session_id: sessionId\n          })\n        });\n        \n        const result = await recoveryResult.json();\n        \n        if (result.success) {\n          // Recovery successful, retry the message\n          showRecoveryMessage(`Recovery successful. Retrying message...`);\n          return await sendMessageWithRecovery(message, sessionId, retryCount + 1);\n        } else {\n          // Recovery failed\n          throw new Error(`Recovery failed: ${result.message}`);\n        }\n      } catch (recoveryError) {\n        throw new Error(`Context recovery failed: ${recoveryError.message}`);\n      }\n    } else {\n      // Not a context error or we've exceeded retry attempts\n      throw error;\n    }\n  }\n}\n\nfunction isContextOverflowError(error) {\n  const errorMessage = error.message.toLowerCase();\n  const overflowPatterns = [\n    'context window full',\n    'maximum context length',\n    'too many tokens',\n    'context overflow',\n    'input too long',\n    'exceeds token limit'\n  ];\n  \n  return overflowPatterns.some(pattern => errorMessage.includes(pattern));\n}\n\nfunction showRecoveryMessage(message) {\n  // Display a recovery message in the UI\n  const recoveryElement = document.createElement('div');\n  recoveryElement.className = 'recovery-message';\n  recoveryElement.innerHTML = `\n    <div class=\"flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-md\">\n      <svg class=\"animate-spin h-5 w-5 text-yellow-500 mr-3\" viewBox=\"0 0 24 24\">\n        <circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"4\"></circle>\n        <path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\"></path>\n      </svg>\n      <span class=\"text-sm text-yellow-800\">${message}</span>\n    </div>\n  `;\n  \n  document.getElementById('message-container').appendChild(recoveryElement);\n  \n  // Scroll to bottom\n  const container = document.getElementById('message-container');\n  container.scrollTop = container.scrollHeight;\n  \n  return recoveryElement;\n}\n```\n\nThe error recovery system should work transparently to recover from context overflow errors without requiring user intervention. It should preserve as much critical information as possible while aggressively reducing context size to fit within limits.",
+        "testStrategy": "1. Unit tests:\n   - Test error detection for different API error formats\n   - Verify essential message detection logic\n   - Test recovery strategies with different reduction percentages\n\n2. Integration tests:\n   - Simulate overflow errors and verify recovery\n   - Test multiple recovery attempts\n   - Verify checkpoint creation before recovery\n\n3. End-to-end tests:\n   - Test complete recovery flow from error to successful retry\n   - Verify client-side recovery handling\n   - Test with different conversation types\n\n4. Stress tests:\n   - Test with conversations at various token limits\n   - Verify recovery with minimal available tokens\n   - Test recovery with complex conversation structures",
+        "priority": "high",
+        "dependencies": [
+          "203",
+          "206"
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement error detection for context window overflow",
+            "description": "Create a robust error detection system that identifies context window overflow errors from various API providers",
+            "dependencies": [],
+            "details": "Enhance the _is_context_overflow_error method to detect overflow errors from different LLM APIs (OpenAI, Anthropic, etc.). Add comprehensive pattern matching for different error message formats. Implement unit tests to verify detection accuracy across different error formats. Add logging for detected errors with structured data.",
+            "status": "pending",
+            "testStrategy": "Unit tests for error detection with different API error formats. Test with mock API responses from OpenAI, Anthropic, and other providers. Verify both positive and negative cases (overflow vs. non-overflow errors).",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement aggressive context reduction strategy",
+            "description": "Create a multi-tiered context reduction system that progressively increases reduction aggressiveness",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement the _reduce_context_aggressively method with configurable reduction percentages. Create logic to identify and preserve essential messages (code, errors, decisions). Implement checkpoint creation before reduction to allow rollback. Add metrics collection for reduction effectiveness (pre/post token counts, reduction percentage).",
+            "status": "pending",
+            "testStrategy": "Unit tests for context reduction with different reduction percentages. Test essential message detection logic. Integration tests with simulated large contexts to verify reduction effectiveness.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Implement automatic retry mechanism with recovery",
+            "description": "Create a system that automatically retries failed requests after context reduction",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement the handle_api_error method to coordinate recovery and retry. Add progressive retry logic with increasing reduction aggressiveness. Implement client-side recovery UI components to show recovery status. Add timeout handling and maximum retry limits. Implement recovery metrics tracking for success/failure rates.",
+            "status": "pending",
+            "testStrategy": "Integration tests simulating overflow errors and verifying recovery. Test multiple recovery attempts with different reduction percentages. Test timeout handling and maximum retry limits.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Implement graceful degradation and fallback mechanisms",
+            "description": "Create fallback mechanisms for when automatic recovery fails or API services are unavailable",
+            "dependencies": [
+              3
+            ],
+            "details": "Implement fallback to simpler models when primary models fail. Add graceful degradation when Anthropic API is unavailable (fallback to truncation). Implement session state preservation during recovery attempts. Add user notification system for degraded service. Implement concurrent access handling with last-write-wins and notification.",
+            "status": "pending",
+            "testStrategy": "Integration tests for fallback mechanisms with simulated API unavailability. Test degradation paths with different failure scenarios. Test concurrent access handling with multiple simulated users.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Implement monitoring and observability for error recovery",
+            "description": "Add comprehensive logging, metrics, and alerting for the error recovery system",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement structured logging with structlog for all recovery operations. Add Prometheus metrics for recovery attempts, success rates, and reduction percentages. Create a Prometheus dashboard configuration for context management metrics. Implement alerting for repeated recovery failures. Add session update notifications in the desktop UI for concurrent modifications.",
+            "status": "pending",
+            "testStrategy": "Verify metrics collection during simulated recovery scenarios. Test dashboard configurations with sample data. Test alerting mechanisms with threshold violations.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T22:30:26.918Z"
+      },
+      {
+        "id": "211",
+        "title": "Database Schema Setup for Chat Context Management",
+        "description": "Create all database migrations and verify schema setup in Supabase for the chat context window management feature. CRITICAL BLOCKER for Tasks 201, 206, 207.",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "details": "Create and apply the following migration files for Supabase to set up the database schema for chat context management:\n\n1. **conversation_contexts table**:\n```sql\ncreate table public.conversation_contexts (\n  id uuid primary key default uuid_generate_v4(),\n  conversation_id uuid not null references public.conversations(id) on delete cascade,\n  total_tokens integer not null default 0,\n  max_tokens integer not null default 8000,\n  retained_messages integer not null default 0,\n  compaction_enabled boolean not null default true,\n  last_compaction_time timestamp with time zone,\n  created_at timestamp with time zone not null default now(),\n  updated_at timestamp with time zone not null default now(),\n  unique(conversation_id)\n);\n\ncreate index idx_conversation_contexts_conversation_id on public.conversation_contexts(conversation_id);\n```\n\n2. **context_messages table**:\n```sql\ncreate table public.context_messages (\n  id uuid primary key default uuid_generate_v4(),\n  conversation_id uuid not null references public.conversations(id) on delete cascade,\n  message_id uuid not null references public.messages(id) on delete cascade,\n  token_count integer not null,\n  is_retained boolean not null default true,\n  embedding vector(1536),\n  created_at timestamp with time zone not null default now(),\n  unique(conversation_id, message_id)\n);\n\ncreate index idx_context_messages_conversation_id on public.context_messages(conversation_id);\ncreate index idx_context_messages_message_id on public.context_messages(message_id);\ncreate index idx_context_messages_is_retained on public.context_messages(is_retained);\n```\n\n3. **compaction_logs table**:\n```sql\ncreate table public.compaction_logs (\n  id uuid primary key default uuid_generate_v4(),\n  conversation_id uuid not null references public.conversations(id) on delete cascade,\n  tokens_before integer not null,\n  tokens_after integer not null,\n  messages_before integer not null,\n  messages_after integer not null,\n  compaction_type text not null check (compaction_type in ('auto', 'manual', 'threshold')),\n  created_at timestamp with time zone not null default now()\n);\n\ncreate index idx_compaction_logs_conversation_id on public.compaction_logs(conversation_id);\ncreate index idx_compaction_logs_created_at on public.compaction_logs(created_at);\n```\n\n4. **session_checkpoints table**:\n```sql\ncreate table public.session_checkpoints (\n  id uuid primary key default uuid_generate_v4(),\n  conversation_id uuid not null references public.conversations(id) on delete cascade,\n  summary text not null,\n  token_count integer not null,\n  checkpoint_type text not null check (checkpoint_type in ('auto', 'manual', 'milestone')),\n  messages_included integer not null,\n  created_at timestamp with time zone not null default now()\n);\n\ncreate index idx_session_checkpoints_conversation_id on public.session_checkpoints(conversation_id);\n```\n\n5. **session_memories table**:\n```sql\ncreate table public.session_memories (\n  id uuid primary key default uuid_generate_v4(),\n  conversation_id uuid not null references public.conversations(id) on delete cascade,\n  memory_type text not null check (memory_type in ('key_point', 'action_item', 'decision', 'custom')),\n  content text not null,\n  token_count integer not null,\n  is_pinned boolean not null default false,\n  source_message_id uuid references public.messages(id) on delete set null,\n  created_at timestamp with time zone not null default now(),\n  updated_at timestamp with time zone not null default now()\n);\n\ncreate index idx_session_memories_conversation_id on public.session_memories(conversation_id);\ncreate index idx_session_memories_memory_type on public.session_memories(memory_type);\ncreate index idx_session_memories_is_pinned on public.session_memories(is_pinned);\n```\n\n6. **RLS policies**:\n```sql\n-- RLS for conversation_contexts\nalter table public.conversation_contexts enable row level security;\n\ncreate policy \"Users can view their own conversation contexts\"\n  on public.conversation_contexts for select\n  using (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\ncreate policy \"Users can update their own conversation contexts\"\n  on public.conversation_contexts for update\n  using (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\n-- RLS for context_messages\nalter table public.context_messages enable row level security;\n\ncreate policy \"Users can view their own context messages\"\n  on public.context_messages for select\n  using (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\n-- RLS for compaction_logs\nalter table public.compaction_logs enable row level security;\n\ncreate policy \"Users can view their own compaction logs\"\n  on public.compaction_logs for select\n  using (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\n-- RLS for session_checkpoints\nalter table public.session_checkpoints enable row level security;\n\ncreate policy \"Users can view their own session checkpoints\"\n  on public.session_checkpoints for select\n  using (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\ncreate policy \"Users can create their own session checkpoints\"\n  on public.session_checkpoints for insert\n  with check (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\n-- RLS for session_memories\nalter table public.session_memories enable row level security;\n\ncreate policy \"Users can view their own session memories\"\n  on public.session_memories for select\n  using (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\ncreate policy \"Users can create their own session memories\"\n  on public.session_memories for insert\n  with check (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n\ncreate policy \"Users can update their own session memories\"\n  on public.session_memories for update\n  using (\n    conversation_id in (\n      select id from public.conversations where user_id = auth.uid()\n    )\n  );\n```\n\nImplementation steps:\n\n1. Create the migration files in the `supabase/migrations` directory with appropriate timestamps\n2. Run the migrations using `supabase db reset` or `supabase migration up`\n3. Verify the schema has been created correctly by checking the database tables\n4. Test the RLS policies by attempting to access data from different user contexts\n5. Document the schema for reference by the UI implementation team",
+        "testStrategy": "1. Database schema validation tests:\n   - Verify all tables are created with the correct columns and constraints\n   - Test primary key constraints\n   - Test foreign key relationships\n   - Verify indexes are created correctly\n\n2. RLS policy tests:\n   - Test each policy with authenticated users accessing their own data\n   - Test users attempting to access other users' data\n   - Test anonymous access attempts\n   - Verify admin access works correctly\n\n3. Data integrity tests:\n   - Test cascading deletes when a conversation is deleted\n   - Test unique constraints\n   - Test check constraints on enum-like fields\n\n4. Migration tests:\n   - Test applying migrations in sequence\n   - Test rolling back migrations\n   - Test idempotency of migrations\n\n5. Performance tests:\n   - Test query performance with indexes\n   - Test with simulated large datasets\n\n6. Integration tests:\n   - Test interaction between tables with sample data\n   - Verify triggers and functions work correctly\n\n7. Manual testing checklist:\n   - Run migrations on development database\n   - Verify all tables exist with correct structure\n   - Insert sample data and verify constraints\n   - Test RLS policies with different user contexts\n   - Verify foreign key relationships work correctly",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create conversation_contexts table migration",
+            "description": "Create the migration file for the conversation_contexts table that tracks token usage and compaction settings",
+            "dependencies": [],
+            "details": "Create a migration file in the supabase/migrations directory with the SQL to create the conversation_contexts table. This table will store metadata about the context for each conversation including token counts, compaction settings, and timestamps.",
+            "status": "pending",
+            "testStrategy": "Verify the table is created with all required columns, constraints, and indexes. Test the foreign key relationship to the conversations table.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Create context_messages table migration",
+            "description": "Create the migration file for the context_messages table that tracks which messages are part of the context",
+            "dependencies": [],
+            "details": "Create a migration file for the context_messages table that will track which messages are included in the conversation context, their token counts, and retention status. Include vector embedding column for semantic search capabilities.",
+            "status": "pending",
+            "testStrategy": "Test the table creation, foreign key constraints to both conversations and messages tables, and verify indexes are created correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create compaction_logs table migration",
+            "description": "Create the migration file for the compaction_logs table that tracks history of context compactions",
+            "dependencies": [],
+            "details": "Create a migration file for the compaction_logs table that will record the history of context compactions, including metrics before and after compaction, and the type of compaction performed.",
+            "status": "pending",
+            "testStrategy": "Verify the table is created with all required columns and constraints. Test the foreign key relationship to the conversations table.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Create session_checkpoints table migration",
+            "description": "Create the migration file for the session_checkpoints table that stores conversation summaries",
+            "dependencies": [],
+            "details": "Create a migration file for the session_checkpoints table that will store conversation summaries and checkpoints that can be used to compress context while preserving important information.",
+            "status": "pending",
+            "testStrategy": "Test the table creation, foreign key constraints, and verify the checkpoint_type check constraint works correctly.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Create session_memories table migration",
+            "description": "Create the migration file for the session_memories table that stores important conversation points",
+            "dependencies": [],
+            "details": "Create a migration file for the session_memories table that will store important points from the conversation that should be preserved even during context compaction, such as key points, action items, and decisions.",
+            "status": "pending",
+            "testStrategy": "Verify the table is created with all required columns and constraints. Test the memory_type check constraint and the foreign key relationships.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Create RLS policies for all tables",
+            "description": "Create the migration file for Row Level Security policies to secure access to context tables",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Create a migration file that implements Row Level Security policies for all the context management tables to ensure users can only access their own data. Include policies for select, insert, and update operations as appropriate for each table.",
+            "status": "pending",
+            "testStrategy": "Test each RLS policy by attempting to access data as different users. Verify users can only access their own data and that admin access works correctly if applicable.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Run migrations and verify schema",
+            "description": "Apply all migration files and verify the database schema is created correctly",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "details": "Run the migrations using Supabase CLI commands and verify that all tables, constraints, indexes, and RLS policies are created correctly. Document any issues encountered and their resolutions.",
+            "status": "pending",
+            "testStrategy": "Manually verify all tables exist with the correct structure. Test inserting sample data to verify constraints. Test RLS policies with different user contexts.",
+            "parentId": "undefined"
+          }
+        ],
+        "updatedAt": "2026-01-20T20:58:08.687Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-01-17T21:16:25.296Z",
-      "taskCount": 100,
-      "completedCount": 80,
+      "lastModified": "2026-01-20T22:30:26.918Z",
+      "taskCount": 111,
+      "completedCount": 90,
       "tags": [
         "v7_3_features"
       ]
