@@ -102,11 +102,11 @@ This checklist ensures all API keys, credentials, and MCPs are configured before
 ## 3. Existing Render Deployments (IMPORTANT!)
 
 ### ✅ Render Workspace
-- **Workspace ID**: `tea-d1vtdtre5dus73a4rb4g`
+- **Workspace ID**: `<your-workspace-id>` (see .env: RENDER_WORKSPACE_ID)
 - **Access**: Already configured, deployments are live
 
 ### ✅ LlamaIndex Service (Already Deployed)
-- **Service ID**: `srv-d2nl1lre5dus73atm9u0`
+- **Service ID**: `<your-llamaindex-service-id>` (see .env: LLAMAINDEX_SERVICE_ID)
 - **URL**: https://jb-llamaindex.onrender.com
 - **Purpose**: Document parsing, indexing, and retrieval
 - **Status**: ACTIVE - Already running
@@ -128,7 +128,7 @@ This checklist ensures all API keys, credentials, and MCPs are configured before
 - **Where to put**: `.env` file
 
 ### ✅ CrewAI Service (Already Deployed)
-- **Service ID**: `srv-d2n0hh3uibrs73buafo0`
+- **Service ID**: `<your-crewai-service-id>` (see .env: CREWAI_SERVICE_ID)
 - **URL**: https://jb-crewai.onrender.com
 - **Purpose**: Multi-agent AI orchestration for complex workflows
 - **Status**: ACTIVE - Already running

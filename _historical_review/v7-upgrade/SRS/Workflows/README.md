@@ -149,7 +149,7 @@ testing_validation.md
 
 All content extracted from:
 ```
-/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/10_n8n_orchestration.md
+<project-root>/10_n8n_orchestration.md
 ```
 
 This split maintains 100% of the original content while organizing it for better navigation and usability.

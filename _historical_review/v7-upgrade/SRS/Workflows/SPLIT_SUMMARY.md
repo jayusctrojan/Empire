@@ -8,8 +8,8 @@ Successfully split the massive 10,231-line n8n orchestration file into 16 organi
 
 ## Source Document
 
-**File**: `10_n8n_orchestration.md`  
-**Location**: `/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/`  
+**File**: `10_n8n_orchestration.md`
+**Location**: `/path/to/Empire/` (project root)  
 **Size**: 360KB  
 **Lines**: 10,231  
 **Content Type**: Complete n8n orchestration implementation guide v7.2
@@ -350,14 +350,14 @@ All critical gaps from the analysis have been addressed:
 
 ## File Locations
 
-**Source**: 
+**Source**:
 ```
-/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/10_n8n_orchestration.md
+<project-root>/10_n8n_orchestration.md
 ```
 
-**Output Directory**: 
+**Output Directory**:
 ```
-/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire/SRS/Workflows/
+<project-root>/SRS/Workflows/
 ```
 
 ---

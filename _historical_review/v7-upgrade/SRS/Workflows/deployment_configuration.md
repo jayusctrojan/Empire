@@ -47,9 +47,10 @@ COPY ./custom-nodes /home/node/.n8n/custom/
 COPY ./workflows /home/node/.n8n/workflows/
 
 # Set environment variables
+# Note: Auth credentials should be injected at runtime, not baked into the image
 ENV N8N_BASIC_AUTH_ACTIVE=true \
-    N8N_BASIC_AUTH_USER=admin \
-    N8N_BASIC_AUTH_PASSWORD=changeme \
+    N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin} \
+    N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD} \
     N8N_HOST=0.0.0.0 \
     N8N_PORT=5678 \
     N8N_PROTOCOL=https \
