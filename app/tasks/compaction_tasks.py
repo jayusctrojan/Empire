@@ -28,6 +28,14 @@ from app.models.context_models import CompactionTrigger
 logger = structlog.get_logger(__name__)
 
 # =============================================================================
+# REDIS KEY PATTERNS
+# =============================================================================
+
+COMPACTION_PENDING_KEY = "compaction:pending:{conversation_id}"
+COMPACTION_PENDING_TTL = 300  # 5 minutes - prevent duplicate compaction queuing
+
+
+# =============================================================================
 # PROMETHEUS METRICS
 # =============================================================================
 
@@ -209,6 +217,14 @@ def compact_context(
 
     finally:
         COMPACTION_TASKS_ACTIVE.dec()
+        # Clear the pending flag so new compactions can be queued
+        try:
+            from app.core.database import get_redis
+            redis = get_redis()
+            pending_key = COMPACTION_PENDING_KEY.format(conversation_id=conversation_id)
+            redis.delete(pending_key)
+        except Exception:
+            pass  # Non-critical, key will expire via TTL
 
 
 @shared_task(
@@ -263,7 +279,28 @@ def check_and_compact_if_needed(
             loop.close()
 
         if should_compact:
-            # Queue compaction task
+            # RACE CONDITION FIX: Use Redis SETNX to atomically check and set
+            # pending flag - only one task can acquire this
+            from app.core.database import get_redis
+            redis = get_redis()
+            pending_key = COMPACTION_PENDING_KEY.format(conversation_id=conversation_id)
+
+            # Atomic set-if-not-exists with TTL
+            # Returns True only if we set the key (no pending compaction)
+            acquired = redis.set(pending_key, "1", nx=True, ex=COMPACTION_PENDING_TTL)
+
+            if not acquired:
+                logger.info(
+                    "Compaction already pending, skipping duplicate",
+                    conversation_id=conversation_id
+                )
+                return {
+                    "compaction_triggered": False,
+                    "conversation_id": conversation_id,
+                    "reason": "Compaction already pending"
+                }
+
+            # We acquired the lock, queue the compaction task
             task = compact_context.delay(
                 conversation_id=conversation_id,
                 user_id=user_id,
