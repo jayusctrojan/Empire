@@ -27,7 +27,7 @@ This directory contains the complete Software Requirements Specification (SRS) f
 
 ## 📁 Directory Structure
 
-```
+```text
 Empire/
 ├── Core Sections (IEEE 830-1998 Structure)
 │   ├── 01_introduction.md ✅
@@ -136,7 +136,7 @@ Note: Section 02 needs updating for v6.0 simplified architecture
 ## 🏗️ v6.0 Simplified Architecture
 
 ### Mac Studio M3 Ultra (96GB) - Development Hub
-```
+```text
 Mac Studio M3 Ultra (96GB)
 ├── 28-core CPU, 60-core GPU, 32-core Neural Engine
 ├── 800 GB/s memory bandwidth

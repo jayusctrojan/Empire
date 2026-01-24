@@ -6,7 +6,7 @@
 
 The AI Empire File Processing System v6.0 operates as a cloud-first AI architecture with Claude Sonnet 4.5 API at its core, achieving enterprise-grade document processing while maintaining simplicity and cost-effectiveness:
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────┐
 │              AI Empire v6.0 Claude API Edition Architecture          │
 ├──────────────────────────────────────────────────────────────────────┤
