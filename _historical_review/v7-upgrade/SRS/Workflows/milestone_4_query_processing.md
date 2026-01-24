@@ -79,6 +79,17 @@
     },
     {
       "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Return cached response\nconst cachedValue = $json.value;\n\ntry {\n  const cachedResponse = JSON.parse(cachedValue);\n  cachedResponse.metadata = cachedResponse.metadata || {};\n  cachedResponse.metadata.used_cache = true;\n  cachedResponse.metadata.cache_hit_time = new Date().toISOString();\n  return [{ json: cachedResponse }];\n} catch (error) {\n  // If cache parsing fails, return error object\n  return [{\n    json: {\n      error: 'Cache parse error',\n      message: error.message,\n      fallback: true\n    }\n  }];\n}"
+      },
+      "name": "Return Cached",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 150],
+      "id": "return_cached_304b"
+    },
+    {
+      "parameters": {
         "model": "text-embedding-ada-002",
         "options": {}
       },

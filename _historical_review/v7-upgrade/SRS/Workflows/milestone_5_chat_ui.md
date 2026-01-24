@@ -241,8 +241,8 @@ CREATE INDEX idx_chat_history_user ON n8n_chat_histories(user_id);
 CREATE INDEX idx_chat_history_created ON n8n_chat_histories(created_at DESC);
 CREATE INDEX idx_chat_history_type ON n8n_chat_histories(message_type);
 
--- Session metadata table
-CREATE TABLE IF NOT EXISTS public.chat_sessions (
+-- Session metadata table (separate from core chat_sessions for extended tracking)
+CREATE TABLE IF NOT EXISTS public.chat_session_metadata (
   id VARCHAR(255) PRIMARY KEY,
   user_id VARCHAR(255),
   title TEXT,
@@ -262,7 +262,7 @@ CREATE OR REPLACE FUNCTION update_chat_session_metadata()
 RETURNS TRIGGER AS $$
 BEGIN
   -- Update or insert session metadata
-  INSERT INTO chat_sessions (
+  INSERT INTO chat_session_metadata (
     id,
     user_id,
     first_message_at,
@@ -280,8 +280,8 @@ BEGIN
   )
   ON CONFLICT (id) DO UPDATE SET
     last_message_at = NEW.created_at,
-    message_count = chat_sessions.message_count + 1,
-    total_tokens = chat_sessions.total_tokens + COALESCE(NEW.token_count, 0),
+    message_count = chat_session_metadata.message_count + 1,
+    total_tokens = chat_session_metadata.total_tokens + COALESCE(NEW.token_count, 0),
     updated_at = NOW();
 
   RETURN NEW;
