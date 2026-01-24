@@ -572,7 +572,7 @@ ai_empire_v5_config:
       open_webui:
         port: 3000
         enabled: true
-        auth_enabled: false
+        auth_enabled: true  # Security: Always enable authentication
       litellm:
         port: 8000
         api_compatible: true

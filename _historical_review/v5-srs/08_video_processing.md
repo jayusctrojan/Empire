@@ -133,7 +133,7 @@ The v5.0 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 - Face blur for privacy compliance
 - Sensitive content stays local
 - Audit trail for video processing
-- **HIPAA-compliant** processing option
+- **HIPAA-ready** processing option (requires operational controls for full compliance)
 
 **VPR-018: Local Video Memory Management (NEW)**
 - Intelligent frame caching in 31GB buffer
@@ -213,10 +213,10 @@ The v5.0 architecture leverages Mac Studio M3 Ultra's powerful hardware for LOCA
 
 ### 8.5.2 Compliance Features
 
-**Privacy Compliance:**
-- GDPR-compliant processing
+**Privacy Compliance (requires operational controls for certification):**
+- GDPR-ready processing infrastructure
 - HIPAA-ready video handling
-- COPPA compliance for children's content
+- COPPA-ready architecture for children's content
 - Local face recognition (no cloud storage)
 - Automatic PII redaction option
 

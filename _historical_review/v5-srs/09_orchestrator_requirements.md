@@ -79,7 +79,7 @@ The v5.0 architecture enables LOCAL workflow orchestration on Mac Studio, ensuri
 - **Healthcare workflows** never leave hardware
 - **Financial data** processed locally only
 - **Audit trail** for compliance
-- **HIPAA/GDPR compliant** routing
+- **HIPAA/GDPR-ready** routing (requires operational controls for certification)
 
 ## 9.2 Task Scheduling
 

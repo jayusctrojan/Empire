@@ -106,8 +106,8 @@ The AI Empire File Processing System v5.0 is a revolutionary LOCAL-FIRST AI plat
 
 | Term | Definition |
 |------|------------|
-| **Mac Studio** | Apple Mac Studio M3 Ultra with 96GB unified memory, 32-core Neural Engine, 800 GB/s bandwidth |
-| **Llama 3.3 70B** | Meta's 70-billion parameter LLM, GPT-4 quality, runs locally at 32 tok/s |
+| **Mac Studio** | Apple Mac Studio M3 Ultra with 96GB unified memory, 32-core Neural Engine, 819 GB/s bandwidth |
+| **Llama 3.3 70B** | Meta's 70-billion parameter LLM, GPT-4 quality, runs locally at 15-20 tok/s |
 | **Local-First** | Architecture prioritizing on-device processing (98% local inference) |
 | **Neural Engine** | 32-core ML accelerator in M3 Ultra for optimized AI operations |
 | **Ollama** | Model distribution and management platform for local LLM deployment |
