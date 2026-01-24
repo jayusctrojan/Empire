@@ -1016,15 +1016,22 @@ class CheckpointService:
             if ctx_result.data:
                 context_id = ctx_result.data["id"]
 
-                # Delete messages after checkpoint
-                supabase.table("context_messages").delete().eq(
-                    "context_id", context_id
-                ).execute()
+                # TRANSACTION SAFETY: Insert new messages BEFORE deleting old ones
+                # This prevents data loss if any operation fails
 
-                # Re-insert checkpoint messages
+                # Step 1: Get existing message IDs for later deletion
+                existing_result = supabase.table("context_messages").select(
+                    "id"
+                ).eq("context_id", context_id).execute()
+                existing_ids = [row["id"] for row in (existing_result.data or [])]
+
+                # Step 2: Insert checkpoint messages with NEW UUIDs (avoids conflicts)
+                new_message_ids = []
                 for i, msg in enumerate(messages):
+                    new_msg_id = str(uuid4())
+                    new_message_ids.append(new_msg_id)
                     supabase.table("context_messages").insert({
-                        "id": msg.id,
+                        "id": new_msg_id,
                         "context_id": context_id,
                         "role": msg.role.value,
                         "content": msg.content,
@@ -1034,7 +1041,14 @@ class CheckpointService:
                         "created_at": msg.created_at.isoformat() if msg.created_at else datetime.utcnow().isoformat()
                     }).execute()
 
-                # Update context totals
+                # Step 3: Only after successful inserts, delete old messages
+                # If insert failed above, this won't run and old data is preserved
+                for old_id in existing_ids:
+                    supabase.table("context_messages").delete().eq(
+                        "id", old_id
+                    ).execute()
+
+                # Step 4: Update context totals
                 total_tokens = sum(m.token_count for m in messages)
                 supabase.table("conversation_contexts").update({
                     "total_tokens": total_tokens,
