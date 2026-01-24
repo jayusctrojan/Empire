@@ -93,7 +93,21 @@ Respond in JSON format:
             messages=[{"role": "user", "content": prompt}]
         )
 
-        return json.loads(response.content[0].text)
+        response_text = response.content[0].text
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from markdown code blocks
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(1))
+            # Return default classification if parsing fails
+            return {
+                "department": "personal-continuing-ed",
+                "confidence": 0.5,
+                "reasoning": "Classification parsing failed - defaulting to personal education",
+                "suggested_tags": []
+            }
 
     async def _extract_structure(self, filename: str, content_preview: str) -> Dict:
         """Extract course structure metadata"""
@@ -160,7 +174,28 @@ OR for a corporate course:
             messages=[{"role": "user", "content": prompt}]
         )
 
-        return json.loads(response.content[0].text)
+        response_text = response.content[0].text
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            # Try to extract JSON from markdown code blocks
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(1))
+            # Return default structure if parsing fails
+            return {
+                "instructor": None,
+                "company": None,
+                "course_title": original_filename.rsplit(".", 1)[0] if "." in original_filename else original_filename,
+                "has_modules": False,
+                "current_module": None,
+                "module_name": None,
+                "total_modules": None,
+                "has_lessons": False,
+                "current_lesson": None,
+                "lesson_name": None,
+                "total_lessons_in_module": None
+            }
 
     def _generate_filename(self, structure: Dict, original_filename: str) -> str:
         """
