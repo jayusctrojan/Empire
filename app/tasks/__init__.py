@@ -6,4 +6,3 @@ from app.tasks.document_processing import *
 from app.tasks.embedding_generation import *
 from app.tasks.graph_sync import *
 from app.tasks.crewai_workflows import *
-from app.tasks.compaction_tasks import *
