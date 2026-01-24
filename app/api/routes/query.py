@@ -728,9 +728,14 @@ async def auto_routed_query_async(
 
 
 @router.post("/batch", response_model=AsyncTaskResponse)
-async def batch_query_processing(request: BatchQueryRequest):
+async def batch_query_processing(
+    request: BatchQueryRequest,
+    user: dict = Depends(verify_clerk_token)
+):
     """
     Process multiple queries in batch via Celery.
+
+    **Authentication Required**: Must provide valid Clerk JWT token.
 
     Submits all queries as async tasks and returns parent task_id.
     Use /query/status/{task_id} to check progress.
@@ -756,7 +761,11 @@ async def batch_query_processing(request: BatchQueryRequest):
         ```
     """
     try:
-        logger.info("Batch query processing started", query_count=len(request.queries))
+        logger.info(
+            "Batch query processing started",
+            query_count=len(request.queries),
+            user_id=user["user_id"]
+        )
 
         # Submit batch to Celery
         task = batch_process_queries.apply_async(

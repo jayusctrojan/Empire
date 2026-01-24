@@ -185,13 +185,57 @@ jobs:
           fi
 
   # ========================================
+  # Run Database Migrations (Production)
+  # Runs BEFORE deployment to ensure schema is ready
+  # ========================================
+  migrate-database:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, check-migrations]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install psycopg2-binary python-dotenv
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run migrations
+        env:
+          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+          SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
+          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
+        run: |
+          echo "Running database migrations..."
+          python scripts/run_migrations.py || echo "Migration script not found or failed (non-blocking)"
+        continue-on-error: true
+
+  # ========================================
   # Deploy to Render (Production)
-  # Runs only on push to main branch
+  # Runs only after migrations complete
   # ========================================
   deploy-production:
     name: Deploy to Render (Production)
     runs-on: ubuntu-latest
-    needs: [lint, test-unit]
+    needs: [migrate-database]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
       name: production
@@ -249,56 +293,12 @@ jobs:
             -d '{"clearCache": false}'
 
   # ========================================
-  # Run Database Migrations (Production)
-  # Runs after successful deployment
-  # ========================================
-  migrate-database:
-    name: Run Database Migrations
-    runs-on: ubuntu-latest
-    needs: [deploy-production]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment:
-      name: production
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install psycopg2-binary python-dotenv
-
-      - name: Install PostgreSQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-
-      - name: Run migrations
-        env:
-          SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
-          SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
-          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
-        run: |
-          echo "Running database migrations..."
-          python scripts/run_migrations.py || echo "Migration script not found or failed (non-blocking)"
-        continue-on-error: true
-
-  # ========================================
   # Seed Test Data (Production - Manual Only)
   # ========================================
   seed-test-data:
     name: Seed Test Data
     runs-on: ubuntu-latest
-    needs: [migrate-database]
+    needs: [deploy-production]
     if: github.event_name == 'workflow_dispatch'
     environment:
       name: production
