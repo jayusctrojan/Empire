@@ -237,7 +237,9 @@ BEGIN
     ORDER BY umn.embedding <=> query_embedding
     LIMIT match_count;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+-- NOTE: Changed from SECURITY DEFINER to SECURITY INVOKER to ensure RLS policies are respected.
+-- SECURITY DEFINER would bypass RLS, potentially allowing cross-user memory access.
 
 -- ============================================================================
 -- Graph Traversal Function
@@ -312,7 +314,8 @@ BEGIN
     FROM graph_traversal gt
     ORDER BY gt.depth, gt.node_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+-- NOTE: Changed from SECURITY DEFINER to SECURITY INVOKER to ensure RLS policies are respected.
 
 -- ============================================================================
 -- Get Related Memories Function
@@ -360,7 +363,8 @@ BEGIN
     ORDER BY e.strength DESC, n.importance_score DESC
     LIMIT p_max_results;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+-- NOTE: Changed from SECURITY DEFINER to SECURITY INVOKER to ensure RLS policies are respected.
 
 -- ============================================================================
 -- Grants
