@@ -10,8 +10,8 @@ import inspect
 import traceback
 import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, List
 from functools import wraps
+from typing import Any, Dict, List, Optional
 
 import structlog
 from fastapi import Request
@@ -38,7 +38,7 @@ class ErrorLogger:
         request: Optional[Request] = None,
         context: Optional[Dict[str, Any]] = None,
         level: str = "error",
-        include_traceback: bool = True
+        include_traceback: bool = True,
     ) -> str:
         """
         Log an error with full context.
@@ -76,13 +76,17 @@ class ErrorLogger:
         request_id = str(uuid.uuid4())
         if request:
             request_id = getattr(request.state, "request_id", request_id)
-            error_context.update({
-                "request_id": request_id,
-                "request_path": str(request.url.path),
-                "request_method": request.method,
-                "client_ip": request.client.host if request.client else "unknown",
-                "query_params": dict(request.query_params) if request.query_params else {},
-            })
+            error_context.update(
+                {
+                    "request_id": request_id,
+                    "request_path": str(request.url.path),
+                    "request_method": request.method,
+                    "client_ip": request.client.host if request.client else "unknown",
+                    "query_params": (
+                        dict(request.query_params) if request.query_params else {}
+                    ),
+                }
+            )
 
             # Add user context if available
             user_id = getattr(request.state, "user_id", None)
@@ -93,13 +97,15 @@ class ErrorLogger:
 
         # Add BaseAppException-specific details
         if isinstance(error, BaseAppException):
-            error_context.update({
-                "error_code": error.error_code,
-                "status_code": error.status_code,
-                "error_details": error.details,
-                "retriable": error.retriable,
-                "severity": error.severity,
-            })
+            error_context.update(
+                {
+                    "error_code": error.error_code,
+                    "status_code": error.status_code,
+                    "error_details": error.details,
+                    "retriable": error.retriable,
+                    "severity": error.severity,
+                }
+            )
 
         # Add custom context
         if context:
@@ -115,7 +121,7 @@ class ErrorLogger:
         # Log the error
         log_method(
             f"{type(error).__name__} in {module_name}.{func_name}: {str(error)}",
-            **error_context
+            **error_context,
         )
 
         return request_id
@@ -124,7 +130,7 @@ class ErrorLogger:
     def log_warning(
         message: str,
         request: Optional[Request] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Log a warning message with context.
@@ -158,11 +164,13 @@ class ErrorLogger:
         request_id = str(uuid.uuid4())
         if request:
             request_id = getattr(request.state, "request_id", request_id)
-            log_context.update({
-                "request_id": request_id,
-                "request_path": str(request.url.path),
-                "request_method": request.method,
-            })
+            log_context.update(
+                {
+                    "request_id": request_id,
+                    "request_path": str(request.url.path),
+                    "request_method": request.method,
+                }
+            )
         else:
             log_context["request_id"] = request_id
 
@@ -177,7 +185,7 @@ class ErrorLogger:
     def log_info(
         message: str,
         request: Optional[Request] = None,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Log an info message with context.
@@ -222,7 +230,7 @@ class ErrorContext:
         request: Optional[Request] = None,
         context: Optional[Dict[str, Any]] = None,
         reraise: bool = True,
-        log_level: str = "error"
+        log_level: str = "error",
     ):
         """
         Initialize the error context.
@@ -250,7 +258,7 @@ class ErrorContext:
                 error=exc_val,
                 request=self.request,
                 context=self.context,
-                level=self.log_level
+                level=self.log_level,
             )
 
             if not self.reraise:
@@ -262,7 +270,7 @@ class ErrorContext:
 def log_errors(
     context: Optional[Dict[str, Any]] = None,
     reraise: bool = True,
-    log_level: str = "error"
+    log_level: str = "error",
 ):
     """
     Decorator for automatically logging errors from functions.
@@ -278,6 +286,7 @@ def log_errors(
         reraise: Whether to re-raise caught exceptions
         log_level: Log level for errors (default: error)
     """
+
     def decorator(func):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -300,10 +309,7 @@ def log_errors(
                 error_context["kwargs_keys"] = list(kwargs.keys())
 
                 ErrorLogger.log_error(
-                    error=e,
-                    request=request,
-                    context=error_context,
-                    level=log_level
+                    error=e, request=request, context=error_context, level=log_level
                 )
 
                 if reraise:
@@ -326,10 +332,7 @@ def log_errors(
                 error_context["decorated_function"] = func.__name__
 
                 ErrorLogger.log_error(
-                    error=e,
-                    request=request,
-                    context=error_context,
-                    level=log_level
+                    error=e, request=request, context=error_context, level=log_level
                 )
 
                 if reraise:
@@ -367,19 +370,17 @@ class ErrorAggregator:
     def __init__(self):
         self.errors: List[Dict[str, Any]] = []
 
-    def add_error(
-        self,
-        error: Exception,
-        context: Optional[Dict[str, Any]] = None
-    ):
+    def add_error(self, error: Exception, context: Optional[Dict[str, Any]] = None):
         """Add an error to the aggregator."""
-        self.errors.append({
-            "exception": error,
-            "exception_type": type(error).__name__,
-            "message": str(error),
-            "context": context or {},
-            "timestamp": datetime.utcnow().isoformat(),
-        })
+        self.errors.append(
+            {
+                "exception": error,
+                "exception_type": type(error).__name__,
+                "message": str(error),
+                "context": context or {},
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
 
     @property
     def has_errors(self) -> bool:
@@ -391,11 +392,7 @@ class ErrorAggregator:
         """Get the number of collected errors."""
         return len(self.errors)
 
-    def log_all(
-        self,
-        request: Optional[Request] = None,
-        level: str = "error"
-    ) -> str:
+    def log_all(self, request: Optional[Request] = None, level: str = "error") -> str:
         """
         Log all collected errors.
 
@@ -424,8 +421,7 @@ class ErrorAggregator:
 
         log_method = getattr(logger, level, logger.error)
         log_method(
-            f"Batch operation completed with {len(self.errors)} error(s)",
-            **log_context
+            f"Batch operation completed with {len(self.errors)} error(s)", **log_context
         )
 
         return request_id
@@ -451,7 +447,7 @@ class ErrorAggregator:
                     }
                     for e in self.errors
                 ],
-            }
+            },
         )
 
     def clear(self):

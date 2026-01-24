@@ -9,44 +9,30 @@ Centralized error handling middleware that provides consistent error responses
 across all agent services with comprehensive logging.
 """
 
-import uuid
-import traceback
 import sys
-from typing import Optional, Callable, Dict, Any
+import traceback
+import uuid
 from datetime import datetime, timezone
+from typing import Any, Callable, Dict, Optional
 
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from starlette.middleware.base import BaseHTTPMiddleware
-from pydantic import ValidationError
 import structlog
+from fastapi import Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.models.errors import (
-    AgentErrorResponse,
-    ValidationErrorResponse,
-    ValidationErrorDetail,
-    ErrorType,
-    ErrorSeverity,
-    create_validation_error,
-    # Task 175: Production Readiness standardized errors
-    APIError,
-    ErrorCode,
-    get_status_for_error_code,
-)
-from app.constants.error_codes import (
-    INTERNAL_SERVER_ERROR,
-    VALIDATION_ERROR,
-    AGENT_PROCESSING_ERROR,
-    AGENT_TIMEOUT,
-    LLM_ERROR,
-    SERVICE_UNAVAILABLE,
-    RATE_LIMIT_EXCEEDED,
-    get_http_status,
-    is_retriable,
-)
+from app.constants.error_codes import (AGENT_PROCESSING_ERROR, AGENT_TIMEOUT,
+                                       INTERNAL_SERVER_ERROR, LLM_ERROR,
+                                       RATE_LIMIT_EXCEEDED,
+                                       SERVICE_UNAVAILABLE, VALIDATION_ERROR,
+                                       get_http_status, is_retriable)
 # Task 154: Import the new exception hierarchy
 from app.exceptions.base import BaseAppException
+from app.models.errors import (  # Task 175: Production Readiness standardized errors
+    AgentErrorResponse, APIError, ErrorCode, ErrorSeverity, ErrorType,
+    ValidationErrorDetail, ValidationErrorResponse, create_validation_error,
+    get_status_for_error_code)
 
 logger = structlog.get_logger(__name__)
 
@@ -54,6 +40,7 @@ logger = structlog.get_logger(__name__)
 # =============================================================================
 # CUSTOM EXCEPTIONS
 # =============================================================================
+
 
 class AgentError(Exception):
     """Base exception for agent-related errors"""
@@ -66,7 +53,7 @@ class AgentError(Exception):
         details: Optional[dict] = None,
         error_type: ErrorType = ErrorType.PERMANENT,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
-        retry_after: Optional[int] = None
+        retry_after: Optional[int] = None,
     ):
         super().__init__(message)
         self.error_code = error_code
@@ -82,17 +69,14 @@ class AgentProcessingError(AgentError):
     """Error during agent processing"""
 
     def __init__(
-        self,
-        message: str,
-        agent_id: str = "unknown",
-        details: Optional[dict] = None
+        self, message: str, agent_id: str = "unknown", details: Optional[dict] = None
     ):
         super().__init__(
             error_code=AGENT_PROCESSING_ERROR,
             message=message,
             agent_id=agent_id,
             details=details,
-            error_type=ErrorType.RETRIABLE
+            error_type=ErrorType.RETRIABLE,
         )
 
 
@@ -104,7 +88,7 @@ class AgentTimeoutError(AgentError):
         message: str,
         agent_id: str = "unknown",
         details: Optional[dict] = None,
-        retry_after: int = 30
+        retry_after: int = 30,
     ):
         super().__init__(
             error_code=AGENT_TIMEOUT,
@@ -112,7 +96,7 @@ class AgentTimeoutError(AgentError):
             agent_id=agent_id,
             details=details,
             error_type=ErrorType.RETRIABLE,
-            retry_after=retry_after
+            retry_after=retry_after,
         )
 
 
@@ -124,14 +108,14 @@ class LLMError(AgentError):
         message: str,
         agent_id: str = "unknown",
         details: Optional[dict] = None,
-        error_type: ErrorType = ErrorType.RETRIABLE
+        error_type: ErrorType = ErrorType.RETRIABLE,
     ):
         super().__init__(
             error_code=LLM_ERROR,
             message=message,
             agent_id=agent_id,
             details=details,
-            error_type=error_type
+            error_type=error_type,
         )
 
 
@@ -143,7 +127,7 @@ class ServiceUnavailableError(AgentError):
         message: str,
         service_name: str,
         agent_id: str = "unknown",
-        retry_after: int = 60
+        retry_after: int = 60,
     ):
         super().__init__(
             error_code=SERVICE_UNAVAILABLE,
@@ -151,26 +135,21 @@ class ServiceUnavailableError(AgentError):
             agent_id=agent_id,
             details={"service_name": service_name},
             error_type=ErrorType.RETRIABLE,
-            retry_after=retry_after
+            retry_after=retry_after,
         )
 
 
 class ResourceNotFoundError(AgentError):
     """Requested resource not found"""
 
-    def __init__(
-        self,
-        resource_type: str,
-        resource_id: str,
-        agent_id: str = "unknown"
-    ):
+    def __init__(self, resource_type: str, resource_id: str, agent_id: str = "unknown"):
         super().__init__(
             error_code=f"{resource_type.upper()}_NOT_FOUND",
             message=f"{resource_type} not found: {resource_id}",
             agent_id=agent_id,
             details={"resource_type": resource_type, "resource_id": resource_id},
             error_type=ErrorType.PERMANENT,
-            severity=ErrorSeverity.WARNING
+            severity=ErrorSeverity.WARNING,
         )
 
 
@@ -183,7 +162,7 @@ class RateLimitError(AgentError):
         agent_id: str = "unknown",
         retry_after: int = 60,
         limit: int = 100,
-        remaining: int = 0
+        remaining: int = 0,
     ):
         super().__init__(
             error_code=RATE_LIMIT_EXCEEDED,
@@ -191,13 +170,14 @@ class RateLimitError(AgentError):
             agent_id=agent_id,
             details={"limit": limit, "remaining": remaining},
             error_type=ErrorType.RETRIABLE,
-            retry_after=retry_after
+            retry_after=retry_after,
         )
 
 
 # =============================================================================
 # ERROR HANDLER MIDDLEWARE
 # =============================================================================
+
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     """
@@ -257,7 +237,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 details=e.details,
                 request_id=request_id,
                 severity=e.severity,
-                retry_after=e.retry_after
+                retry_after=e.retry_after,
             )
 
         except APIError as e:
@@ -269,7 +249,9 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 
         except BaseAppException as e:
             # Task 154: Handle the new exception hierarchy
-            agent_id = e.details.get("agent_id", self._extract_agent_id(request.url.path))
+            agent_id = e.details.get(
+                "agent_id", self._extract_agent_id(request.url.path)
+            )
             error_type = ErrorType.RETRIABLE if e.retriable else ErrorType.PERMANENT
 
             return self._create_error_response(
@@ -279,26 +261,26 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 error_type=error_type,
                 details=e.details,
                 request_id=request_id,
-                severity=ErrorSeverity(e.severity) if e.severity in [s.value for s in ErrorSeverity] else ErrorSeverity.ERROR,
-                retry_after=e.retry_after
+                severity=(
+                    ErrorSeverity(e.severity)
+                    if e.severity in [s.value for s in ErrorSeverity]
+                    else ErrorSeverity.ERROR
+                ),
+                retry_after=e.retry_after,
             )
 
         except RequestValidationError as e:
             # Handle FastAPI validation errors
             agent_id = self._extract_agent_id(request.url.path)
             return self._create_validation_error_response(
-                errors=e.errors(),
-                agent_id=agent_id,
-                request_id=request_id
+                errors=e.errors(), agent_id=agent_id, request_id=request_id
             )
 
         except ValidationError as e:
             # Handle Pydantic validation errors
             agent_id = self._extract_agent_id(request.url.path)
             return self._create_validation_error_response(
-                errors=e.errors(),
-                agent_id=agent_id,
-                request_id=request_id
+                errors=e.errors(), agent_id=agent_id, request_id=request_id
             )
 
         except Exception as e:
@@ -311,7 +293,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 exc=e,
                 request_id=request_id,
                 agent_id=agent_id,
-                include_stack_trace=True
+                include_stack_trace=True,
             )
 
             # Log with full exception traceback
@@ -319,7 +301,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 message="Unhandled exception in request",
                 context=context,
                 level="error",
-                include_exception=True
+                include_exception=True,
             )
 
             return self._create_error_response(
@@ -329,17 +311,13 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 error_type=ErrorType.RETRIABLE,
                 details={"exception_type": type(e).__name__},
                 request_id=request_id,
-                severity=ErrorSeverity.ERROR
+                severity=ErrorSeverity.ERROR,
             )
 
     def _extract_agent_id(self, path: str) -> str:
         """Extract agent ID from URL path"""
         # Check path prefixes in order of specificity (longer paths first)
-        sorted_paths = sorted(
-            self.AGENT_PATH_MAPPING.keys(),
-            key=len,
-            reverse=True
-        )
+        sorted_paths = sorted(self.AGENT_PATH_MAPPING.keys(), key=len, reverse=True)
 
         for prefix in sorted_paths:
             if path.startswith(prefix):
@@ -353,7 +331,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         exc: Exception,
         request_id: str,
         agent_id: str = "unknown",
-        include_stack_trace: bool = False
+        include_stack_trace: bool = False,
     ) -> Dict[str, Any]:
         """
         Build comprehensive error context for logging (Task 176).
@@ -425,7 +403,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             if exc.__cause__:
                 context["caused_by"] = {
                     "type": type(exc.__cause__).__name__,
-                    "message": str(exc.__cause__)
+                    "message": str(exc.__cause__),
                 }
 
         return context
@@ -435,7 +413,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         message: str,
         context: Dict[str, Any],
         level: str = "error",
-        include_exception: bool = False
+        include_exception: bool = False,
     ) -> None:
         """
         Log an error with the given context (Task 176).
@@ -463,7 +441,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         details: Optional[dict] = None,
         request_id: Optional[str] = None,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
-        retry_after: Optional[int] = None
+        retry_after: Optional[int] = None,
     ) -> JSONResponse:
         """Create a standardized JSON error response"""
         # Determine if retriable from error code if not explicitly set
@@ -479,7 +457,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             request_id=request_id,
             timestamp=datetime.utcnow(),
             severity=severity,
-            retry_after=retry_after
+            retry_after=retry_after,
         )
 
         http_status = get_http_status(error_code)
@@ -497,20 +475,17 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             agent_id=agent_id,
             message=message,
             request_id=request_id,
-            http_status=http_status
+            http_status=http_status,
         )
 
         return JSONResponse(
             status_code=http_status,
             content=error_response.model_dump(mode="json"),
-            headers=headers
+            headers=headers,
         )
 
     def _create_validation_error_response(
-        self,
-        errors: list,
-        agent_id: str,
-        request_id: Optional[str] = None
+        self, errors: list, agent_id: str, request_id: Optional[str] = None
     ) -> JSONResponse:
         """Create a validation error response"""
         validation_errors = [
@@ -518,7 +493,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 field=str(e.get("loc", ["unknown"])[-1]),
                 message=e.get("msg", "Validation failed"),
                 type=e.get("type", "unknown"),
-                value=e.get("input")
+                value=e.get("input"),
             )
             for e in errors
         ]
@@ -531,7 +506,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             validation_errors=validation_errors,
             request_id=request_id,
             timestamp=datetime.utcnow(),
-            severity=ErrorSeverity.WARNING
+            severity=ErrorSeverity.WARNING,
         )
 
         headers = {"X-Request-ID": request_id} if request_id else {}
@@ -540,19 +515,17 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             "Validation error",
             agent_id=agent_id,
             error_count=len(errors),
-            request_id=request_id
+            request_id=request_id,
         )
 
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content=error_response.model_dump(mode="json"),
-            headers=headers
+            headers=headers,
         )
 
     def _create_standardized_error_response(
-        self,
-        error: APIError,
-        request_id: Optional[str] = None
+        self, error: APIError, request_id: Optional[str] = None
     ) -> JSONResponse:
         """
         Create a standardized error response (Task 175 - FR-027).
@@ -588,15 +561,14 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         )
 
         return JSONResponse(
-            status_code=error.status_code,
-            content=response_content,
-            headers=headers
+            status_code=error.status_code, content=response_content, headers=headers
         )
 
 
 # =============================================================================
 # EXCEPTION HANDLERS FOR FASTAPI
 # =============================================================================
+
 
 async def agent_error_handler(request: Request, exc: AgentError) -> JSONResponse:
     """Handle AgentError exceptions"""
@@ -611,7 +583,7 @@ async def agent_error_handler(request: Request, exc: AgentError) -> JSONResponse
         request_id=request_id,
         timestamp=datetime.utcnow(),
         severity=exc.severity,
-        retry_after=exc.retry_after
+        retry_after=exc.retry_after,
     )
 
     http_status = get_http_status(exc.error_code)
@@ -622,13 +594,12 @@ async def agent_error_handler(request: Request, exc: AgentError) -> JSONResponse
     return JSONResponse(
         status_code=http_status,
         content=error_response.model_dump(mode="json"),
-        headers=headers
+        headers=headers,
     )
 
 
 async def validation_error_handler(
-    request: Request,
-    exc: RequestValidationError
+    request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     """Handle FastAPI validation errors"""
     request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
@@ -642,7 +613,7 @@ async def validation_error_handler(
             field=str(e.get("loc", ["unknown"])[-1]),
             message=e.get("msg", "Validation failed"),
             type=e.get("type", "unknown"),
-            value=e.get("input")
+            value=e.get("input"),
         )
         for e in exc.errors()
     ]
@@ -655,13 +626,13 @@ async def validation_error_handler(
         validation_errors=validation_errors,
         request_id=request_id,
         timestamp=datetime.utcnow(),
-        severity=ErrorSeverity.WARNING
+        severity=ErrorSeverity.WARNING,
     )
 
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content=error_response.model_dump(mode="json"),
-        headers={"X-Request-ID": request_id}
+        headers={"X-Request-ID": request_id},
     )
 
 
@@ -669,7 +640,10 @@ async def validation_error_handler(
 # EXCEPTION HANDLER FOR NEW HIERARCHY
 # =============================================================================
 
-async def base_app_exception_handler(request: Request, exc: BaseAppException) -> JSONResponse:
+
+async def base_app_exception_handler(
+    request: Request, exc: BaseAppException
+) -> JSONResponse:
     """
     Handle BaseAppException from the new exception hierarchy (Task 154).
     """
@@ -677,7 +651,9 @@ async def base_app_exception_handler(request: Request, exc: BaseAppException) ->
 
     # Determine agent_id from exception details or URL path
     middleware = ErrorHandlerMiddleware(app=None)
-    agent_id = exc.details.get("agent_id", middleware._extract_agent_id(request.url.path))
+    agent_id = exc.details.get(
+        "agent_id", middleware._extract_agent_id(request.url.path)
+    )
 
     # Map retriable to error type
     error_type = ErrorType.RETRIABLE if exc.retriable else ErrorType.PERMANENT
@@ -695,7 +671,7 @@ async def base_app_exception_handler(request: Request, exc: BaseAppException) ->
         request_id=request_id,
         timestamp=exc.timestamp,
         severity=severity,
-        retry_after=exc.retry_after
+        retry_after=exc.retry_after,
     )
 
     headers = {"X-Request-ID": request_id}
@@ -705,13 +681,14 @@ async def base_app_exception_handler(request: Request, exc: BaseAppException) ->
     return JSONResponse(
         status_code=exc.status_code,
         content=error_response.model_dump(mode="json"),
-        headers=headers
+        headers=headers,
     )
 
 
 # =============================================================================
 # EXCEPTION HANDLER FOR STANDARDIZED API ERRORS (Task 175)
 # =============================================================================
+
 
 async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
     """
@@ -759,15 +736,14 @@ async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
         )
 
     return JSONResponse(
-        status_code=exc.status_code,
-        content=response_content,
-        headers=headers
+        status_code=exc.status_code, content=response_content, headers=headers
     )
 
 
 # =============================================================================
 # SETUP FUNCTION
 # =============================================================================
+
 
 def setup_error_handling(app):
     """
@@ -788,6 +764,8 @@ def setup_error_handling(app):
 
     # Add exception handlers
     app.add_exception_handler(AgentError, agent_error_handler)
-    app.add_exception_handler(APIError, api_error_handler)  # Task 175: Standardized errors
+    app.add_exception_handler(
+        APIError, api_error_handler
+    )  # Task 175: Standardized errors
     app.add_exception_handler(BaseAppException, base_app_exception_handler)  # Task 154
     app.add_exception_handler(RequestValidationError, validation_error_handler)

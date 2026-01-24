@@ -5,13 +5,14 @@ Task 154: Standardized Exception Handling Framework
 Provides exception classes for AI agent-related errors.
 """
 
-from typing import Optional, Dict, Any, List
-from .base import BaseAppException
+from typing import Any, Dict, List, Optional
 
+from .base import BaseAppException
 
 # =============================================================================
 # BASE AGENT EXCEPTION
 # =============================================================================
+
 
 class AgentException(BaseAppException):
     """
@@ -29,7 +30,7 @@ class AgentException(BaseAppException):
         details: Optional[Dict[str, Any]] = None,
         severity: str = "error",
         retriable: bool = True,
-        retry_after: Optional[int] = None
+        retry_after: Optional[int] = None,
     ):
         details = details or {}
         details["agent_id"] = agent_id
@@ -41,7 +42,7 @@ class AgentException(BaseAppException):
             details=details,
             severity=severity,
             retriable=retriable,
-            retry_after=retry_after
+            retry_after=retry_after,
         )
         self.agent_id = agent_id
 
@@ -49,6 +50,7 @@ class AgentException(BaseAppException):
 # =============================================================================
 # AGENT PROCESSING EXCEPTIONS
 # =============================================================================
+
 
 class AgentProcessingException(AgentException):
     """
@@ -62,7 +64,7 @@ class AgentProcessingException(AgentException):
         message: str = "Agent processing failed",
         agent_id: str = "unknown",
         task_type: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if task_type:
@@ -74,7 +76,7 @@ class AgentProcessingException(AgentException):
             agent_id=agent_id,
             status_code=500,
             details=details,
-            retriable=True
+            retriable=True,
         )
 
 
@@ -90,7 +92,7 @@ class AgentTimeoutException(AgentException):
         message: str = "Agent operation timed out",
         agent_id: str = "unknown",
         timeout_seconds: Optional[float] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if timeout_seconds is not None:
@@ -103,7 +105,7 @@ class AgentTimeoutException(AgentException):
             status_code=504,
             details=details,
             retriable=True,
-            retry_after=30
+            retry_after=30,
         )
 
 
@@ -119,7 +121,7 @@ class AgentUnavailableException(AgentException):
         message: str = "Agent is not available",
         agent_id: str = "unknown",
         reason: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if reason:
@@ -132,7 +134,7 @@ class AgentUnavailableException(AgentException):
             status_code=503,
             details=details,
             retriable=True,
-            retry_after=60
+            retry_after=60,
         )
 
 
@@ -147,7 +149,7 @@ class AgentInitializationException(AgentException):
         self,
         message: str = "Agent initialization failed",
         agent_id: str = "unknown",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
@@ -156,7 +158,7 @@ class AgentInitializationException(AgentException):
             status_code=500,
             details=details,
             retriable=False,
-            severity="critical"
+            severity="critical",
         )
 
 
@@ -172,7 +174,7 @@ class AgentCircuitOpenException(AgentException):
         message: str = "Agent circuit breaker is open",
         agent_id: str = "unknown",
         reset_time: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if reset_time:
@@ -185,13 +187,14 @@ class AgentCircuitOpenException(AgentException):
             status_code=503,
             details=details,
             retriable=True,
-            retry_after=reset_time or 30
+            retry_after=reset_time or 30,
         )
 
 
 # =============================================================================
 # LLM EXCEPTIONS
 # =============================================================================
+
 
 class LLMException(AgentException):
     """
@@ -207,7 +210,7 @@ class LLMException(AgentException):
         model: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
         error_code: str = "LLM_ERROR",
-        status_code: int = 502
+        status_code: int = 502,
     ):
         details = details or {}
         if model:
@@ -219,7 +222,7 @@ class LLMException(AgentException):
             agent_id=agent_id,
             status_code=status_code,
             details=details,
-            retriable=True
+            retriable=True,
         )
 
 
@@ -232,7 +235,7 @@ class LLMTimeoutException(LLMException):
         agent_id: str = "unknown",
         model: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if timeout_seconds is not None:
@@ -244,7 +247,7 @@ class LLMTimeoutException(LLMException):
             model=model,
             details=details,
             error_code="LLM_TIMEOUT",
-            status_code=504
+            status_code=504,
         )
         self.retry_after = 30
 
@@ -258,7 +261,7 @@ class LLMRateLimitException(LLMException):
         agent_id: str = "unknown",
         model: Optional[str] = None,
         retry_after: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
@@ -266,7 +269,7 @@ class LLMRateLimitException(LLMException):
             model=model,
             details=details,
             error_code="LLM_RATE_LIMIT",
-            status_code=429
+            status_code=429,
         )
         self.retry_after = retry_after or 60
 
@@ -281,7 +284,7 @@ class LLMContextExceededException(LLMException):
         model: Optional[str] = None,
         context_size: Optional[int] = None,
         max_context: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if context_size is not None:
@@ -295,7 +298,7 @@ class LLMContextExceededException(LLMException):
             model=model,
             details=details,
             error_code="LLM_CONTEXT_EXCEEDED",
-            status_code=422
+            status_code=422,
         )
         self.retriable = False
 
@@ -308,7 +311,7 @@ class LLMInvalidResponseException(LLMException):
         message: str = "Invalid LLM response",
         agent_id: str = "unknown",
         model: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
@@ -316,13 +319,14 @@ class LLMInvalidResponseException(LLMException):
             model=model,
             details=details,
             error_code="LLM_INVALID_RESPONSE",
-            status_code=502
+            status_code=502,
         )
 
 
 # =============================================================================
 # WORKFLOW EXCEPTIONS
 # =============================================================================
+
 
 class WorkflowException(AgentException):
     """
@@ -338,7 +342,7 @@ class WorkflowException(AgentException):
         workflow_id: Optional[str] = None,
         step: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "WORKFLOW_ERROR"
+        error_code: str = "WORKFLOW_ERROR",
     ):
         details = details or {}
         if workflow_id:
@@ -352,7 +356,7 @@ class WorkflowException(AgentException):
             agent_id=agent_id,
             status_code=500,
             details=details,
-            retriable=True
+            retriable=True,
         )
 
 
@@ -365,7 +369,7 @@ class OrchestrationException(WorkflowException):
         agent_id: str = "unknown",
         workflow_id: Optional[str] = None,
         failed_agents: Optional[List[str]] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if failed_agents:
@@ -376,7 +380,7 @@ class OrchestrationException(WorkflowException):
             agent_id=agent_id,
             workflow_id=workflow_id,
             details=details,
-            error_code="ORCHESTRATION_FAILED"
+            error_code="ORCHESTRATION_FAILED",
         )
 
 
@@ -389,7 +393,7 @@ class WorkflowTimeoutException(WorkflowException):
         agent_id: str = "unknown",
         workflow_id: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if timeout_seconds is not None:
@@ -400,7 +404,7 @@ class WorkflowTimeoutException(WorkflowException):
             agent_id=agent_id,
             workflow_id=workflow_id,
             details=details,
-            error_code="WORKFLOW_TIMEOUT"
+            error_code="WORKFLOW_TIMEOUT",
         )
         self.status_code = 504
         self.retry_after = 60
@@ -416,7 +420,7 @@ class WorkflowStepException(WorkflowException):
         workflow_id: Optional[str] = None,
         step: Optional[str] = None,
         step_number: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if step_number is not None:
@@ -428,13 +432,14 @@ class WorkflowStepException(WorkflowException):
             workflow_id=workflow_id,
             step=step,
             details=details,
-            error_code="WORKFLOW_STEP_FAILED"
+            error_code="WORKFLOW_STEP_FAILED",
         )
 
 
 # =============================================================================
 # CONTENT PROCESSING EXCEPTIONS
 # =============================================================================
+
 
 class ContentProcessingException(AgentException):
     """
@@ -449,7 +454,7 @@ class ContentProcessingException(AgentException):
         agent_id: str = "unknown",
         content_type: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "CONTENT_PROCESSING_ERROR"
+        error_code: str = "CONTENT_PROCESSING_ERROR",
     ):
         details = details or {}
         if content_type:
@@ -461,7 +466,7 @@ class ContentProcessingException(AgentException):
             agent_id=agent_id,
             status_code=500,
             details=details,
-            retriable=True
+            retriable=True,
         )
 
 
@@ -472,14 +477,14 @@ class SummarizationException(ContentProcessingException):
         self,
         message: str = "Summarization failed",
         agent_id: str = "AGENT-002",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
             agent_id=agent_id,
             content_type="summarization",
             details=details,
-            error_code="SUMMARIZATION_FAILED"
+            error_code="SUMMARIZATION_FAILED",
         )
 
 
@@ -490,14 +495,14 @@ class ClassificationException(ContentProcessingException):
         self,
         message: str = "Classification failed",
         agent_id: str = "AGENT-008",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message=message,
             agent_id=agent_id,
             content_type="classification",
             details=details,
-            error_code="CLASSIFICATION_FAILED"
+            error_code="CLASSIFICATION_FAILED",
         )
 
 
@@ -509,7 +514,7 @@ class AnalysisException(ContentProcessingException):
         message: str = "Analysis failed",
         agent_id: str = "unknown",
         analysis_type: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if analysis_type:
@@ -520,13 +525,14 @@ class AnalysisException(ContentProcessingException):
             agent_id=agent_id,
             content_type="analysis",
             details=details,
-            error_code="ANALYSIS_FAILED"
+            error_code="ANALYSIS_FAILED",
         )
 
 
 # =============================================================================
 # GRAPH AGENT EXCEPTIONS
 # =============================================================================
+
 
 class GraphAgentException(AgentException):
     """
@@ -541,7 +547,7 @@ class GraphAgentException(AgentException):
         agent_id: str = "unknown",
         operation: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "GRAPH_ERROR"
+        error_code: str = "GRAPH_ERROR",
     ):
         details = details or {}
         if operation:
@@ -553,7 +559,7 @@ class GraphAgentException(AgentException):
             agent_id=agent_id,
             status_code=500,
             details=details,
-            retriable=True
+            retriable=True,
         )
 
 
@@ -565,7 +571,7 @@ class GraphQueryException(GraphAgentException):
         message: str = "Graph query failed",
         agent_id: str = "unknown",
         query: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if query:
@@ -576,7 +582,7 @@ class GraphQueryException(GraphAgentException):
             agent_id=agent_id,
             operation="query",
             details=details,
-            error_code="GRAPH_QUERY_FAILED"
+            error_code="GRAPH_QUERY_FAILED",
         )
 
 
@@ -589,7 +595,7 @@ class GraphTraversalException(GraphAgentException):
         agent_id: str = "unknown",
         start_node: Optional[str] = None,
         max_depth: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if start_node:
@@ -602,13 +608,14 @@ class GraphTraversalException(GraphAgentException):
             agent_id=agent_id,
             operation="traversal",
             details=details,
-            error_code="GRAPH_TRAVERSAL_ERROR"
+            error_code="GRAPH_TRAVERSAL_ERROR",
         )
 
 
 # =============================================================================
 # ENTITY EXTRACTION EXCEPTIONS (Task 155)
 # =============================================================================
+
 
 class EntityExtractionException(AgentException):
     """
@@ -624,7 +631,7 @@ class EntityExtractionException(AgentException):
         task_id: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
         error_code: str = "ENTITY_EXTRACTION_ERROR",
-        status_code: int = 500
+        status_code: int = 500,
     ):
         details = details or {}
         if task_id:
@@ -636,7 +643,7 @@ class EntityExtractionException(AgentException):
             agent_id=agent_id,
             status_code=status_code,
             details=details,
-            retriable=True
+            retriable=True,
         )
 
 
@@ -648,7 +655,7 @@ class InvalidExtractionResultException(EntityExtractionException):
         message: str = "Invalid extraction result",
         task_id: Optional[str] = None,
         validation_errors: Optional[List[str]] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if validation_errors:
@@ -659,7 +666,7 @@ class InvalidExtractionResultException(EntityExtractionException):
             task_id=task_id,
             details=details,
             error_code="INVALID_EXTRACTION_RESULT",
-            status_code=422
+            status_code=422,
         )
         self.retriable = False
 
@@ -672,7 +679,7 @@ class EntityGraphStorageException(EntityExtractionException):
         message: str = "Failed to store entities in graph",
         task_id: Optional[str] = None,
         entity_count: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if entity_count is not None:
@@ -683,7 +690,7 @@ class EntityGraphStorageException(EntityExtractionException):
             task_id=task_id,
             details=details,
             error_code="ENTITY_GRAPH_STORAGE_ERROR",
-            status_code=500
+            status_code=500,
         )
 
 
@@ -695,7 +702,7 @@ class EntityExtractionTimeoutException(EntityExtractionException):
         message: str = "Entity extraction timed out",
         task_id: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if timeout_seconds is not None:
@@ -706,6 +713,6 @@ class EntityExtractionTimeoutException(EntityExtractionException):
             task_id=task_id,
             details=details,
             error_code="ENTITY_EXTRACTION_TIMEOUT",
-            status_code=504
+            status_code=504,
         )
         self.retry_after = 30

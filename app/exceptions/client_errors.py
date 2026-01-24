@@ -5,13 +5,14 @@ Task 154: Standardized Exception Handling Framework
 Provides exception classes for client-side errors (HTTP 4xx).
 """
 
-from typing import Optional, Dict, Any, List
-from .base import BaseAppException
+from typing import Any, Dict, List, Optional
 
+from .base import BaseAppException
 
 # =============================================================================
 # 400 BAD REQUEST EXCEPTIONS
 # =============================================================================
+
 
 class BadRequestException(BaseAppException):
     """
@@ -24,7 +25,7 @@ class BadRequestException(BaseAppException):
         self,
         message: str = "Bad request",
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "BAD_REQUEST"
+        error_code: str = "BAD_REQUEST",
     ):
         super().__init__(
             message=message,
@@ -32,7 +33,7 @@ class BadRequestException(BaseAppException):
             status_code=400,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -47,7 +48,7 @@ class ValidationException(BaseAppException):
         self,
         message: str = "Validation failed",
         validation_errors: Optional[List[Dict[str, Any]]] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if validation_errors:
@@ -60,7 +61,7 @@ class ValidationException(BaseAppException):
             status_code=400,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
         self.validation_errors = validation_errors or []
 
@@ -77,7 +78,7 @@ class InvalidFormatException(BaseAppException):
         message: str = "Invalid format",
         expected_format: Optional[str] = None,
         received_format: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if expected_format:
@@ -91,7 +92,7 @@ class InvalidFormatException(BaseAppException):
             status_code=400,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -106,7 +107,7 @@ class MissingFieldException(BaseAppException):
         self,
         field_name: str,
         message: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         details["field"] = field_name
@@ -117,13 +118,14 @@ class MissingFieldException(BaseAppException):
             status_code=400,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
 # =============================================================================
 # 401 UNAUTHORIZED EXCEPTIONS
 # =============================================================================
+
 
 class UnauthorizedException(BaseAppException):
     """
@@ -136,7 +138,7 @@ class UnauthorizedException(BaseAppException):
         self,
         message: str = "Authentication required",
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "UNAUTHORIZED"
+        error_code: str = "UNAUTHORIZED",
     ):
         super().__init__(
             message=message,
@@ -144,7 +146,7 @@ class UnauthorizedException(BaseAppException):
             status_code=401,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -154,13 +156,9 @@ class InvalidTokenException(UnauthorizedException):
     def __init__(
         self,
         message: str = "Invalid authentication token",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(
-            message=message,
-            details=details,
-            error_code="INVALID_TOKEN"
-        )
+        super().__init__(message=message, details=details, error_code="INVALID_TOKEN")
 
 
 class TokenExpiredException(UnauthorizedException):
@@ -169,13 +167,9 @@ class TokenExpiredException(UnauthorizedException):
     def __init__(
         self,
         message: str = "Authentication token has expired",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(
-            message=message,
-            details=details,
-            error_code="TOKEN_EXPIRED"
-        )
+        super().__init__(message=message, details=details, error_code="TOKEN_EXPIRED")
 
 
 class MissingAuthException(UnauthorizedException):
@@ -184,18 +178,17 @@ class MissingAuthException(UnauthorizedException):
     def __init__(
         self,
         message: str = "Authentication header required",
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
-            message=message,
-            details=details,
-            error_code="MISSING_AUTH_HEADER"
+            message=message, details=details, error_code="MISSING_AUTH_HEADER"
         )
 
 
 # =============================================================================
 # 403 FORBIDDEN EXCEPTIONS
 # =============================================================================
+
 
 class ForbiddenException(BaseAppException):
     """
@@ -209,7 +202,7 @@ class ForbiddenException(BaseAppException):
         message: str = "Access forbidden",
         required_permission: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "FORBIDDEN"
+        error_code: str = "FORBIDDEN",
     ):
         details = details or {}
         if required_permission:
@@ -221,7 +214,7 @@ class ForbiddenException(BaseAppException):
             status_code=403,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -233,7 +226,7 @@ class InsufficientPermissionsException(ForbiddenException):
         message: str = "Insufficient permissions",
         required_role: Optional[str] = None,
         user_roles: Optional[List[str]] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if required_role:
@@ -242,9 +235,7 @@ class InsufficientPermissionsException(ForbiddenException):
             details["user_roles"] = user_roles
 
         super().__init__(
-            message=message,
-            details=details,
-            error_code="INSUFFICIENT_PERMISSIONS"
+            message=message, details=details, error_code="INSUFFICIENT_PERMISSIONS"
         )
 
 
@@ -256,7 +247,7 @@ class AccessDeniedException(ForbiddenException):
         message: str = "Access denied to this resource",
         resource_type: Optional[str] = None,
         resource_id: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if resource_type:
@@ -264,16 +255,13 @@ class AccessDeniedException(ForbiddenException):
         if resource_id:
             details["resource_id"] = resource_id
 
-        super().__init__(
-            message=message,
-            details=details,
-            error_code="ACCESS_DENIED"
-        )
+        super().__init__(message=message, details=details, error_code="ACCESS_DENIED")
 
 
 # =============================================================================
 # 404 NOT FOUND EXCEPTIONS
 # =============================================================================
+
 
 class NotFoundException(BaseAppException):
     """
@@ -287,7 +275,7 @@ class NotFoundException(BaseAppException):
         message: str = "Resource not found",
         resource_type: Optional[str] = None,
         resource_id: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if resource_type:
@@ -296,7 +284,11 @@ class NotFoundException(BaseAppException):
             details["resource_id"] = resource_id
 
         # Generate specific error code if resource type is provided
-        error_code = f"{resource_type.upper()}_NOT_FOUND" if resource_type else "RESOURCE_NOT_FOUND"
+        error_code = (
+            f"{resource_type.upper()}_NOT_FOUND"
+            if resource_type
+            else "RESOURCE_NOT_FOUND"
+        )
 
         super().__init__(
             message=message,
@@ -304,7 +296,7 @@ class NotFoundException(BaseAppException):
             status_code=404,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -316,7 +308,7 @@ class DocumentNotFoundException(NotFoundException):
             message=f"Document not found: {document_id}",
             resource_type="document",
             resource_id=document_id,
-            details=details
+            details=details,
         )
 
 
@@ -328,7 +320,7 @@ class UserNotFoundException(NotFoundException):
             message=f"User not found: {user_id}",
             resource_type="user",
             resource_id=user_id,
-            details=details
+            details=details,
         )
 
 
@@ -340,13 +332,14 @@ class ProjectNotFoundException(NotFoundException):
             message=f"Project not found: {project_id}",
             resource_type="project",
             resource_id=project_id,
-            details=details
+            details=details,
         )
 
 
 # =============================================================================
 # 409 CONFLICT EXCEPTIONS
 # =============================================================================
+
 
 class ConflictException(BaseAppException):
     """
@@ -359,7 +352,7 @@ class ConflictException(BaseAppException):
         self,
         message: str = "Resource conflict",
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "CONFLICT"
+        error_code: str = "CONFLICT",
     ):
         super().__init__(
             message=message,
@@ -367,7 +360,7 @@ class ConflictException(BaseAppException):
             status_code=409,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -379,7 +372,7 @@ class DuplicateResourceException(ConflictException):
         message: str = "Resource already exists",
         resource_type: Optional[str] = None,
         identifier: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if resource_type:
@@ -388,9 +381,7 @@ class DuplicateResourceException(ConflictException):
             details["identifier"] = identifier
 
         super().__init__(
-            message=message,
-            details=details,
-            error_code="DUPLICATE_RESOURCE"
+            message=message, details=details, error_code="DUPLICATE_RESOURCE"
         )
 
 
@@ -402,7 +393,7 @@ class StateConflictException(ConflictException):
         message: str = "State conflict",
         current_state: Optional[str] = None,
         expected_state: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if current_state:
@@ -410,16 +401,13 @@ class StateConflictException(ConflictException):
         if expected_state:
             details["expected_state"] = expected_state
 
-        super().__init__(
-            message=message,
-            details=details,
-            error_code="STATE_CONFLICT"
-        )
+        super().__init__(message=message, details=details, error_code="STATE_CONFLICT")
 
 
 # =============================================================================
 # 422 UNPROCESSABLE ENTITY EXCEPTIONS
 # =============================================================================
+
 
 class UnprocessableEntityException(BaseAppException):
     """
@@ -432,7 +420,7 @@ class UnprocessableEntityException(BaseAppException):
         self,
         message: str = "Unprocessable entity",
         details: Optional[Dict[str, Any]] = None,
-        error_code: str = "UNPROCESSABLE_ENTITY"
+        error_code: str = "UNPROCESSABLE_ENTITY",
     ):
         super().__init__(
             message=message,
@@ -440,7 +428,7 @@ class UnprocessableEntityException(BaseAppException):
             status_code=422,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -451,22 +439,21 @@ class BusinessRuleViolationException(UnprocessableEntityException):
         self,
         message: str = "Business rule violation",
         rule: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if rule:
             details["violated_rule"] = rule
 
         super().__init__(
-            message=message,
-            details=details,
-            error_code="BUSINESS_RULE_VIOLATION"
+            message=message, details=details, error_code="BUSINESS_RULE_VIOLATION"
         )
 
 
 # =============================================================================
 # 429 TOO MANY REQUESTS EXCEPTIONS
 # =============================================================================
+
 
 class RateLimitException(BaseAppException):
     """
@@ -481,7 +468,7 @@ class RateLimitException(BaseAppException):
         limit: Optional[int] = None,
         remaining: int = 0,
         reset_seconds: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if limit is not None:
@@ -497,7 +484,7 @@ class RateLimitException(BaseAppException):
             details=details,
             severity="warning",
             retriable=True,
-            retry_after=reset_seconds or 60
+            retry_after=reset_seconds or 60,
         )
 
 
@@ -514,7 +501,7 @@ class QuotaExceededException(BaseAppException):
         quota_type: Optional[str] = None,
         limit: Optional[int] = None,
         used: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if quota_type:
@@ -530,5 +517,5 @@ class QuotaExceededException(BaseAppException):
             status_code=429,
             details=details,
             severity="warning",
-            retriable=False
+            retriable=False,
         )

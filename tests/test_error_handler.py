@@ -18,13 +18,14 @@ from app.services.error_handler import (
     ProcessingLog,
     handle_errors,
     with_fallback,
-    get_error_handler
+    get_error_handler,
 )
 
 
 # ============================================================================
 # Test Error Classification
 # ============================================================================
+
 
 class TestErrorClassifier:
     """Test error classification logic"""
@@ -84,6 +85,7 @@ class TestErrorClassifier:
 # Test Error Context
 # ============================================================================
 
+
 class TestErrorContext:
     """Test error context dataclass"""
 
@@ -95,7 +97,7 @@ class TestErrorContext:
             file_id="file-456",
             filename="test.pdf",
             retry_count=1,
-            max_retries=3
+            max_retries=3,
         )
 
         assert context.task_id == "task-123"
@@ -108,8 +110,7 @@ class TestErrorContext:
     def test_error_context_with_additional_data(self):
         """Test error context with additional context"""
         context = ErrorContext(
-            task_id="task-123",
-            additional_context={"user": "test_user", "attempt": 2}
+            task_id="task-123", additional_context={"user": "test_user", "attempt": 2}
         )
 
         assert context.additional_context["user"] == "test_user"
@@ -120,6 +121,7 @@ class TestErrorContext:
 # Test Error Handler
 # ============================================================================
 
+
 class TestErrorHandler:
     """Test error handler service"""
 
@@ -128,9 +130,7 @@ class TestErrorHandler:
         """Test handling error without Supabase storage"""
         handler = ErrorHandler()
         context = ErrorContext(
-            task_id="task-123",
-            task_type="test_task",
-            filename="test.pdf"
+            task_id="task-123", task_type="test_task", filename="test.pdf"
         )
 
         error = ConnectionError("Network failure")
@@ -173,9 +173,7 @@ class TestErrorHandler:
         error = ValueError("Test error")
 
         log_entry = await handler.handle_error(
-            error,
-            context,
-            custom_recovery=custom_recovery
+            error, context, custom_recovery=custom_recovery
         )
 
         assert recovery_called is True
@@ -185,6 +183,7 @@ class TestErrorHandler:
     @pytest.mark.asyncio
     async def test_handle_error_recovery_failure(self):
         """Test error handling when recovery function fails"""
+
         async def failing_recovery(exception, context):
             raise Exception("Recovery failed")
 
@@ -193,9 +192,7 @@ class TestErrorHandler:
         error = ValueError("Test error")
 
         log_entry = await handler.handle_error(
-            error,
-            context,
-            custom_recovery=failing_recovery
+            error, context, custom_recovery=failing_recovery
         )
 
         assert log_entry.recovery_action == "custom_recovery_failed"
@@ -204,7 +201,9 @@ class TestErrorHandler:
         """Test severity determination when retries exhausted"""
         handler = ErrorHandler()
         error = ConnectionError("Network error")
-        severity = handler._determine_severity(error, ErrorCategory.NETWORK, retry_count=3)
+        severity = handler._determine_severity(
+            error, ErrorCategory.NETWORK, retry_count=3
+        )
 
         assert severity == ErrorSeverity.CRITICAL
 
@@ -212,7 +211,9 @@ class TestErrorHandler:
         """Test severity determination for database errors"""
         handler = ErrorHandler()
         error = Exception("Database connection failed")
-        severity = handler._determine_severity(error, ErrorCategory.DATABASE, retry_count=0)
+        severity = handler._determine_severity(
+            error, ErrorCategory.DATABASE, retry_count=0
+        )
 
         assert severity == ErrorSeverity.ERROR
 
@@ -220,7 +221,9 @@ class TestErrorHandler:
         """Test severity determination for transient errors"""
         handler = ErrorHandler()
         error = ConnectionError("Network error")
-        severity = handler._determine_severity(error, ErrorCategory.NETWORK, retry_count=0)
+        severity = handler._determine_severity(
+            error, ErrorCategory.NETWORK, retry_count=0
+        )
 
         assert severity == ErrorSeverity.WARNING
 
@@ -265,12 +268,14 @@ class TestErrorHandler:
 # Test Decorators
 # ============================================================================
 
+
 class TestDecorators:
     """Test error handling decorators"""
 
     @pytest.mark.asyncio
     async def test_handle_errors_decorator_success(self):
         """Test handle_errors decorator on successful function"""
+
         @handle_errors(fallback_value=[], log_errors=True)
         async def successful_function():
             return [1, 2, 3]
@@ -281,6 +286,7 @@ class TestDecorators:
     @pytest.mark.asyncio
     async def test_handle_errors_decorator_with_error(self):
         """Test handle_errors decorator when function raises error"""
+
         @handle_errors(fallback_value=[], log_errors=True)
         async def failing_function():
             raise ValueError("Test error")
@@ -291,6 +297,7 @@ class TestDecorators:
     @pytest.mark.asyncio
     async def test_handle_errors_decorator_reraise(self):
         """Test handle_errors decorator with reraise=True"""
+
         @handle_errors(fallback_value=None, log_errors=True, reraise=True)
         async def failing_function():
             raise ValueError("Test error")
@@ -301,6 +308,7 @@ class TestDecorators:
     @pytest.mark.asyncio
     async def test_with_fallback_decorator_success(self):
         """Test with_fallback decorator on successful function"""
+
         async def fallback_function():
             return "fallback"
 
@@ -314,6 +322,7 @@ class TestDecorators:
     @pytest.mark.asyncio
     async def test_with_fallback_decorator_uses_fallback(self):
         """Test with_fallback decorator uses fallback on error"""
+
         async def fallback_function():
             return "fallback"
 
@@ -328,6 +337,7 @@ class TestDecorators:
 # ============================================================================
 # Test Singleton
 # ============================================================================
+
 
 class TestSingleton:
     """Test singleton pattern for error handler"""
@@ -351,6 +361,7 @@ class TestSingleton:
 # Integration Tests
 # ============================================================================
 
+
 class TestIntegration:
     """Integration tests for complete error handling flow"""
 
@@ -369,7 +380,7 @@ class TestIntegration:
             filename="test.pdf",
             retry_count=1,
             max_retries=3,
-            additional_context={"test": "data"}
+            additional_context={"test": "data"},
         )
 
         # Simulate a network error

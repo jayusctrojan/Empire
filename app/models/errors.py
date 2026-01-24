@@ -17,21 +17,24 @@ Production Error Format (FR-027, FR-028):
 }
 """
 
-from typing import Optional, Dict, Any, List
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
-import uuid
 
 
 class ErrorType(str, Enum):
     """Classification of errors for client handling"""
+
     RETRIABLE = "retriable"  # Temporary errors that may succeed on retry
     PERMANENT = "permanent"  # Errors that will not succeed on retry
 
 
 class ErrorSeverity(str, Enum):
     """Severity level of errors for logging and alerting"""
+
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -46,41 +49,33 @@ class AgentErrorResponse(BaseModel):
     This model provides a consistent structure for error responses,
     making it easier for clients to parse and handle errors uniformly.
     """
+
     error_code: str = Field(
         ...,
-        description="Machine-readable error code (e.g., VALIDATION_ERROR, AGENT_TIMEOUT)"
+        description="Machine-readable error code (e.g., VALIDATION_ERROR, AGENT_TIMEOUT)",
     )
     error_type: ErrorType = Field(
-        ...,
-        description="Whether the error is retriable or permanent"
+        ..., description="Whether the error is retriable or permanent"
     )
     agent_id: str = Field(
-        ...,
-        description="ID of the agent that generated the error (e.g., AGENT-003)"
+        ..., description="ID of the agent that generated the error (e.g., AGENT-003)"
     )
-    message: str = Field(
-        ...,
-        description="Human-readable error message"
-    )
+    message: str = Field(..., description="Human-readable error message")
     details: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Additional error details or context"
+        default=None, description="Additional error details or context"
     )
     request_id: Optional[str] = Field(
-        default=None,
-        description="Unique identifier for request tracing"
+        default=None, description="Unique identifier for request tracing"
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="When the error occurred"
+        default_factory=datetime.utcnow, description="When the error occurred"
     )
     severity: ErrorSeverity = Field(
-        default=ErrorSeverity.ERROR,
-        description="Severity level of the error"
+        default=ErrorSeverity.ERROR, description="Severity level of the error"
     )
     retry_after: Optional[int] = Field(
         default=None,
-        description="Suggested retry delay in seconds (for retriable errors)"
+        description="Suggested retry delay in seconds (for retriable errors)",
     )
 
     class Config:
@@ -94,13 +89,14 @@ class AgentErrorResponse(BaseModel):
                 "request_id": "req-a1b2c3d4-e5f6-7890",
                 "timestamp": "2025-01-13T10:30:00Z",
                 "severity": "error",
-                "retry_after": 30
+                "retry_after": 30,
             }
         }
 
 
 class ValidationErrorDetail(BaseModel):
     """Detail for a single validation error"""
+
     field: str = Field(..., description="Field that failed validation")
     message: str = Field(..., description="Validation error message")
     type: str = Field(..., description="Type of validation error")
@@ -111,9 +107,9 @@ class ValidationErrorResponse(AgentErrorResponse):
     """
     Extended error response for validation errors with field-level details.
     """
+
     validation_errors: List[ValidationErrorDetail] = Field(
-        default_factory=list,
-        description="List of individual validation errors"
+        default_factory=list, description="List of individual validation errors"
     )
 
     class Config:
@@ -128,12 +124,12 @@ class ValidationErrorResponse(AgentErrorResponse):
                         "field": "name",
                         "message": "String should have at least 1 character",
                         "type": "string_too_short",
-                        "value": ""
+                        "value": "",
                     }
                 ],
                 "request_id": "req-xyz123",
                 "timestamp": "2025-01-13T10:30:00Z",
-                "severity": "warning"
+                "severity": "warning",
             }
         }
 
@@ -142,6 +138,7 @@ class RateLimitErrorResponse(AgentErrorResponse):
     """
     Extended error response for rate limit errors.
     """
+
     limit: int = Field(..., description="Rate limit threshold")
     remaining: int = Field(default=0, description="Remaining requests")
     reset_at: datetime = Field(..., description="When the rate limit resets")
@@ -158,7 +155,7 @@ class RateLimitErrorResponse(AgentErrorResponse):
                 "reset_at": "2025-01-13T11:00:00Z",
                 "retry_after": 60,
                 "request_id": "req-xyz123",
-                "timestamp": "2025-01-13T10:59:00Z"
+                "timestamp": "2025-01-13T10:59:00Z",
             }
         }
 
@@ -167,10 +164,10 @@ class ServiceUnavailableResponse(AgentErrorResponse):
     """
     Extended error response for service unavailable errors.
     """
+
     service_name: str = Field(..., description="Name of the unavailable service")
     dependencies_status: Optional[Dict[str, str]] = Field(
-        default=None,
-        description="Status of dependent services"
+        default=None, description="Status of dependent services"
     )
 
     class Config:
@@ -184,11 +181,11 @@ class ServiceUnavailableResponse(AgentErrorResponse):
                 "dependencies_status": {
                     "neo4j": "unhealthy",
                     "supabase": "healthy",
-                    "redis": "healthy"
+                    "redis": "healthy",
                 },
                 "retry_after": 30,
                 "request_id": "req-xyz123",
-                "timestamp": "2025-01-13T10:30:00Z"
+                "timestamp": "2025-01-13T10:30:00Z",
             }
         }
 
@@ -196,6 +193,7 @@ class ServiceUnavailableResponse(AgentErrorResponse):
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
 
 def create_agent_error(
     error_code: str,
@@ -205,7 +203,7 @@ def create_agent_error(
     details: Optional[Dict[str, Any]] = None,
     request_id: Optional[str] = None,
     severity: ErrorSeverity = ErrorSeverity.ERROR,
-    retry_after: Optional[int] = None
+    retry_after: Optional[int] = None,
 ) -> AgentErrorResponse:
     """
     Factory function to create an AgentErrorResponse.
@@ -231,7 +229,7 @@ def create_agent_error(
         details=details,
         request_id=request_id,
         severity=severity,
-        retry_after=retry_after
+        retry_after=retry_after,
     )
 
 
@@ -239,7 +237,7 @@ def create_validation_error(
     agent_id: str,
     message: str,
     validation_errors: List[Dict[str, Any]],
-    request_id: Optional[str] = None
+    request_id: Optional[str] = None,
 ) -> ValidationErrorResponse:
     """
     Factory function to create a ValidationErrorResponse.
@@ -258,7 +256,7 @@ def create_validation_error(
             field=str(e.get("loc", ["unknown"])[-1]),
             message=e.get("msg", "Validation failed"),
             type=e.get("type", "unknown"),
-            value=e.get("input")
+            value=e.get("input"),
         )
         for e in validation_errors
     ]
@@ -270,7 +268,7 @@ def create_validation_error(
         message=message,
         validation_errors=errors,
         request_id=request_id,
-        severity=ErrorSeverity.WARNING
+        severity=ErrorSeverity.WARNING,
     )
 
 
@@ -278,12 +276,14 @@ def create_validation_error(
 # PRODUCTION READINESS STANDARDIZED ERROR MODELS (Task 175 - US6)
 # =============================================================================
 
+
 class ErrorCode(str, Enum):
     """
     Standard error codes for API responses (FR-028).
 
     These codes provide consistent error classification across all endpoints.
     """
+
     VALIDATION_ERROR = "VALIDATION_ERROR"
     AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR"
     AUTHORIZATION_ERROR = "AUTHORIZATION_ERROR"
@@ -306,25 +306,19 @@ class StandardError(BaseModel):
     - timestamp: When the error occurred (ISO 8601 format)
     """
 
-    code: ErrorCode = Field(
-        ...,
-        description="Error code identifying the type of error"
-    )
-    message: str = Field(
-        ...,
-        description="Human-readable error message"
-    )
+    code: ErrorCode = Field(..., description="Error code identifying the type of error")
+    message: str = Field(..., description="Human-readable error message")
     details: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="Additional error details (field-specific errors, etc.)"
+        description="Additional error details (field-specific errors, etc.)",
     )
     request_id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
-        description="Unique request identifier for correlation"
+        description="Unique request identifier for correlation",
     )
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        description="When the error occurred"
+        description="When the error occurred",
     )
 
     class Config:
@@ -334,7 +328,7 @@ class StandardError(BaseModel):
                 "message": "Invalid input parameters",
                 "details": {"field": "email", "reason": "Invalid email format"},
                 "request_id": "123e4567-e89b-12d3-a456-426614174000",
-                "timestamp": "2025-01-15T12:00:00Z"
+                "timestamp": "2025-01-15T12:00:00Z",
             }
         }
 
@@ -355,10 +349,7 @@ class ErrorResponse(BaseModel):
     }
     """
 
-    error: StandardError = Field(
-        ...,
-        description="The error details"
-    )
+    error: StandardError = Field(..., description="The error details")
 
     class Config:
         json_schema_extra = {
@@ -368,7 +359,7 @@ class ErrorResponse(BaseModel):
                     "message": "Invalid input parameters",
                     "details": {"field": "email", "reason": "Invalid email format"},
                     "request_id": "123e4567-e89b-12d3-a456-426614174000",
-                    "timestamp": "2025-01-15T12:00:00Z"
+                    "timestamp": "2025-01-15T12:00:00Z",
                 }
             }
         }
@@ -403,6 +394,7 @@ def get_status_for_error_code(code: ErrorCode) -> int:
 # =============================================================================
 # STANDARDIZED API EXCEPTIONS (Task 175 - US6)
 # =============================================================================
+
 
 class APIError(Exception):
     """
@@ -550,6 +542,7 @@ class InternalAPIError(APIError):
 # =============================================================================
 # STANDARDIZED ERROR RESPONSE HELPERS
 # =============================================================================
+
 
 def create_error_response(
     code: ErrorCode,

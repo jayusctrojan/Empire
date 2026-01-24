@@ -60,6 +60,7 @@ from app.middleware.error_handler import (
 # ERROR RESPONSE MODEL TESTS
 # =============================================================================
 
+
 class TestAgentErrorResponse:
     """Test AgentErrorResponse Pydantic model"""
 
@@ -69,7 +70,7 @@ class TestAgentErrorResponse:
             error_code="TEST_ERROR",
             error_type=ErrorType.PERMANENT,
             agent_id="AGENT-001",
-            message="Test error message"
+            message="Test error message",
         )
 
         assert error.error_code == "TEST_ERROR"
@@ -92,7 +93,7 @@ class TestAgentErrorResponse:
             details={"reason": "Invalid format", "file": "test.xyz"},
             request_id="req-abc123",
             severity=ErrorSeverity.ERROR,
-            retry_after=30
+            retry_after=30,
         )
 
         assert error.error_code == AGENT_PROCESSING_ERROR
@@ -107,7 +108,7 @@ class TestAgentErrorResponse:
             error_code="TEST_ERROR",
             error_type=ErrorType.PERMANENT,
             agent_id="AGENT-003",
-            message="Test message"
+            message="Test message",
         )
 
         json_data = error.model_dump(mode="json")
@@ -131,12 +132,9 @@ class TestValidationErrorResponse:
             message="Validation failed",
             validation_errors=[
                 ValidationErrorDetail(
-                    field="name",
-                    message="Field required",
-                    type="missing",
-                    value=None
+                    field="name", message="Field required", type="missing", value=None
                 )
-            ]
+            ],
         )
 
         assert error.error_code == VALIDATION_ERROR
@@ -147,7 +145,9 @@ class TestValidationErrorResponse:
         """Test validation error with multiple errors"""
         errors = [
             ValidationErrorDetail(field="name", message="Required", type="missing"),
-            ValidationErrorDetail(field="email", message="Invalid format", type="format"),
+            ValidationErrorDetail(
+                field="email", message="Invalid format", type="format"
+            ),
         ]
 
         error = ValidationErrorResponse(
@@ -155,7 +155,7 @@ class TestValidationErrorResponse:
             error_type=ErrorType.PERMANENT,
             agent_id="AGENT-005",
             message="Multiple validation errors",
-            validation_errors=errors
+            validation_errors=errors,
         )
 
         assert len(error.validation_errors) == 2
@@ -176,7 +176,7 @@ class TestRateLimitErrorResponse:
             limit=100,
             remaining=0,
             reset_at=reset_time,
-            retry_after=60
+            retry_after=60,
         )
 
         assert error.limit == 100
@@ -194,7 +194,7 @@ class TestFactoryFunctions:
             error_code=AGENT_PROCESSING_ERROR,
             agent_id="AGENT-016",
             message="Processing failed",
-            details={"step": "validation"}
+            details={"step": "validation"},
         )
 
         assert isinstance(error, AgentErrorResponse)
@@ -204,13 +204,18 @@ class TestFactoryFunctions:
     def test_create_validation_error_from_pydantic(self):
         """Test create_validation_error factory function"""
         pydantic_errors = [
-            {"loc": ["body", "name"], "msg": "field required", "type": "missing", "input": None}
+            {
+                "loc": ["body", "name"],
+                "msg": "field required",
+                "type": "missing",
+                "input": None,
+            }
         ]
 
         error = create_validation_error(
             agent_id="AGENT-003",
             message="Validation failed",
-            validation_errors=pydantic_errors
+            validation_errors=pydantic_errors,
         )
 
         assert isinstance(error, ValidationErrorResponse)
@@ -221,6 +226,7 @@ class TestFactoryFunctions:
 # =============================================================================
 # ERROR CODES TESTS
 # =============================================================================
+
 
 class TestErrorCodes:
     """Test error code constants and functions"""
@@ -255,6 +261,7 @@ class TestErrorCodes:
 # CUSTOM EXCEPTION TESTS
 # =============================================================================
 
+
 class TestCustomExceptions:
     """Test custom exception classes"""
 
@@ -263,7 +270,7 @@ class TestCustomExceptions:
         error = AgentError(
             error_code=AGENT_PROCESSING_ERROR,
             message="Test error",
-            agent_id="AGENT-003"
+            agent_id="AGENT-003",
         )
 
         assert error.error_code == AGENT_PROCESSING_ERROR
@@ -276,7 +283,7 @@ class TestCustomExceptions:
         error = AgentProcessingError(
             message="Content processing failed",
             agent_id="AGENT-016",
-            details={"step": "parse"}
+            details={"step": "parse"},
         )
 
         assert error.error_code == AGENT_PROCESSING_ERROR
@@ -286,9 +293,7 @@ class TestCustomExceptions:
     def test_agent_timeout_error(self):
         """Test AgentTimeoutError exception"""
         error = AgentTimeoutError(
-            message="Operation timed out",
-            agent_id="AGENT-012",
-            retry_after=60
+            message="Operation timed out", agent_id="AGENT-012", retry_after=60
         )
 
         assert error.error_code == AGENT_TIMEOUT
@@ -300,7 +305,7 @@ class TestCustomExceptions:
         error = LLMError(
             message="LLM API call failed",
             agent_id="AGENT-002",
-            details={"provider": "anthropic"}
+            details={"provider": "anthropic"},
         )
 
         assert error.error_code == LLM_ERROR
@@ -312,7 +317,7 @@ class TestCustomExceptions:
             message="Neo4j unavailable",
             service_name="neo4j",
             agent_id="AGENT-012",
-            retry_after=120
+            retry_after=120,
         )
 
         assert error.error_code == SERVICE_UNAVAILABLE
@@ -322,9 +327,7 @@ class TestCustomExceptions:
     def test_resource_not_found_error(self):
         """Test ResourceNotFoundError exception"""
         error = ResourceNotFoundError(
-            resource_type="Document",
-            resource_id="doc-123",
-            agent_id="AGENT-016"
+            resource_type="Document", resource_id="doc-123", agent_id="AGENT-016"
         )
 
         assert error.error_code == "DOCUMENT_NOT_FOUND"
@@ -338,7 +341,7 @@ class TestCustomExceptions:
             agent_id="AGENT-003",
             retry_after=60,
             limit=100,
-            remaining=0
+            remaining=0,
         )
 
         assert error.error_code == RATE_LIMIT_EXCEEDED
@@ -349,6 +352,7 @@ class TestCustomExceptions:
 # =============================================================================
 # ERROR HANDLER MIDDLEWARE TESTS
 # =============================================================================
+
 
 class TestErrorHandlerMiddleware:
     """Test ErrorHandlerMiddleware"""
@@ -368,16 +372,13 @@ class TestErrorHandlerMiddleware:
         @router.get("/agent-error")
         async def agent_error_route():
             raise AgentProcessingError(
-                message="Processing failed",
-                agent_id="AGENT-016"
+                message="Processing failed", agent_id="AGENT-016"
             )
 
         @router.get("/timeout-error")
         async def timeout_route():
             raise AgentTimeoutError(
-                message="Timeout",
-                agent_id="AGENT-012",
-                retry_after=30
+                message="Timeout", agent_id="AGENT-012", retry_after=30
             )
 
         @router.get("/generic-error")
@@ -439,10 +440,7 @@ class TestErrorHandlerMiddleware:
     def test_request_id_propagated(self, client):
         """Test X-Request-ID header is propagated"""
         request_id = "custom-request-id-123"
-        response = client.get(
-            "/api/test/success",
-            headers={"X-Request-ID": request_id}
-        )
+        response = client.get("/api/test/success", headers={"X-Request-ID": request_id})
 
         assert response.headers["X-Request-ID"] == request_id
 
@@ -474,15 +472,26 @@ class TestAgentIdExtraction:
         """Test extracting agent IDs from document analysis paths"""
         middleware = ErrorHandlerMiddleware(app=None)
 
-        assert middleware._extract_agent_id("/api/document-analysis/research") == "AGENT-009"
-        assert middleware._extract_agent_id("/api/document-analysis/strategy") == "AGENT-010"
-        assert middleware._extract_agent_id("/api/document-analysis/fact-check") == "AGENT-011"
+        assert (
+            middleware._extract_agent_id("/api/document-analysis/research")
+            == "AGENT-009"
+        )
+        assert (
+            middleware._extract_agent_id("/api/document-analysis/strategy")
+            == "AGENT-010"
+        )
+        assert (
+            middleware._extract_agent_id("/api/document-analysis/fact-check")
+            == "AGENT-011"
+        )
 
     def test_extract_agent_from_orchestration_paths(self):
         """Test extracting agent IDs from orchestration paths"""
         middleware = ErrorHandlerMiddleware(app=None)
 
-        assert middleware._extract_agent_id("/api/orchestration/research") == "AGENT-012"
+        assert (
+            middleware._extract_agent_id("/api/orchestration/research") == "AGENT-012"
+        )
         assert middleware._extract_agent_id("/api/orchestration/analyze") == "AGENT-013"
         assert middleware._extract_agent_id("/api/orchestration/write") == "AGENT-014"
         assert middleware._extract_agent_id("/api/orchestration/review") == "AGENT-015"
@@ -502,8 +511,10 @@ class TestAgentIdExtraction:
 # VALIDATION MODEL FOR TESTS
 # =============================================================================
 
+
 class TestValidationModel(BaseModel):
     """Model for validation testing"""
+
     name: str = Field(..., min_length=1)
     count: int = Field(..., gt=0)
 
@@ -511,6 +522,7 @@ class TestValidationModel(BaseModel):
 # =============================================================================
 # INTEGRATION TESTS
 # =============================================================================
+
 
 class TestErrorHandlingIntegration:
     """Integration tests for error handling system"""
@@ -533,16 +545,13 @@ class TestErrorHandlingIntegration:
                 raise ResourceNotFoundError(
                     resource_type="Workflow",
                     resource_id=workflow_id,
-                    agent_id="AGENT-012"
+                    agent_id="AGENT-012",
                 )
             return {"id": workflow_id}
 
         @router.post("/summarizer/summarize")
         async def summarize():
-            raise LLMError(
-                message="Claude API rate limited",
-                agent_id="AGENT-002"
-            )
+            raise LLMError(message="Claude API rate limited", agent_id="AGENT-002")
 
         app.include_router(router, prefix="/api")
 
@@ -554,10 +563,7 @@ class TestErrorHandlingIntegration:
 
     def test_validation_error_response_format(self, client):
         """Test validation errors have correct format"""
-        response = client.post(
-            "/api/assets/skill",
-            json={"name": "", "count": -1}
-        )
+        response = client.post("/api/assets/skill", json={"name": "", "count": -1})
 
         assert response.status_code == 400
         data = response.json()

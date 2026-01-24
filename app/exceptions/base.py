@@ -32,7 +32,7 @@ class BaseAppException(Exception):
         details: Optional[Dict[str, Any]] = None,
         severity: str = "error",
         retriable: bool = False,
-        retry_after: Optional[int] = None
+        retry_after: Optional[int] = None,
     ):
         """
         Initialize the base exception.
@@ -106,7 +106,7 @@ class ConfigurationError(BaseAppException):
         self,
         message: str,
         config_key: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if config_key:
@@ -118,7 +118,7 @@ class ConfigurationError(BaseAppException):
             status_code=500,
             details=details,
             severity="critical",
-            retriable=False
+            retriable=False,
         )
 
 
@@ -133,7 +133,7 @@ class InitializationError(BaseAppException):
         self,
         message: str,
         component: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         details = details or {}
         if component:
@@ -145,5 +145,5 @@ class InitializationError(BaseAppException):
             status_code=500,
             details=details,
             severity="critical",
-            retriable=False
+            retriable=False,
         )

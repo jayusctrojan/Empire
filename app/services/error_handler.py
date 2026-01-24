@@ -3,14 +3,14 @@ Empire v7.3 - Error Handling Service
 Centralized error handling, logging, and retry management
 """
 
-import traceback
+import asyncio
 import logging
-from typing import Optional, Dict, Any, Callable, Type
+import traceback
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass, asdict
 from functools import wraps
-import asyncio
+from typing import Any, Callable, Dict, Optional, Type
 
 logger = logging.getLogger(__name__)
 
@@ -19,44 +19,50 @@ logger = logging.getLogger(__name__)
 # Error Classification
 # ============================================================================
 
+
 class ErrorSeverity(str, Enum):
     """Error severity levels"""
+
     CRITICAL = "critical"  # System failure, requires immediate attention
-    ERROR = "error"        # Operation failed, needs investigation
-    WARNING = "warning"    # Potential issue, degraded functionality
-    INFO = "info"         # Informational, operation recovered
+    ERROR = "error"  # Operation failed, needs investigation
+    WARNING = "warning"  # Potential issue, degraded functionality
+    INFO = "info"  # Informational, operation recovered
 
 
 class ErrorCategory(str, Enum):
     """Error categories for classification"""
-    NETWORK = "network"              # Network connectivity issues
+
+    NETWORK = "network"  # Network connectivity issues
     SERVICE_UNAVAILABLE = "service_unavailable"  # External service down
-    VALIDATION = "validation"        # Data validation errors
-    PARSING = "parsing"              # Document parsing failures
-    DATABASE = "database"            # Database operation failures
-    STORAGE = "storage"              # File storage errors
-    TIMEOUT = "timeout"              # Operation timeout
+    VALIDATION = "validation"  # Data validation errors
+    PARSING = "parsing"  # Document parsing failures
+    DATABASE = "database"  # Database operation failures
+    STORAGE = "storage"  # File storage errors
+    TIMEOUT = "timeout"  # Operation timeout
     AUTHENTICATION = "authentication"  # Auth/permission errors
     CONFIGURATION = "configuration"  # Configuration issues
-    UNKNOWN = "unknown"              # Unclassified errors
+    UNKNOWN = "unknown"  # Unclassified errors
 
 
 class RetryStrategy(str, Enum):
     """Retry strategy types"""
-    NONE = "none"                    # Don't retry
-    IMMEDIATE = "immediate"          # Retry immediately
-    LINEAR = "linear"                # Linear backoff
-    EXPONENTIAL = "exponential"      # Exponential backoff
-    CUSTOM = "custom"                # Custom retry logic
+
+    NONE = "none"  # Don't retry
+    IMMEDIATE = "immediate"  # Retry immediately
+    LINEAR = "linear"  # Linear backoff
+    EXPONENTIAL = "exponential"  # Exponential backoff
+    CUSTOM = "custom"  # Custom retry logic
 
 
 # ============================================================================
 # Error Data Classes
 # ============================================================================
 
+
 @dataclass
 class ErrorContext:
     """Context information for an error"""
+
     task_id: Optional[str] = None
     task_type: Optional[str] = None
     file_id: Optional[str] = None
@@ -71,6 +77,7 @@ class ErrorContext:
 @dataclass
 class ProcessingLog:
     """Structured processing log entry"""
+
     timestamp: datetime
     severity: ErrorSeverity
     category: ErrorCategory
@@ -85,6 +92,7 @@ class ProcessingLog:
 # ============================================================================
 # Error Classification Helper
 # ============================================================================
+
 
 class ErrorClassifier:
     """Classify errors into categories and determine retry strategies"""
@@ -135,11 +143,17 @@ class ErrorClassifier:
             return ErrorCategory.NETWORK, RetryStrategy.EXPONENTIAL
 
         # Service unavailable
-        if any(keyword in error_message for keyword in ["503", "service unavailable", "temporarily unavailable"]):
+        if any(
+            keyword in error_message
+            for keyword in ["503", "service unavailable", "temporarily unavailable"]
+        ):
             return ErrorCategory.SERVICE_UNAVAILABLE, RetryStrategy.EXPONENTIAL
 
         # Validation errors
-        if any(keyword in error_type for keyword in ["Validation", "ValueError", "TypeError"]):
+        if any(
+            keyword in error_type
+            for keyword in ["Validation", "ValueError", "TypeError"]
+        ):
             return ErrorCategory.VALIDATION, RetryStrategy.NONE
 
         # Parsing errors
@@ -147,7 +161,10 @@ class ErrorClassifier:
             return ErrorCategory.PARSING, RetryStrategy.NONE
 
         # Parsing errors in message
-        if any(keyword in error_message for keyword in ["parse", "parsing", "invalid json", "invalid xml"]):
+        if any(
+            keyword in error_message
+            for keyword in ["parse", "parsing", "invalid json", "invalid xml"]
+        ):
             return ErrorCategory.PARSING, RetryStrategy.NONE
 
         # Database errors
@@ -163,7 +180,9 @@ class ErrorClassifier:
             return ErrorCategory.STORAGE, RetryStrategy.EXPONENTIAL
 
         # Auth errors
-        if any(keyword in error_type for keyword in ["Auth", "Permission", "Forbidden"]):
+        if any(
+            keyword in error_type for keyword in ["Auth", "Permission", "Forbidden"]
+        ):
             return ErrorCategory.AUTHENTICATION, RetryStrategy.NONE
 
         # Check if transient
@@ -188,6 +207,7 @@ class ErrorClassifier:
 # Error Handler Service
 # ============================================================================
 
+
 class ErrorHandler:
     """Centralized error handling service"""
 
@@ -206,7 +226,7 @@ class ErrorHandler:
         exception: Exception,
         context: ErrorContext,
         severity: Optional[ErrorSeverity] = None,
-        custom_recovery: Optional[Callable] = None
+        custom_recovery: Optional[Callable] = None,
     ) -> ProcessingLog:
         """
         Handle an error: classify, log, and optionally recover
@@ -225,7 +245,9 @@ class ErrorHandler:
 
         # Determine severity if not provided
         if severity is None:
-            severity = self._determine_severity(exception, category, context.retry_count)
+            severity = self._determine_severity(
+                exception, category, context.retry_count
+            )
 
         # Create processing log
         log_entry = ProcessingLog(
@@ -237,7 +259,9 @@ class ErrorHandler:
             stack_trace=traceback.format_exc(),
             context=context,
             recovery_action=None,
-            resolution_status="retrying" if retry_strategy != RetryStrategy.NONE else "failed"
+            resolution_status=(
+                "retrying" if retry_strategy != RetryStrategy.NONE else "failed"
+            ),
         )
 
         # Log to Python logger
@@ -259,7 +283,9 @@ class ErrorHandler:
 
         return log_entry
 
-    def _determine_severity(self, exception: Exception, category: ErrorCategory, retry_count: int) -> ErrorSeverity:
+    def _determine_severity(
+        self, exception: Exception, category: ErrorCategory, retry_count: int
+    ) -> ErrorSeverity:
         """Determine error severity based on type and retry count"""
         # Critical if we've exhausted retries
         if retry_count >= 3:
@@ -300,25 +326,27 @@ class ErrorHandler:
     async def _log_to_database(self, log_entry: ProcessingLog):
         """Log to processing_logs table in database"""
         try:
-            await self.supabase_storage.insert_processing_log({
-                "timestamp": log_entry.timestamp.isoformat(),
-                "severity": log_entry.severity.value,
-                "category": log_entry.category.value,
-                "error_type": log_entry.error_type,
-                "error_message": log_entry.error_message,
-                "stack_trace": log_entry.stack_trace,
-                "task_id": log_entry.context.task_id,
-                "task_type": log_entry.context.task_type,
-                "file_id": log_entry.context.file_id,
-                "filename": log_entry.context.filename,
-                "user_id": log_entry.context.user_id,
-                "document_id": log_entry.context.document_id,
-                "retry_count": log_entry.context.retry_count,
-                "max_retries": log_entry.context.max_retries,
-                "recovery_action": log_entry.recovery_action,
-                "resolution_status": log_entry.resolution_status,
-                "additional_context": log_entry.context.additional_context
-            })
+            await self.supabase_storage.insert_processing_log(
+                {
+                    "timestamp": log_entry.timestamp.isoformat(),
+                    "severity": log_entry.severity.value,
+                    "category": log_entry.category.value,
+                    "error_type": log_entry.error_type,
+                    "error_message": log_entry.error_message,
+                    "stack_trace": log_entry.stack_trace,
+                    "task_id": log_entry.context.task_id,
+                    "task_type": log_entry.context.task_type,
+                    "file_id": log_entry.context.file_id,
+                    "filename": log_entry.context.filename,
+                    "user_id": log_entry.context.user_id,
+                    "document_id": log_entry.context.document_id,
+                    "retry_count": log_entry.context.retry_count,
+                    "max_retries": log_entry.context.max_retries,
+                    "recovery_action": log_entry.recovery_action,
+                    "resolution_status": log_entry.resolution_status,
+                    "additional_context": log_entry.context.additional_context,
+                }
+            )
         except Exception as e:
             logger.error(f"Failed to log error to database: {e}")
 
@@ -344,10 +372,9 @@ class ErrorHandler:
 # Decorators for Error Handling
 # ============================================================================
 
+
 def handle_errors(
-    fallback_value: Any = None,
-    log_errors: bool = True,
-    reraise: bool = False
+    fallback_value: Any = None, log_errors: bool = True, reraise: bool = False
 ):
     """
     Decorator to handle errors in async functions
@@ -363,6 +390,7 @@ def handle_errors(
             # ... code that might fail
             return data
     """
+
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -377,7 +405,9 @@ def handle_errors(
                     raise
 
                 return fallback_value
+
         return wrapper
+
     return decorator
 
 
@@ -394,6 +424,7 @@ def with_fallback(fallback_fn: Callable):
             # ... complex processing
             return result
     """
+
     def decorator(func: Callable):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -402,7 +433,9 @@ def with_fallback(fallback_fn: Callable):
             except Exception as e:
                 logger.warning(f"{func.__name__} failed, using fallback: {e}")
                 return await fallback_fn(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
