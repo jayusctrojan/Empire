@@ -152,8 +152,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 ### Configuration
 **Provider**: Backblaze B2
-**Bucket**: `JB-Course-KB`
-**Application Key ID**: `00571e0fe999a5b0000000003`
+**Bucket**: `<from .env: B2_BUCKET_NAME>`
+**Application Key ID**: `<from .env: B2_APPLICATION_KEY_ID>`
 
 ### Encryption Features
 
