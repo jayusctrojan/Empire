@@ -13,6 +13,7 @@ from prometheus_client import Counter, Histogram, Gauge
 import structlog
 import time
 
+from app.middleware.auth import require_admin
 from app.services.agent_router_service import (
     AgentRouterService,
     get_agent_router_service,
@@ -684,7 +685,8 @@ async def get_cache_analytics(
 )
 async def clear_cache(
     expired_only: bool = True,
-    service: AgentRouterService = Depends(get_router_service)
+    service: AgentRouterService = Depends(get_router_service),
+    admin_user: dict = Depends(require_admin)
 ):
     """
     Clear routing cache entries.

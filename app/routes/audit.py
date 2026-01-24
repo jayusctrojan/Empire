@@ -78,7 +78,7 @@ async def get_audit_logs(
     end_date: Optional[datetime] = Query(None, description="End date (ISO 8601)"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
-    # admin_user=Depends(require_admin)  # Uncomment when auth is implemented
+    admin_user: dict = Depends(require_admin)
 ):
     """
     Query audit logs with filters and pagination
@@ -150,7 +150,7 @@ async def get_audit_logs(
 @router.get("/logs/{log_id}", response_model=AuditLogEntry)
 async def get_audit_log(
     log_id: str,
-    # admin_user=Depends(require_admin)  # Uncomment when auth is implemented
+    admin_user: dict = Depends(require_admin)
 ):
     """
     Get a specific audit log entry by ID
@@ -191,7 +191,7 @@ async def get_user_audit_trail(
     days: int = Query(30, ge=1, le=365, description="Number of days to look back"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
-    # admin_user=Depends(require_admin)  # Uncomment when auth is implemented
+    admin_user: dict = Depends(require_admin)
 ):
     """
     Get audit trail for a specific user
@@ -243,7 +243,7 @@ async def get_user_audit_trail(
 @router.get("/stats", response_model=AuditLogStats)
 async def get_audit_stats(
     days: int = Query(7, ge=1, le=365, description="Number of days for statistics"),
-    # admin_user=Depends(require_admin)  # Uncomment when auth is implemented
+    admin_user: dict = Depends(require_admin)
 ):
     """
     Get audit log statistics and metrics
@@ -331,7 +331,7 @@ async def get_audit_stats(
 async def get_recent_events(
     limit: int = Query(100, ge=1, le=1000, description="Number of recent events"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
-    # admin_user=Depends(require_admin)  # Uncomment when auth is implemented
+    admin_user: dict = Depends(require_admin)
 ):
     """
     Get most recent audit events
@@ -376,7 +376,7 @@ async def get_recent_events(
 
 @router.get("/events/types")
 async def get_event_types(
-    # admin_user=Depends(require_admin)  # Uncomment when auth is implemented
+    admin_user: dict = Depends(require_admin)
 ):
     """
     Get list of all event types in the system
