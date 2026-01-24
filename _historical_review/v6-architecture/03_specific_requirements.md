@@ -941,7 +941,7 @@ def assessPDFComplexity(file):
 **NFR-006:** The system SHALL maintain sub-100ms vector search latency
 
 *Measurement: 95th percentile query time*
-*Note: Pinecone cloud latency*
+*Note: Supabase pgvector with HNSW indexing (v6.0)*
 *Status: Active - All Versions*
 
 **NFR-011:** The system SHALL maintain 98% local processing ratio
@@ -1279,9 +1279,11 @@ Request: {
 ```
 *Status: Active - All Versions*
 
-**SI-005:** Pinecone Vector Database Interface
+**SI-005:** ~~Pinecone Vector Database Interface~~ (DEPRECATED in v6.0)
 ```python
-Interface: Pinecone API
+# DEPRECATED: Replaced by Supabase pgvector in v6.0
+# See SI-006 for Supabase PostgreSQL Interface with pgvector
+Interface: Pinecone API (v5.0 only)
 Protocol: HTTPS/REST
 Endpoint: https://api.pinecone.io
 Authentication: API Key
@@ -1290,7 +1292,7 @@ Operations:
   - query(vector, top_k=10, filter={})
   - delete(ids)
 ```
-*Status: Active - All Versions*
+*Status: DEPRECATED - v5.0 only (replaced by Supabase pgvector in v6.0)*
 
 **SI-006:** Supabase PostgreSQL Interface
 ```python
