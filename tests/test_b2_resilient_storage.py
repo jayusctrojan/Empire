@@ -19,7 +19,7 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from datetime import datetime
 from io import BytesIO
 
-from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeoutError
+from b2sdk.v2.exception import B2Error, B2ConnectionError, B2RequestTimeout
 
 # Import test subjects
 from app.services.b2_resilient_storage import (
