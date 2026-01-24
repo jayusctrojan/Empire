@@ -38,9 +38,15 @@ from app.services.supabase_storage import get_supabase_storage
 from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
 from app.core.connections import connection_manager
 from app.core.feature_flags import get_feature_flag_manager  # Task 3.2: Feature Flags
-from app.core.graceful_shutdown import initialize_shutdown_coordinator, setup_signal_handlers, ShutdownMiddleware  # Service Orchestration
 
-# Service Orchestration: Optional import - file may not exist yet
+# Service Orchestration: Optional imports - files may not exist yet
+try:
+    from app.core.graceful_shutdown import initialize_shutdown_coordinator, setup_signal_handlers, ShutdownMiddleware
+except ImportError:
+    initialize_shutdown_coordinator = None  # type: ignore
+    setup_signal_handlers = None  # type: ignore
+    ShutdownMiddleware = None  # type: ignore
+
 try:
     from app.core.service_orchestrator import ServiceOrchestrator
 except ImportError:
@@ -162,19 +168,22 @@ async def lifespan(app: FastAPI):
         print("⚠️  Service orchestrator not available (module not installed)")
 
     # Service Orchestration: Initialize Graceful Shutdown Coordinator
-    try:
-        shutdown_coordinator = initialize_shutdown_coordinator(app)
-        setup_signal_handlers(shutdown_coordinator)
-        app.state.shutdown_coordinator = shutdown_coordinator
+    if initialize_shutdown_coordinator is not None:
+        try:
+            shutdown_coordinator = initialize_shutdown_coordinator(app)
+            setup_signal_handlers(shutdown_coordinator)
+            app.state.shutdown_coordinator = shutdown_coordinator
 
-        # Add shutdown middleware (rejects new requests during graceful shutdown)
-        # This must be added after coordinator initialization
-        from starlette.middleware.base import BaseHTTPMiddleware
-        _shutdown_middleware = ShutdownMiddleware(app, shutdown_coordinator)  # noqa: F841
-        # Note: middleware is registered via the ShutdownMiddleware class which wraps the dispatch
-        print("🛑 Graceful shutdown coordinator initialized with middleware")
-    except Exception as e:
-        print(f"⚠️  Failed to initialize shutdown coordinator: {e}")
+            # Add shutdown middleware (rejects new requests during graceful shutdown)
+            # This must be added after coordinator initialization
+            from starlette.middleware.base import BaseHTTPMiddleware  # noqa: F401
+            _shutdown_middleware = ShutdownMiddleware(app, shutdown_coordinator)  # noqa: F841
+            # Note: middleware is registered via the ShutdownMiddleware class which wraps the dispatch
+            print("🛑 Graceful shutdown coordinator initialized with middleware")
+        except Exception as e:
+            print(f"⚠️  Failed to initialize shutdown coordinator: {e}")
+    else:
+        print("⚠️  Graceful shutdown coordinator not available (module not installed)")
 
     # Task 10.3: Initialize WebSocket Manager with Redis Pub/Sub
     try:
