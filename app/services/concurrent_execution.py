@@ -703,7 +703,7 @@ class ConcurrentExecutionEngine:
                 monitor = get_performance_monitor()
 
                 # Generate comprehensive job metrics
-                job_metrics = monitor.generate_job_metrics(metrics.job_id)
+                job_metrics = monitor.generate_job_metrics(metrics.job_id)  # noqa: F841
 
                 # Check SLA compliance
                 monitor.check_sla_compliance(metrics.job_id)

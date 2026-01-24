@@ -242,7 +242,7 @@ class VersioningService:
         v2 = await self.get_version_by_number(document_id, version2)
 
         if not v1 or not v2:
-            raise Exception(f"One or both versions not found")
+            raise Exception("One or both versions not found")
 
         return {
             "document_id": document_id,

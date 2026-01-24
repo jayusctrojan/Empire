@@ -77,7 +77,7 @@ def bulk_upload_documents(
                     document_id=result.get('document_id'),
                     filename=doc['filename'],
                     status="success",
-                    message=f"Document uploaded successfully"
+                    message="Document uploaded successfully"
                 ))
                 successful += 1
 
@@ -332,7 +332,7 @@ def bulk_reprocess_documents(
                 from app.services.document_management import reprocess_document
 
                 # Reprocess document
-                result = reprocess_document(
+                result = reprocess_document(  # noqa: F841
                     document_id=doc_id,
                     user_id=user_id,
                     force_reparse=options.get('force_reparse', False),

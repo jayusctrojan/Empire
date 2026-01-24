@@ -794,7 +794,7 @@ def create_document_upload_status_component() -> gr.Blocks:
     ]
 
     with gr.Blocks(css=PROCESSING_STATUS_CSS) as upload_status:
-        document_id = gr.State(value=None)
+        document_id = gr.State(value=None)  # noqa: F841
         upload_state = gr.State(value={
             "status": "pending",
             "percentage": 0,
@@ -818,13 +818,13 @@ def create_document_upload_status_component() -> gr.Blocks:
         )
 
         with gr.Row():
-            filename_display = gr.Textbox(
+            filename_display = gr.Textbox(  # noqa: F841
                 label="File",
                 value="No file selected",
                 interactive=False
             )
 
-            elapsed_time = gr.Textbox(
+            elapsed_time = gr.Textbox(  # noqa: F841
                 label="Elapsed Time",
                 value="--:--",
                 interactive=False
@@ -871,7 +871,7 @@ def create_query_status_component() -> gr.Blocks:
     Returns:
         gr.Blocks: Gradio Blocks component for query status
     """
-    query_stages = [
+    query_stages = [  # noqa: F841
         "refining",
         "searching",
         "reranking",
@@ -880,7 +880,7 @@ def create_query_status_component() -> gr.Blocks:
     ]
 
     with gr.Blocks(css=PROCESSING_STATUS_CSS) as query_status:
-        query_id = gr.State(value=None)
+        query_id = gr.State(value=None)  # noqa: F841
         query_state = gr.State(value={
             "status": "pending",
             "percentage": 0,

@@ -171,8 +171,8 @@ class RetrievalExecutor(TaskExecutor):
         """
         query = task["query"]
         config = task.get("config", {})
-        job_id = task["job_id"]
-        task_id = task["id"]
+        job_id = task["job_id"]  # noqa: F841
+        task_id = task["id"]  # noqa: F841
 
         # Get search parameters from config
         limit = config.get("limit", self.config.default_limit)
@@ -609,7 +609,7 @@ class RetrievalExecutor(TaskExecutor):
             max_depth = config.get("max_depth", 2)
             include_entities = config.get("include_entities", True)
             include_related_docs = config.get("include_related_docs", True)
-            entity_types = config.get("entity_types")
+            entity_types = config.get("entity_types")  # noqa: F841
 
             # Import Neo4j services
             from app.services.neo4j_graph_queries import get_neo4j_graph_query_service

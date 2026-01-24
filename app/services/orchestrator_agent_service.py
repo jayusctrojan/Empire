@@ -713,7 +713,7 @@ Respond with JSON only."""
 
             # Extract JSON
             if "{" in result_text and "}" in result_text:
-                json_str = result_text[result_text.find("{"):result_text.rfind("}")+1]
+                json_str = result_text[result_text.find("{"):result_text.rfind("}") + 1]
                 result = json.loads(json_str)
 
                 dept_str = result.get("department", "").lower().replace("_", "-")
@@ -1158,9 +1158,9 @@ if __name__ == "__main__":
             filename="sales_pipeline_advanced.pdf"
         )
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("AGENT-001 ORCHESTRATION RESULT")
-        print("="*70)
+        print("=" * 70)
         print(f"\nDepartment: {result.classification.department.value}")
         print(f"Confidence: {result.classification.confidence:.2%}")
         print(f"Reasoning: {result.classification.reasoning}")
@@ -1168,13 +1168,13 @@ if __name__ == "__main__":
         print(f"All Assets: {[a.value for a in result.asset_decision.asset_types]}")
         print(f"Needs Summary: {result.asset_decision.needs_summary}")
         print(f"\nDelegation Targets: {result.delegation_targets}")
-        print(f"\nOutput Paths:")
+        print("\nOutput Paths:")
         for key, path in result.output_paths.items():
             print(f"  {key}: {path}")
         print(f"\nProcessing Time: {result.processing_metadata['processing_time_seconds']:.2f}s")
 
         # Print stats
-        print(f"\n=== Statistics ===")
+        print("\n=== Statistics ===")
         print(json.dumps(orchestrator.get_stats(), indent=2))
 
     asyncio.run(test())

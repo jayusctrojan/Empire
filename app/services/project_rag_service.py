@@ -680,7 +680,7 @@ Please answer the question based on the sources above. Include citations [1], [2
         matches = re.finditer(pattern, answer)
 
         for match in matches:
-            is_global = match.group(0).startswith('[G')
+            is_global = match.group(0).startswith('[G')  # noqa: F841
             citation_marker = match.group(0)
             num = int(match.group(1))
 

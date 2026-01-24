@@ -172,7 +172,7 @@ class ConversationService:
                 has_more=has_more
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             return ListConversationsResponse(
                 success=False,
                 conversations=[],
@@ -409,7 +409,7 @@ class ConversationService:
                 total=result.count or len(messages)
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             return ListMessagesResponse(
                 success=False,
                 messages=[],

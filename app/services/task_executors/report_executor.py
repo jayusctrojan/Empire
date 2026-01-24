@@ -521,7 +521,7 @@ class ReportExecutor(TaskExecutor):
             Dict with review results
         """
         job_id = task["job_id"]
-        depends_on = task.get("depends_on", [])
+        depends_on = task.get("depends_on", [])  # noqa: F841
 
         logger.info(
             "Reviewing report",
@@ -635,7 +635,7 @@ class ReportExecutor(TaskExecutor):
             if isinstance(metadata, str):
                 try:
                     metadata = json.loads(metadata)
-                except:
+                except Exception:
                     metadata = {}
 
             key_findings = metadata.get("key_findings", [])
@@ -705,7 +705,7 @@ class ReportExecutor(TaskExecutor):
                 if isinstance(metadata, str):
                     try:
                         metadata = json.loads(metadata)
-                    except:
+                    except Exception:
                         metadata = {}
 
                 for finding in metadata.get("key_findings", []):

@@ -844,7 +844,7 @@ def create_citation_display_component() -> gr.Blocks:
             )
 
             # JavaScript for interactivity (injected once)
-            js_injector = gr.HTML(
+            js_injector = gr.HTML(  # noqa: F841
                 value=CITATION_JS,
                 visible=False
             )

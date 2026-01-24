@@ -57,7 +57,7 @@ SEQUENCE_PATTERNS: list[tuple[str, str]] = [
     (r"unit[-_\s]?(\d{1,3})", "unit"),                # "unit-1.pdf"
     (r"section[-_\s]?(\d{1,3})", "section"),          # "section-1.pdf"
     # Roman numerals (must come before alpha to avoid i=9th letter bug)
-    (r"^(i{1,3}|iv|v|vi{0,3}|ix|x)[-_\s]", "roman"), # "i-intro.pdf"
+    (r"^(i{1,3}|iv|v|vi{0,3}|ix|x)[-_\s]", "roman"),  # "i-intro.pdf"
     # Alpha sequence patterns (excluding roman numeral letters at start)
     (r"^([a-hjk-uwyz])[-_\s]", "alpha_prefix"),      # "a-intro.pdf" (excludes i,v,x)
 ]
@@ -983,7 +983,7 @@ class ContentPrepAgent:
 
         # Create filename lookup (case-insensitive)
         file_map = {f.filename.lower(): f for f in files}
-        file_map_original = {f.filename: f for f in files}
+        file_map_original = {f.filename: f for f in files}  # noqa: F841
 
         # Track reordering
         reordered_count = 0

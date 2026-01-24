@@ -584,7 +584,7 @@ Respond with JSON only:
                 "retrieval_params": json.dumps(retrieval_params) if retrieval_params else None,
             }
 
-            result = self.supabase.table("rag_quality_metrics").insert(data).execute()
+            result = self.supabase.table("rag_quality_metrics").insert(data).execute()  # noqa: F841
             logger.debug("Metrics stored", query_id=query_id)
             return True
 

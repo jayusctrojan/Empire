@@ -673,7 +673,7 @@ class B2StorageService:
             bucket = self._get_bucket()
 
             # Verify bucket by getting its ID (lightweight operation)
-            _bucket_id = bucket.id_
+            _bucket_id = bucket.id_  # noqa: F841
 
             logger.debug("B2 connection check passed")
             return True

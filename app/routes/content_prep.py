@@ -243,7 +243,7 @@ async def health_check() -> HealthResponse:
     try:
         agent = ContentPrepAgent()
         return await agent.get_health_status()
-    except Exception as e:
+    except Exception as e:  # noqa: F841
         # Return degraded status on error
         from app.models.content_sets import AgentInfo, ProcessingMetrics, ConnectivityStatus
         return HealthResponse(

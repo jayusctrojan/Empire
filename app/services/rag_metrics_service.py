@@ -261,7 +261,7 @@ class RAGMetricsService:
 
         try:
             # Query metrics grouped by time bucket
-            interval = "1 hour" if granularity == "hour" else "1 day"
+            interval = "1 hour" if granularity == "hour" else "1 day"  # noqa: F841
 
             query = f"""
                 SELECT
@@ -291,8 +291,8 @@ class RAGMetricsService:
             trend_percentage = 0.0
 
             if len(data_points) >= 2:
-                first_half = data_points[:len(data_points)//2]
-                second_half = data_points[len(data_points)//2:]
+                first_half = data_points[:len(data_points) // 2]
+                second_half = data_points[len(data_points) // 2:]
 
                 first_avg = sum(p.value for p in first_half) / len(first_half) if first_half else 0
                 second_avg = sum(p.value for p in second_half) / len(second_half) if second_half else 0

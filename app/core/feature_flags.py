@@ -515,7 +515,7 @@ class FeatureFlagManager:
             result = self.supabase.table("feature_flags")\
                 .delete()\
                 .eq("flag_name", flag_name)\
-                .execute()
+                .execute()  # noqa: F841
 
             # Invalidate cache
             if self.enable_cache and self.redis_cache:

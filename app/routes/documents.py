@@ -66,6 +66,7 @@ def calculate_file_hash(file_path: str) -> str:
 
     return sha256_hash.hexdigest()
 
+
 from app.models.documents import (
     BulkUploadRequest,
     BulkDeleteRequest,

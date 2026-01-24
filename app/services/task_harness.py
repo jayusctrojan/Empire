@@ -583,7 +583,7 @@ class TaskHarnessService:
         ).execute()
 
         tasks = result.data or []
-        task_map = {t["task_key"]: t for t in tasks}
+        task_map = {t["task_key"]: t for t in tasks}  # noqa: F841
 
         # Find failed task keys
         failed_keys = {

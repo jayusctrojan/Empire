@@ -311,7 +311,7 @@ class StatusBroadcaster:
 
             # Update documents table
             # The processing_status column stores current status and brief history
-            result = supabase.client.table("documents").update({
+            result = supabase.client.table("documents").update({  # noqa: F841
                 "processing_status": status_message.status.value,
                 "processing_details": status_entry,
                 "updated_at": datetime.utcnow().isoformat()
@@ -381,7 +381,7 @@ class StatusBroadcaster:
                 task_record["metadata"] = status_message.metadata
 
             # Upsert to processing_tasks table
-            result = supabase.client.table("processing_tasks").upsert(
+            result = supabase.client.table("processing_tasks").upsert(  # noqa: F841
                 task_record,
                 on_conflict="task_id"
             ).execute()
@@ -765,7 +765,7 @@ class SyncStatusBroadcaster:
 
             manager = get_connection_manager()
 
-            notification = {
+            notification = {  # noqa: F841
                 "type": "source_status",
                 "source_id": source_id,
                 "project_id": project_id,

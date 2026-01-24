@@ -15,7 +15,7 @@ Integration with Empire architecture:
 
 import os
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from supabase import create_client, Client
 
 
@@ -307,7 +307,6 @@ class RAGASStorageService:
 
         try:
             # Calculate start date
-            from datetime import datetime, timedelta
             start_date = (datetime.utcnow() - timedelta(days=days)).isoformat() + "Z"
 
             # Retrieve evaluations

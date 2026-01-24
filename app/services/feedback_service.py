@@ -184,7 +184,7 @@ class FeedbackService:
             import json
             try:
                 keywords = json.loads(keywords)
-            except:
+            except Exception:
                 keywords = []
 
         return Feedback(

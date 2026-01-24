@@ -595,7 +595,7 @@ class ContentStrategistAgent:
                 # Include research analysis context if available
                 context = ""
                 if research_analysis:
-                    context = f"\n\nPrior Research Analysis:\n"
+                    context = "\n\nPrior Research Analysis:\n"
                     if research_analysis.topics:
                         context += f"Main Topics: {', '.join(t.name for t in research_analysis.topics[:5])}\n"
                     if research_analysis.facts:

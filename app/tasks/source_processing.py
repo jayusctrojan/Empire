@@ -52,6 +52,7 @@ def _get_cache():
         _cache = get_source_content_cache()
     return _cache
 
+
 # Constants
 CHUNK_SIZE = 512  # tokens per chunk
 MAX_SUMMARY_LENGTH = 2000  # characters
@@ -150,7 +151,7 @@ def process_source(
 
         # Task 69: Start performance profiling
         file_size = source.get("file_size_bytes")
-        profile = profiler.start_source_profile(
+        profile = profiler.start_source_profile(  # noqa: F841
             source_id=source_id,
             source_type=source_type,
             file_type=file_type,

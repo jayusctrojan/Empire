@@ -142,7 +142,6 @@ def get_tracer() -> trace.Tracer:
 
 def shutdown_tracing():
     """Shutdown the tracer provider and flush pending spans."""
-    global _tracer_provider
     if _tracer_provider:
         _tracer_provider.shutdown()
         logger.info("OpenTelemetry tracing shutdown complete")

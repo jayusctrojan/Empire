@@ -458,7 +458,7 @@ class StudioCKOConversationService:
             if not session:
                 raise ValueError(f"Session {session_id} not found or access denied")
 
-            user_msg = await self._save_message(
+            user_msg = await self._save_message(  # noqa: F841
                 session_id=session_id,
                 role=MessageRole.USER,
                 content=message
