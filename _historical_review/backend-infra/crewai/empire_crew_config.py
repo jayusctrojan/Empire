@@ -5,9 +5,108 @@ Main orchestrator and specialized agents for content analysis and asset generati
 """
 
 from crewai import Agent, Task, Crew
-from typing import Dict, List, Any
+from crewai.tools import BaseTool
+from typing import Dict, List, Any, Type
+from pydantic import BaseModel, Field
 import os
 from datetime import datetime
+
+
+# =============================================================================
+# TOOL DEFINITIONS
+# CrewAI requires actual Tool objects, not string names.
+# These are placeholder implementations that should be enhanced for production.
+# =============================================================================
+
+class ContentAnalyzerInput(BaseModel):
+    """Input schema for content analyzer tool."""
+    content: str = Field(description="The content to analyze")
+
+
+class ContentAnalyzerTool(BaseTool):
+    """Tool for analyzing content structure and extracting key information."""
+    name: str = "content_analyzer"
+    description: str = "Analyzes content to extract structure, key topics, and metadata"
+    args_schema: Type[BaseModel] = ContentAnalyzerInput
+
+    def _run(self, content: str) -> str:
+        """Analyze content and return structured analysis."""
+        # Placeholder implementation - enhance for production
+        word_count = len(content.split())
+        return f"Content analyzed: {word_count} words. Key topics extracted."
+
+
+class DepartmentClassifierInput(BaseModel):
+    """Input schema for department classifier tool."""
+    content: str = Field(description="The content to classify")
+
+
+class DepartmentClassifierTool(BaseTool):
+    """Tool for classifying content into business departments."""
+    name: str = "department_classifier"
+    description: str = "Classifies content into one of 10 business departments"
+    args_schema: Type[BaseModel] = DepartmentClassifierInput
+
+    def _run(self, content: str) -> str:
+        """Classify content into a department."""
+        # Placeholder implementation - enhance for production
+        return "Department classification completed."
+
+
+class YamlGeneratorInput(BaseModel):
+    """Input schema for YAML generator tool."""
+    data: str = Field(description="The data to convert to YAML format")
+
+
+class YamlGeneratorTool(BaseTool):
+    """Tool for generating YAML output."""
+    name: str = "yaml_generator"
+    description: str = "Generates properly formatted YAML output"
+    args_schema: Type[BaseModel] = YamlGeneratorInput
+
+    def _run(self, data: str) -> str:
+        """Generate YAML from data."""
+        return f"YAML generated from input data."
+
+
+class MarkdownGeneratorInput(BaseModel):
+    """Input schema for Markdown generator tool."""
+    content: str = Field(description="The content to format as Markdown")
+
+
+class MarkdownGeneratorTool(BaseTool):
+    """Tool for generating Markdown output."""
+    name: str = "markdown_generator"
+    description: str = "Generates properly formatted Markdown output"
+    args_schema: Type[BaseModel] = MarkdownGeneratorInput
+
+    def _run(self, content: str) -> str:
+        """Generate Markdown from content."""
+        return f"Markdown generated from input content."
+
+
+class JsonGeneratorInput(BaseModel):
+    """Input schema for JSON generator tool."""
+    data: str = Field(description="The data to convert to JSON format")
+
+
+class JsonGeneratorTool(BaseTool):
+    """Tool for generating JSON output."""
+    name: str = "json_generator"
+    description: str = "Generates properly formatted JSON output"
+    args_schema: Type[BaseModel] = JsonGeneratorInput
+
+    def _run(self, data: str) -> str:
+        """Generate JSON from data."""
+        return f"JSON generated from input data."
+
+
+# Instantiate tool objects for use in agents
+content_analyzer_tool = ContentAnalyzerTool()
+department_classifier_tool = DepartmentClassifierTool()
+yaml_generator_tool = YamlGeneratorTool()
+markdown_generator_tool = MarkdownGeneratorTool()
+json_generator_tool = JsonGeneratorTool()
 
 # Department codes for classification
 DEPARTMENTS = [
@@ -110,10 +209,8 @@ class EmpireCrewAgents:
             {self.quick_reference[:2000]}
             """,
             tools=[
-                "content_analyzer",
-                "department_classifier",
-                "asset_type_decider",
-                "delegation_router"
+                content_analyzer_tool,
+                department_classifier_tool,
             ],
             allow_delegation=True,
             max_iterations=3,
@@ -169,11 +266,8 @@ class EmpireCrewAgents:
             - Materials with rich visual content
             """,
             tools=[
-                "pdf_generator",
-                "table_extractor",
-                "framework_identifier",
-                "image_processor",
-                "content_structurer"
+                content_analyzer_tool,
+                markdown_generator_tool,
             ],
             allow_delegation=False,
             max_iterations=5,
@@ -209,7 +303,7 @@ class EmpireCrewAgents:
             - Clear documentation
             - Production-ready (no placeholders)
             """,
-            tools=["yaml_generator", "skill_validator"],
+            tools=[yaml_generator_tool],
             allow_delegation=False,
             verbose=True
         )
@@ -241,7 +335,7 @@ class EmpireCrewAgents:
 
             Keep commands simple and fast to execute.
             """,
-            tools=["markdown_generator", "command_validator"],
+            tools=[markdown_generator_tool],
             allow_delegation=False,
             verbose=True
         )
@@ -274,7 +368,7 @@ class EmpireCrewAgents:
 
             Agents should be autonomous and goal-oriented.
             """,
-            tools=["yaml_generator", "agent_validator"],
+            tools=[yaml_generator_tool],
             allow_delegation=False,
             verbose=True
         )
@@ -308,7 +402,7 @@ class EmpireCrewAgents:
 
             Focus on clarity, reusability, and consistent high-quality outputs.
             """,
-            tools=["markdown_generator", "prompt_validator"],
+            tools=[markdown_generator_tool],
             allow_delegation=False,
             verbose=True
         )
@@ -342,7 +436,7 @@ class EmpireCrewAgents:
 
             Workflows should be robust with proper error handling.
             """,
-            tools=["json_generator", "workflow_validator"],
+            tools=[json_generator_tool],
             allow_delegation=False,
             verbose=True
         )
@@ -368,7 +462,7 @@ class EmpireCrewAgents:
 
             You ensure content is routed to the correct department every time.
             """,
-            tools=["keyword_analyzer", "department_matcher"],
+            tools=[content_analyzer_tool, department_classifier_tool],
             allow_delegation=False,
             verbose=True
         )
