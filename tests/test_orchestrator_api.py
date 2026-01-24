@@ -95,6 +95,7 @@ def test_client():
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestCoordinateEndpoint:
     """Tests for POST /api/orchestrator/coordinate."""
 
@@ -173,6 +174,7 @@ class TestCoordinateEndpoint:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestClassifyEndpoint:
     """Tests for POST /api/orchestrator/classify."""
 
@@ -235,6 +237,7 @@ class TestClassifyEndpoint:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestAnalyzeEndpoint:
     """Tests for POST /api/orchestrator/analyze."""
 
@@ -286,6 +289,7 @@ class TestAnalyzeEndpoint:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestAgentsEndpoints:
     """Tests for agent listing endpoints."""
 
@@ -362,6 +366,7 @@ class TestAgentsEndpoints:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestHealthEndpoint:
     """Tests for GET /api/orchestrator/health."""
 
@@ -396,6 +401,7 @@ class TestHealthEndpoint:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestStatsEndpoint:
     """Tests for GET /api/orchestrator/stats."""
 
@@ -427,6 +433,7 @@ class TestStatsEndpoint:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestInfoEndpoints:
     """Tests for department and asset type info endpoints."""
 
@@ -464,6 +471,7 @@ class TestInfoEndpoints:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestModelValidation:
     """Tests for Pydantic model validation."""
 
@@ -500,6 +508,7 @@ class TestModelValidation:
 # ============================================================================
 
 
+@pytest.mark.integration
 class TestErrorHandling:
     """Tests for error handling."""
 

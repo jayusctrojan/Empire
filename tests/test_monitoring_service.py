@@ -316,7 +316,7 @@ class TestMonitoringService:
                 await asyncio.sleep(0.05)
                 llm_stage.cost = await monitor.record_llm_call(
                     provider="anthropic",
-                    model="claude-3-5-haiku-20241022",
+                    model="claude-haiku-4-5",  # Use model name from LLM_COSTS config
                     operation="classification",
                     input_tokens=500,
                     output_tokens=250,
