@@ -26,7 +26,7 @@ from app.api.routes import query
 from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator, entity_extraction, llama_index, circuit_breakers, workflow_management, asset_generators, graph_agent, rag_metrics  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001), Task 155: Entity Extraction, Task 156: LlamaIndex Integration Hardening, Task 159: Circuit Breaker Management, Task 158: Workflow Management, Task 43: Asset Generators, Task 107: Graph Agent, Task 149: RAG Metrics
 from app.routes import health as health_router  # Task 190: Enhanced Health Checks
 from app.routes import feedback as feedback_router  # Task 188: Agent Feedback System
-from app.routes import preflight as preflight_router  # Service Orchestration: Preflight checks
+# from app.routes import preflight as preflight_router  # Service Orchestration: Preflight checks (not yet implemented)
 from app.routes import context_window as context_window_router  # Feature 011: Chat Context Window Management
 from app.routes import checkpoints as checkpoints_router  # Task 206: Automatic Checkpoint System
 from app.routes import session_memory as session_memory_router  # Task 207: Session Memory & Persistence
@@ -611,7 +611,7 @@ app.include_router(health_router.router)  # Health router has /api/health prefix
 app.include_router(feedback_router.router)  # Feedback router has /api/feedback prefix
 
 # Service Orchestration: Preflight checks and service health management
-app.include_router(preflight_router.router)  # Preflight router has /api/preflight prefix
+# app.include_router(preflight_router.router)  # Preflight router has /api/preflight prefix (not yet implemented)
 
 # Feature 011: Chat Context Window Management - Progress bar and token tracking
 app.include_router(context_window_router.router)  # Context Window router has /api/context-window prefix
