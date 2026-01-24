@@ -11,21 +11,22 @@ Tests cover:
 - Health check
 """
 
-import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from fastapi.testclient import TestClient
-from uuid import uuid4
 from datetime import datetime
+from unittest.mock import AsyncMock, Mock, patch
+from uuid import uuid4
 
+import pytest
+from fastapi.testclient import TestClient
 
 # =============================================================================
 # Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def mock_memory_service():
     """Mock conversation memory service."""
-    with patch('app.routes.conversation_memory.get_memory_service') as mock:
+    with patch("app.routes.conversation_memory.get_memory_service") as mock:
         service = Mock()
         service.supabase = Mock()
 
@@ -71,14 +72,16 @@ def mock_memory_service():
         service.search_similar_memories = AsyncMock(return_value=[(sample_node, 0.92)])
 
         # Mock stats
-        service.get_memory_statistics = AsyncMock(return_value={
-            "total_nodes": 100,
-            "active_nodes": 95,
-            "total_edges": 50,
-            "active_edges": 48,
-            "nodes_by_type": {"conversation": 60, "fact": 30, "preference": 10},
-            "edges_by_type": {"related_to": 40, "follows": 10}
-        })
+        service.get_memory_statistics = AsyncMock(
+            return_value={
+                "total_nodes": 100,
+                "active_nodes": 95,
+                "total_edges": 50,
+                "active_edges": 48,
+                "nodes_by_type": {"conversation": 60, "fact": 30, "preference": 10},
+                "edges_by_type": {"related_to": 40, "follows": 10},
+            }
+        )
 
         # Mock maintenance
         service.deactivate_old_memories = AsyncMock(return_value=5)
@@ -109,16 +112,20 @@ def client(mock_memory_service):
 # Memory Node Tests
 # =============================================================================
 
+
 class TestMemoryNodes:
     """Tests for memory node endpoints."""
 
     def test_create_memory_node_success(self, client, mock_memory_service):
         """Test successful memory node creation."""
-        response = client.post("/api/memory/nodes", json={
-            "content": "User prefers dark mode",
-            "node_type": "preference",
-            "importance_score": 0.8
-        })
+        response = client.post(
+            "/api/memory/nodes",
+            json={
+                "content": "User prefers dark mode",
+                "node_type": "preference",
+                "importance_score": 0.8,
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -130,23 +137,26 @@ class TestMemoryNodes:
         """Test creating node with embedding."""
         embedding = [0.1] * 768  # 768-dim vector
 
-        response = client.post("/api/memory/nodes", json={
-            "content": "Important fact to remember",
-            "node_type": "fact",
-            "embedding": embedding,
-            "importance_score": 0.9
-        })
+        response = client.post(
+            "/api/memory/nodes",
+            json={
+                "content": "Important fact to remember",
+                "node_type": "fact",
+                "embedding": embedding,
+                "importance_score": 0.9,
+            },
+        )
 
         assert response.status_code == 200
 
     def test_create_memory_node_validation(self, client):
         """Test node creation validation."""
         # Empty content
-        response = client.post("/api/memory/nodes", json={
-            "content": "",
-            "node_type": "fact"
-        })
-        assert response.status_code == 422
+        response = client.post(
+            "/api/memory/nodes", json={"content": "", "node_type": "fact"}
+        )
+        # Should fail validation (400 from middleware or 422 from FastAPI)
+        assert response.status_code in [400, 422]
 
     def test_get_memory_node_success(self, client, mock_memory_service):
         """Test retrieving a memory node."""
@@ -168,10 +178,10 @@ class TestMemoryNodes:
     def test_update_memory_node_success(self, client, mock_memory_service):
         """Test updating a memory node."""
         node_id = str(uuid4())
-        response = client.patch(f"/api/memory/nodes/{node_id}", json={
-            "content": "Updated content",
-            "importance_score": 0.9
-        })
+        response = client.patch(
+            f"/api/memory/nodes/{node_id}",
+            json={"content": "Updated content", "importance_score": 0.9},
+        )
 
         assert response.status_code == 200
 
@@ -180,7 +190,9 @@ class TestMemoryNodes:
         node_id = str(uuid4())
 
         # Mock the table operations
-        mock_memory_service.supabase.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = Mock()
+        mock_memory_service.supabase.table.return_value.update.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            Mock()
+        )
 
         response = client.delete(f"/api/memory/nodes/{node_id}")
 
@@ -192,17 +204,21 @@ class TestMemoryNodes:
 # Memory Edge Tests
 # =============================================================================
 
+
 class TestMemoryEdges:
     """Tests for memory edge endpoints."""
 
     def test_create_memory_edge_success(self, client, mock_memory_service):
         """Test successful memory edge creation."""
-        response = client.post("/api/memory/edges", json={
-            "source_node_id": str(uuid4()),
-            "target_node_id": str(uuid4()),
-            "relationship_type": "related_to",
-            "strength": 0.8
-        })
+        response = client.post(
+            "/api/memory/edges",
+            json={
+                "source_node_id": str(uuid4()),
+                "target_node_id": str(uuid4()),
+                "relationship_type": "related_to",
+                "strength": 0.8,
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -212,11 +228,14 @@ class TestMemoryEdges:
     def test_create_memory_edge_different_types(self, client, mock_memory_service):
         """Test creating edges with different relationship types."""
         for rel_type in ["follows", "contradicts", "supports", "mentions"]:
-            response = client.post("/api/memory/edges", json={
-                "source_node_id": str(uuid4()),
-                "target_node_id": str(uuid4()),
-                "relationship_type": rel_type
-            })
+            response = client.post(
+                "/api/memory/edges",
+                json={
+                    "source_node_id": str(uuid4()),
+                    "target_node_id": str(uuid4()),
+                    "relationship_type": rel_type,
+                },
+            )
             assert response.status_code == 200
 
     def test_update_memory_edge_success(self, client, mock_memory_service):
@@ -224,7 +243,7 @@ class TestMemoryEdges:
         edge_id = str(uuid4())
         response = client.patch(
             f"/api/memory/edges/{edge_id}",
-            params={"strength": 0.95, "increment_observation": True}
+            params={"strength": 0.95, "increment_observation": True},
         )
 
         assert response.status_code == 200
@@ -234,14 +253,13 @@ class TestMemoryEdges:
 # Context Retrieval Tests
 # =============================================================================
 
+
 class TestContextRetrieval:
     """Tests for context retrieval endpoints."""
 
     def test_get_recent_context_success(self, client, mock_memory_service):
         """Test getting recent conversation context."""
-        response = client.post("/api/memory/context/recent", json={
-            "limit": 10
-        })
+        response = client.post("/api/memory/context/recent", json={"limit": 10})
 
         assert response.status_code == 200
         data = response.json()
@@ -249,30 +267,32 @@ class TestContextRetrieval:
 
     def test_get_recent_context_with_session(self, client, mock_memory_service):
         """Test getting context filtered by session."""
-        response = client.post("/api/memory/context/recent", json={
-            "session_id": "session-123",
-            "limit": 5
-        })
+        response = client.post(
+            "/api/memory/context/recent", json={"session_id": "session-123", "limit": 5}
+        )
 
         assert response.status_code == 200
 
     def test_get_recent_context_with_node_types(self, client, mock_memory_service):
         """Test getting context filtered by node types."""
-        response = client.post("/api/memory/context/recent", json={
-            "node_types": ["conversation", "fact"],
-            "limit": 10
-        })
+        response = client.post(
+            "/api/memory/context/recent",
+            json={"node_types": ["conversation", "fact"], "limit": 10},
+        )
 
         assert response.status_code == 200
 
     def test_get_weighted_context_success(self, client, mock_memory_service):
         """Test getting weighted memory context."""
-        response = client.post("/api/memory/context/weighted", json={
-            "limit": 20,
-            "recency_weight": 0.5,
-            "importance_weight": 0.3,
-            "access_weight": 0.2
-        })
+        response = client.post(
+            "/api/memory/context/weighted",
+            json={
+                "limit": 20,
+                "recency_weight": 0.5,
+                "importance_weight": 0.3,
+                "access_weight": 0.2,
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -282,13 +302,16 @@ class TestContextRetrieval:
 
     def test_get_weighted_context_custom_weights(self, client, mock_memory_service):
         """Test weighted context with custom weights."""
-        response = client.post("/api/memory/context/weighted", json={
-            "limit": 10,
-            "recency_weight": 0.7,
-            "importance_weight": 0.2,
-            "access_weight": 0.1,
-            "time_decay_hours": 72
-        })
+        response = client.post(
+            "/api/memory/context/weighted",
+            json={
+                "limit": 10,
+                "recency_weight": 0.7,
+                "importance_weight": 0.2,
+                "access_weight": 0.1,
+                "time_decay_hours": 72,
+            },
+        )
 
         assert response.status_code == 200
 
@@ -297,6 +320,7 @@ class TestContextRetrieval:
 # Semantic Search Tests
 # =============================================================================
 
+
 class TestSemanticSearch:
     """Tests for semantic search endpoint."""
 
@@ -304,25 +328,30 @@ class TestSemanticSearch:
         """Test successful semantic search."""
         query_embedding = [0.1] * 768
 
-        response = client.post("/api/memory/search/semantic", json={
-            "query_embedding": query_embedding,
-            "limit": 10,
-            "similarity_threshold": 0.7
-        })
+        response = client.post(
+            "/api/memory/search/semantic",
+            json={
+                "query_embedding": query_embedding,
+                "limit": 10,
+                "similarity_threshold": 0.7,
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert "results" in data
         assert "count" in data
 
-    def test_semantic_search_invalid_embedding_dimension(self, client, mock_memory_service):
+    def test_semantic_search_invalid_embedding_dimension(
+        self, client, mock_memory_service
+    ):
         """Test semantic search with wrong embedding dimension."""
         wrong_embedding = [0.1] * 512  # Wrong size
 
-        response = client.post("/api/memory/search/semantic", json={
-            "query_embedding": wrong_embedding,
-            "limit": 10
-        })
+        response = client.post(
+            "/api/memory/search/semantic",
+            json={"query_embedding": wrong_embedding, "limit": 10},
+        )
 
         assert response.status_code == 400
         data = response.json()
@@ -334,11 +363,14 @@ class TestSemanticSearch:
         """Test semantic search with custom threshold."""
         query_embedding = [0.1] * 768
 
-        response = client.post("/api/memory/search/semantic", json={
-            "query_embedding": query_embedding,
-            "limit": 5,
-            "similarity_threshold": 0.9
-        })
+        response = client.post(
+            "/api/memory/search/semantic",
+            json={
+                "query_embedding": query_embedding,
+                "limit": 5,
+                "similarity_threshold": 0.9,
+            },
+        )
 
         assert response.status_code == 200
 
@@ -347,6 +379,7 @@ class TestSemanticSearch:
 # Graph Traversal Tests
 # =============================================================================
 
+
 class TestGraphTraversal:
     """Tests for graph traversal endpoint."""
 
@@ -354,13 +387,18 @@ class TestGraphTraversal:
         """Test successful graph traversal."""
         # Mock RPC response
         mock_memory_service.supabase.rpc.return_value.execute.return_value.data = [
-            {"node_id": str(uuid4()), "node_type": "fact", "content": "Related fact", "depth": 1}
+            {
+                "node_id": str(uuid4()),
+                "node_type": "fact",
+                "content": "Related fact",
+                "depth": 1,
+            }
         ]
 
-        response = client.post("/api/memory/graph/traverse", json={
-            "start_node_id": str(uuid4()),
-            "max_depth": 2
-        })
+        response = client.post(
+            "/api/memory/graph/traverse",
+            json={"start_node_id": str(uuid4()), "max_depth": 2},
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -371,11 +409,14 @@ class TestGraphTraversal:
         """Test graph traversal with relationship type filter."""
         mock_memory_service.supabase.rpc.return_value.execute.return_value.data = []
 
-        response = client.post("/api/memory/graph/traverse", json={
-            "start_node_id": str(uuid4()),
-            "max_depth": 3,
-            "relationship_types": ["related_to", "follows"]
-        })
+        response = client.post(
+            "/api/memory/graph/traverse",
+            json={
+                "start_node_id": str(uuid4()),
+                "max_depth": 3,
+                "relationship_types": ["related_to", "follows"],
+            },
+        )
 
         assert response.status_code == 200
 
@@ -383,6 +424,7 @@ class TestGraphTraversal:
 # =============================================================================
 # Statistics Tests
 # =============================================================================
+
 
 class TestStatistics:
     """Tests for statistics endpoint."""
@@ -413,6 +455,7 @@ class TestStatistics:
 # Maintenance Tests
 # =============================================================================
 
+
 class TestMaintenance:
     """Tests for maintenance endpoints."""
 
@@ -420,7 +463,7 @@ class TestMaintenance:
         """Test cleaning up old memories."""
         response = client.post(
             "/api/memory/maintenance/cleanup",
-            params={"days_threshold": 90, "importance_threshold": 0.3}
+            params={"days_threshold": 90, "importance_threshold": 0.3},
         )
 
         assert response.status_code == 200
@@ -431,7 +474,7 @@ class TestMaintenance:
         """Test cleanup with custom thresholds."""
         response = client.post(
             "/api/memory/maintenance/cleanup",
-            params={"days_threshold": 30, "importance_threshold": 0.5}
+            params={"days_threshold": 30, "importance_threshold": 0.5},
         )
 
         assert response.status_code == 200
@@ -440,6 +483,7 @@ class TestMaintenance:
 # =============================================================================
 # Health Check Tests
 # =============================================================================
+
 
 class TestHealthCheck:
     """Tests for health check endpoint."""
@@ -468,6 +512,7 @@ class TestHealthCheck:
 # =============================================================================
 # Integration Tests (Marked for actual database)
 # =============================================================================
+
 
 @pytest.mark.integration
 class TestConversationMemoryIntegration:

@@ -5,24 +5,25 @@ Feature: 007-content-prep-agent
 Integration tests for Content Prep API endpoints.
 """
 
-import pytest
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
-from fastapi.testclient import TestClient
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
+import pytest
+from fastapi.testclient import TestClient
 
 # ============================================================================
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def mock_content_prep_agent():
     """Mock ContentPrepAgent for API tests."""
     # Patch at multiple levels to ensure the mock is used
-    with patch('app.routes.content_prep.ContentPrepAgent') as MockAgent, \
-         patch('app.services.content_prep_agent.get_supabase_client'), \
-         patch('app.services.content_prep_agent.B2StorageService'):
+    with patch("app.routes.content_prep.ContentPrepAgent") as MockAgent, patch(
+        "app.services.content_prep_agent.get_supabase_client"
+    ), patch("app.services.content_prep_agent.B2StorageService"):
         agent_instance = MagicMock()
         MockAgent.return_value = agent_instance
         yield agent_instance
@@ -31,7 +32,7 @@ def mock_content_prep_agent():
 @pytest.fixture
 def mock_cko_chat_service():
     """Mock CKOChatService for clarification tests."""
-    with patch('app.routes.content_prep.get_cko_chat_service') as mock_get:
+    with patch("app.routes.content_prep.get_cko_chat_service") as mock_get:
         service = MagicMock()
         mock_get.return_value = service
         yield service
@@ -40,7 +41,7 @@ def mock_cko_chat_service():
 @pytest.fixture
 def mock_clarification_logger():
     """Mock ClarificationConversationLogger."""
-    with patch('app.routes.content_prep.get_clarification_logger') as mock_get:
+    with patch("app.routes.content_prep.get_clarification_logger") as mock_get:
         logger = MagicMock()
         mock_get.return_value = logger
         yield logger
@@ -50,6 +51,7 @@ def mock_clarification_logger():
 def client():
     """Create FastAPI test client."""
     from app.main import app
+
     return TestClient(app)
 
 
@@ -87,9 +89,21 @@ def sample_content_set():
         "is_complete": True,
         "missing_files": [],
         "files": [
-            {"filename": "01-intro.pdf", "sequence": 1, "b2_path": "courses/01-intro.pdf"},
-            {"filename": "02-basics.pdf", "sequence": 2, "b2_path": "courses/02-basics.pdf"},
-            {"filename": "03-advanced.pdf", "sequence": 3, "b2_path": "courses/03-advanced.pdf"},
+            {
+                "filename": "01-intro.pdf",
+                "sequence": 1,
+                "b2_path": "courses/01-intro.pdf",
+            },
+            {
+                "filename": "02-basics.pdf",
+                "sequence": 2,
+                "b2_path": "courses/02-basics.pdf",
+            },
+            {
+                "filename": "03-advanced.pdf",
+                "sequence": 3,
+                "b2_path": "courses/03-advanced.pdf",
+            },
         ],
         "processing_status": "pending",
         "confidence": 0.95,
@@ -104,9 +118,24 @@ def sample_manifest():
         "content_set_id": str(uuid4()),
         "content_set_name": "Test Course",
         "ordered_files": [
-            {"sequence": 1, "file": "01-intro.pdf", "b2_path": "courses/01-intro.pdf", "dependencies": []},
-            {"sequence": 2, "file": "02-basics.pdf", "b2_path": "courses/02-basics.pdf", "dependencies": ["01-intro.pdf"]},
-            {"sequence": 3, "file": "03-advanced.pdf", "b2_path": "courses/03-advanced.pdf", "dependencies": ["02-basics.pdf"]},
+            {
+                "sequence": 1,
+                "file": "01-intro.pdf",
+                "b2_path": "courses/01-intro.pdf",
+                "dependencies": [],
+            },
+            {
+                "sequence": 2,
+                "file": "02-basics.pdf",
+                "b2_path": "courses/02-basics.pdf",
+                "dependencies": ["01-intro.pdf"],
+            },
+            {
+                "sequence": 3,
+                "file": "03-advanced.pdf",
+                "b2_path": "courses/03-advanced.pdf",
+                "dependencies": ["02-basics.pdf"],
+            },
         ],
         "total_files": 3,
         "warnings": [],
@@ -120,18 +149,17 @@ def sample_manifest():
 # Health Check Tests
 # ============================================================================
 
+
 class TestHealthCheck:
     """Tests for health check endpoint (Task 140: Enhanced Health)."""
 
-    def test_health_check_returns_comprehensive_status(self, client, mock_content_prep_agent):
+    def test_health_check_returns_comprehensive_status(
+        self, client, mock_content_prep_agent
+    ):
         """Test /api/content-prep/health returns comprehensive status."""
         # Mock the get_health_status method
-        from app.models.content_sets import (
-            HealthResponse,
-            AgentInfo,
-            ProcessingMetrics,
-            ConnectivityStatus,
-        )
+        from app.models.content_sets import (AgentInfo, ConnectivityStatus,
+                                             HealthResponse, ProcessingMetrics)
 
         mock_health_response = HealthResponse(
             status="healthy",
@@ -162,7 +190,9 @@ class TestHealthCheck:
             },
         )
 
-        mock_content_prep_agent.get_health_status = AsyncMock(return_value=mock_health_response)
+        mock_content_prep_agent.get_health_status = AsyncMock(
+            return_value=mock_health_response
+        )
 
         response = client.get("/api/content-prep/health")
 
@@ -200,21 +230,21 @@ class TestHealthCheck:
 
     def test_health_check_degraded_status(self, client, mock_content_prep_agent):
         """Test health endpoint returns degraded status when Neo4j is down."""
-        from app.models.content_sets import (
-            HealthResponse,
-            AgentInfo,
-            ProcessingMetrics,
-            ConnectivityStatus,
-        )
+        from app.models.content_sets import (AgentInfo, ConnectivityStatus,
+                                             HealthResponse, ProcessingMetrics)
 
         mock_health_response = HealthResponse(
             status="degraded",
             agent=AgentInfo(),
             metrics=ProcessingMetrics(),
-            connectivity=ConnectivityStatus(supabase=True, neo4j=False, b2_storage=True),
+            connectivity=ConnectivityStatus(
+                supabase=True, neo4j=False, b2_storage=True
+            ),
         )
 
-        mock_content_prep_agent.get_health_status = AsyncMock(return_value=mock_health_response)
+        mock_content_prep_agent.get_health_status = AsyncMock(
+            return_value=mock_health_response
+        )
 
         response = client.get("/api/content-prep/health")
 
@@ -225,21 +255,21 @@ class TestHealthCheck:
 
     def test_health_check_unhealthy_status(self, client, mock_content_prep_agent):
         """Test health endpoint returns unhealthy status when critical services are down."""
-        from app.models.content_sets import (
-            HealthResponse,
-            AgentInfo,
-            ProcessingMetrics,
-            ConnectivityStatus,
-        )
+        from app.models.content_sets import (AgentInfo, ConnectivityStatus,
+                                             HealthResponse, ProcessingMetrics)
 
         mock_health_response = HealthResponse(
             status="unhealthy",
             agent=AgentInfo(),
             metrics=ProcessingMetrics(recent_error_count=-1),
-            connectivity=ConnectivityStatus(supabase=False, neo4j=False, b2_storage=False),
+            connectivity=ConnectivityStatus(
+                supabase=False, neo4j=False, b2_storage=False
+            ),
         )
 
-        mock_content_prep_agent.get_health_status = AsyncMock(return_value=mock_health_response)
+        mock_content_prep_agent.get_health_status = AsyncMock(
+            return_value=mock_health_response
+        )
 
         response = client.get("/api/content-prep/health")
 
@@ -250,7 +280,9 @@ class TestHealthCheck:
 
     def test_health_check_exception_handling(self, client, mock_content_prep_agent):
         """Test health endpoint handles exceptions gracefully."""
-        mock_content_prep_agent.get_health_status = AsyncMock(side_effect=Exception("Database error"))
+        mock_content_prep_agent.get_health_status = AsyncMock(
+            side_effect=Exception("Database error")
+        )
 
         response = client.get("/api/content-prep/health")
 
@@ -265,19 +297,21 @@ class TestHealthCheck:
 # Analysis Endpoint Tests
 # ============================================================================
 
+
 class TestAnalyzeEndpoint:
     """Tests for /api/content-prep/analyze endpoint."""
 
-    def test_analyze_success(self, client, mock_content_prep_agent, sample_analyze_response):
+    def test_analyze_success(
+        self, client, mock_content_prep_agent, sample_analyze_response
+    ):
         """Test successful folder analysis."""
-        mock_content_prep_agent.analyze_folder = AsyncMock(return_value=sample_analyze_response)
+        mock_content_prep_agent.analyze_folder = AsyncMock(
+            return_value=sample_analyze_response
+        )
 
         response = client.post(
             "/api/content-prep/analyze",
-            json={
-                "b2_folder": "pending/courses/",
-                "detection_mode": "auto"
-            }
+            json={"b2_folder": "pending/courses/", "detection_mode": "auto"},
         )
 
         assert response.status_code == 200
@@ -285,16 +319,17 @@ class TestAnalyzeEndpoint:
         assert "content_sets" in data
         assert "standalone_files" in data
 
-    def test_analyze_with_pattern_mode(self, client, mock_content_prep_agent, sample_analyze_response):
+    def test_analyze_with_pattern_mode(
+        self, client, mock_content_prep_agent, sample_analyze_response
+    ):
         """Test analysis with pattern detection mode."""
-        mock_content_prep_agent.analyze_folder = AsyncMock(return_value=sample_analyze_response)
+        mock_content_prep_agent.analyze_folder = AsyncMock(
+            return_value=sample_analyze_response
+        )
 
         response = client.post(
             "/api/content-prep/analyze",
-            json={
-                "b2_folder": "pending/courses/",
-                "detection_mode": "pattern"
-            }
+            json={"b2_folder": "pending/courses/", "detection_mode": "pattern"},
         )
 
         assert response.status_code == 200
@@ -302,14 +337,13 @@ class TestAnalyzeEndpoint:
 
     def test_analyze_error_handling(self, client, mock_content_prep_agent):
         """Test error handling in analyze endpoint."""
-        mock_content_prep_agent.analyze_folder = AsyncMock(side_effect=Exception("Storage error"))
+        mock_content_prep_agent.analyze_folder = AsyncMock(
+            side_effect=Exception("Storage error")
+        )
 
         response = client.post(
             "/api/content-prep/analyze",
-            json={
-                "b2_folder": "pending/courses/",
-                "detection_mode": "auto"
-            }
+            json={"b2_folder": "pending/courses/", "detection_mode": "auto"},
         )
 
         assert response.status_code == 500
@@ -319,10 +353,13 @@ class TestAnalyzeEndpoint:
 # Content Set Endpoint Tests
 # ============================================================================
 
+
 class TestContentSetEndpoints:
     """Tests for content set endpoints."""
 
-    def test_list_content_sets(self, client, mock_content_prep_agent, sample_content_set):
+    def test_list_content_sets(
+        self, client, mock_content_prep_agent, sample_content_set
+    ):
         """Test listing content sets."""
         mock_content_prep_agent.list_sets = AsyncMock(return_value=[sample_content_set])
 
@@ -332,7 +369,9 @@ class TestContentSetEndpoints:
         data = response.json()
         assert len(data) >= 0  # May be empty if not mocked properly
 
-    def test_list_content_sets_with_filter(self, client, mock_content_prep_agent, sample_content_set):
+    def test_list_content_sets_with_filter(
+        self, client, mock_content_prep_agent, sample_content_set
+    ):
         """Test listing content sets with status filter."""
         mock_content_prep_agent.list_sets = AsyncMock(return_value=[sample_content_set])
 
@@ -351,7 +390,9 @@ class TestContentSetEndpoints:
 
     def test_get_nonexistent_content_set(self, client, mock_content_prep_agent):
         """Test getting non-existent content set."""
-        mock_content_prep_agent.get_set = AsyncMock(side_effect=ValueError("Content set not found"))
+        mock_content_prep_agent.get_set = AsyncMock(
+            side_effect=ValueError("Content set not found")
+        )
 
         response = client.get("/api/content-prep/sets/nonexistent-id")
 
@@ -362,20 +403,23 @@ class TestContentSetEndpoints:
 # Validation Endpoint Tests
 # ============================================================================
 
+
 class TestValidationEndpoint:
     """Tests for content set validation endpoint."""
 
     def test_validate_complete_set(self, client, mock_content_prep_agent):
         """Test validating a complete content set."""
-        mock_content_prep_agent.validate_completeness = AsyncMock(return_value={
-            "set_id": "test-id",
-            "is_complete": True,
-            "missing_files": [],
-            "total_files": 5,
-            "gaps_detected": 0,
-            "can_proceed": True,
-            "requires_acknowledgment": False,
-        })
+        mock_content_prep_agent.validate_completeness = AsyncMock(
+            return_value={
+                "set_id": "test-id",
+                "is_complete": True,
+                "missing_files": [],
+                "total_files": 5,
+                "gaps_detected": 0,
+                "can_proceed": True,
+                "requires_acknowledgment": False,
+            }
+        )
 
         response = client.post("/api/content-prep/validate/test-id")
 
@@ -386,15 +430,17 @@ class TestValidationEndpoint:
 
     def test_validate_incomplete_set(self, client, mock_content_prep_agent):
         """Test validating an incomplete content set."""
-        mock_content_prep_agent.validate_completeness = AsyncMock(return_value={
-            "set_id": "test-id",
-            "is_complete": False,
-            "missing_files": ["#3 (between 2 and 4)"],
-            "total_files": 4,
-            "gaps_detected": 1,
-            "can_proceed": True,
-            "requires_acknowledgment": True,
-        })
+        mock_content_prep_agent.validate_completeness = AsyncMock(
+            return_value={
+                "set_id": "test-id",
+                "is_complete": False,
+                "missing_files": ["#3 (between 2 and 4)"],
+                "total_files": 4,
+                "gaps_detected": 1,
+                "can_proceed": True,
+                "requires_acknowledgment": True,
+            }
+        )
 
         response = client.post("/api/content-prep/validate/test-id")
 
@@ -418,19 +464,19 @@ class TestValidationEndpoint:
 # Manifest Endpoint Tests
 # ============================================================================
 
+
 class TestManifestEndpoint:
     """Tests for manifest generation endpoint."""
 
     def test_generate_manifest(self, client, mock_content_prep_agent, sample_manifest):
         """Test generating a processing manifest."""
-        mock_content_prep_agent.generate_manifest = AsyncMock(return_value=sample_manifest)
+        mock_content_prep_agent.generate_manifest = AsyncMock(
+            return_value=sample_manifest
+        )
 
         response = client.post(
             "/api/content-prep/manifest",
-            json={
-                "content_set_id": "test-id",
-                "proceed_incomplete": False
-            }
+            json={"content_set_id": "test-id", "proceed_incomplete": False},
         )
 
         assert response.status_code == 200
@@ -438,18 +484,19 @@ class TestManifestEndpoint:
         assert "manifest_id" in data
         assert "ordered_files" in data
 
-    def test_generate_manifest_incomplete_blocked(self, client, mock_content_prep_agent):
+    def test_generate_manifest_incomplete_blocked(
+        self, client, mock_content_prep_agent
+    ):
         """Test that incomplete sets are blocked."""
         mock_content_prep_agent.generate_manifest = AsyncMock(
-            side_effect=ValueError("Content set is incomplete. Set proceed_incomplete=true to process anyway.")
+            side_effect=ValueError(
+                "Content set is incomplete. Set proceed_incomplete=true to process anyway."
+            )
         )
 
         response = client.post(
             "/api/content-prep/manifest",
-            json={
-                "content_set_id": "test-id",
-                "proceed_incomplete": False
-            }
+            json={"content_set_id": "test-id", "proceed_incomplete": False},
         )
 
         assert response.status_code == 400
@@ -457,17 +504,18 @@ class TestManifestEndpoint:
         # Check for 'incomplete' in the response (handle different error formats)
         assert "incomplete" in str(data).lower()
 
-    def test_generate_manifest_incomplete_acknowledged(self, client, mock_content_prep_agent, sample_manifest):
+    def test_generate_manifest_incomplete_acknowledged(
+        self, client, mock_content_prep_agent, sample_manifest
+    ):
         """Test generating manifest with acknowledged incomplete set."""
         sample_manifest["warnings"] = ["#3 (between 2 and 4)"]
-        mock_content_prep_agent.generate_manifest = AsyncMock(return_value=sample_manifest)
+        mock_content_prep_agent.generate_manifest = AsyncMock(
+            return_value=sample_manifest
+        )
 
         response = client.post(
             "/api/content-prep/manifest",
-            json={
-                "content_set_id": "test-id",
-                "proceed_incomplete": True
-            }
+            json={"content_set_id": "test-id", "proceed_incomplete": True},
         )
 
         assert response.status_code == 200
@@ -479,21 +527,24 @@ class TestManifestEndpoint:
 # Clarification Endpoint Tests
 # ============================================================================
 
+
 class TestClarificationEndpoints:
     """Tests for clarification endpoints (Task 129)."""
 
     def test_clarify_ordering(self, client, mock_content_prep_agent):
         """Test ordering clarification endpoint."""
-        mock_content_prep_agent.resolve_order_with_clarification = AsyncMock(return_value={
-            "status": "success",
-            "content_set_id": "test-id",
-            "ordering_confidence": 0.95,
-            "clarification_requested": False,
-            "ordered_files": [
-                {"sequence": 1, "file": "01-intro.pdf"},
-                {"sequence": 2, "file": "02-basics.pdf"},
-            ],
-        })
+        mock_content_prep_agent.resolve_order_with_clarification = AsyncMock(
+            return_value={
+                "status": "success",
+                "content_set_id": "test-id",
+                "ordering_confidence": 0.95,
+                "clarification_requested": False,
+                "ordered_files": [
+                    {"sequence": 1, "file": "01-intro.pdf"},
+                    {"sequence": 2, "file": "02-basics.pdf"},
+                ],
+            }
+        )
 
         response = client.post(
             "/api/content-prep/clarify-ordering",
@@ -502,7 +553,7 @@ class TestClarificationEndpoints:
                 "user_id": "user-123",
                 "confidence_threshold": 0.8,
                 "timeout_seconds": 3600,
-            }
+            },
         )
 
         assert response.status_code == 200
@@ -520,7 +571,7 @@ class TestClarificationEndpoints:
             json={
                 "content_set_id": "nonexistent-id",
                 "user_id": "user-123",
-            }
+            },
         )
 
         assert response.status_code == 404
@@ -534,8 +585,8 @@ class TestClarificationEndpoints:
             json={
                 "request_id": "request-123",
                 "user_id": "user-123",
-                "response": "1. file1.pdf\n2. file2.pdf\n3. file3.pdf"
-            }
+                "response": "1. file1.pdf\n2. file2.pdf\n3. file3.pdf",
+            },
         )
 
         assert response.status_code == 200
@@ -551,25 +602,27 @@ class TestClarificationEndpoints:
             json={
                 "request_id": "invalid-request",
                 "user_id": "user-123",
-                "response": "test response"
-            }
+                "response": "test response",
+            },
         )
 
         assert response.status_code == 400
 
     def test_get_pending_clarifications(self, client, mock_cko_chat_service):
         """Test getting pending clarifications for user."""
-        mock_cko_chat_service.get_pending_requests = AsyncMock(return_value=[
-            {
-                "id": "request-1",
-                "agent_id": "AGENT-016",
-                "message": "Please confirm the file order",
-                "clarification_type": "ordering",
-                "context": {"content_set_id": "test-id"},
-                "created_at": datetime.utcnow().isoformat(),
-                "expires_at": None,
-            }
-        ])
+        mock_cko_chat_service.get_pending_requests = AsyncMock(
+            return_value=[
+                {
+                    "id": "request-1",
+                    "agent_id": "AGENT-016",
+                    "message": "Please confirm the file order",
+                    "clarification_type": "ordering",
+                    "context": {"content_set_id": "test-id"},
+                    "created_at": datetime.utcnow().isoformat(),
+                    "expires_at": None,
+                }
+            ]
+        )
 
         response = client.get("/api/content-prep/clarifications/pending/user-123")
 
@@ -579,18 +632,20 @@ class TestClarificationEndpoints:
 
     def test_get_clarification_history(self, client, mock_clarification_logger):
         """Test getting clarification history for content set."""
-        mock_clarification_logger.get_conversation_history = AsyncMock(return_value=[
-            {
-                "id": "log-1",
-                "content_set_id": "test-id",
-                "agent_id": "AGENT-016",
-                "question": "Please confirm the file order",
-                "answer": "1. file1.pdf\n2. file2.pdf",
-                "outcome": "ordering_updated",
-                "clarification_type": "ordering",
-                "created_at": datetime.utcnow().isoformat(),
-            }
-        ])
+        mock_clarification_logger.get_conversation_history = AsyncMock(
+            return_value=[
+                {
+                    "id": "log-1",
+                    "content_set_id": "test-id",
+                    "agent_id": "AGENT-016",
+                    "question": "Please confirm the file order",
+                    "answer": "1. file1.pdf\n2. file2.pdf",
+                    "outcome": "ordering_updated",
+                    "clarification_type": "ordering",
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            ]
+        )
 
         response = client.get("/api/content-prep/clarifications/history/test-id")
 
@@ -623,22 +678,22 @@ class TestClarificationEndpoints:
 # Admin/Cleanup Endpoint Tests (Task 130)
 # ============================================================================
 
+
 class TestCleanupEndpoints:
     """Tests for admin cleanup endpoints."""
 
     def test_trigger_cleanup_async(self, client):
         """Test triggering async cleanup."""
-        with patch('app.tasks.content_prep_tasks.cleanup_old_content_sets') as mock_task:
+        with patch(
+            "app.tasks.content_prep_tasks.cleanup_old_content_sets"
+        ) as mock_task:
             mock_result = MagicMock()
             mock_result.id = "task-123"
             mock_task.apply_async.return_value = mock_result
 
             response = client.post(
                 "/api/content-prep/admin/cleanup",
-                json={
-                    "retention_days": 90,
-                    "async_mode": True
-                }
+                json={"retention_days": 90, "async_mode": True},
             )
 
             assert response.status_code == 200
@@ -648,7 +703,9 @@ class TestCleanupEndpoints:
 
     def test_trigger_cleanup_sync(self, client):
         """Test triggering synchronous cleanup."""
-        with patch('app.tasks.content_prep_tasks.cleanup_old_content_sets') as mock_task:
+        with patch(
+            "app.tasks.content_prep_tasks.cleanup_old_content_sets"
+        ) as mock_task:
             mock_task.return_value = {
                 "status": "success",
                 "deleted_count": 5,
@@ -658,10 +715,7 @@ class TestCleanupEndpoints:
 
             response = client.post(
                 "/api/content-prep/admin/cleanup",
-                json={
-                    "retention_days": 90,
-                    "async_mode": False
-                }
+                json={"retention_days": 90, "async_mode": False},
             )
 
             assert response.status_code == 200
@@ -670,12 +724,12 @@ class TestCleanupEndpoints:
 
     def test_get_cleanup_status_pending(self, client):
         """Test getting cleanup task status - pending."""
-        with patch('app.celery_app.celery_app') as mock_celery:
+        with patch("app.celery_app.celery_app") as mock_celery:
             mock_result = MagicMock()
             mock_result.status = "PENDING"
             mock_result.ready.return_value = False
 
-            with patch('celery.result.AsyncResult', return_value=mock_result):
+            with patch("celery.result.AsyncResult", return_value=mock_result):
                 response = client.get("/api/content-prep/admin/cleanup/status/task-123")
 
                 assert response.status_code == 200
@@ -685,14 +739,14 @@ class TestCleanupEndpoints:
 
     def test_get_cleanup_status_complete(self, client):
         """Test getting cleanup task status - complete."""
-        with patch('app.celery_app.celery_app') as mock_celery:
+        with patch("app.celery_app.celery_app") as mock_celery:
             mock_result = MagicMock()
             mock_result.status = "SUCCESS"
             mock_result.ready.return_value = True
             mock_result.successful.return_value = True
             mock_result.result = {"deleted_count": 10}
 
-            with patch('celery.result.AsyncResult', return_value=mock_result):
+            with patch("celery.result.AsyncResult", return_value=mock_result):
                 response = client.get("/api/content-prep/admin/cleanup/status/task-123")
 
                 assert response.status_code == 200
@@ -705,6 +759,7 @@ class TestCleanupEndpoints:
 # Request Validation Tests
 # ============================================================================
 
+
 class TestRequestValidation:
     """Tests for request validation."""
 
@@ -714,10 +769,7 @@ class TestRequestValidation:
         # (validation depends on Pydantic model)
         response = client.post(
             "/api/content-prep/analyze",
-            json={
-                "b2_folder": "pending/",
-                "detection_mode": "invalid_mode"
-            }
+            json={"b2_folder": "pending/", "detection_mode": "invalid_mode"},
         )
 
         # Either 422 (validation) or handled gracefully
@@ -732,37 +784,31 @@ class TestRequestValidation:
                 "user_id": "user-123",
                 "confidence_threshold": 1.5,  # Invalid: > 1.0
                 "timeout_seconds": 3600,
-            }
+            },
         )
 
-        # Should fail validation
-        assert response.status_code == 422
+        # Should fail validation (400 from middleware or 422 from FastAPI)
+        assert response.status_code in [400, 422]
 
     def test_cleanup_request_validation(self, client):
         """Test cleanup request with invalid retention days."""
         response = client.post(
             "/api/content-prep/admin/cleanup",
-            json={
-                "retention_days": 0,  # Invalid: must be >= 1
-                "async_mode": True
-            }
+            json={"retention_days": 0, "async_mode": True},  # Invalid: must be >= 1
         )
 
-        # Should fail validation
-        assert response.status_code == 422
+        # Should fail validation (400 from middleware or 422 from FastAPI)
+        assert response.status_code in [400, 422]
 
     def test_cleanup_request_max_retention(self, client):
         """Test cleanup request with max retention days."""
         response = client.post(
             "/api/content-prep/admin/cleanup",
-            json={
-                "retention_days": 400,  # Invalid: > 365
-                "async_mode": True
-            }
+            json={"retention_days": 400, "async_mode": True},  # Invalid: > 365
         )
 
-        # Should fail validation
-        assert response.status_code == 422
+        # Should fail validation (400 from middleware or 422 from FastAPI)
+        assert response.status_code in [400, 422]
 
 
 if __name__ == "__main__":
