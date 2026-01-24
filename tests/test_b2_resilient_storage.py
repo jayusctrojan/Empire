@@ -253,7 +253,7 @@ class TestResilientB2StorageService:
         result = await resilient_service.upload_file(
             file_data=file_data,
             filename="test.txt",
-            verify_checksum=False
+            
         )
 
         assert result["file_id"] == "file123"
@@ -274,7 +274,7 @@ class TestResilientB2StorageService:
         result = await resilient_service.upload_file(
             file_data=file_data,
             filename="test.txt",
-            verify_checksum=False
+            
         )
 
         assert result["file_id"] == "file123"
@@ -295,7 +295,7 @@ class TestResilientB2StorageService:
             await resilient_service.upload_file(
                 file_data=file_data,
                 filename="test.txt",
-                verify_checksum=False
+                
             )
 
         assert exc_info.value.error_code == "B2_RETRY_EXHAUSTED"
@@ -314,7 +314,7 @@ class TestResilientB2StorageService:
                     file_id="file123",
                     file_name="test.txt",
                     destination_path="/tmp/test.txt",
-                    verify_checksum=False
+                    
                 )
 
         assert result["success"] is True
@@ -451,7 +451,7 @@ class TestIntegration:
         result = await resilient_service.upload_file(
             file_data=file_data,
             filename="test.txt",
-            verify_checksum=True
+            
         )
 
         assert result["file_id"] == "file123"
@@ -474,7 +474,7 @@ class TestIntegration:
             await resilient_service.upload_file(
                 file_data=file_data,
                 filename="test.txt",
-                verify_checksum=True
+                
             )
 
     def test_singleton_pattern(self):
