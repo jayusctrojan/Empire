@@ -39,7 +39,12 @@ from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
 from app.core.connections import connection_manager
 from app.core.feature_flags import get_feature_flag_manager  # Task 3.2: Feature Flags
 from app.core.graceful_shutdown import initialize_shutdown_coordinator, setup_signal_handlers, ShutdownMiddleware  # Service Orchestration
-from app.core.service_orchestrator import ServiceOrchestrator  # Service Orchestration
+
+# Service Orchestration: Optional import - file may not exist yet
+try:
+    from app.core.service_orchestrator import ServiceOrchestrator
+except ImportError:
+    ServiceOrchestrator = None  # type: ignore
 
 # Import security middleware (Task 41.1, 41.2, 41.4, 41.5)
 from app.middleware.security import SecurityHeadersMiddleware
@@ -133,25 +138,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Failed to initialize feature flag manager: {e}")
 
-    # Service Orchestration: Initialize Service Orchestrator
-    try:
-        service_orchestrator = ServiceOrchestrator()
-        app.state.service_orchestrator = service_orchestrator
-        print("🎯 Service orchestrator initialized")
+    # Service Orchestration: Initialize Service Orchestrator (if available)
+    if ServiceOrchestrator is not None:
+        try:
+            service_orchestrator = ServiceOrchestrator()
+            app.state.service_orchestrator = service_orchestrator
+            print("🎯 Service orchestrator initialized")
 
-        # Integrate with connection manager for unified health checks
-        connection_manager.set_service_orchestrator(service_orchestrator)
+            # Integrate with connection manager for unified health checks
+            connection_manager.set_service_orchestrator(service_orchestrator)
 
-        # Run preflight checks
-        preflight_result = await service_orchestrator.check_all_services()
-        if preflight_result.ready:
-            print("✅ Preflight checks passed - all required services healthy")
-        elif preflight_result.all_required_healthy:
-            print("⚠️  Preflight checks passed with warnings - some optional services unavailable")
-        else:
-            print("❌ Preflight checks failed - some required services unhealthy")
-    except Exception as e:
-        print(f"⚠️  Failed to initialize service orchestrator: {e}")
+            # Run preflight checks
+            preflight_result = await service_orchestrator.check_all_services()
+            if preflight_result.ready:
+                print("✅ Preflight checks passed - all required services healthy")
+            elif preflight_result.all_required_healthy:
+                print("⚠️  Preflight checks passed with warnings - some optional services unavailable")
+            else:
+                print("❌ Preflight checks failed - some required services unhealthy")
+        except Exception as e:
+            print(f"⚠️  Failed to initialize service orchestrator: {e}")
+    else:
+        print("⚠️  Service orchestrator not available (module not installed)")
 
     # Service Orchestration: Initialize Graceful Shutdown Coordinator
     try:
