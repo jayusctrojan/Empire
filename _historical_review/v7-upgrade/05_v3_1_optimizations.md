@@ -14,7 +14,7 @@
   - Graph query tools for developers
   - Automatic Cypher generation from user intent
 
-- **Chat UI Interface:** $15-20/month (new end-user access channel)
+- **Chat UI:** $15-20/month (new end-user access channel)
   - Gradio/Streamlit on Render
   - Both vector AND graph query support
 

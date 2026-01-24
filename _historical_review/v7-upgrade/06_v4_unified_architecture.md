@@ -12,7 +12,7 @@
 - **Neo4j MCP Server:** Direct Claude Desktop/Code integration
   - Natural language → Cypher translation via Claude Sonnet
   - Graph query tools (neo4j_query, entity_search, graph_traverse, path_find)
-- **Chat UI Interface:** Gradio/Streamlit on Render ($15-20/month)
+- **Chat UI:** Gradio/Streamlit on Render ($15-20/month)
   - End-user access with both vector AND graph query support
   - Hybrid search combining semantic + relationship intelligence
 
@@ -850,11 +850,11 @@ ai_empire_v5_config:
 | Local Processing | 50% | 98% | 98-99% | Near complete |
 | Cache Hit Rate | 60% | 80% | 82% | Exceeded |
 | Memory Usage | 85% | <70% | 65-68% | Optimized |
-| **Cost** |
+| **Cost** | | | | |
 | Monthly Cost | $125-255 | <$195 | $100-150 | 40% reduction |
 | Per Document | $0.10-0.20 | <$0.01 | $0.005 | 95% reduction |
 | API Calls/Day | 1000+ | <100 | 50-80 | 92% reduction |
-| **Reliability** |
+| **Reliability** | | | | |
 | Uptime | 99% | 99.5% | 99.6% | Exceeded |
 | Error Rate | 2% | <1% | 0.8% | Exceeded |
 | Recovery Time | 8 hours | 4 hours | 4-6 hours | On target |

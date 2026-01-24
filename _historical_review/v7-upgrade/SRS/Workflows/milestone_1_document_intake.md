@@ -23,7 +23,7 @@
           "rawBody": true,
           "binaryPropertyName": "file",
           "responseHeaders": {
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": "https://empire-chat.onrender.com",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type"
           }

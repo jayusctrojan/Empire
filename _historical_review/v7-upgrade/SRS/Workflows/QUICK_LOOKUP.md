@@ -91,7 +91,7 @@ Fast reference for finding content across the split n8n orchestration files.
 3. `milestone_3_advanced_rag.md` - Embedding workflow
 4. `milestone_4_query_processing.md` - Search/RAG workflow
 5. `milestone_5_chat_ui.md` - Chat interface workflow
-6. All milestones contain complete, copy-paste ready JSON
+6. All milestones contain complete, copy-paste-ready JSON
 
 ### Looking for SQL
 - `database_setup.md` - All schemas and functions (3,318 lines)

@@ -19,7 +19,7 @@ This directory contains the complete Software Requirements Specification (SRS) f
 - ✅ **Neo4j Graph Database** - FREE, running on Mac Studio via Docker (replaces some vector-only searches)
 - ✅ **Natural Language to Cypher Translation** - Claude Sonnet converts user queries to Cypher
 - ✅ **Neo4j MCP Server** - Available in Claude Desktop + Claude Code for direct graph queries
-- ✅ **Chat UI Interface** - Gradio/Streamlit frontend for non-technical users
+- ✅ **Chat UI** - Gradio/Streamlit frontend for non-technical users
 - ✅ **Bi-directional Sync** - Supabase ↔ Neo4j synchronization for entity/relationship data
 - ✅ **Graph-based Entity Management** - All entities stored as nodes with relationships
 - ✅ **LightRAG Integration** - Enhanced with Neo4j backend for knowledge graphs
@@ -143,7 +143,7 @@ This directory contains the complete Software Requirements Specification (SRS) f
 
 ## 📁 Directory Structure
 
-```
+```text
 Empire/
 ├── Core Sections (IEEE 830-1998 Structure)
 │   ├── 01_introduction.md ✅
@@ -266,7 +266,7 @@ Note: All core sections updated to v7.0 with comprehensive gap resolutions
 ## 🏗️ v7.0 Production-Grade Architecture
 
 ### Mac Studio M3 Ultra (96GB) - Development & Memory Hub
-```
+```text
 Mac Studio M3 Ultra (96GB)
 ├── 28-core CPU, 60-core GPU, 32-core Neural Engine
 ├── 800 GB/s memory bandwidth

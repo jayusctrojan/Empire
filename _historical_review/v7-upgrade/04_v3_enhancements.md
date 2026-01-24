@@ -7,7 +7,7 @@
 ### v7.2 NEW - Dual-Interface Architecture
 - **Neo4j Graph Database:** FREE on Mac Studio Docker (10-100x faster relationship queries)
 - **Neo4j MCP Server:** Direct Claude Desktop/Code integration with natural language → Cypher
-- **Chat UI Interface:** Gradio/Streamlit for end-user access (Render deployment)
+- **Chat UI:** Gradio/Streamlit for end-user access (Render deployment)
 - **Bi-directional Sync:** Automatic Supabase ↔ Neo4j synchronization
 - **Graph Traversal:** Multi-hop pathfinding, community detection, centrality analysis
 - **Semantic Entity Resolution:** ML-based deduplication

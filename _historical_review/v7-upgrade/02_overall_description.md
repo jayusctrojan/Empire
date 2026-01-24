@@ -7,7 +7,7 @@
 The AI Empire File Processing System v7.2 operates as a revolutionary dual-interface architecture combining Neo4j Graph Database (FREE on Mac Studio Docker) with Supabase vector search (pgvector). The system features:
 
 1. **Neo4j MCP Server** - Direct Claude Desktop/Code integration for natural language → Cypher queries
-2. **Chat UI Interface** - Gradio/Streamlit frontend for end-user access
+2. **Chat UI** - Gradio/Streamlit frontend for end-user access
 3. **Hybrid Intelligence** - Graph-native relationship queries (10-100x faster than SQL) + vector semantic search
 4. **Bi-directional Sync** - Automatic Supabase ↔ Neo4j synchronization
 

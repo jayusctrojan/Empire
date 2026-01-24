@@ -201,7 +201,7 @@ This checklist ensures all API keys, credentials, and MCPs are configured before
   - `TAILSCALE_IP`: [Your Mac Studio Tailscale IP - format: 100.x.x.x]
 - **Where to put**: `.env` file
 - **How to get**:
-  1. Go to https://login.tailscale.com/admin/machines
+  1. Go to [Tailscale Admin](https://login.tailscale.com/admin/machines)
   2. Find your Mac Studio machine
   3. Copy the Tailscale IP (100.x.x.x)
 - **Monthly Cost**: FREE (Personal plan for up to 20 devices)
