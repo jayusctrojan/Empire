@@ -520,10 +520,12 @@ BEGIN
         UPDATE book_authors
         SET book_count = book_count + 1
         WHERE id = NEW.author_id;
+        RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
         UPDATE book_authors
         SET book_count = book_count - 1
         WHERE id = OLD.author_id;
+        RETURN OLD;
     ELSIF TG_OP = 'UPDATE' AND NEW.author_id != OLD.author_id THEN
         UPDATE book_authors
         SET book_count = book_count - 1
@@ -532,6 +534,7 @@ BEGIN
         UPDATE book_authors
         SET book_count = book_count + 1
         WHERE id = NEW.author_id;
+        RETURN NEW;
     END IF;
 
     RETURN NEW;
@@ -551,10 +554,12 @@ BEGIN
         UPDATE publishers
         SET book_count = book_count + 1
         WHERE id = NEW.publisher_id;
+        RETURN NEW;
     ELSIF TG_OP = 'DELETE' AND OLD.publisher_id IS NOT NULL THEN
         UPDATE publishers
         SET book_count = book_count - 1
         WHERE id = OLD.publisher_id;
+        RETURN OLD;
     ELSIF TG_OP = 'UPDATE' AND NEW.publisher_id != OLD.publisher_id THEN
         IF OLD.publisher_id IS NOT NULL THEN
             UPDATE publishers
@@ -567,6 +572,7 @@ BEGIN
             SET book_count = book_count + 1
             WHERE id = NEW.publisher_id;
         END IF;
+        RETURN NEW;
     END IF;
 
     RETURN NEW;

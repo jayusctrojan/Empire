@@ -10,6 +10,9 @@ import type { RetryConfig, APIError } from '@/types'
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_EMPIRE_API_URL as string || 'https://jb-empire-api.onrender.com'
 
+// Request timeout in milliseconds (30 seconds)
+const DEFAULT_TIMEOUT_MS = 30000
+
 // Default retry configuration
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
@@ -101,12 +104,13 @@ async function parseErrorResponse(response: Response): Promise<APIError> {
 }
 
 /**
- * Core request function with retry logic
+ * Core request function with retry logic and timeout
  */
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
-  retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG
+  retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
@@ -115,10 +119,15 @@ export async function apiRequest<T>(
   let lastError: Error | null = null
 
   for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    // Create abort controller for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
     try {
       const response = await fetch(url, {
         ...options,
         headers,
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -140,6 +149,9 @@ export async function apiRequest<T>(
         )
       }
 
+      // Clear timeout on success
+      clearTimeout(timeoutId)
+
       // Handle empty responses
       const contentLength = response.headers.get('content-length')
       if (contentLength === '0' || response.status === 204) {
@@ -148,18 +160,32 @@ export async function apiRequest<T>(
 
       return await response.json() as T
     } catch (error) {
+      // Clear timeout on error
+      clearTimeout(timeoutId)
+
       if (error instanceof EmpireAPIError) {
         throw error
       }
 
-      lastError = error as Error
+      // Handle timeout/abort errors
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        lastError = new Error(`Request timed out after ${timeoutMs}ms`)
+        if (attempt < retryConfig.maxRetries) {
+          const delay = getBackoffDelay(attempt, retryConfig)
+          console.warn(`Request timed out, retrying in ${delay}ms...`)
+          await sleep(delay)
+          continue
+        }
+      } else {
+        lastError = error as Error
 
-      // Network error - retry
-      if (attempt < retryConfig.maxRetries) {
-        const delay = getBackoffDelay(attempt, retryConfig)
-        console.warn(`Network error, retrying in ${delay}ms...`, error)
-        await sleep(delay)
-        continue
+        // Network error - retry
+        if (attempt < retryConfig.maxRetries) {
+          const delay = getBackoffDelay(attempt, retryConfig)
+          console.warn(`Network error, retrying in ${delay}ms...`, error)
+          await sleep(delay)
+          continue
+        }
       }
     }
   }
@@ -187,8 +213,9 @@ export async function post<T>(endpoint: string, body?: unknown): Promise<T> {
 
 /**
  * POST multipart form data (for file uploads)
+ * Uses longer timeout (60s) for file uploads
  */
-export async function postFormData<T>(endpoint: string, formData: FormData): Promise<T> {
+export async function postFormData<T>(endpoint: string, formData: FormData, timeoutMs: number = 60000): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
   const token = getAuthToken()
 
@@ -198,18 +225,39 @@ export async function postFormData<T>(endpoint: string, formData: FormData): Pro
   }
   // Don't set Content-Type for FormData - let browser set it with boundary
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: formData,
-  })
+  // Create abort controller for timeout
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-  if (!response.ok) {
-    const apiError = await parseErrorResponse(response)
-    throw new EmpireAPIError(apiError.message, apiError.code, response.status, apiError.details)
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const apiError = await parseErrorResponse(response)
+      throw new EmpireAPIError(apiError.message, apiError.code, response.status, apiError.details)
+    }
+
+    return await response.json() as T
+  } catch (error) {
+    clearTimeout(timeoutId)
+
+    if (error instanceof EmpireAPIError) {
+      throw error
+    }
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new EmpireAPIError(`File upload timed out after ${timeoutMs}ms`, 'TIMEOUT', 408)
+    }
+
+    throw error
   }
-
-  return await response.json() as T
 }
 
 /**

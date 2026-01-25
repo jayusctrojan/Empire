@@ -28,7 +28,7 @@ DROP FUNCTION IF EXISTS match_user_memories(vector(768), TEXT, DECIMAL, INTEGER)
 -- Drop the set_user_context function
 DROP FUNCTION IF EXISTS set_user_context(TEXT);
 
-RAISE NOTICE 'Dropped memory helper functions';
+DO $$ BEGIN RAISE NOTICE 'Dropped memory helper functions'; END $$;
 
 -- ============================================================================
 -- PHASE 2: DROP RLS POLICIES FOR user_memory_nodes
@@ -39,7 +39,7 @@ DROP POLICY IF EXISTS user_memory_nodes_insert_policy ON user_memory_nodes;
 DROP POLICY IF EXISTS user_memory_nodes_update_policy ON user_memory_nodes;
 DROP POLICY IF EXISTS user_memory_nodes_delete_policy ON user_memory_nodes;
 
-RAISE NOTICE 'Dropped user_memory_nodes RLS policies';
+DO $$ BEGIN RAISE NOTICE 'Dropped user_memory_nodes RLS policies'; END $$;
 
 -- ============================================================================
 -- PHASE 3: DROP RLS POLICIES FOR user_memory_edges
@@ -50,7 +50,7 @@ DROP POLICY IF EXISTS user_memory_edges_insert_policy ON user_memory_edges;
 DROP POLICY IF EXISTS user_memory_edges_update_policy ON user_memory_edges;
 DROP POLICY IF EXISTS user_memory_edges_delete_policy ON user_memory_edges;
 
-RAISE NOTICE 'Dropped user_memory_edges RLS policies';
+DO $$ BEGIN RAISE NOTICE 'Dropped user_memory_edges RLS policies'; END $$;
 
 -- ============================================================================
 -- PHASE 4: DISABLE ROW LEVEL SECURITY
@@ -59,7 +59,7 @@ RAISE NOTICE 'Dropped user_memory_edges RLS policies';
 ALTER TABLE user_memory_nodes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE user_memory_edges DISABLE ROW LEVEL SECURITY;
 
-RAISE NOTICE 'Disabled RLS on memory tables';
+DO $$ BEGIN RAISE NOTICE 'Disabled RLS on memory tables'; END $$;
 
 -- ============================================================================
 -- PHASE 5: VERIFICATION

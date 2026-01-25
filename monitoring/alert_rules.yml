@@ -20,7 +20,11 @@ groups:
           runbook: "Check Render service status at https://jb-empire-api.onrender.com"
 
       - alert: APIHighErrorRate
-        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        expr: |
+          (
+            rate(http_requests_total{status=~"5.."}[5m]) /
+            rate(http_requests_total[5m])
+          ) > 0.05
         for: 5m
         labels:
           severity: critical

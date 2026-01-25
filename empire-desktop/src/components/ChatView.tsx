@@ -13,6 +13,8 @@ export function ChatView() {
     messages,
     isStreaming,
     streamingContent,
+    streamingMessageId,
+    streamingSources,
     activeConversationId,
     activeProjectId,
     isKBMode,
@@ -261,13 +263,13 @@ export function ChatView() {
               <MessageBubble
                 key={message.id}
                 message={
-                  message.id === useChatStore.getState().streamingMessageId
+                  message.id === streamingMessageId
                     ? { ...message, content: streamingContent || message.content }
                     : message
                 }
                 isStreaming={
                   isStreaming &&
-                  message.id === useChatStore.getState().streamingMessageId
+                  message.id === streamingMessageId
                 }
                 isKBMode={isKBMode}
                 onRegenerate={
