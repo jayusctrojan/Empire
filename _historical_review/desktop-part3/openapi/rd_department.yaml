@@ -1,0 +1,466 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - R&D Department API
+  description: |
+    API endpoints for managing the R&D (Research & Development) department feature.
+    This API supports the addition of R&D as the 11th department in the Empire taxonomy,
+    including classification, storage path management, and department-specific workflows.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: departments
+    description: Department management operations
+  - name: classification
+    description: Document classification by department
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/departments:
+    get:
+      tags:
+        - departments
+      summary: List all departments
+      description: Retrieve a list of all available departments including R&D (11th department)
+      operationId: listDepartments
+      responses:
+        '200':
+          description: Successfully retrieved departments list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  departments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Department'
+                  total:
+                    type: integer
+                    example: 11
+              examples:
+                success:
+                  summary: List of all 11 departments
+                  value:
+                    departments:
+                      - id: 1
+                        slug: "it-engineering"
+                        name: "IT & Engineering"
+                        description: "Technology and engineering content"
+                        created_at: "2024-01-01T00:00:00Z"
+                      - id: 11
+                        slug: "rnd"
+                        name: "Research & Development"
+                        description: "Research and development content"
+                        created_at: "2025-11-24T00:00:00Z"
+                    total: 11
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/departments/{department_id}:
+    get:
+      tags:
+        - departments
+      summary: Get department by ID
+      description: Retrieve detailed information about a specific department
+      operationId: getDepartmentById
+      parameters:
+        - name: department_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 11
+          description: Department ID (1-11, where 11 is R&D)
+          example: 11
+      responses:
+        '200':
+          description: Department details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+              examples:
+                rnd_department:
+                  summary: R&D Department details
+                  value:
+                    id: 11
+                    slug: "rnd"
+                    name: "Research & Development"
+                    description: "Research and development content"
+                    storage_path: "crewai/assets/rnd/"
+                    node_label: "Department:RND"
+                    created_at: "2025-11-24T00:00:00Z"
+                    updated_at: "2025-11-24T00:00:00Z"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/classify:
+    post:
+      tags:
+        - classification
+      summary: Classify document by department
+      description: |
+        Automatically classify a document into the appropriate department using AI.
+        Supports all 11 departments including the new R&D department.
+      operationId: classifyDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - document_id
+              properties:
+                document_id:
+                  type: string
+                  format: uuid
+                  description: UUID of the document to classify
+                  example: "550e8400-e29b-41d4-a716-446655440000"
+                content_preview:
+                  type: string
+                  description: Optional content preview for classification (max 1000 chars)
+                  maxLength: 1000
+                  example: "Research paper on machine learning algorithms..."
+                override_classification:
+                  type: boolean
+                  description: Force re-classification even if already classified
+                  default: false
+            examples:
+              basic_classification:
+                summary: Basic classification request
+                value:
+                  document_id: "550e8400-e29b-41d4-a716-446655440000"
+              with_preview:
+                summary: Classification with content preview
+                value:
+                  document_id: "550e8400-e29b-41d4-a716-446655440000"
+                  content_preview: "Research on neural network architectures..."
+                  override_classification: false
+      responses:
+        '200':
+          description: Document classified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id:
+                    type: string
+                    format: uuid
+                  classified_department:
+                    $ref: '#/components/schemas/Department'
+                  confidence_score:
+                    type: number
+                    format: float
+                    minimum: 0.0
+                    maximum: 1.0
+                    description: AI confidence score for classification (0-1)
+                  alternative_departments:
+                    type: array
+                    description: Other potential departments with scores
+                    items:
+                      type: object
+                      properties:
+                        department:
+                          $ref: '#/components/schemas/Department'
+                        confidence_score:
+                          type: number
+                          format: float
+                  classification_timestamp:
+                    type: string
+                    format: date-time
+              examples:
+                rnd_classification:
+                  summary: Document classified as R&D
+                  value:
+                    document_id: "550e8400-e29b-41d4-a716-446655440000"
+                    classified_department:
+                      id: 11
+                      slug: "rnd"
+                      name: "Research & Development"
+                    confidence_score: 0.92
+                    alternative_departments:
+                      - department:
+                          id: 1
+                          slug: "it-engineering"
+                          name: "IT & Engineering"
+                        confidence_score: 0.65
+                    classification_timestamp: "2025-11-24T13:49:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{document_id}/department:
+    patch:
+      tags:
+        - classification
+      summary: Update document department
+      description: Manually update the department classification for a document
+      operationId: updateDocumentDepartment
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - department_id
+              properties:
+                department_id:
+                  type: integer
+                  minimum: 1
+                  maximum: 11
+                  description: New department ID (1-11)
+                  example: 11
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: Optional reason for manual reclassification
+            examples:
+              reclassify_to_rnd:
+                summary: Reclassify document to R&D
+                value:
+                  department_id: 11
+                  reason: "Document content is primarily research-focused"
+      responses:
+        '200':
+          description: Department updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id:
+                    type: string
+                    format: uuid
+                  previous_department:
+                    $ref: '#/components/schemas/Department'
+                  new_department:
+                    $ref: '#/components/schemas/Department'
+                  updated_at:
+                    type: string
+                    format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/departments/storage-paths:
+    get:
+      tags:
+        - departments
+      summary: Get department storage paths
+      description: Retrieve B2 storage paths for all departments including R&D
+      operationId: getDepartmentStoragePaths
+      responses:
+        '200':
+          description: Storage paths retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  storage_paths:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        department_id:
+                          type: integer
+                        department_slug:
+                          type: string
+                        base_path:
+                          type: string
+                          description: B2 storage base path
+                        assets_path:
+                          type: string
+                          description: Full assets storage path
+              examples:
+                all_paths:
+                  summary: All department storage paths
+                  value:
+                    storage_paths:
+                      - department_id: 11
+                        department_slug: "rnd"
+                        base_path: "crewai/assets/"
+                        assets_path: "crewai/assets/rnd/"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    Department:
+      type: object
+      required:
+        - id
+        - slug
+        - name
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          maximum: 11
+          description: Unique department identifier (1-11)
+          example: 11
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+          description: URL-safe department identifier
+          example: "rnd"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Human-readable department name
+          example: "Research & Development"
+        description:
+          type: string
+          maxLength: 500
+          description: Department description
+          example: "Research and development content"
+        storage_path:
+          type: string
+          description: B2 storage path for department assets
+          example: "crewai/assets/rnd/"
+        node_label:
+          type: string
+          description: Neo4j node label for graph database
+          example: "Department:RND"
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when department was added
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp of last update
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "UNAUTHORIZED"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Authentication required"
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_department_id:
+              summary: Invalid department ID
+              value:
+                error: "BAD_REQUEST"
+                message: "Department ID must be between 1 and 11"
+                details:
+                  field: "department_id"
+                  value: 15
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing_token:
+              summary: Missing authentication token
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication required. Please provide a valid JWT token."
+                timestamp: "2025-11-24T13:49:00Z"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            department_not_found:
+              summary: Department not found
+              value:
+                error: "NOT_FOUND"
+                message: "Department with ID 15 does not exist"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            generic_error:
+              summary: Internal server error
+              value:
+                error: "INTERNAL_SERVER_ERROR"
+                message: "An unexpected error occurred. Please try again later."
+                timestamp: "2025-11-24T13:49:00Z"

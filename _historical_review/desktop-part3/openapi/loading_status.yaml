@@ -1,0 +1,435 @@
+openapi: 3.0.3
+info:
+  title: Empire v7.3 - Loading/Processing Status API
+  description: |
+    API endpoints for real-time document processing and query execution status updates.
+    Supports WebSocket connections for live status broadcasts and REST endpoints for polling.
+    Provides visibility into: uploading → parsing → embedding → indexing → complete stages.
+  version: 1.0.0
+  contact:
+    name: Empire API Team
+    url: https://github.com/jayusctrojan/Empire
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://jb-empire-api.onrender.com
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: status
+    description: Processing status operations
+  - name: websocket
+    description: WebSocket real-time updates
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/status/{task_id}:
+    get:
+      tags:
+        - status
+      summary: Get task processing status
+      description: |
+        Retrieve current processing status for a document upload or query task.
+        Use for polling when WebSocket connection is not available.
+      operationId: getTaskStatus
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Celery task ID or document/query ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingStatus'
+              examples:
+                document_uploading:
+                  summary: Document upload in progress
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    task_type: "document_upload"
+                    status: "uploading"
+                    progress_percentage: 45
+                    current_stage: "uploading"
+                    stages_completed: []
+                    stages_pending: ["parsing", "embedding", "indexing"]
+                    estimated_time_remaining: 15
+                    started_at: "2025-11-24T13:49:00Z"
+                    updated_at: "2025-11-24T13:49:15Z"
+                document_complete:
+                  summary: Document processing complete
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    task_type: "document_upload"
+                    status: "complete"
+                    progress_percentage: 100
+                    current_stage: "complete"
+                    stages_completed: ["uploading", "parsing", "embedding", "indexing"]
+                    stages_pending: []
+                    estimated_time_remaining: 0
+                    started_at: "2025-11-24T13:49:00Z"
+                    completed_at: "2025-11-24T13:50:30Z"
+                    result:
+                      document_id: "550e8400-e29b-41d4-a716-446655440000"
+                      chunks_created: 42
+                      embeddings_generated: 42
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/status/batch:
+    post:
+      tags:
+        - status
+      summary: Get status for multiple tasks
+      description: Retrieve processing status for multiple tasks in a single request
+      operationId: getBatchTaskStatus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task_ids
+              properties:
+                task_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                  maxItems: 50
+                  description: List of task IDs (max 50)
+            examples:
+              multiple_tasks:
+                summary: Status for 3 tasks
+                value:
+                  task_ids:
+                    - "550e8400-e29b-41d4-a716-446655440000"
+                    - "660e8400-e29b-41d4-a716-446655440001"
+                    - "770e8400-e29b-41d4-a716-446655440002"
+      responses:
+        '200':
+          description: Batch status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statuses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProcessingStatus'
+                  total:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /ws/status/{task_id}:
+    get:
+      tags:
+        - websocket
+      summary: WebSocket connection for real-time status updates
+      description: |
+        Establish WebSocket connection to receive real-time status updates for a task.
+        Status messages are broadcast within 500ms of state changes.
+
+        **Connection**: wss://jb-empire-api.onrender.com/ws/status/{task_id}
+
+        **Message Format**: JSON objects with ProcessingStatus schema
+
+        **Example Messages**:
+        ```json
+        {
+          "task_id": "550e8400-e29b-41d4-a716-446655440000",
+          "status": "parsing",
+          "progress_percentage": 25,
+          "current_stage": "parsing",
+          "message": "Extracting text from PDF..."
+        }
+        ```
+      operationId: connectStatusWebSocket
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Task ID to monitor
+      responses:
+        '101':
+          description: WebSocket connection established (Switching Protocols)
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/status/history/{task_id}:
+    get:
+      tags:
+        - status
+      summary: Get complete status history for a task
+      description: Retrieve full timeline of status changes for completed or failed tasks
+      operationId: getTaskStatusHistory
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Task ID
+      responses:
+        '200':
+          description: Status history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                    format: uuid
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StatusHistoryEntry'
+              examples:
+                complete_history:
+                  summary: Complete processing history
+                  value:
+                    task_id: "550e8400-e29b-41d4-a716-446655440000"
+                    history:
+                      - status: "pending"
+                        timestamp: "2025-11-24T13:49:00Z"
+                        message: "Task queued"
+                      - status: "uploading"
+                        timestamp: "2025-11-24T13:49:05Z"
+                        progress_percentage: 0
+                        message: "Starting upload"
+                      - status: "parsing"
+                        timestamp: "2025-11-24T13:49:30Z"
+                        progress_percentage: 25
+                        message: "Parsing document"
+                      - status: "complete"
+                        timestamp: "2025-11-24T13:50:30Z"
+                        progress_percentage: 100
+                        message: "Processing complete"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication (obtained from Clerk)
+
+  schemas:
+    ProcessingStatus:
+      type: object
+      required:
+        - task_id
+        - task_type
+        - status
+        - current_stage
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          description: Unique task identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        task_type:
+          type: string
+          enum: [document_upload, query_execution, url_processing, book_processing]
+          description: Type of task being processed
+          example: "document_upload"
+        status:
+          type: string
+          enum: [pending, uploading, parsing, embedding, indexing, complete, failed, cancelled]
+          description: Current status of the task
+          example: "parsing"
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Overall progress percentage (0-100)
+          example: 45
+        current_stage:
+          type: string
+          description: Current processing stage name
+          example: "parsing"
+        stages_completed:
+          type: array
+          items:
+            type: string
+          description: List of completed stages
+          example: ["uploading"]
+        stages_pending:
+          type: array
+          items:
+            type: string
+          description: List of remaining stages
+          example: ["parsing", "embedding", "indexing"]
+        message:
+          type: string
+          description: Human-readable status message
+          example: "Extracting text from PDF..."
+        estimated_time_remaining:
+          type: integer
+          description: Estimated seconds until completion
+          example: 30
+        started_at:
+          type: string
+          format: date-time
+          description: Timestamp when task started
+        updated_at:
+          type: string
+          format: date-time
+          description: Timestamp of last status update
+        completed_at:
+          type: string
+          format: date-time
+          description: Timestamp when task completed (if complete)
+        failed_at:
+          type: string
+          format: date-time
+          description: Timestamp when task failed (if failed)
+        error:
+          $ref: '#/components/schemas/Error'
+        result:
+          type: object
+          description: Task result data (if complete)
+          additionalProperties: true
+
+    StatusHistoryEntry:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          description: Status at this point in time
+        timestamp:
+          type: string
+          format: date-time
+          description: When this status was recorded
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Progress at this timestamp
+        message:
+          type: string
+          description: Status message
+        metadata:
+          type: object
+          description: Additional metadata for this status change
+          additionalProperties: true
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "PROCESSING_FAILED"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Failed to parse document: unsupported file format"
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_task_id:
+              summary: Invalid task ID format
+              value:
+                error: "BAD_REQUEST"
+                message: "Invalid task_id format. Must be a valid UUID."
+                timestamp: "2025-11-24T13:49:00Z"
+
+    UnauthorizedError:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing_token:
+              summary: Missing authentication token
+              value:
+                error: "UNAUTHORIZED"
+                message: "Authentication required. Please provide a valid JWT token."
+                timestamp: "2025-11-24T13:49:00Z"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            task_not_found:
+              summary: Task not found
+              value:
+                error: "NOT_FOUND"
+                message: "Task with ID 550e8400-e29b-41d4-a716-446655440000 not found"
+                timestamp: "2025-11-24T13:49:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            generic_error:
+              summary: Internal server error
+              value:
+                error: "INTERNAL_SERVER_ERROR"
+                message: "An unexpected error occurred. Please try again later."
+                timestamp: "2025-11-24T13:49:00Z"
