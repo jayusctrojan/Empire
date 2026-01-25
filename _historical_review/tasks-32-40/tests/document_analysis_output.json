@@ -1,0 +1,30 @@
+{
+  "id": "6e0f81b3-d702-4299-a950-a238ff4839a7",
+  "crew_id": "d7dcc3aa-4694-4faa-ae86-a8da7f8ef618",
+  "document_id": null,
+  "user_id": null,
+  "execution_type": "test",
+  "input_data": {
+    "document": "\n    Title: California Insurance Policy Requirements - 2024\n\n    The State of California requires all vehicle owners to maintain minimum\n    liability insurance coverage. As of January 2024, the minimum coverage\n    limits are:\n    - $15,000 for injury/death to one person\n    - $30,000 for injury/death to more than one person\n    - $5,000 for damage to property\n\n    According to the California Department of Insurance (CDI), approximately\n    85% of California drivers maintain coverage above these minimums.\n    Insurance companies such as State Farm, Geico, and Progressive dominate\n    the market, with State Farm holding a 22% market share as of 2023.\n\n    The average annual premium for minimum coverage in California is $742,\n    though this varies significantly by region. Los Angeles County residents\n    pay an average of $892 annually, while rural counties like Modoc average\n    $521 per year.\n\n    Recent legislation (AB 1234) passed in 2023 aims to increase minimum\n    coverage requirements by 20% starting January 2025, citing inflation\n    and rising medical costs.\n    ",
+    "requirements": [
+      "Extract key entities (people, organizations, locations, laws)",
+      "Identify main topics and themes",
+      "Assess factual claims and confidence levels",
+      "Provide executive summary",
+      "Categorize content",
+      "Recommend further analysis areas"
+    ],
+    "analysis_type": "comprehensive",
+    "task_description": "Analyze the following document and provide comprehensive insights"
+  },
+  "status": "completed",
+  "total_tasks": 3,
+  "completed_tasks": 0,
+  "failed_tasks": 0,
+  "results": "Presented above is the complete fact-checked report of all claims with detailed confidence scores and verification notes fulfilling the requested criteria.",
+  "error_message": null,
+  "execution_time_ms": null,
+  "started_at": "2025-11-12T17:56:50.60319+00:00",
+  "completed_at": null,
+  "created_at": "2025-11-12T17:56:50.603196+00:00"
+}

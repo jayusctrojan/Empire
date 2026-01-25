@@ -1,0 +1,356 @@
+"""
+Empire v7.3 - FastAPI Main Application
+Production-grade API server with monitoring, error handling, and authentication
+"""
+
+import os
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Response
+import time
+from typing import Optional
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables
+load_dotenv()
+
+# Import routers
+from app.api import upload, notifications
+from app.api.routes import query
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage
+
+# Import services
+from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
+from app.services.monitoring_service import get_monitoring_service
+from app.services.supabase_storage import get_supabase_storage
+from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
+from app.core.connections import connection_manager
+
+# Import security middleware (Task 41.1 & 41.2)
+from app.middleware.security import SecurityHeadersMiddleware
+from app.middleware.rate_limit import configure_rate_limiting, limiter
+from app.middleware.rls_context import configure_rls_context
+
+# Prometheus metrics (basic request tracking)
+REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
+REQUEST_LATENCY = Histogram('empire_request_duration_seconds', 'HTTP request latency', ['method', 'endpoint'])
+
+# Note: Business metrics for document processing are defined in monitoring_service.py
+# This includes: DOCUMENT_PROCESSING_TOTAL, DOCUMENT_PROCESSING_DURATION, EMBEDDING_GENERATION_TOTAL, etc.
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events
+    """
+    # Startup: Initialize connections
+    print("🚀 Empire v7.3 FastAPI starting...")
+    print(f"📊 Supabase: {os.getenv('SUPABASE_URL')}")
+    print(f"🔴 Redis: {os.getenv('REDIS_URL')}")
+    print(f"🗄️ Neo4j: {os.getenv('NEO4J_URI')}")
+    print(f"📦 LlamaIndex Service: {os.getenv('LLAMAINDEX_SERVICE_URL')}")
+    print(f"🤖 CrewAI Service: {os.getenv('CREWAI_SERVICE_URL')}")
+
+    # Initialize monitoring service with Supabase storage
+    supabase_storage = get_supabase_storage()
+    monitoring_service = get_monitoring_service(supabase_storage)
+    app.state.monitoring = monitoring_service
+    print("📈 Monitoring service initialized")
+
+    # Initialize Langfuse for LLM observability (Task 29)
+    langfuse_client = get_langfuse_client()
+    if langfuse_client:
+        print(f"🔍 Langfuse observability enabled: {os.getenv('LANGFUSE_HOST')}")
+    else:
+        print("⚠️  Langfuse observability disabled")
+
+    # Start Mountain Duck file monitoring (if enabled)
+    if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
+        start_mountain_duck_monitoring()
+        print("📁 Mountain Duck monitoring started")
+
+    # Task 36: Initialize database connections
+    try:
+        await connection_manager.initialize()
+        print("✅ Database connections initialized (Supabase, Redis, Neo4j)")
+
+        # Verify external services
+        is_ready = await connection_manager.check_readiness()
+        if is_ready:
+            print("✅ All critical services are ready")
+        else:
+            print("⚠️  Some services are not ready - check logs")
+    except Exception as e:
+        print(f"❌ Failed to initialize connections: {e}")
+        # Continue anyway - some features may work without all connections
+
+    yield
+
+    # Shutdown: Close connections
+    print("👋 Empire v7.3 FastAPI shutting down...")
+
+    # Flush and shutdown Langfuse
+    shutdown_langfuse()
+
+    # Stop Mountain Duck monitoring
+    if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
+        stop_mountain_duck_monitoring()
+        print("📁 Mountain Duck monitoring stopped")
+
+    # Task 36: Close database connections gracefully
+    try:
+        await connection_manager.shutdown()
+        print("✅ All database connections closed")
+    except Exception as e:
+        print(f"❌ Error closing connections: {e}")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="Empire v7.3 API",
+    description="AI File Processing System with Dual-Interface Architecture",
+    version="7.3.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan
+)
+
+# CORS Configuration (Task 41.1: Hardened CORS)
+# In production, restrict to specific origins. In development, allow all for testing.
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+if "*" in cors_origins and os.getenv("ENVIRONMENT") == "production":
+    print("⚠️  WARNING: CORS allowing all origins (*) in production - security risk!")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit methods
+    allow_headers=["*"],  # TODO: Restrict to specific headers in future
+)
+
+# Task 41.1: Security Headers Middleware
+# Adds HSTS, X-Frame-Options, CSP, and other security headers
+app.add_middleware(SecurityHeadersMiddleware, enable_hsts=os.getenv("ENVIRONMENT") == "production")
+print("🔒 Security headers middleware enabled")
+
+# Task 41.1: Rate Limiting
+# Configure rate limiting for all endpoints
+configure_rate_limiting(app)
+
+# Task 41.2: RLS Context Middleware
+# Sets PostgreSQL session variables for row-level security enforcement
+configure_rls_context(app)
+
+# Mount static files
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+# Middleware for request tracking
+@app.middleware("http")
+async def track_requests(request, call_next):
+    """Track request metrics"""
+    start_time = time.time()
+
+    response = await call_next(request)
+
+    # Record metrics
+    duration = time.time() - start_time
+    REQUEST_LATENCY.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(duration)
+
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+
+    # Add timing header
+    response.headers["X-Process-Time"] = str(duration)
+
+    return response
+
+
+# Health check endpoints
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Basic health check"""
+    return {
+        "status": "healthy",
+        "version": "7.3.0",
+        "service": "Empire FastAPI"
+    }
+
+
+@app.get("/health/detailed", tags=["Health"])
+async def detailed_health_check():
+    """Detailed health check with dependency status - Task 36"""
+
+    # Check all connections and services
+    dependencies = await connection_manager.check_health()
+
+    # Determine overall status
+    unhealthy_services = [
+        service for service, status in dependencies.items()
+        if "unhealthy" in str(status).lower()
+    ]
+
+    overall_status = "healthy" if not unhealthy_services else "degraded"
+
+    health_status = {
+        "status": overall_status,
+        "version": "7.3.0",
+        "service": "Empire FastAPI",
+        "dependencies": dependencies,
+        "unhealthy_services": unhealthy_services if unhealthy_services else [],
+        "connections_initialized": connection_manager.connections_initialized
+    }
+
+    return health_status
+
+
+@app.get("/health/ready", tags=["Health"])
+async def readiness_check():
+    """Kubernetes readiness probe - Task 36"""
+    # Check if all critical dependencies are ready
+    is_ready = await connection_manager.check_readiness()
+
+    if not is_ready:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ready": False,
+                "message": "Not all critical services are available"
+            }
+        )
+
+    return {"ready": True, "message": "All critical services are operational"}
+
+
+@app.get("/health/live", tags=["Health"])
+async def liveness_check():
+    """Kubernetes liveness probe"""
+    return {"alive": True}
+
+
+# Monitoring endpoints
+@app.get("/monitoring/metrics", tags=["Monitoring"])
+async def metrics():
+    """Prometheus metrics endpoint"""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/monitoring/stats", tags=["Monitoring"])
+async def stats():
+    """Application statistics"""
+    return {
+        "total_requests": "see /monitoring/metrics",
+        "average_latency": "see /monitoring/metrics",
+        "active_tasks": "see /monitoring/metrics"
+    }
+
+
+# API version endpoint
+@app.get("/", tags=["Info"])
+async def root():
+    """API root - returns version and documentation links"""
+    return {
+        "service": "Empire v7.3 API",
+        "version": "7.3.0",
+        "architecture": "FastAPI + Celery + Supabase + Neo4j + Redis",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "health": "/health",
+        "metrics": "/monitoring/metrics"
+    }
+
+
+# Error handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Handle HTTP exceptions"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "status_code": exc.status_code,
+            "path": request.url.path
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle general exceptions"""
+    print(f"❌ Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "status_code": 500,
+            "path": request.url.path
+        }
+    )
+
+
+# Include routers
+app.include_router(upload.router, prefix="/api/v1/upload", tags=["Upload"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+app.include_router(query.router)  # Query router already has /api/query prefix defined
+
+# Task 28: Session & Preference Management
+app.include_router(sessions.router, prefix="/api/v1", tags=["Sessions"])
+app.include_router(preferences.router, prefix="/api/v1", tags=["Preferences"])
+
+# Task 30: Cost Tracking & Optimization
+app.include_router(costs.router, prefix="/api/v1", tags=["Costs"])
+
+# Task 31: RBAC & API Key Management
+app.include_router(rbac.router)  # RBAC router already has /api/rbac prefix defined
+
+# Task 32: Bulk Document Management & Batch Operations
+app.include_router(documents.router)  # Documents router already has /api/documents prefix defined
+
+# Task 33: User Management & GDPR Compliance
+app.include_router(users.router)  # Users router already has /api/users prefix defined
+
+# Task 34: Analytics Dashboard Implementation
+app.include_router(monitoring.router)  # Monitoring router already has /api/monitoring prefix defined
+
+# Task 35: CrewAI Multi-Agent Integration & Orchestration
+app.include_router(crewai.router)  # CrewAI router already has /api/crewai prefix defined
+
+# Task 39: Agent Interactions - Inter-Agent Messaging & Collaboration
+app.include_router(agent_interactions.router)  # Agent Interactions router already has /api/crewai/agent-interactions prefix defined
+
+# Task 40: CrewAI Asset Storage & Retrieval
+app.include_router(crewai_assets.router)  # CrewAI Assets router already has /api/crewai/assets prefix defined
+
+# TODO: Additional routers
+# app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
+# app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
+# app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("PORT", 8000))
+
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=os.getenv("ENVIRONMENT") == "development",
+        log_level="info"
+    )
