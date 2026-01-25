@@ -1,0 +1,16 @@
+# ==========================================
+# EMPIRE v7.2 - MONITORING REQUIREMENTS
+# ==========================================
+# Install with: pip install -r requirements-monitoring.txt
+
+# Prometheus metrics client
+prometheus-client>=0.21.0
+
+# Celery task queue (if using async tasks)
+celery>=5.4.0
+redis>=5.2.0  # CVE fixes for HSET/HMSET memory vulnerabilities
+flower>=2.0.1
+
+# FastAPI (if not already installed)
+fastapi>=0.115.0  # Security updates and performance improvements
+uvicorn[standard]>=0.32.0  # HTTP/2 and security fixes
