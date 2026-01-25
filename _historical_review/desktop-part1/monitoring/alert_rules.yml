@@ -1,0 +1,457 @@
+# Prometheus Alert Rules for Empire v7.3
+# Defines conditions that trigger alerts for production monitoring
+
+groups:
+  # ========================================
+  # API Health & Availability Alerts
+  # ========================================
+  - name: api_health
+    interval: 30s
+    rules:
+      - alert: APIDown
+        expr: up{job="empire-api-production"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Empire API is down"
+          description: "The Empire API ({{ $labels.instance }}) has been down for more than 2 minutes."
+          runbook: "Check Render service status at https://jb-empire-api.onrender.com"
+
+      - alert: APIHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High 5xx error rate on Empire API"
+          description: "More than 5% of requests are returning 5xx errors (current: {{ $value | humanizePercentage }})"
+
+      - alert: APISlowResponse
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 30
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "API response time is slow"
+          description: "95th percentile response time is {{ $value }}s (threshold: 30s)"
+
+  # ========================================
+  # Cache Performance Alerts (Task 43.3)
+  # ========================================
+  - name: cache_performance
+    interval: 1m
+    rules:
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            rate(query_cache_hits_total[10m]) /
+            (rate(query_cache_hits_total[10m]) + rate(query_cache_misses_total[10m]))
+          ) < 0.30
+        for: 15m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Cache hit rate is below 30%"
+          description: "Current cache hit rate: {{ $value | humanizePercentage }}. Expected >30% for production."
+          runbook: "Check Redis connection and semantic similarity threshold."
+
+      - alert: CacheServiceDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis cache service is down"
+          description: "Redis (Upstash) is unreachable. All queries will be uncached."
+
+  # ========================================
+  # Database Alerts
+  # ========================================
+  - name: database_health
+    interval: 1m
+    rules:
+      - alert: DatabaseConnectionErrors
+        expr: rate(database_errors_total{type="connection"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "High rate of database connection errors"
+          description: "{{ $value }} connection errors per second to {{ $labels.database }}"
+
+      - alert: SlowDatabaseQueries
+        expr: rate(database_query_duration_seconds_sum[5m]) / rate(database_query_duration_seconds_count[5m]) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database queries are slow"
+          description: "Average query time: {{ $value }}s (threshold: 5s)"
+
+  # ========================================
+  # LangGraph Workflow Alerts (Task 46)
+  # ========================================
+  - name: langgraph_workflows
+    interval: 1m
+    rules:
+      - alert: HighLangGraphFailureRate
+        expr: |
+          (
+            rate(langgraph_workflow_failures_total[10m]) /
+            rate(langgraph_workflow_total[10m])
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          component: langgraph
+        annotations:
+          summary: "LangGraph workflow failure rate > 10%"
+          description: "{{ $value | humanizePercentage }} of LangGraph workflows are failing"
+          runbook: "Check Claude API rate limits and Arcade.dev tool availability"
+
+      - alert: LangGraphIterationLimit
+        expr: rate(langgraph_max_iterations_reached_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: info
+          component: langgraph
+        annotations:
+          summary: "LangGraph workflows hitting max iterations"
+          description: "{{ $value }} workflows/sec reaching max iteration limit (3)"
+          runbook: "Consider increasing max_iterations or optimizing prompts"
+
+  # ========================================
+  # Authentication & Security Alerts
+  # ========================================
+  - name: security
+    interval: 1m
+    rules:
+      - alert: HighAuthenticationFailureRate
+        expr: rate(auth_failures_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High rate of authentication failures"
+          description: "{{ $value }} failed authentication attempts per second"
+          runbook: "Possible brute force attack. Check audit logs."
+
+      - alert: RateLimitExceeded
+        expr: rate(rate_limit_exceeded_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: info
+          component: security
+        annotations:
+          summary: "High rate of rate limit violations"
+          description: "{{ $value }} requests/sec are being rate limited"
+
+  # ========================================
+  # Celery Background Tasks
+  # ========================================
+  - name: celery_tasks
+    interval: 1m
+    rules:
+      - alert: CeleryWorkerDown
+        expr: celery_workers_active == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: celery
+        annotations:
+          summary: "No active Celery workers"
+          description: "Background task processing is halted"
+          runbook: "Check Render Celery worker service"
+
+      - alert: CeleryTaskQueueBacklog
+        expr: celery_tasks_pending > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: celery
+        annotations:
+          summary: "Large Celery task backlog"
+          description: "{{ $value }} tasks pending in queue"
+          runbook: "Consider scaling Celery workers"
+
+      - alert: HighCeleryTaskFailureRate
+        expr: |
+          (
+            rate(celery_tasks_failed_total[10m]) /
+            rate(celery_tasks_total[10m])
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          component: celery
+        annotations:
+          summary: "High Celery task failure rate"
+          description: "{{ $value | humanizePercentage }} of background tasks are failing"
+
+  # ========================================
+  # System Resource Alerts
+  # ========================================
+  - name: system_resources
+    interval: 1m
+    rules:
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes / 1024 / 1024 / 1024 > 1.5
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Process using {{ $value }}GB RAM (threshold: 1.5GB)"
+          runbook: "Check for memory leaks or increase instance size"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage at {{ $value | humanizePercentage }}"
+
+  # ========================================
+  # External Service Alerts
+  # ========================================
+  - name: external_services
+    interval: 2m
+    rules:
+      - alert: ClaudeAPIError
+        expr: rate(claude_api_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: external
+        annotations:
+          summary: "High error rate from Claude API"
+          description: "{{ $value }} Claude API errors per second"
+          runbook: "Check Anthropic API status and rate limits"
+
+      - alert: ArcadeToolsUnavailable
+        expr: rate(arcade_tool_failures_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: external
+        annotations:
+          summary: "Arcade.dev tools experiencing failures"
+          description: "{{ $value }} tool failures per second"
+
+  # ========================================
+  # Business Metrics Alerts
+  # ========================================
+  - name: business_metrics
+    interval: 5m
+    rules:
+      - alert: NoQueriesProcessed
+        expr: rate(query_requests_total[30m]) == 0
+        for: 1h
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "No user queries in the last hour"
+          description: "System may not be receiving traffic"
+
+      - alert: HighAverageCost
+        expr: rate(query_cost_total[1h]) / rate(query_requests_total[1h]) > 0.50
+        for: 2h
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "High average query cost"
+          description: "Average cost per query: ${{ $value }}"
+          runbook: "Review LLM usage and consider optimizing prompts"
+
+  # ========================================
+  # Feature Flag System Alerts (Task 4 - v7.3)
+  # ========================================
+  - name: feature_flags
+    interval: 1m
+    rules:
+      - alert: FeatureFlagCacheMissRateHigh
+        expr: |
+          (
+            rate(empire_feature_flag_cache_misses_total[10m]) /
+            (rate(empire_feature_flag_cache_hits_total[10m]) + rate(empire_feature_flag_cache_misses_total[10m]))
+          ) > 0.50
+        for: 10m
+        labels:
+          severity: warning
+          component: feature_flags
+        annotations:
+          summary: "High feature flag cache miss rate"
+          description: "{{ $value | humanizePercentage }} of feature flag checks are missing cache (expected <50%)"
+          runbook: "Check Redis connection and cache TTL settings. Increase TTL if needed."
+
+      - alert: FeatureFlagCheckErrors
+        expr: rate(empire_feature_flag_errors_total{operation="check"}[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          component: feature_flags
+        annotations:
+          summary: "High rate of feature flag check errors"
+          description: "{{ $value }} feature flag check errors per second"
+          runbook: "Check Supabase connection and feature_flags table accessibility"
+
+      - alert: FeatureFlagSlowChecks
+        expr: histogram_quantile(0.95, rate(empire_feature_flag_check_duration_seconds_bucket[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: feature_flags
+        annotations:
+          summary: "Feature flag checks are slow"
+          description: "95th percentile check duration: {{ $value }}s (threshold: 0.1s)"
+          runbook: "Check cache hit rate. Investigate database query performance."
+
+      - alert: FeatureFlagUpdateErrors
+        expr: rate(empire_feature_flag_errors_total{operation="update"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: feature_flags
+        annotations:
+          summary: "Feature flag update errors occurring"
+          description: "{{ $value }} update errors per second"
+          runbook: "Check admin API authentication and database write permissions"
+
+      - alert: ExcessiveFeatureFlagUpdates
+        expr: rate(empire_feature_flag_updates_total[10m]) > 5
+        for: 15m
+        labels:
+          severity: info
+          component: feature_flags
+        annotations:
+          summary: "Unusual rate of feature flag updates"
+          description: "{{ $value }} flag updates per second (may indicate misconfiguration or testing)"
+          runbook: "Review audit logs to identify source of updates"
+
+  # ========================================
+  # Agent Router Alerts (Task 19)
+  # ========================================
+  - name: agent_router
+    interval: 1m
+    rules:
+      - alert: AgentRouterLowAccuracy
+        expr: |
+          (
+            sum(rate(agent_router_feedback_total{feedback_type="positive"}[1h])) /
+            sum(rate(agent_router_feedback_total[1h]))
+          ) < 0.90
+        for: 30m
+        labels:
+          severity: warning
+          component: agent_router
+        annotations:
+          summary: "Agent routing accuracy below 90%"
+          description: "Routing accuracy is {{ $value | humanizePercentage }} (target: >90%)"
+          runbook: "Review routing decisions and consider adjusting classification thresholds"
+
+      - alert: AgentRouterHighLatency
+        expr: histogram_quantile(0.95, rate(agent_router_processing_time_ms_bucket[5m])) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: agent_router
+        annotations:
+          summary: "Agent routing latency exceeds 100ms"
+          description: "95th percentile routing time: {{ $value }}ms (target: <100ms)"
+          runbook: "Check cache hit rate and classification service performance"
+
+      - alert: AgentRouterHighErrorRate
+        expr: |
+          (
+            rate(agent_router_errors_total[5m]) /
+            rate(agent_router_requests_total[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: agent_router
+        annotations:
+          summary: "Agent router error rate > 5%"
+          description: "{{ $value | humanizePercentage }} of routing requests are failing"
+          runbook: "Check service health and database connectivity"
+
+      - alert: AgentRouterLowCacheHitRate
+        expr: |
+          (
+            rate(agent_router_cache_hits_total[10m]) /
+            (rate(agent_router_cache_hits_total[10m]) + rate(agent_router_cache_misses_total[10m]))
+          ) < 0.30
+        for: 15m
+        labels:
+          severity: info
+          component: agent_router
+        annotations:
+          summary: "Agent router cache hit rate below 30%"
+          description: "Cache hit rate: {{ $value | humanizePercentage }}"
+          runbook: "Check semantic cache threshold and cache TTL settings"
+
+      - alert: AgentRouterNoRequests
+        expr: rate(agent_router_requests_total[30m]) == 0
+        for: 1h
+        labels:
+          severity: info
+          component: agent_router
+        annotations:
+          summary: "No agent routing requests in the last hour"
+          description: "Agent router is not receiving any traffic"
+
+      - alert: AgentRouterLowConfidence
+        expr: |
+          (
+            sum(rate(agent_router_requests_total{confidence_level="low"}[1h])) /
+            sum(rate(agent_router_requests_total[1h]))
+          ) > 0.20
+        for: 30m
+        labels:
+          severity: info
+          component: agent_router
+        annotations:
+          summary: "High proportion of low-confidence routing decisions"
+          description: "{{ $value | humanizePercentage }} of routing decisions have low confidence"
+          runbook: "Review query patterns and consider adding training data for edge cases"
+
+      - alert: AgentRouterCrewAIOverload
+        expr: |
+          (
+            sum(rate(agent_router_requests_total{agent_type="crewai"}[10m])) /
+            sum(rate(agent_router_requests_total[10m]))
+          ) > 0.50
+        for: 15m
+        labels:
+          severity: warning
+          component: agent_router
+        annotations:
+          summary: "CrewAI handling >50% of requests"
+          description: "{{ $value | humanizePercentage }} of requests routed to CrewAI"
+          runbook: "Review query complexity - may need to tune routing thresholds"
+
+      - alert: AgentRouterNegativeFeedbackSpike
+        expr: rate(agent_router_feedback_total{feedback_type="negative"}[15m]) > 0.5
+        for: 15m
+        labels:
+          severity: warning
+          component: agent_router
+        annotations:
+          summary: "High rate of negative routing feedback"
+          description: "{{ $value }} negative feedback submissions per second"
+          runbook: "Review recent routing decisions and user complaints"
