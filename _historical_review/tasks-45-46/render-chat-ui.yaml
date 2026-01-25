@@ -1,0 +1,27 @@
+# Render Blueprint for Empire Chat UI
+# Deploy Gradio chat interface as a separate web service
+
+services:
+  # Empire Chat UI (Gradio)
+  - type: web
+    name: jb-empire-chat-ui
+    env: python
+    region: oregon
+    plan: starter  # $7/month - same as API service
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python3 chat_ui.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Set manually in Render dashboard from .env
+      - key: EMPIRE_API_URL
+        value: https://jb-empire-api.onrender.com
+      - key: CHAT_UI_PORT
+        value: 7860
+      - key: CHAT_UI_HOST
+        value: 0.0.0.0
+      - key: CHAT_MODEL
+        value: claude-3-5-sonnet-20241022
+    healthCheckPath: /
+    numInstances: 1
+    autoDeploy: true
