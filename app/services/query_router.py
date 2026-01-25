@@ -17,11 +17,10 @@ Usage:
     router = get_query_router()
     result = await router.route_and_search("What is insurance?")
 
-    print(f"Pipeline: {result.pipeline}")
-    print(f"Results: {result.results}")
+    logger.info("routing_result", pipeline=result.pipeline, results_count=len(result.results))
 """
 
-import logging
+import structlog
 import asyncio
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
@@ -34,7 +33,7 @@ from app.services.query_classifier import (
     ClassificationResult
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -128,9 +127,9 @@ class QueryRouter:
         }
 
         logger.info(
-            f"Initialized QueryRouter "
-            f"(routing: {self.config.enable_routing}, "
-            f"fallback: {self.config.fallback_to_hybrid})"
+            "query_router_initialized",
+            routing_enabled=self.config.enable_routing,
+            fallback_enabled=self.config.fallback_to_hybrid
         )
 
     async def route_and_search(
@@ -167,16 +166,18 @@ class QueryRouter:
 
             if self.config.log_routing_decisions:
                 logger.info(
-                    f"Routing query: '{query[:50]}...' -> "
-                    f"{classification.query_type.value} "
-                    f"(confidence: {classification.confidence:.2f})"
+                    "query_routing_decision",
+                    query_preview=query[:50],
+                    query_type=classification.query_type.value,
+                    confidence=round(classification.confidence, 2)
                 )
 
             # Check confidence threshold
             if classification.confidence < self.config.confidence_threshold:
                 logger.warning(
-                    f"Low confidence {classification.confidence:.2f} "
-                    f"< {self.config.confidence_threshold}, using hybrid"
+                    "low_confidence_using_hybrid",
+                    confidence=round(classification.confidence, 2),
+                    threshold=self.config.confidence_threshold
                 )
                 return await self._search_hybrid(
                     query=query,
@@ -195,7 +196,7 @@ class QueryRouter:
             )
 
         except Exception as e:
-            logger.error(f"Classification failed: {e}")
+            logger.error("classification_failed", error=str(e))
 
             # Fallback to hybrid if enabled
             if self.config.fallback_to_hybrid:
@@ -234,8 +235,8 @@ class QueryRouter:
 
         if search_service is None:
             logger.warning(
-                f"Search service '{pipeline_name}' not available, "
-                f"falling back to hybrid"
+                "search_service_unavailable_fallback_hybrid",
+                pipeline_name=pipeline_name
             )
             return await self._search_hybrid(
                 query=query,
@@ -263,7 +264,7 @@ class QueryRouter:
             )
 
         except Exception as e:
-            logger.error(f"Search failed on {pipeline_name} pipeline: {e}")
+            logger.error("search_pipeline_failed", pipeline_name=pipeline_name, error=str(e))
 
             # Fallback to hybrid
             if self.config.fallback_to_hybrid:
@@ -324,7 +325,7 @@ class QueryRouter:
             )
 
         except Exception as e:
-            logger.error(f"Hybrid search failed: {e}")
+            logger.error("hybrid_search_failed", error=str(e))
             return RouteResult(
                 pipeline="hybrid",
                 query_type=query_type,

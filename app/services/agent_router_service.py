@@ -333,10 +333,70 @@ class AgentRouterService:
 
                 return RouterCacheEntry.from_dict(cache_data)
 
-            # TODO: Implement semantic similarity search with embeddings
+            # Semantic similarity search with embeddings
+            if embedding is not None:
+                similar_result = await self._semantic_cache_lookup(embedding)
+                if similar_result:
+                    return similar_result
 
         except Exception as e:
             logger.warning("Cache lookup failed", error=str(e))
+
+        return None
+
+    async def _semantic_cache_lookup(
+        self,
+        query_embedding: List[float],
+        match_threshold: float = 0.85,
+        match_count: int = 1
+    ) -> Optional[RouterCacheEntry]:
+        """
+        Perform semantic similarity search on cached query embeddings.
+        Uses pgvector cosine similarity to find similar cached queries.
+
+        Args:
+            query_embedding: The embedding vector of the current query
+            match_threshold: Minimum similarity score (0-1) to consider a match
+            match_count: Maximum number of matches to return
+
+        Returns:
+            RouterCacheEntry if a similar cached query is found, None otherwise
+        """
+        if not self.supabase:
+            return None
+
+        try:
+            # Use pgvector similarity search via Supabase RPC
+            result = self.supabase.rpc(
+                "match_router_cache",
+                {
+                    "query_embedding": query_embedding,
+                    "match_threshold": match_threshold,
+                    "match_count": match_count
+                }
+            ).execute()
+
+            if result.data and len(result.data) > 0:
+                cache_data = result.data[0]
+                similarity_score = cache_data.get("similarity", 0)
+
+                logger.info(
+                    "semantic_cache_hit",
+                    similarity_score=similarity_score,
+                    cache_id=cache_data.get("id")
+                )
+
+                # Increment hit count for the matched cache entry
+                self.supabase.rpc(
+                    "increment_router_cache_hit",
+                    {"p_cache_id": cache_data["id"]}
+                ).execute()
+
+                return RouterCacheEntry.from_dict(cache_data)
+
+        except Exception as e:
+            # Log but don't fail - semantic search is an optimization
+            logger.debug("semantic_cache_lookup_failed", error=str(e))
 
         return None
 

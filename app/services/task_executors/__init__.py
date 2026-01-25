@@ -8,6 +8,10 @@ Executors:
 - RetrievalExecutor: RAG, NLQ, Graph, and API retrieval tasks
 - SynthesisExecutor: Combining and analyzing findings
 - ReportExecutor: Report generation and review tasks
+
+Progress Tracking:
+- ProgressEmitter: Mixin for mid-task progress updates
+- BatchProgressTracker: Track progress across batch operations
 """
 
 from app.services.task_executors.retrieval_executor import (
@@ -22,6 +26,12 @@ from app.services.task_executors.report_executor import (
     ReportExecutor,
     get_report_executor,
 )
+from app.services.task_executors.progress_emitter import (
+    ProgressEmitter,
+    ProgressState,
+    ProgressStep,
+    BatchProgressTracker,
+)
 
 __all__ = [
     "RetrievalExecutor",
@@ -30,4 +40,8 @@ __all__ = [
     "get_synthesis_executor",
     "ReportExecutor",
     "get_report_executor",
+    "ProgressEmitter",
+    "ProgressState",
+    "ProgressStep",
+    "BatchProgressTracker",
 ]

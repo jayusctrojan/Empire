@@ -534,7 +534,7 @@ class Benchmark:
             parse_pdf()
         with bench.section("chunking"):
             chunk_text()
-        print(bench.report())
+        logger.info("benchmark_complete", **bench.report())
     """
 
     def __init__(self, name: str):

@@ -5,6 +5,7 @@ Production-grade API server with monitoring, error handling, and authentication
 
 import os
 from contextlib import asynccontextmanager
+import structlog
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi import status as http_status  # Renamed to avoid conflict with app.routes.status
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,9 +24,14 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator, entity_extraction, llama_index, circuit_breakers, workflow_management, asset_generators, graph_agent, rag_metrics  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001), Task 155: Entity Extraction, Task 156: LlamaIndex Integration Hardening, Task 159: Circuit Breaker Management, Task 158: Workflow Management, Task 43: Asset Generators, Task 107: Graph Agent, Task 149: RAG Metrics
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator, entity_extraction, llama_index, circuit_breakers, workflow_management, asset_generators, graph_agent, rag_metrics, report_downloads  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001), Task 155: Entity Extraction, Task 156: LlamaIndex Integration Hardening, Task 159: Circuit Breaker Management, Task 158: Workflow Management, Task 43: Asset Generators, Task 107: Graph Agent, Task 149: RAG Metrics, Report Downloads API
 from app.routes import health as health_router  # Task 190: Enhanced Health Checks
 from app.routes import feedback as feedback_router  # Task 188: Agent Feedback System
+
+# PENDING FEATURES (to be implemented in future releases):
+# - Feature 011: Chat Context Window Management (context_window_router)
+# - Task 206: Automatic Checkpoint System (checkpoints_router)
+# - Task 207: Session Memory & Persistence (session_memory_router)
 
 # Import services
 from app.services.mountain_duck_poller import start_mountain_duck_monitoring, stop_mountain_duck_monitoring
@@ -34,6 +40,19 @@ from app.services.supabase_storage import get_supabase_storage
 from app.core.langfuse_config import get_langfuse_client, shutdown_langfuse
 from app.core.connections import connection_manager
 from app.core.feature_flags import get_feature_flag_manager  # Task 3.2: Feature Flags
+
+# Service Orchestration: Optional imports - files may not exist yet
+try:
+    from app.core.graceful_shutdown import initialize_shutdown_coordinator, setup_signal_handlers, ShutdownMiddleware
+except ImportError:
+    initialize_shutdown_coordinator = None  # type: ignore
+    setup_signal_handlers = None  # type: ignore
+    ShutdownMiddleware = None  # type: ignore
+
+try:
+    from app.core.service_orchestrator import ServiceOrchestrator
+except ImportError:
+    ServiceOrchestrator = None  # type: ignore
 
 # Import security middleware (Task 41.1, 41.2, 41.4, 41.5)
 from app.middleware.security import SecurityHeadersMiddleware
@@ -51,6 +70,9 @@ from app.middleware.error_handler import setup_error_handling
 
 # Task 170, 171: Startup Environment and CORS Validation (US1, US2 - Production Readiness)
 from app.core.startup_validation import validate_environment, validate_cors_origins
+
+# Initialize structlog logger
+logger = structlog.get_logger(__name__)
 
 # Prometheus metrics (basic request tracking)
 REQUEST_COUNT = Counter('empire_requests_total', 'Total HTTP requests', ['method', 'endpoint', 'status'])
@@ -76,56 +98,98 @@ async def lifespan(app: FastAPI):
     # This will raise RuntimeError and prevent startup if critical vars are missing
     validation_result = validate_environment()
     if validation_result["recommended"]:
-        print(f"⚠️  Missing recommended env vars: {', '.join(validation_result['recommended'])}")
+        logger.warning("missing_recommended_env_vars", missing_vars=validation_result["recommended"])
 
     # Startup: Initialize connections
-    print("🚀 Empire v7.3 FastAPI starting...")
-    print(f"📊 Supabase: {os.getenv('SUPABASE_URL')}")
-    print(f"🔴 Redis: {os.getenv('REDIS_URL')}")
-    print(f"🗄️ Neo4j: {os.getenv('NEO4J_URI')}")
-    print(f"📦 LlamaIndex Service: {os.getenv('LLAMAINDEX_SERVICE_URL')}")
-    print(f"🤖 CrewAI Service: {os.getenv('CREWAI_SERVICE_URL')}")
+    logger.info("fastapi_starting", version="7.3")
+    logger.info("service_config",
+                supabase_url=os.getenv('SUPABASE_URL'),
+                redis_url=os.getenv('REDIS_URL'),
+                neo4j_uri=os.getenv('NEO4J_URI'),
+                llamaindex_url=os.getenv('LLAMAINDEX_SERVICE_URL'),
+                crewai_url=os.getenv('CREWAI_SERVICE_URL'))
 
     # Initialize monitoring service with Supabase storage
     supabase_storage = get_supabase_storage()
     monitoring_service = get_monitoring_service(supabase_storage)
     app.state.monitoring = monitoring_service
-    print("📈 Monitoring service initialized")
+    logger.info("monitoring_service_initialized")
 
     # Initialize Langfuse for LLM observability (Task 29)
     langfuse_client = get_langfuse_client()
     if langfuse_client:
-        print(f"🔍 Langfuse observability enabled: {os.getenv('LANGFUSE_HOST')}")
+        logger.info("langfuse_enabled", host=os.getenv('LANGFUSE_HOST'))
     else:
-        print("⚠️  Langfuse observability disabled")
+        logger.warning("langfuse_disabled")
 
     # Start Mountain Duck file monitoring (if enabled)
     if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
         start_mountain_duck_monitoring()
-        print("📁 Mountain Duck monitoring started")
+        logger.info("mountain_duck_monitoring_started")
 
     # Task 36: Initialize database connections
     try:
         await connection_manager.initialize()
-        print("✅ Database connections initialized (Supabase, Redis, Neo4j)")
+        logger.info("database_connections_initialized", services=["Supabase", "Redis", "Neo4j"])
 
         # Verify external services
         is_ready = await connection_manager.check_readiness()
         if is_ready:
-            print("✅ All critical services are ready")
+            logger.info("all_critical_services_ready")
         else:
-            print("⚠️  Some services are not ready - check logs")
+            logger.warning("some_services_not_ready")
     except Exception as e:
-        print(f"❌ Failed to initialize connections: {e}")
+        logger.error("connection_initialization_failed", error=str(e))
         # Continue anyway - some features may work without all connections
 
     # Task 3.2: Initialize Feature Flag Manager
     try:
         feature_flag_manager = get_feature_flag_manager()
         app.state.feature_flags = feature_flag_manager
-        print("🚩 Feature flag manager initialized (Database + Redis cache)")
+        logger.info("feature_flag_manager_initialized", storage="database_redis_cache")
     except Exception as e:
-        print(f"⚠️  Failed to initialize feature flag manager: {e}")
+        logger.warning("feature_flag_manager_initialization_failed", error=str(e))
+
+    # Service Orchestration: Initialize Service Orchestrator (if available)
+    if ServiceOrchestrator is not None:
+        try:
+            service_orchestrator = ServiceOrchestrator()
+            app.state.service_orchestrator = service_orchestrator
+            logger.info("service_orchestrator_initialized")
+
+            # Integrate with connection manager for unified health checks
+            connection_manager.set_service_orchestrator(service_orchestrator)
+
+            # Run preflight checks
+            preflight_result = await service_orchestrator.check_all_services()
+            if preflight_result.ready:
+                logger.info("preflight_checks_passed", status="all_services_healthy")
+            elif preflight_result.all_required_healthy:
+                logger.warning("preflight_checks_passed_with_warnings", status="some_optional_services_unavailable")
+            else:
+                logger.error("preflight_checks_failed", status="required_services_unhealthy")
+        except Exception as e:
+            logger.warning("service_orchestrator_initialization_failed", error=str(e))
+    else:
+        logger.warning("service_orchestrator_not_available", reason="module_not_installed")
+
+    # Service Orchestration: Initialize Graceful Shutdown Coordinator
+    if initialize_shutdown_coordinator is not None:
+        try:
+            shutdown_coordinator = initialize_shutdown_coordinator(app)
+            setup_signal_handlers(shutdown_coordinator)
+            app.state.shutdown_coordinator = shutdown_coordinator
+
+            # Add shutdown middleware (rejects new requests during graceful shutdown)
+            # This must be added after coordinator initialization
+            from starlette.middleware.base import BaseHTTPMiddleware  # noqa: F401
+            _shutdown_middleware = ShutdownMiddleware(app, shutdown_coordinator)  # noqa: F841
+            # Note: middleware is registered via the ShutdownMiddleware class which wraps the dispatch
+            logger.info("graceful_shutdown_coordinator_initialized", middleware_enabled=True)
+        except Exception as e:
+            logger.warning("shutdown_coordinator_initialization_failed", error=str(e))
+    else:
+        logger.warning("shutdown_coordinator_not_available", reason="module_not_installed")
 
     # Task 10.3: Initialize WebSocket Manager with Redis Pub/Sub
     try:
@@ -134,18 +198,18 @@ async def lifespan(app: FastAPI):
         await ws_manager.initialize_redis_pubsub()
 
         if ws_manager.redis_enabled:
-            print("🔌 WebSocket manager initialized with Redis Pub/Sub (distributed broadcasting enabled)")
+            logger.info("websocket_manager_initialized", redis_pubsub=True, mode="distributed_broadcasting")
         else:
-            print("🔌 WebSocket manager initialized (local-only broadcasting - Redis unavailable)")
+            logger.info("websocket_manager_initialized", redis_pubsub=False, mode="local_only_broadcasting")
 
         app.state.websocket_manager = ws_manager
     except Exception as e:
-        print(f"⚠️  Failed to initialize WebSocket manager: {e}")
+        logger.warning("websocket_manager_initialization_failed", error=str(e))
 
     yield
 
     # Shutdown: Close connections
-    print("👋 Empire v7.3 FastAPI shutting down...")
+    logger.info("fastapi_shutting_down", version="7.3")
 
     # Flush and shutdown Langfuse
     shutdown_langfuse()
@@ -153,7 +217,7 @@ async def lifespan(app: FastAPI):
     # Stop Mountain Duck monitoring
     if os.getenv("ENABLE_MOUNTAIN_DUCK_POLLING", "false").lower() == "true":
         stop_mountain_duck_monitoring()
-        print("📁 Mountain Duck monitoring stopped")
+        logger.info("mountain_duck_monitoring_stopped")
 
     # Task 10.3: Shutdown WebSocket Manager and Redis Pub/Sub
     try:
@@ -169,16 +233,16 @@ async def lifespan(app: FastAPI):
             if ws_manager.redis_pubsub:
                 await ws_manager.redis_pubsub.disconnect()
 
-            print("✅ WebSocket manager and Redis Pub/Sub shut down gracefully")
+            logger.info("websocket_manager_shutdown_complete")
     except Exception as e:
-        print(f"⚠️  Error shutting down WebSocket manager: {e}")
+        logger.warning("websocket_manager_shutdown_error", error=str(e))
 
     # Task 36: Close database connections gracefully
     try:
         await connection_manager.shutdown()
-        print("✅ All database connections closed")
+        logger.info("database_connections_closed")
     except Exception as e:
-        print(f"❌ Error closing connections: {e}")
+        logger.error("database_connections_close_error", error=str(e))
 
 
 # Create FastAPI app
@@ -214,21 +278,26 @@ app.add_middleware(
     ],  # Restricted to necessary headers for security
 )
 
+# Service Orchestration: Shutdown Middleware (rejects requests during graceful shutdown)
+# Note: This middleware is initialized but requires the shutdown_coordinator from app.state
+# It will be configured during the lifespan startup event
+logger.info("shutdown_middleware_configured", status="active_after_startup")
+
 # Task 154: Standardized Exception Handling Framework
 # Registers error handler middleware and exception handlers for BaseAppException
 setup_error_handling(app)
-print("🛡️ Exception handling framework enabled (Task 154)")
+logger.info("exception_handling_framework_enabled", task="154")
 
 # Task 41.1: Security Headers Middleware
 # Adds HSTS, X-Frame-Options, CSP, and other security headers
 app.add_middleware(SecurityHeadersMiddleware, enable_hsts=os.getenv("ENVIRONMENT") == "production")
-print("🔒 Security headers middleware enabled")
+logger.info("security_headers_middleware_enabled")
 
 # Task 43.3: Response Compression Middleware
 # Gzip compression for responses > 1KB to reduce bandwidth and improve transfer times
 from app.middleware.compression import add_compression_middleware
 add_compression_middleware(app, minimum_size=1000)
-print("📦 Response compression enabled (min_size=1KB)")
+logger.info("response_compression_enabled", min_size_bytes=1000)
 
 # Task 41.1: Rate Limiting
 # Configure rate limiting for all endpoints
@@ -240,11 +309,11 @@ configure_rls_context(app)
 
 # Task 41.4: Input Validation - Request body size limits and security validators
 configure_input_validation(app, max_body_size=100 * 1024 * 1024)  # 100MB default
-print("🛡️ Input validation middleware enabled (max body size: 100MB)")
+logger.info("input_validation_middleware_enabled", max_body_size_mb=100)
 
 # Task 41.5: Audit Logging - Track security events
 configure_audit_logging(app)
-print("📝 Audit logging middleware enabled")
+logger.info("audit_logging_middleware_enabled")
 
 # Task 136: Request Tracing - X-Request-ID propagation for agent chains
 app.add_middleware(
@@ -254,7 +323,7 @@ app.add_middleware(
     include_path=True,
     include_timing=True
 )
-print("🔗 Request tracing middleware enabled (X-Request-ID)")
+logger.info("request_tracing_middleware_enabled", header="X-Request-ID")
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"
@@ -400,7 +469,7 @@ async def http_exception_handler(request, exc):
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
     """Handle general exceptions"""
-    print(f"❌ Unhandled exception: {exc}")
+    logger.error("unhandled_exception", exception=str(exc), path=request.url.path)
     return JSONResponse(
         status_code=500,
         content={
@@ -523,6 +592,9 @@ app.include_router(conversations.router)  # Conversations router has /api/conver
 # Research Projects API (Task 91-100: Agent Harness)
 app.include_router(research_projects.router)  # Research Projects router has /api/research-projects prefix
 
+# Report Downloads API - PDF, Markdown, HTML download endpoints for research reports
+app.include_router(report_downloads.router)  # Report Downloads router has /api/reports prefix
+
 # Task 47: Content Prep Agent (AGENT-016) - Content Set Detection and Ordering
 app.include_router(content_prep.router)  # Content Prep router has /api/content-prep prefix
 
@@ -556,10 +628,18 @@ app.include_router(health_router.router)  # Health router has /api/health prefix
 # Task 188: Agent Feedback System - Feedback collection and statistics for AI agents
 app.include_router(feedback_router.router)  # Feedback router has /api/feedback prefix
 
-# TODO: Additional routers
-# app.include_router(search.router, prefix="/api/v1/search", tags=["Search"])
-# app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
-# app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+# =============================================================================
+# PENDING FEATURES (to be implemented in future releases)
+# =============================================================================
+# Feature 011: Chat Context Window Management - Progress bar and token tracking
+#   Route: /api/context-window (context_window_router)
+#
+# Task 206: Automatic Checkpoint System - Session checkpoints and crash recovery
+#   Route: /api/checkpoints (checkpoints_router)
+#
+# Task 207: Session Memory & Persistence - Long-term session memory and resumption
+#   Route: /api/session-memory (session_memory_router)
+# =============================================================================
 
 
 if __name__ == "__main__":

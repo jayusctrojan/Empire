@@ -707,7 +707,7 @@ async def evaluate_retrieval(
             contexts=["RAG stands for..."],
             answer="RAG is a technique..."
         )
-        print(f"Faithfulness: {metrics.faithfulness}")
+        logger.info("retrieval_metrics", faithfulness=metrics.faithfulness)
     """
     evaluator = get_retrieval_evaluator()
     return await evaluator.evaluate(query, contexts, answer, mode)

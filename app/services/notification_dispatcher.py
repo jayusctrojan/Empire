@@ -370,6 +370,40 @@ class NotificationDispatcher:
             logger.error(f"Error sending long-running task alert: {e}")
             return False
 
+    def notify_alert(
+        self,
+        alert_type: str,
+        severity: str,
+        message: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None
+    ):
+        """
+        Send a generic alert notification via WebSocket
+
+        Args:
+            alert_type: Type of alert (e.g., 'budget_alert', 'system_alert')
+            severity: Alert severity ('info', 'warning', 'critical')
+            message: Alert message
+            metadata: Optional additional metadata
+            session_id: Optional session to notify (broadcasts to all if None)
+        """
+        try:
+            loop = self._get_or_create_loop()
+            loop.run_until_complete(
+                self.manager.broadcast_message({
+                    "type": "alert",
+                    "alert_type": alert_type,
+                    "severity": severity,
+                    "message": message,
+                    "metadata": metadata or {},
+                    "timestamp": datetime.now().isoformat()
+                })
+            )
+            logger.info(f"Broadcast alert: {alert_type} ({severity})")
+        except Exception as e:
+            logger.error(f"Error sending alert notification: {e}")
+
 
 # Global singleton instance
 _notification_dispatcher = None

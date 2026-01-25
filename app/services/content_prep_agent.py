@@ -532,12 +532,112 @@ class ContentPrepAgent:
             crew = Crew(agents=[self.crew_agent], tasks=[task], verbose=True)
             result = crew.kickoff()
             self.logger.info("llm_detection_complete", result_length=len(str(result)))
+
             # Parse LLM response and create ContentSets
-            # TODO: Implement proper JSON parsing of LLM output
-            return []
+            return self._parse_llm_json_response(str(result), files)
         except Exception as e:
             self.logger.error("llm_detection_failed", error=str(e))
             return []
+
+    def _parse_llm_json_response(
+        self,
+        result: str,
+        original_files: list[dict]
+    ) -> list[ContentSet]:
+        """
+        Parse LLM JSON response and create ContentSet objects.
+
+        Args:
+            result: Raw LLM output string
+            original_files: Original file list for metadata lookup
+
+        Returns:
+            List of ContentSet objects parsed from LLM response
+        """
+        import json
+        import re
+
+        content_sets: list[ContentSet] = []
+
+        try:
+            # Try to extract JSON from LLM response
+            # LLM might wrap JSON in markdown code blocks or extra text
+            json_match = re.search(r'\{[\s\S]*\}', result)
+            if not json_match:
+                # Try array format
+                json_match = re.search(r'\[[\s\S]*\]', result)
+
+            if not json_match:
+                self.logger.warning("no_json_in_llm_response", response_preview=result[:200])
+                return []
+
+            json_str = json_match.group()
+            data = json.loads(json_str)
+
+            # Handle both object and array formats
+            if isinstance(data, list):
+                sets_data = data
+            else:
+                sets_data = data.get("content_sets", [])
+
+            # Create file lookup for quick access
+            file_lookup = {f.get("filename", ""): f for f in original_files}
+
+            for set_data in sets_data:
+                if not isinstance(set_data, dict):
+                    continue
+
+                # Extract content set properties
+                set_name = set_data.get("name", "Unnamed Set")
+                set_files = set_data.get("files", [])
+                missing = set_data.get("missing_files", [])
+
+                # Build ContentFile list
+                content_files: list[ContentFile] = []
+                for idx, file_entry in enumerate(set_files):
+                    # File entry can be string (filename) or dict
+                    if isinstance(file_entry, str):
+                        filename = file_entry
+                        file_meta = file_lookup.get(filename, {})
+                    else:
+                        filename = file_entry.get("filename", file_entry.get("name", ""))
+                        file_meta = file_lookup.get(filename, {})
+
+                    if filename:
+                        content_files.append(ContentFile(
+                            b2_path=file_meta.get("b2_path", filename),
+                            filename=filename,
+                            sequence_number=idx + 1,  # Use LLM-determined order
+                            detection_pattern="llm",
+                            file_type=file_meta.get("file_type", ""),
+                            size_bytes=file_meta.get("size_bytes", 0),
+                            metadata={"llm_detected": True}
+                        ))
+
+                if content_files:
+                    content_set = ContentSet(
+                        name=set_name,
+                        detection_method="llm",
+                        files=content_files,
+                        is_complete=len(missing) == 0,
+                        missing_files=missing if isinstance(missing, list) else [],
+                        confidence=0.7,  # LLM detection has moderate confidence
+                        metadata={"llm_raw_response": set_data}
+                    )
+                    content_sets.append(content_set)
+
+            self.logger.info(
+                "llm_json_parsed",
+                content_sets_found=len(content_sets),
+                total_files_assigned=sum(len(cs.files) for cs in content_sets)
+            )
+
+        except json.JSONDecodeError as e:
+            self.logger.warning("llm_json_parse_error", error=str(e), response_preview=result[:200])
+        except Exception as e:
+            self.logger.error("llm_response_processing_error", error=str(e))
+
+        return content_sets
 
     # ========================================================================
     # Confidence Calculation (US-005: Chat Clarification)
