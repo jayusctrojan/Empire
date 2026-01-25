@@ -27,7 +27,7 @@ from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 
 from app.core.supabase_client import get_supabase_client
-from app.services.b2_storage import get_b2_storage
+from app.services.b2_storage import get_b2_service
 
 logger = structlog.get_logger(__name__)
 
@@ -106,7 +106,7 @@ async def get_report_content(job_id: int, format_type: str) -> tuple[bytes, str]
         )
 
     # Check B2 storage first for pre-generated files
-    b2 = get_b2_storage()
+    b2 = get_b2_service()
     metadata = job.get("metadata", {}) or {}
 
     if format_type == "pdf":
@@ -564,7 +564,7 @@ async def get_download_url(
     filename = f"{sanitize_filename(job.get('query', 'report'))}.{format if format != 'markdown' else 'md'}"
 
     # For B2-stored files, generate presigned URL
-    b2 = get_b2_storage()
+    b2 = get_b2_service()
     metadata = job.get("metadata", {}) or {}
 
     if format == "pdf" and metadata.get("pdf_key"):
@@ -603,7 +603,7 @@ async def stream_pdf(job_id: int):
     job = get_job_report_info(job_id)
 
     # Check for pre-generated PDF in B2
-    b2 = get_b2_storage()
+    b2 = get_b2_service()
     metadata = job.get("metadata", {}) or {}
     pdf_key = metadata.get("pdf_key") or f"reports/{job_id}/report.pdf"
 

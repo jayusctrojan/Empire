@@ -64,7 +64,7 @@ class NotificationDispatcher:
         # Record task start time for long-running detection
         self._task_start_times[task_id] = time.time()
 
-        message = f"Processing started"
+        message = "Processing started"
         if filename:
             message = f"Processing started: {filename}"
 
@@ -143,7 +143,7 @@ class NotificationDispatcher:
             duration = time.time() - self._task_start_times[task_id]
             del self._task_start_times[task_id]  # Clean up
 
-        message = f"Processing completed successfully"
+        message = "Processing completed successfully"
         if filename:
             message = f"Processing completed: {filename}"
 

@@ -743,7 +743,6 @@ async def asset_generators_health(
     # Build health status for each generator
     for agent_id, config in generator_configs.items():
         asset_type = config["asset_type"]
-        stats = all_stats.get(agent_id, {})
 
         generators_health[agent_id] = GeneratorHealthStatus(
             agent_id=agent_id,

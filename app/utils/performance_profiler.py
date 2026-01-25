@@ -411,7 +411,6 @@ class PerformanceProfiler:
 
         # Calculate percentiles
         sorted_durations = sorted(durations)
-        n = len(sorted_durations)
 
         def percentile(data: List[float], p: float) -> float:
             if not data:
