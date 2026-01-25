@@ -1,0 +1,32 @@
+# Locust Load Testing - Generated Files
+
+# Reports directory
+reports/*.html
+reports/*.csv
+reports/*.log
+reports/*.txt
+
+# Keep the directory structure
+!reports/.gitkeep
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+.clerk_test_token
