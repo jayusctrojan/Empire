@@ -131,7 +131,7 @@ class ClassificationService:
             import json
             try:
                 keywords = json.loads(keywords)
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 keywords = []
 
         return Classification(

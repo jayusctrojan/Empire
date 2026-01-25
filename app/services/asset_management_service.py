@@ -208,7 +208,7 @@ class AssetManagementService:
             import json
             try:
                 keywords = json.loads(keywords)
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 keywords = []
 
         return Asset(

@@ -34,7 +34,30 @@ except ImportError:
     MISTRAL_AVAILABLE = False
     logging.warning("mistralai not available - install with: pip install mistralai")
 
+from app.services.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    get_circuit_breaker_sync,
+)
+
 logger = logging.getLogger(__name__)
+
+# Circuit breaker for Ollama embedding service
+_ollama_embedding_circuit_breaker: Optional[CircuitBreaker] = None
+
+
+def get_ollama_embedding_circuit_breaker() -> CircuitBreaker:
+    """Get or create Ollama embedding circuit breaker with appropriate settings"""
+    global _ollama_embedding_circuit_breaker
+    if _ollama_embedding_circuit_breaker is None:
+        config = CircuitBreakerConfig(
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            half_open_max_calls=2,
+            success_threshold=2,
+        )
+        _ollama_embedding_circuit_breaker = get_circuit_breaker_sync("ollama_embeddings", config)
+    return _ollama_embedding_circuit_breaker
 
 
 # ============================================================================
@@ -538,31 +561,41 @@ class EmbeddingService:
         return results
 
     async def _generate_ollama_embedding(self, text: str) -> List[float]:
-        """Generate single embedding using Ollama"""
+        """Generate single embedding using Ollama (with circuit breaker protection)"""
         if not self.ollama_client:
             raise ValueError("Ollama client not initialized")
 
+        circuit = get_ollama_embedding_circuit_breaker()
+
         try:
             # Ollama embed_documents expects a list
-            embeddings = await asyncio.to_thread(
-                self.ollama_client.embed_documents,
-                [text]
-            )
+            async def ollama_embed():
+                return await asyncio.to_thread(
+                    self.ollama_client.embed_documents,
+                    [text]
+                )
+
+            embeddings = await circuit.call(ollama_embed, operation="embed_single")
             return embeddings[0]
         except Exception as e:
             logger.error(f"Ollama embedding generation failed: {e}")
             raise
 
     async def _generate_ollama_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """Generate batch embeddings using Ollama"""
+        """Generate batch embeddings using Ollama (with circuit breaker protection)"""
         if not self.ollama_client:
             raise ValueError("Ollama client not initialized")
 
+        circuit = get_ollama_embedding_circuit_breaker()
+
         try:
-            embeddings = await asyncio.to_thread(
-                self.ollama_client.embed_documents,
-                texts
-            )
+            async def ollama_embed_batch():
+                return await asyncio.to_thread(
+                    self.ollama_client.embed_documents,
+                    texts
+                )
+
+            embeddings = await circuit.call(ollama_embed_batch, operation="embed_batch")
             return embeddings
         except Exception as e:
             logger.error(f"Ollama batch embedding generation failed: {e}")
