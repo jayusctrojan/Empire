@@ -1486,21 +1486,23 @@ if __name__ == "__main__":
             source_type="course"
         )
 
-        logger.info(
-            "agent_002_summary_generation_result",
-            success=result.success,
-            pdf_path=result.pdf_path,
-            department=result.department,
-            sections_generated=result.sections_generated,
-            diagrams_generated=result.diagrams_generated,
-            tables_generated=result.tables_generated,
-            processing_time_seconds=f"{result.processing_time_seconds:.2f}s"
-        )
+        print("\n" + "=" * 70)
+        print("AGENT-002 SUMMARY GENERATION RESULT")
+        print("=" * 70)
+        print(f"\nSuccess: {result.success}")
+        print(f"PDF Path: {result.pdf_path}")
+        print(f"Department: {result.department}")
+        print(f"Sections Generated: {result.sections_generated}")
+        print(f"Diagrams Generated: {result.diagrams_generated}")
+        print(f"Tables Generated: {result.tables_generated}")
+        print(f"Processing Time: {result.processing_time_seconds:.2f}s")
 
         if result.error:
-            logger.error("agent_002_summary_generation_error", error=result.error)
+            print(f"Error: {result.error}")
 
-        # Log stats
-        logger.info("agent_002_statistics", stats=agent.get_stats())
+        # Print stats
+        print("\n=== Statistics ===")
+        import json
+        print(json.dumps(agent.get_stats(), indent=2))
 
     asyncio.run(test())

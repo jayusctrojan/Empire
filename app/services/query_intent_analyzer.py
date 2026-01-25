@@ -639,7 +639,7 @@ async def analyze_query_intent(query: str, use_llm: bool = True) -> QueryIntent:
 
     Example:
         intent = await analyze_query_intent("What is the capital of France?")
-        logger.info("intent_analyzed", intent_type=intent.intent_type)  # "factual"
+        print(intent.intent_type)  # "factual"
     """
     analyzer = get_query_intent_analyzer()
     return await analyzer.analyze(query, use_llm=use_llm)

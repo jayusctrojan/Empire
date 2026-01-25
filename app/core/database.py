@@ -6,9 +6,6 @@ Handles connections to Supabase PostgreSQL, Neo4j, and Redis
 import os
 from typing import Optional
 from dotenv import load_dotenv
-import structlog
-
-logger = structlog.get_logger(__name__)
 
 # Supabase
 from supabase import create_client, Client as SupabaseClient
@@ -42,7 +39,7 @@ class DatabaseManager:
                 raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set")
 
             self._supabase = create_client(url, key)
-            logger.info("supabase_connected", url=url)
+            print(f"✅ Connected to Supabase: {url}")
 
         return self._supabase
 
@@ -58,7 +55,7 @@ class DatabaseManager:
                 raise ValueError("NEO4J_PASSWORD must be set")
 
             self._neo4j = GraphDatabase.driver(uri, auth=(username, password))
-            logger.info("neo4j_connected", uri=uri)
+            print(f"✅ Connected to Neo4j: {uri}")
 
             # Verify connection
             with self._neo4j.session() as session:
@@ -86,7 +83,7 @@ class DatabaseManager:
             else:
                 self._redis = redis.from_url(clean_url, decode_responses=True)
 
-            logger.info("redis_connected", url=clean_url.split('@')[-1] if '@' in clean_url else clean_url)
+            print(f"✅ Connected to Redis: {clean_url.split('@')[-1] if '@' in clean_url else clean_url}")
 
             # Verify connection
             self._redis.ping()
@@ -102,7 +99,7 @@ class DatabaseManager:
             _result = client.table("documents").select("id").limit(1).execute()  # noqa: F841
             return True
         except Exception as e:
-            logger.error("supabase_health_check_failed", error=str(e))
+            print(f"❌ Supabase health check failed: {e}")
             return False
 
     def check_neo4j_health(self) -> bool:
@@ -114,7 +111,7 @@ class DatabaseManager:
                 result.single()
             return True
         except Exception as e:
-            logger.error("neo4j_health_check_failed", error=str(e))
+            print(f"❌ Neo4j health check failed: {e}")
             return False
 
     def check_redis_health(self) -> bool:
@@ -124,7 +121,7 @@ class DatabaseManager:
             client.ping()
             return True
         except Exception as e:
-            logger.error("redis_health_check_failed", error=str(e))
+            print(f"❌ Redis health check failed: {e}")
             return False
 
     def check_all_health(self) -> dict:
@@ -140,14 +137,14 @@ class DatabaseManager:
         """Close all database connections"""
         if self._neo4j:
             self._neo4j.close()
-            logger.info("neo4j_connection_closed")
+            print("👋 Closed Neo4j connection")
 
         if self._redis:
             self._redis.close()
-            logger.info("redis_connection_closed")
+            print("👋 Closed Redis connection")
 
         # Supabase client doesn't need explicit closing
-        logger.info("all_database_connections_closed")
+        print("👋 All database connections closed")
 
 
 # Global database manager instance

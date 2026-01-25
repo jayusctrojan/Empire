@@ -21,20 +21,19 @@ Usage:
     )
 
     for result in formatted_results:
-        logger.info("search_result",
-            snippet=result.highlighted_snippet,
-            source=result.source,
-            score=result.relevance_score)
+        print(f"Snippet: {result.highlighted_snippet}")
+        print(f"Source: {result.source}")
+        print(f"Score: {result.relevance_score}")
 """
 
-import structlog
+import logging
 import re
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 
 from app.services.hybrid_search_service import SearchResult
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -114,9 +113,9 @@ class SnippetService:
         self.config = config or SnippetConfig()
 
         logger.info(
-            "snippet_service_initialized",
-            snippet_length=self.config.snippet_length,
-            context_window=self.config.context_window
+            f"Initialized SnippetService "
+            f"(snippet_length={self.config.snippet_length}, "
+            f"context_window={self.config.context_window})"
         )
 
     def extract_snippet(
@@ -306,7 +305,7 @@ class SnippetService:
             formatted = self.format_result(result, snippet_result, query)
             formatted_results.append(formatted)
 
-        logger.debug("results_formatted_with_snippets", result_count=len(formatted_results))
+        logger.debug(f"Formatted {len(formatted_results)} results with snippets")
 
         return formatted_results
 

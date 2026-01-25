@@ -606,7 +606,7 @@ async def evaluate_grounding(
             answer="Python was created in 1991 by Guido van Rossum.",
             sources=["Python is a programming language created by Guido van Rossum in 1991."]
         )
-        logger.info("grounding_evaluated", score=result.overall_grounding_score)
+        print(f"Grounding score: {result.overall_grounding_score}")
     """
     evaluator = get_grounding_evaluator()
     return await evaluator.evaluate(answer, sources)

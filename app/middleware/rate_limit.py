@@ -29,9 +29,6 @@ import os
 import redis
 import time
 import uuid
-import structlog
-
-logger = structlog.get_logger(__name__)
 
 # Import tiered rate limit configurations
 from app.middleware.rate_limit_tiers import (
@@ -79,15 +76,15 @@ def get_rate_limit_backend():
                 redis_client = redis.from_url(clean_redis_url, decode_responses=True)
 
             redis_client.ping()  # Test connection
-            logger.info("rate_limiting_redis_connected", url=clean_redis_url.split('@')[-1] if '@' in clean_redis_url else clean_redis_url)
+            print(f"✅ Rate limiting using Redis: {clean_redis_url.split('@')[-1] if '@' in clean_redis_url else clean_redis_url}")
             return redis_client
         except Exception as e:
-            logger.warning("rate_limiting_redis_connection_failed", error=str(e))
-            logger.warning("rate_limiting_fallback_to_memory")
+            print(f"⚠️  Redis connection failed for rate limiting: {e}")
+            print("⚠️  Falling back to in-memory rate limiting")
             return None
     else:
         # Use in-memory storage for development
-        logger.info("rate_limiting_using_memory_storage", mode="development")
+        print("📝 Rate limiting using in-memory storage (development mode)")
         return None
 
 
@@ -280,7 +277,7 @@ def configure_rate_limiting(app):
     # Add SlowAPI middleware
     app.add_middleware(SlowAPIMiddleware)
 
-    logger.info("rate_limiting_configured")
+    print("✅ Rate limiting configured")
 
 
 # =============================================================================

@@ -11,10 +11,6 @@ import json
 import re
 from typing import Dict, Optional
 
-import structlog
-
-logger = structlog.get_logger(__name__)
-
 
 class CourseClassifier:
     """Auto-classify courses and extract structural metadata"""
@@ -288,7 +284,10 @@ if __name__ == "__main__":
             test_content_1
         )
 
-        logger.info("test_1_complete", test_name="Course with modules and lessons", department=result1['department'], suggested_filename=result1['suggested_filename'])
+        print("Test 1 - Course with modules and lessons:")
+        print(f"Department: {result1['department']}")
+        print(f"Suggested filename: {result1['suggested_filename']}")
+        print()
 
         # Test case 2: Simple corporate course
         test_content_2 = """
@@ -303,7 +302,10 @@ if __name__ == "__main__":
             test_content_2
         )
 
-        logger.info("test_2_complete", test_name="Simple corporate course", department=result2['department'], suggested_filename=result2['suggested_filename'])
+        print("Test 2 - Simple corporate course:")
+        print(f"Department: {result2['department']}")
+        print(f"Suggested filename: {result2['suggested_filename']}")
+        print()
 
         # Test case 3: NLP course with modules
         test_content_3 = """
@@ -318,7 +320,9 @@ if __name__ == "__main__":
             test_content_3
         )
 
-        logger.info("test_3_complete", test_name="NLP course with modules", department=result3['department'], suggested_filename=result3['suggested_filename'])
+        print("Test 3 - NLP course with modules:")
+        print(f"Department: {result3['department']}")
+        print(f"Suggested filename: {result3['suggested_filename']}")
 
     # Run test
     asyncio.run(test())

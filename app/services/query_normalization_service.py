@@ -17,18 +17,17 @@ Usage:
     normalizer = get_query_normalization_service()
     result = normalizer.normalize("What is Insurance?")
 
-    logger.info("normalization_result",
-        original=result.original_query,
-        normalized=result.normalized_query)
+    print(f"Original: {result.original_query}")
+    print(f"Normalized: {result.normalized_query}")
 """
 
-import structlog
+import logging
 import re
 from typing import Optional, List, Set, Dict, Any
 from dataclasses import dataclass, field
 import string
 
-logger = structlog.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Default English stopwords (common words to remove)
 DEFAULT_STOPWORDS = {
@@ -119,10 +118,10 @@ class QueryNormalizationService:
             self.stopwords = DEFAULT_STOPWORDS
 
         logger.info(
-            "query_normalization_service_initialized",
-            lowercase=self.config.lowercase,
-            remove_stopwords=self.config.remove_stopwords,
-            remove_punctuation=self.config.remove_punctuation
+            f"Initialized QueryNormalizationService "
+            f"(lowercase: {self.config.lowercase}, "
+            f"stopwords: {self.config.remove_stopwords}, "
+            f"punctuation: {self.config.remove_punctuation})"
         )
 
     def normalize(self, query: str) -> NormalizationResult:
@@ -192,10 +191,8 @@ class QueryNormalizationService:
         normalized = normalized.strip()
 
         logger.debug(
-            "query_normalized",
-            original_query=original_query,
-            normalized_query=normalized,
-            transformations=transformations
+            f"Normalized query: '{original_query}' -> '{normalized}' "
+            f"(transformations: {transformations})"
         )
 
         return NormalizationResult(

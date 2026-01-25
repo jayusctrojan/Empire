@@ -33,7 +33,7 @@ Usage:
 
     # Get metrics
     metrics = await service.get_query_metrics(query_id=query_log.query_id)
-    logger.info("query_metrics", ctr=metrics.ctr)
+    print(f"CTR: {metrics.ctr}")
 """
 
 import logging

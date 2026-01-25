@@ -17,10 +17,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Callable
 import os
 
-import structlog
-
-logger = structlog.get_logger(__name__)
-
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
@@ -53,7 +49,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # Only enable HSTS in production by default
         if self.enable_hsts and not self.is_production:
-            logger.warning("hsts_disabled_in_development", environment="development")
+            print("⚠️  HSTS disabled in development environment")
             self.enable_hsts = False
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

@@ -1085,7 +1085,9 @@ if __name__ == "__main__":
         """Test all asset generators"""
         service = AssetGeneratorService()
 
-        logger.info("asset_generator_test_started", agents="AGENT-003 to AGENT-007")
+        print("\n" + "=" * 70)
+        print("ASSET GENERATOR AGENTS TEST (AGENT-003 to AGENT-007)")
+        print("=" * 70)
 
         # Test each generator
         test_cases = [
@@ -1097,7 +1099,7 @@ if __name__ == "__main__":
         ]
 
         for asset_type, name, description in test_cases:
-            logger.info("testing_generator", asset_type=asset_type.value.upper())
+            print(f"\n--- Testing {asset_type.value.upper()} Generator ---")
 
             request = AssetGenerationRequest(
                 name=name,
@@ -1107,17 +1109,17 @@ if __name__ == "__main__":
 
             result = await service.generate(asset_type, request)
 
-            logger.info(
-                "generator_result",
-                success=result.success,
-                file_path=result.file_path,
-                processing_time_seconds=round(result.processing_time_seconds, 2)
-            )
+            print(f"Success: {result.success}")
+            print(f"File: {result.file_path}")
+            print(f"Time: {result.processing_time_seconds:.2f}s")
 
             if result.error:
-                logger.error("generator_error", error=result.error)
+                print(f"Error: {result.error}")
 
-        # Log all stats
-        logger.info("asset_generator_test_completed", stats=service.get_all_stats())
+        # Print all stats
+        print("\n" + "=" * 70)
+        print("STATISTICS")
+        print("=" * 70)
+        print(json.dumps(service.get_all_stats(), indent=2))
 
     asyncio.run(test())
