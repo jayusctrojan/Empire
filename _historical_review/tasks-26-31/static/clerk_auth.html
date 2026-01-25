@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empire AI Chat - Sign In</title>
+
+    <!-- Clerk JavaScript SDK -->
+    <!-- Note: Publishable key should be injected by the server -->
+    <script
+        async
+        crossorigin="anonymous"
+        data-clerk-publishable-key="{{ CLERK_PUBLISHABLE_KEY }}"
+        src="https://stirring-gibbon-32.clerk.accounts.dev/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
+        type="text/javascript"
+    ></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 450px;
+            width: 100%;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        #loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #sign-in {
+            /* Clerk will inject sign-in component here */
+        }
+
+        #user-info {
+            text-align: center;
+        }
+
+        #user-info h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 22px;
+        }
+
+        #user-info p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #e8e8e8;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-list {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+        }
+
+        .feature-list h3 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .feature-list ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 8px 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .feature-list li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .error-message {
+            background: #fee;
+            border-left: 4px solid #c33;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            color: #c33;
+        }
+
+        @media (max-width: 480px) {
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1>🏛️ Empire AI Chat</h1>
+                <p>Secure access to your knowledge base</p>
+            </div>
+
+            <div class="content">
+                <!-- Loading state -->
+                <div id="loading">
+                    <div class="spinner"></div>
+                    <p style="color: #666;">Loading authentication...</p>
+                </div>
+
+                <!-- Sign-in component -->
+                <div id="sign-in" style="display: none;"></div>
+
+                <!-- Signed-in user info -->
+                <div id="user-info" style="display: none;">
+                    <h2>Welcome back!</h2>
+                    <p id="user-email"></p>
+                    <button class="btn" onclick="launchChat()">
+                        🚀 Launch Chat Interface
+                    </button>
+                    <button class="btn btn-secondary" onclick="signOut()">
+                        Sign Out
+                    </button>
+
+                    <div class="feature-list">
+                        <h3>Features</h3>
+                        <ul>
+                            <li>Search your knowledge base</li>
+                            <li>Get instant answers from your documents</li>
+                            <li>Ask questions about policies and regulations</li>
+                            <li>Analyze compliance requirements</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Error display -->
+                <div id="error" style="display: none;" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let clerkInstance;
+        let sessionToken = null;
+
+        window.addEventListener("load", async function() {
+            try {
+                // Initialize Clerk
+                clerkInstance = window.Clerk;
+                await clerkInstance.load();
+
+                // Check if user is already signed in
+                if (clerkInstance.user) {
+                    await showUserInfo();
+                } else {
+                    showSignIn();
+                }
+
+                // Listen for sign-in events
+                clerkInstance.addListener(({ user }) => {
+                    if (user) {
+                        showUserInfo();
+                    }
+                });
+
+            } catch (error) {
+                console.error("Clerk initialization error:", error);
+                showError("Failed to initialize authentication. Please refresh the page.");
+            }
+        });
+
+        async function showSignIn() {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("sign-in").style.display = "block";
+
+            // Mount Clerk sign-in component
+            clerkInstance.mountSignIn(document.getElementById("sign-in"), {
+                afterSignInUrl: window.location.href,
+                appearance: {
+                    elements: {
+                        rootBox: "w-full",
+                        card: "shadow-none"
+                    }
+                }
+            });
+        }
+
+        async function showUserInfo() {
+            try {
+                // Get session token
+                sessionToken = await clerkInstance.session.getToken();
+
+                // Store token in localStorage for chat UI
+                localStorage.setItem("clerk_session_token", sessionToken);
+
+                // Get user info
+                const user = clerkInstance.user;
+                const email = user.primaryEmailAddress?.emailAddress || "User";
+
+                // Update UI
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("sign-in").style.display = "none";
+                document.getElementById("user-info").style.display = "block";
+                document.getElementById("user-email").textContent = email;
+
+            } catch (error) {
+                console.error("Error getting session token:", error);
+                showError("Failed to get authentication token. Please sign in again.");
+            }
+        }
+
+        function launchChat() {
+            // Check if token exists
+            const token = localStorage.getItem("clerk_session_token");
+            if (!token) {
+                showError("No authentication token found. Please sign in again.");
+                return;
+            }
+
+            // Redirect to Gradio chat interface
+            // The chat interface will read the token from localStorage
+            window.location.href = "/chat";
+        }
+
+        async function signOut() {
+            try {
+                await clerkInstance.signOut();
+                localStorage.removeItem("clerk_session_token");
+                showSignIn();
+            } catch (error) {
+                console.error("Sign out error:", error);
+                showError("Failed to sign out. Please try again.");
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById("error");
+            errorDiv.textContent = message;
+            errorDiv.style.display = "block";
+            document.getElementById("loading").style.display = "none";
+        }
+    </script>
+</body>
+</html>
