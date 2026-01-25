@@ -1158,23 +1158,20 @@ if __name__ == "__main__":
             filename="sales_pipeline_advanced.pdf"
         )
 
-        print("\n" + "=" * 70)
-        print("AGENT-001 ORCHESTRATION RESULT")
-        print("=" * 70)
-        print(f"\nDepartment: {result.classification.department.value}")
-        print(f"Confidence: {result.classification.confidence:.2%}")
-        print(f"Reasoning: {result.classification.reasoning}")
-        print(f"\nPrimary Asset: {result.asset_decision.primary_type.value}")
-        print(f"All Assets: {[a.value for a in result.asset_decision.asset_types]}")
-        print(f"Needs Summary: {result.asset_decision.needs_summary}")
-        print(f"\nDelegation Targets: {result.delegation_targets}")
-        print("\nOutput Paths:")
-        for key, path in result.output_paths.items():
-            print(f"  {key}: {path}")
-        print(f"\nProcessing Time: {result.processing_metadata['processing_time_seconds']:.2f}s")
+        logger.info(
+            "orchestration_result",
+            department=result.classification.department.value,
+            confidence=f"{result.classification.confidence:.2%}",
+            reasoning=result.classification.reasoning,
+            primary_asset=result.asset_decision.primary_type.value,
+            all_assets=[a.value for a in result.asset_decision.asset_types],
+            needs_summary=result.asset_decision.needs_summary,
+            delegation_targets=result.delegation_targets,
+            output_paths=result.output_paths,
+            processing_time=f"{result.processing_metadata['processing_time_seconds']:.2f}s"
+        )
 
-        # Print stats
-        print("\n=== Statistics ===")
-        print(json.dumps(orchestrator.get_stats(), indent=2))
+        # Log stats
+        logger.info("statistics", stats=orchestrator.get_stats())
 
     asyncio.run(test())

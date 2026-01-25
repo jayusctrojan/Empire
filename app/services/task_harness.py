@@ -9,6 +9,7 @@ Date: 2025-01-10
 """
 
 import os
+import asyncio
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from abc import ABC, abstractmethod
@@ -20,6 +21,9 @@ from app.core.supabase_client import get_supabase_client
 from app.models.research_project import JobStatus, TaskStatus, TaskType
 
 logger = structlog.get_logger(__name__)
+
+# Default timeout for task execution (5 minutes)
+DEFAULT_TASK_TIMEOUT = 300
 
 
 # ==============================================================================
@@ -185,12 +189,17 @@ class TaskHarnessService:
     # Task Execution
     # ==========================================================================
 
-    async def execute_task(self, task_id: int) -> Dict[str, Any]:
+    async def execute_task(
+        self,
+        task_id: int,
+        timeout: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
-        Execute a single task based on its type.
+        Execute a single task based on its type with timeout enforcement.
 
         Args:
             task_id: The plan_tasks record ID
+            timeout: Optional timeout in seconds (default: DEFAULT_TASK_TIMEOUT)
 
         Returns:
             Dict with execution result
@@ -206,11 +215,15 @@ class TaskHarnessService:
         task = result.data
         task_type = task["task_type"]
 
+        # Determine timeout: use provided, task-specific, or default
+        task_timeout = timeout or task.get("timeout") or DEFAULT_TASK_TIMEOUT
+
         logger.info(
             "Executing task",
             task_id=task_id,
             task_type=task_type,
-            task_key=task["task_key"]
+            task_key=task["task_key"],
+            timeout=task_timeout
         )
 
         # Update status to running
@@ -236,57 +249,51 @@ class TaskHarnessService:
             logger.debug(f"Performance monitor task start failed: {e}")
 
         try:
-            # Route to appropriate executor
-            execution_result = await self.execute_task_by_type(task)
+            # Route to appropriate executor with timeout enforcement
+            execution_result = await asyncio.wait_for(
+                self.execute_task_by_type(task),
+                timeout=task_timeout
+            )
 
-            if execution_result.get("success"):
-                # Store artifacts if any
-                artifacts = execution_result.get("artifacts", [])
-                artifact_count = await self._store_artifacts(task, artifacts)
+        except asyncio.TimeoutError:
+            logger.error(
+                "Task execution timeout",
+                task_id=task_id,
+                task_type=task_type,
+                timeout=task_timeout
+            )
 
-                # Record quality scores for artifacts
-                try:
-                    from app.services.performance_monitor import get_performance_monitor
-                    monitor = get_performance_monitor()
-
-                    # Record task completion
-                    monitor.record_task_complete(
-                        task_id=task_id,
-                        task_type=task_type,
-                        job_id=task["job_id"],
-                        success=True
-                    )
-
-                    # Record quality gate pass
-                    monitor.record_quality_gate_result(
-                        job_id=task["job_id"],
-                        gate_type=task_type,
-                        passed=True,
-                        message="Task completed successfully"
-                    )
-                except Exception as e:
-                    logger.debug(f"Performance monitor task complete failed: {e}")
-
-                # Update task as complete
-                self.update_task_status(
-                    task_id,
-                    TaskStatus.COMPLETE,
-                    result_data={
-                        "summary": execution_result.get("summary", ""),
-                        "data": execution_result.get("data", {}),
-                        "artifact_count": artifact_count
-                    }
+            # Record timeout in performance monitor
+            try:
+                from app.services.performance_monitor import get_performance_monitor
+                monitor = get_performance_monitor()
+                monitor.record_task_complete(
+                    task_id=task_id,
+                    task_type=task_type,
+                    job_id=task["job_id"],
+                    success=False
                 )
+                monitor.record_quality_gate_result(
+                    job_id=task["job_id"],
+                    gate_type=task_type,
+                    passed=False,
+                    message=f"Task timeout after {task_timeout} seconds"
+                )
+            except Exception:
+                pass
 
-                return {
-                    "success": True,
-                    "task_id": task_id,
-                    "task_key": task["task_key"],
-                    "summary": execution_result.get("summary"),
-                    "artifact_count": artifact_count
-                }
-            else:
-                raise Exception(execution_result.get("error", "Task execution failed"))
+            self.update_task_status(
+                task_id,
+                TaskStatus.FAILED,
+                error_message=f"Task timeout after {task_timeout} seconds"
+            )
+            return {
+                "success": False,
+                "task_id": task_id,
+                "task_key": task["task_key"],
+                "error": f"Task timeout after {task_timeout} seconds",
+                "timeout": True
+            }
 
         except Exception as e:
             logger.error(
@@ -326,6 +333,74 @@ class TaskHarnessService:
                 "task_id": task_id,
                 "task_key": task["task_key"],
                 "error": str(e)
+            }
+
+        # Handle successful execution result
+        if execution_result.get("success"):
+            # Store artifacts if any
+            artifacts = execution_result.get("artifacts", [])
+            artifact_count = await self._store_artifacts(task, artifacts)
+
+            # Record quality scores for artifacts
+            try:
+                from app.services.performance_monitor import get_performance_monitor
+                monitor = get_performance_monitor()
+
+                # Record task completion
+                monitor.record_task_complete(
+                    task_id=task_id,
+                    task_type=task_type,
+                    job_id=task["job_id"],
+                    success=True
+                )
+
+                # Record quality gate pass
+                monitor.record_quality_gate_result(
+                    job_id=task["job_id"],
+                    gate_type=task_type,
+                    passed=True,
+                    message="Task completed successfully"
+                )
+            except Exception as e:
+                logger.debug(f"Performance monitor task complete failed: {e}")
+
+            # Update task as complete
+            self.update_task_status(
+                task_id,
+                TaskStatus.COMPLETE,
+                result_data={
+                    "summary": execution_result.get("summary", ""),
+                    "data": execution_result.get("data", {}),
+                    "artifact_count": artifact_count
+                }
+            )
+
+            return {
+                "success": True,
+                "task_id": task_id,
+                "task_key": task["task_key"],
+                "summary": execution_result.get("summary"),
+                "artifact_count": artifact_count
+            }
+        else:
+            # Handle execution failure
+            error_msg = execution_result.get("error", "Task execution failed")
+            logger.error(
+                "Task execution returned failure",
+                task_id=task_id,
+                error=error_msg
+            )
+
+            self.update_task_status(
+                task_id,
+                TaskStatus.FAILED,
+                error_message=error_msg
+            )
+            return {
+                "success": False,
+                "task_id": task_id,
+                "task_key": task["task_key"],
+                "error": error_msg
             }
 
     async def execute_task_by_type(self, task: Dict[str, Any]) -> Dict[str, Any]:
