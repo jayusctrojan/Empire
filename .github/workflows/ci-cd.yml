@@ -289,8 +289,7 @@ jobs:
           SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
         run: |
           echo "Running database migrations..."
-          python scripts/run_migrations.py || echo "Migration script not found or failed (non-blocking)"
-        continue-on-error: true
+          python scripts/run_migrations.py
 
   # ========================================
   # Seed Test Data (Production - Manual Only)

@@ -411,20 +411,17 @@ $$ LANGUAGE plpgsql SECURITY INVOKER;
 -- ============================================================================
 
 -- Grant execute on functions
+-- Note: Write functions (increment_*) only granted to authenticated users for security
 GRANT EXECUTE ON FUNCTION increment_node_mention_count(UUID, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION increment_node_mention_count(UUID, TEXT) TO anon;
 
 GRANT EXECUTE ON FUNCTION increment_edge_observation_count(UUID, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION increment_edge_observation_count(UUID, TEXT) TO anon;
 
+-- Read-only functions can be accessed by authenticated users
 GRANT EXECUTE ON FUNCTION match_user_memories(vector(768), TEXT, DECIMAL, INTEGER) TO authenticated;
-GRANT EXECUTE ON FUNCTION match_user_memories(vector(768), TEXT, DECIMAL, INTEGER) TO anon;
 
 GRANT EXECUTE ON FUNCTION traverse_memory_graph(TEXT, UUID, INTEGER, TEXT[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION traverse_memory_graph(TEXT, UUID, INTEGER, TEXT[]) TO anon;
 
 GRANT EXECUTE ON FUNCTION get_related_memories(TEXT, UUID, INTEGER) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_related_memories(TEXT, UUID, INTEGER) TO anon;
 
 -- ============================================================================
 -- Verification Query
