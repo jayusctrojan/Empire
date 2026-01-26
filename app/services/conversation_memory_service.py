@@ -299,18 +299,24 @@ class ConversationMemoryService:
                 .execute()
 
             # Atomic increment of mention_count via RPC to avoid race condition
+            rpc_increment_succeeded = False
             if increment_mention_count:
                 try:
                     self.supabase.rpc(
                         "increment_node_mention_count",
                         {"p_node_id": str(node_id), "p_user_id": user_id}
                     ).execute()
+                    rpc_increment_succeeded = True
                 except PostgrestAPIError as rpc_error:
                     self.logger.warning(f"RPC increment_node_mention_count failed: {rpc_error}")
 
             if response.data:
                 self.logger.info(f"Updated memory node {node_id}")
-                return MemoryNode.from_dict(response.data[0])
+                node_data = response.data[0]
+                # Reflect the RPC increment in the returned data to avoid stale values
+                if rpc_increment_succeeded:
+                    node_data["mention_count"] = node_data.get("mention_count", 0) + 1
+                return MemoryNode.from_dict(node_data)
             else:
                 self.logger.warning(f"No node found with id {node_id} for user {user_id}")
                 return None
@@ -436,18 +442,24 @@ class ConversationMemoryService:
                 .execute()
 
             # Atomic increment of observation_count via RPC to avoid race condition
+            rpc_increment_succeeded = False
             if increment_observation_count:
                 try:
                     self.supabase.rpc(
                         "increment_edge_observation_count",
                         {"p_edge_id": str(edge_id), "p_user_id": user_id}
                     ).execute()
+                    rpc_increment_succeeded = True
                 except PostgrestAPIError as rpc_error:
                     self.logger.warning(f"RPC increment_edge_observation_count failed: {rpc_error}")
 
             if response.data:
                 self.logger.info(f"Updated memory edge {edge_id}")
-                return MemoryEdge.from_dict(response.data[0])
+                edge_data = response.data[0]
+                # Reflect the RPC increment in the returned data to avoid stale values
+                if rpc_increment_succeeded:
+                    edge_data["observation_count"] = edge_data.get("observation_count", 0) + 1
+                return MemoryEdge.from_dict(edge_data)
             else:
                 self.logger.warning(f"No edge found with id {edge_id} for user {user_id}")
                 return None
