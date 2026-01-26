@@ -11,6 +11,11 @@ from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
 try:
+    from postgrest.exceptions import APIError as PostgrestAPIError
+except ImportError:
+    PostgrestAPIError = Exception  # Fallback for environments without postgrest
+
+try:
     from app.core.database import get_supabase
 except ImportError:
     get_supabase = None
@@ -300,7 +305,7 @@ class ConversationMemoryService:
                         "increment_node_mention_count",
                         {"p_node_id": str(node_id), "p_user_id": user_id}
                     ).execute()
-                except Exception as rpc_error:
+                except PostgrestAPIError as rpc_error:
                     self.logger.warning(f"RPC increment_node_mention_count failed: {rpc_error}")
 
             if response.data:
@@ -437,7 +442,7 @@ class ConversationMemoryService:
                         "increment_edge_observation_count",
                         {"p_edge_id": str(edge_id), "p_user_id": user_id}
                     ).execute()
-                except Exception as rpc_error:
+                except PostgrestAPIError as rpc_error:
                     self.logger.warning(f"RPC increment_edge_observation_count failed: {rpc_error}")
 
             if response.data:
