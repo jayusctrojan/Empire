@@ -76,9 +76,9 @@ BEGIN
       AND tablename = 'user_memory_nodes';
 
     IF NOT rls_status.rowsecurity THEN
-        RAISE NOTICE '✅ RLS disabled on user_memory_nodes';
+        RAISE NOTICE '[OK] RLS disabled on user_memory_nodes';
     ELSE
-        RAISE WARNING '⚠️  RLS still enabled on user_memory_nodes';
+        RAISE WARNING '[WARN] RLS still enabled on user_memory_nodes';
     END IF;
 
     -- Check user_memory_edges
@@ -88,9 +88,9 @@ BEGIN
       AND tablename = 'user_memory_edges';
 
     IF NOT rls_status.rowsecurity THEN
-        RAISE NOTICE '✅ RLS disabled on user_memory_edges';
+        RAISE NOTICE '[OK] RLS disabled on user_memory_edges';
     ELSE
-        RAISE WARNING '⚠️  RLS still enabled on user_memory_edges';
+        RAISE WARNING '[WARN] RLS still enabled on user_memory_edges';
     END IF;
 END $$;
 

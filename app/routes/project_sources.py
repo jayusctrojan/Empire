@@ -401,43 +401,7 @@ async def list_project_sources(
         )
 
 
-@router.get("/{project_id}/sources/{source_id}", response_model=ProjectSource)
-async def get_source(
-    project_id: str,
-    source_id: str,
-    user_id: str = Depends(get_current_user),
-    service: ProjectSourcesService = Depends(get_service)
-) -> ProjectSource:
-    """
-    Get details of a specific source.
-    """
-    try:
-        source = await service.get_source(source_id=source_id, user_id=user_id)
-
-        if not source:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Source not found"
-            )
-
-        if source.project_id != project_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Source not found in this project"
-            )
-
-        return source
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Get source failed", error=str(e), source_id=source_id)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get source: {str(e)}"
-        )
-
-
+# Static routes must come BEFORE dynamic path parameters
 @router.get("/{project_id}/sources/stats", response_model=ProjectSourceStats)
 async def get_project_source_stats(
     project_id: str,
@@ -489,6 +453,43 @@ async def check_project_capacity(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check capacity: {str(e)}"
+        )
+
+
+@router.get("/{project_id}/sources/{source_id}", response_model=ProjectSource)
+async def get_source(
+    project_id: str,
+    source_id: str,
+    user_id: str = Depends(get_current_user),
+    service: ProjectSourcesService = Depends(get_service)
+) -> ProjectSource:
+    """
+    Get details of a specific source.
+    """
+    try:
+        source = await service.get_source(source_id=source_id, user_id=user_id)
+
+        if not source:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Source not found"
+            )
+
+        if source.project_id != project_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Source not found in this project"
+            )
+
+        return source
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Get source failed", error=str(e), source_id=source_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get source: {str(e)}"
         )
 
 

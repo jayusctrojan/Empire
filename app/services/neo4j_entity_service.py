@@ -22,6 +22,10 @@ from app.services.neo4j_connection import Neo4jConnection, get_neo4j_connection
 
 logger = logging.getLogger(__name__)
 
+# Security: Allowlists for Cypher injection prevention
+VALID_NODE_TYPES = {"Document", "Entity"}
+VALID_PROPERTY_KEYS = {"weight", "timestamp", "confidence", "source", "type", "created_at"}
+
 
 class RelationshipType(str, Enum):
     """Types of relationships between nodes"""
@@ -181,8 +185,18 @@ class Neo4jEntityService:
             True if successful, False otherwise
         """
         try:
-            # Build property string
+            # Security: Validate node types against allowlist
+            if from_type not in VALID_NODE_TYPES:
+                raise ValueError(f"Invalid node type: {from_type}")
+            if to_type not in VALID_NODE_TYPES:
+                raise ValueError(f"Invalid node type: {to_type}")
+
+            # Build property string with validation
             props = properties or {}
+            # Security: Validate property keys against allowlist
+            for key in props.keys():
+                if key not in VALID_PROPERTY_KEYS:
+                    raise ValueError(f"Invalid property key: {key}")
             prop_string = ", ".join([f"r.{k} = ${k}" for k in props.keys()])
             set_clause = f"SET {prop_string}" if prop_string else ""
 
