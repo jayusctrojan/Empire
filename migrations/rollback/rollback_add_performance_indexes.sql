@@ -14,9 +14,8 @@
 --
 -- NOTE: Removing indexes will NOT delete data, only slow down queries.
 -- The pg_trgm extension is left intact as other features may use it.
+-- NOTE: DROP INDEX CONCURRENTLY cannot run inside a transaction block
 -- ============================================================================
-
-BEGIN;
 
 -- ============================================================================
 -- PHASE 1: DROP DOCUMENT INDEXES
@@ -113,10 +112,8 @@ DROP INDEX CONCURRENTLY IF EXISTS idx_user_doc_connections_document_id;
 
 RAISE NOTICE 'Dropped user document connection indexes';
 
-COMMIT;
-
 -- ============================================================================
--- PHASE 10: VERIFICATION (Run after COMMIT)
+-- PHASE 10: VERIFICATION
 -- ============================================================================
 
 -- Count remaining indexes from Task 43.3

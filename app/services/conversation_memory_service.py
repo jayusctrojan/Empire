@@ -286,15 +286,19 @@ class ConversationMemoryService:
                 updates["embedding"] = embedding
             if importance_score is not None:
                 updates["importance_score"] = importance_score
-            if increment_mention_count:
-                # Increment mention count using SQL
-                updates["mention_count"] = self.supabase.table("user_memory_nodes").select("mention_count").eq("id", str(node_id)).single().execute().data["mention_count"] + 1
-
+            # First, do the main update
             response = self.supabase.table("user_memory_nodes") \
                 .update(updates) \
                 .eq("id", str(node_id)) \
                 .eq("user_id", user_id) \
                 .execute()
+
+            # Atomic increment of mention_count via RPC to avoid race condition
+            if increment_mention_count:
+                self.supabase.rpc(
+                    "increment_node_mention_count",
+                    {"p_node_id": str(node_id), "p_user_id": user_id}
+                ).execute()
 
             if response.data:
                 self.logger.info(f"Updated memory node {node_id}")
@@ -415,16 +419,20 @@ class ConversationMemoryService:
 
             if strength is not None:
                 updates["strength"] = strength
-            if increment_observation_count:
-                # Fetch current count and increment
-                current_edge = self.supabase.table("user_memory_edges").select("observation_count").eq("id", str(edge_id)).single().execute()
-                updates["observation_count"] = current_edge.data["observation_count"] + 1
 
+            # First, do the main update
             response = self.supabase.table("user_memory_edges") \
                 .update(updates) \
                 .eq("id", str(edge_id)) \
                 .eq("user_id", user_id) \
                 .execute()
+
+            # Atomic increment of observation_count via RPC to avoid race condition
+            if increment_observation_count:
+                self.supabase.rpc(
+                    "increment_edge_observation_count",
+                    {"p_edge_id": str(edge_id), "p_user_id": user_id}
+                ).execute()
 
             if response.data:
                 self.logger.info(f"Updated memory edge {edge_id}")
