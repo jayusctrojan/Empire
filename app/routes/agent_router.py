@@ -8,6 +8,8 @@ Date: 2025-01-25
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import JSONResponse
+
+from app.middleware.auth import require_admin
 from typing import Dict, Any, List, Optional
 from prometheus_client import Counter, Histogram, Gauge
 import structlog
@@ -684,7 +686,8 @@ async def get_cache_analytics(
 )
 async def clear_cache(
     expired_only: bool = True,
-    service: AgentRouterService = Depends(get_router_service)
+    service: AgentRouterService = Depends(get_router_service),
+    admin_user=Depends(require_admin)
 ):
     """
     Clear routing cache entries.

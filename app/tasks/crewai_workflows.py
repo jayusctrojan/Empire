@@ -262,7 +262,7 @@ def analyze_document_multi_agent(
         )
 
         # Get Supabase client
-        supabase = get_supabase_client()
+        supabase = get_supabase()
 
         # Create CrewAI service
         crewai_service = CrewAIService(supabase=supabase)
@@ -351,7 +351,7 @@ def generate_assets(
         )
 
         # Get Supabase client
-        supabase = get_supabase_client()
+        supabase = get_supabase()
 
         # Create CrewAI service
         crewai_service = CrewAIService(supabase=supabase)
