@@ -295,10 +295,13 @@ class ConversationMemoryService:
 
             # Atomic increment of mention_count via RPC to avoid race condition
             if increment_mention_count:
-                self.supabase.rpc(
-                    "increment_node_mention_count",
-                    {"p_node_id": str(node_id), "p_user_id": user_id}
-                ).execute()
+                try:
+                    self.supabase.rpc(
+                        "increment_node_mention_count",
+                        {"p_node_id": str(node_id), "p_user_id": user_id}
+                    ).execute()
+                except Exception as rpc_error:
+                    self.logger.warning(f"RPC increment_node_mention_count failed: {rpc_error}")
 
             if response.data:
                 self.logger.info(f"Updated memory node {node_id}")
@@ -429,10 +432,13 @@ class ConversationMemoryService:
 
             # Atomic increment of observation_count via RPC to avoid race condition
             if increment_observation_count:
-                self.supabase.rpc(
-                    "increment_edge_observation_count",
-                    {"p_edge_id": str(edge_id), "p_user_id": user_id}
-                ).execute()
+                try:
+                    self.supabase.rpc(
+                        "increment_edge_observation_count",
+                        {"p_edge_id": str(edge_id), "p_user_id": user_id}
+                    ).execute()
+                except Exception as rpc_error:
+                    self.logger.warning(f"RPC increment_edge_observation_count failed: {rpc_error}")
 
             if response.data:
                 self.logger.info(f"Updated memory edge {edge_id}")

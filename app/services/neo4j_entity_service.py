@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Security: Allowlists for Cypher injection prevention
 VALID_NODE_TYPES = {"Document", "Entity"}
-VALID_PROPERTY_KEYS = {"weight", "timestamp", "confidence", "source", "type", "created_at"}
+VALID_PROPERTY_KEYS = {"weight", "timestamp", "confidence", "source", "type", "created_at", "count"}
 
 
 class RelationshipType(str, Enum):

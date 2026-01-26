@@ -21,8 +21,8 @@ groups:
 
       - alert: APIHighErrorRate
         expr: |
-          (rate(http_requests_total{job="empire-api-production",status=~"5.."}[5m])
-          / rate(http_requests_total{job="empire-api-production"}[5m])) > 0.05
+          (sum(rate(http_requests_total{job="empire-api-production",status=~"5.."}[5m]))
+          / sum(rate(http_requests_total{job="empire-api-production"}[5m]))) > 0.05
         for: 5m
         labels:
           severity: critical
