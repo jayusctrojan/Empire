@@ -131,7 +131,7 @@ class ClassificationService:
             import json
             try:
                 keywords = json.loads(keywords)
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 keywords = []
 
         return Classification(
@@ -322,12 +322,29 @@ class ClassificationService:
     ) -> None:
         """
         Log classification correction for model improvement.
+        Inserts feedback into agent_feedback table for training data collection.
         """
         try:
-            # Log to structlog for now
-            # TODO: Create agent_feedback table and insert feedback record
+            # Insert into agent_feedback table
+            feedback_data = {
+                "agent_id": "AGENT-008",  # Department Classifier Agent
+                "feedback_type": "classification",
+                "input_summary": f"Classification ID: {classification_id}",
+                "output_summary": f"Changed from '{previous_department}' to '{new_department}'",
+                "feedback_text": reason,
+                "created_by": user_id,
+                "metadata": {
+                    "classification_id": classification_id,
+                    "previous_department": previous_department,
+                    "new_department": new_department,
+                    "correction_type": "classification_correction"
+                }
+            }
+
+            self.supabase.client.table("agent_feedback").insert(feedback_data).execute()
+
             logger.info(
-                "Classification correction feedback",
+                "classification_correction_feedback_logged",
                 classification_id=classification_id,
                 user_id=user_id,
                 previous_department=previous_department,
@@ -338,7 +355,7 @@ class ClassificationService:
         except Exception as e:
             # Don't fail the correction if feedback logging fails
             logger.warning(
-                "Failed to log correction feedback",
+                "failed_to_log_correction_feedback",
                 error=str(e),
                 classification_id=classification_id
             )

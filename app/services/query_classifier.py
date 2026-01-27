@@ -18,12 +18,13 @@ Usage:
     classifier = get_query_classifier()
     result = await classifier.classify_async("What is insurance?")
 
-    print(f"Type: {result.query_type}")
-    print(f"Confidence: {result.confidence}")
-    print(f"Method: {result.classification_method}")
+    logger.info("classification_result",
+        query_type=result.query_type,
+        confidence=result.confidence,
+        method=result.classification_method)
 """
 
-import logging
+import structlog
 import json
 import asyncio
 from typing import Optional, List, Dict, Any
@@ -36,7 +37,7 @@ from app.services.query_taxonomy import (
     get_query_taxonomy
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -121,15 +122,15 @@ class QueryClassifier:
                         api_key=os.getenv("ANTHROPIC_API_KEY")
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to initialize Anthropic client: {e}")
+                    logger.warning("anthropic_client_init_failed", error=str(e))
                     self.anthropic_client = None
         else:
             self.anthropic_client = None
 
         logger.info(
-            f"Initialized QueryClassifier "
-            f"(AI: {self.config.use_ai_classification}, "
-            f"Model: {self.config.model})"
+            "query_classifier_initialized",
+            use_ai_classification=self.config.use_ai_classification,
+            model=self.config.model
         )
 
     async def classify_async(self, query: str) -> ClassificationResult:
@@ -144,7 +145,7 @@ class QueryClassifier:
         """
         # Check cache
         if self.config.cache_classifications and query in self.cache:
-            logger.debug(f"Returning cached classification for: {query[:50]}")
+            logger.debug("returning_cached_classification", query_preview=query[:50])
             return self.cache[query]
 
         # Try AI classification first if enabled
@@ -160,11 +161,12 @@ class QueryClassifier:
                     return result
                 else:
                     logger.debug(
-                        f"AI confidence {result.confidence} below threshold "
-                        f"{self.config.confidence_threshold}, using fallback"
+                        "ai_confidence_below_threshold_using_fallback",
+                        confidence=result.confidence,
+                        threshold=self.config.confidence_threshold
                     )
             except Exception as e:
-                logger.warning(f"AI classification failed: {e}")
+                logger.warning("ai_classification_failed", error=str(e))
 
         # Fallback to pattern-based classification
         if self.config.fallback_to_patterns:
@@ -232,7 +234,7 @@ Respond with JSON only:
                 response = test_result
         except Exception as e:
             # If direct call failed, fall back to running in thread (real Anthropic client)
-            logger.debug(f"Direct call failed, using thread pool: {e}")
+            logger.debug("direct_call_failed_using_thread_pool", error=str(e))
             response = await asyncio.to_thread(
                 create_method,
                 model=self.config.model,

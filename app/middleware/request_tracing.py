@@ -227,7 +227,7 @@ def get_request_context() -> Dict[str, Any]:
 
     Example:
         ctx = get_request_context()
-        print(f"Request {ctx['method']} {ctx['path']}")
+        logger.info("request_context", method=ctx['method'], path=ctx['path'])
     """
     return request_context_var.get().copy()
 
