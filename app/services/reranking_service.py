@@ -24,8 +24,30 @@ import httpx
 from anthropic import Anthropic
 
 from app.services.hybrid_search_service import SearchResult
+from app.services.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    get_circuit_breaker_sync,
+)
 
 logger = logging.getLogger(__name__)
+
+# Circuit breaker for Ollama service
+_ollama_circuit_breaker: Optional[CircuitBreaker] = None
+
+
+def get_ollama_circuit_breaker() -> CircuitBreaker:
+    """Get or create Ollama circuit breaker with appropriate settings"""
+    global _ollama_circuit_breaker
+    if _ollama_circuit_breaker is None:
+        config = CircuitBreakerConfig(
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            half_open_max_calls=2,
+            success_threshold=2,
+        )
+        _ollama_circuit_breaker = get_circuit_breaker_sync("ollama_reranker", config)
+    return _ollama_circuit_breaker
 
 
 class RerankingProvider(str, Enum):
@@ -204,21 +226,25 @@ class RerankingService:
         result: SearchResult,
         index: int
     ) -> tuple[int, SearchResult]:
-        """Rerank a single result with Ollama"""
+        """Rerank a single result with Ollama (with circuit breaker protection)"""
         prompt = f"query: {query}\ndoc: {result.content[:500]}"
+        circuit = get_ollama_circuit_breaker()
 
         try:
-            # Call Ollama generate API
-            response = await client.post(
-                f"{self.config.base_url}/api/generate",
-                json={
-                    "model": self.config.model,
-                    "prompt": prompt,
-                    "stream": False
-                }
-            )
-            response.raise_for_status()
-            data = response.json()
+            # Call Ollama generate API with circuit breaker protection
+            async def ollama_call():
+                response = await client.post(
+                    f"{self.config.base_url}/api/generate",
+                    json={
+                        "model": self.config.model,
+                        "prompt": prompt,
+                        "stream": False
+                    }
+                )
+                response.raise_for_status()
+                return response.json()
+
+            data = await circuit.call(ollama_call, operation="rerank")
 
             # Parse relevance score from response
             score_text = data.get("response", "0.0").strip()

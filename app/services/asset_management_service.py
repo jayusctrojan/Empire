@@ -208,7 +208,7 @@ class AssetManagementService:
             import json
             try:
                 keywords = json.loads(keywords)
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 keywords = []
 
         return Asset(
@@ -607,14 +607,30 @@ class AssetManagementService:
     ) -> None:
         """
         Log asset reclassification for feedback and model improvement.
-        Uses studio_cko_messages table with a special feedback marker for now,
-        until agent_feedback table is created.
+        Inserts feedback into agent_feedback table for training data collection.
         """
         try:
-            # For now, just log to structlog
-            # TODO: Create agent_feedback table and insert feedback record
+            # Insert into agent_feedback table
+            feedback_data = {
+                "agent_id": "AGENT-008",  # Department Classifier Agent
+                "feedback_type": "classification",
+                "input_summary": f"Asset ID: {asset_id}",
+                "output_summary": f"Type: '{previous_type}' -> '{new_type}', Dept: '{previous_department}' -> '{new_department}'",
+                "created_by": user_id,
+                "metadata": {
+                    "asset_id": asset_id,
+                    "previous_type": previous_type,
+                    "new_type": new_type,
+                    "previous_department": previous_department,
+                    "new_department": new_department,
+                    "correction_type": "asset_reclassification"
+                }
+            }
+
+            self.supabase.client.table("agent_feedback").insert(feedback_data).execute()
+
             logger.info(
-                "Asset reclassification feedback",
+                "asset_reclassification_feedback_logged",
                 asset_id=asset_id,
                 user_id=user_id,
                 previous_type=previous_type,
@@ -626,7 +642,7 @@ class AssetManagementService:
         except Exception as e:
             # Don't fail the reclassification if feedback logging fails
             logger.warning(
-                "Failed to log reclassification feedback",
+                "failed_to_log_reclassification_feedback",
                 error=str(e),
                 asset_id=asset_id
             )

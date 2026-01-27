@@ -19,6 +19,10 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime
 from datasets import Dataset
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 from ragas import evaluate
 from ragas.metrics import (
     faithfulness,
@@ -176,7 +180,7 @@ class RAGASEvaluator:
                 })
             except Exception as e:
                 # Log error but continue with other samples
-                print(f"Error evaluating sample {sample.get('id')}: {str(e)}")
+                logger.error("sample_evaluation_failed", sample_id=sample.get('id'), error=str(e))
                 continue
 
         return results

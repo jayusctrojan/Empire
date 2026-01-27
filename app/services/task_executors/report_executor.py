@@ -635,7 +635,7 @@ class ReportExecutor(TaskExecutor):
             if isinstance(metadata, str):
                 try:
                     metadata = json.loads(metadata)
-                except:
+                except (json.JSONDecodeError, TypeError, ValueError):
                     metadata = {}
 
             key_findings = metadata.get("key_findings", [])
@@ -705,7 +705,7 @@ class ReportExecutor(TaskExecutor):
                 if isinstance(metadata, str):
                     try:
                         metadata = json.loads(metadata)
-                    except:
+                    except (json.JSONDecodeError, TypeError, ValueError):
                         metadata = {}
 
                 for finding in metadata.get("key_findings", []):
