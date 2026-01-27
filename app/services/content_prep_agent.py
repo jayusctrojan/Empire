@@ -581,7 +581,7 @@ class ContentPrepAgent:
                 sets_data = data.get("content_sets", [])
 
             # Create file lookup for quick access
-            file_lookup = {f.get("filename", ""): f for f in original_files}
+            file_lookup = {f.get("file_name", ""): f for f in original_files}
 
             for set_data in sets_data:
                 if not isinstance(set_data, dict):
@@ -600,7 +600,7 @@ class ContentPrepAgent:
                         filename = file_entry
                         file_meta = file_lookup.get(filename, {})
                     else:
-                        filename = file_entry.get("filename", file_entry.get("name", ""))
+                        filename = file_entry.get("file_name", file_entry.get("filename", file_entry.get("name", "")))
                         file_meta = file_lookup.get(filename, {})
 
                     if filename:
@@ -610,7 +610,7 @@ class ContentPrepAgent:
                             sequence_number=idx + 1,  # Use LLM-determined order
                             detection_pattern="llm",
                             file_type=file_meta.get("file_type", ""),
-                            size_bytes=file_meta.get("size_bytes", 0),
+                            size_bytes=file_meta.get("size", 0),
                             metadata={"llm_detected": True}
                         ))
 

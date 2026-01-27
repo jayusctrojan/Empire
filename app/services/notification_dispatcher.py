@@ -390,19 +390,25 @@ class NotificationDispatcher:
         """
         try:
             loop = self._get_or_create_loop()
-            loop.run_until_complete(
-                self.manager.broadcast_message({
-                    "type": "alert",
-                    "alert_type": alert_type,
-                    "severity": severity,
-                    "message": message,
-                    "metadata": metadata or {},
-                    "timestamp": datetime.now().isoformat()
-                })
-            )
+            alert_message = {
+                "type": "alert",
+                "alert_type": alert_type,
+                "severity": severity,
+                "message": message,
+                "metadata": metadata or {},
+                "timestamp": datetime.now().isoformat()
+            }
+            if session_id:
+                loop.run_until_complete(
+                    self.manager.send_to_session(alert_message, session_id)
+                )
+            else:
+                loop.run_until_complete(
+                    self.manager.broadcast(alert_message)
+                )
             logger.info(f"Broadcast alert: {alert_type} ({severity})")
         except Exception as e:
-            logger.error(f"Error sending alert notification: {e}")
+            logger.exception(f"Error sending alert notification: {e}")
 
 
 # Global singleton instance

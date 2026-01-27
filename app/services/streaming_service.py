@@ -457,16 +457,18 @@ class StreamingService:
 
         # Update metrics
         stream.chunks_sent += 1
+        chunk_bytes = 0
         if isinstance(data, str):
-            stream.bytes_sent += len(data.encode())
+            chunk_bytes = len(data.encode())
         elif isinstance(data, bytes):
-            stream.bytes_sent += len(data)
+            chunk_bytes = len(data)
+        stream.bytes_sent += chunk_bytes
 
         STREAM_CHUNKS.labels(
             stream_type=stream.stream_type.value,
             stream_id=stream_id
         ).inc()
-        STREAM_BYTES.labels(stream_type=stream.stream_type.value).inc(stream.bytes_sent)
+        STREAM_BYTES.labels(stream_type=stream.stream_type.value).inc(chunk_bytes)
 
         # Broadcast via Redis for cross-instance
         await self._publish_chunk(stream_id, chunk)

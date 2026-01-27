@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 # Base directory
-BASE_DIR = Path("/Users/jaybajaj/Library/Mobile Documents/com~apple~CloudDocs/Documents/ai/Empire")
+BASE_DIR = Path(__file__).resolve().parent.parent
 TESTS_DIR = BASE_DIR / "tests"
 
 # Test file mappings: (test_file_name, service_file, class_name, description)

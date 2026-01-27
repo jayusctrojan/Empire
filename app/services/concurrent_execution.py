@@ -639,6 +639,8 @@ class ConcurrentExecutionEngine:
         tasks_to_execute = list(wave_tasks)
 
         while tasks_to_execute:
+            batch_failed_tasks: List[str] = []
+
             # Split into batches
             for i in range(0, len(tasks_to_execute), max_concurrent):
                 batch = tasks_to_execute[i:i + max_concurrent]
@@ -657,8 +659,6 @@ class ConcurrentExecutionEngine:
 
                 # Execute and wait for results
                 result = task_group.apply_async()
-
-                batch_failed_tasks: List[str] = []
 
                 try:
                     # Wait for all tasks in batch to complete
@@ -952,7 +952,8 @@ class ConcurrentExecutionEngine:
         initial_concurrency: int
     ) -> DynamicConcurrencyController:
         """Get or create the concurrency controller."""
-        if self._concurrency_controller is None:
+        if (self._concurrency_controller is None or
+                self._concurrency_controller.current_concurrency != initial_concurrency):
             self._concurrency_controller = DynamicConcurrencyController(
                 initial_concurrency=initial_concurrency,
                 config=self.dynamic_config

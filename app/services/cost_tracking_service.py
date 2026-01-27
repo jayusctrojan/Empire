@@ -14,7 +14,7 @@ import json
 
 from prometheus_client import Counter, Gauge, Histogram
 from app.core.database import get_supabase
-from app.services.notification_dispatcher import NotificationDispatcher
+from app.services.notification_dispatcher import NotificationDispatcher, get_notification_dispatcher
 from app.services.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
@@ -666,7 +666,7 @@ class CostTrackingService:
         # Send WebSocket notification via NotificationDispatcher
         if "websocket" in channels:
             try:
-                dispatcher = NotificationDispatcher()
+                dispatcher = get_notification_dispatcher()
                 dispatcher.notify_alert(
                     alert_type="budget_alert",
                     severity=severity,

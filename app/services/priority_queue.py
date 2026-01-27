@@ -87,6 +87,7 @@ class QueueItem:
     job_id: int = field(compare=False)
     metadata: Dict[str, Any] = field(default_factory=dict, compare=False)
     enqueued_at: datetime = field(default_factory=datetime.utcnow, compare=False)
+    removed: bool = field(default=False, compare=False)
 
     @classmethod
     def create(
@@ -142,13 +143,12 @@ class PriorityTaskQueue:
         self._heap: List[QueueItem] = []
         self._lock = threading.RLock()
         self._task_map: Dict[str, QueueItem] = {}  # task_key -> item for O(1) lookup
-        self._removed: set = set()  # Lazy deletion tracking
 
     @property
     def size(self) -> int:
         """Current queue size (excluding removed items)"""
         with self._lock:
-            return len(self._heap) - len(self._removed)
+            return len(self._task_map)
 
     def is_empty(self) -> bool:
         """Check if queue is empty"""
@@ -181,7 +181,7 @@ class PriorityTaskQueue:
         """
         with self._lock:
             # Check if task already exists
-            if task_key in self._task_map and task_key not in self._removed:
+            if task_key in self._task_map:
                 logger.warning(f"Task {task_key} already in queue, updating priority")
                 self.update_priority(task_key, priority)
                 return
@@ -197,9 +197,6 @@ class PriorityTaskQueue:
 
             heapq.heappush(self._heap, item)
             self._task_map[task_key] = item
-
-            # Remove from removed set if re-adding
-            self._removed.discard(task_key)
 
             # Update metrics
             QUEUE_SIZE.labels(queue_name=self.name).set(self.size)
@@ -224,8 +221,7 @@ class PriorityTaskQueue:
                 item = heapq.heappop(self._heap)
 
                 # Skip if marked as removed
-                if item.task_key in self._removed:
-                    self._removed.remove(item.task_key)
+                if item.removed:
                     continue
 
                 # Remove from task map
@@ -255,7 +251,7 @@ class PriorityTaskQueue:
         with self._lock:
             # Find first non-removed item
             for item in self._heap:
-                if item.task_key not in self._removed:
+                if not item.removed:
                     return item
             return None
 
@@ -292,8 +288,9 @@ class PriorityTaskQueue:
             True if task was in queue and marked for removal
         """
         with self._lock:
-            if task_key in self._task_map and task_key not in self._removed:
-                self._removed.add(task_key)
+            if task_key in self._task_map:
+                self._task_map[task_key].removed = True
+                del self._task_map[task_key]
                 QUEUE_SIZE.labels(queue_name=self.name).set(self.size)
                 logger.debug("Task marked for removal", task_key=task_key)
                 return True
@@ -322,8 +319,8 @@ class PriorityTaskQueue:
             if old_item.priority == new_priority:
                 return True
 
-            # Mark old entry for removal
-            self._removed.add(task_key)
+            # Mark old entry as removed
+            old_item.removed = True
 
             # Create new entry with updated priority
             new_item = QueueItem.create(
@@ -337,7 +334,6 @@ class PriorityTaskQueue:
 
             heapq.heappush(self._heap, new_item)
             self._task_map[task_key] = new_item
-            self._removed.discard(task_key)
 
             logger.debug(
                 "Task priority updated",
@@ -351,12 +347,12 @@ class PriorityTaskQueue:
     def contains(self, task_key: str) -> bool:
         """Check if a task is in the queue"""
         with self._lock:
-            return task_key in self._task_map and task_key not in self._removed
+            return task_key in self._task_map
 
     def get(self, task_key: str) -> Optional[QueueItem]:
         """Get a task by key without removing it"""
         with self._lock:
-            if task_key in self._task_map and task_key not in self._removed:
+            if task_key in self._task_map:
                 return self._task_map[task_key]
             return None
 
@@ -398,7 +394,6 @@ class PriorityTaskQueue:
             count = self.size
             self._heap.clear()
             self._task_map.clear()
-            self._removed.clear()
             QUEUE_SIZE.labels(queue_name=self.name).set(0)
             logger.info("Queue cleared", count=count)
             return count
@@ -416,8 +411,9 @@ class PriorityTaskQueue:
         with self._lock:
             removed = 0
             for task_key, item in list(self._task_map.items()):
-                if item.job_id == job_id and task_key not in self._removed:
-                    self._removed.add(task_key)
+                if item.job_id == job_id:
+                    item.removed = True
+                    del self._task_map[task_key]
                     removed += 1
 
             QUEUE_SIZE.labels(queue_name=self.name).set(self.size)
@@ -432,33 +428,30 @@ class PriorityTaskQueue:
         """Get all tasks with a specific priority"""
         with self._lock:
             return [
-                item for item in self._heap
-                if item.priority == priority and item.task_key not in self._removed
+                item for item in self._task_map.values()
+                if item.priority == priority
             ]
 
     def get_by_job(self, job_id: int) -> List[QueueItem]:
         """Get all tasks for a specific job"""
         with self._lock:
             return [
-                item for item in self._heap
-                if item.job_id == job_id and item.task_key not in self._removed
+                item for item in self._task_map.values()
+                if item.job_id == job_id
             ]
 
     def get_by_type(self, task_type: str) -> List[QueueItem]:
         """Get all tasks of a specific type"""
         with self._lock:
             return [
-                item for item in self._heap
-                if item.task_type == task_type and item.task_key not in self._removed
+                item for item in self._task_map.values()
+                if item.task_type == task_type
             ]
 
     def get_stats(self) -> Dict[str, Any]:
         """Get queue statistics"""
         with self._lock:
-            active_items = [
-                item for item in self._heap
-                if item.task_key not in self._removed
-            ]
+            active_items = list(self._task_map.values())
 
             priority_counts = {}
             type_counts = {}
@@ -473,7 +466,7 @@ class PriorityTaskQueue:
                 "name": self.name,
                 "size": len(active_items),
                 "heap_size": len(self._heap),
-                "removed_count": len(self._removed),
+                "removed_count": len(self._heap) - len(active_items),
                 "priority_distribution": priority_counts,
                 "type_distribution": type_counts,
                 "job_distribution": job_counts
@@ -482,10 +475,7 @@ class PriorityTaskQueue:
     def to_list(self) -> List[Dict[str, Any]]:
         """Get all tasks as a sorted list"""
         with self._lock:
-            items = [
-                item for item in self._heap
-                if item.task_key not in self._removed
-            ]
+            items = list(self._task_map.values())
             # Sort by priority (highest first) and timestamp
             items.sort(key=lambda x: x.sort_key)
             return [item.to_dict() for item in items]
@@ -508,15 +498,13 @@ class PriorityTaskQueue:
             # Filter out removed items
             self._heap = [
                 item for item in self._heap
-                if item.task_key not in self._removed
+                if not item.removed
             ]
 
             # Rebuild the heap
             heapq.heapify(self._heap)
 
-            # Clear removed set
-            removed_count = len(self._removed)
-            self._removed.clear()
+            removed_count = old_size - len(self._heap)
 
             new_size = len(self._heap)
             logger.info(

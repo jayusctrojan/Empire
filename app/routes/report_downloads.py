@@ -16,6 +16,7 @@ Author: Claude Code
 Date: 2025-01-24
 """
 
+import html
 import io
 import os
 from typing import Optional
@@ -160,7 +161,7 @@ async def generate_pdf_from_markdown(markdown: str, job: dict) -> bytes:
         )
 
         # Wrap in complete HTML document with styling
-        query = job.get("query", "Research Report")
+        query = html.escape(job.get("query", "Research Report"))
         created_at = job.get("created_at", datetime.utcnow().isoformat())
 
         full_html = f"""
@@ -264,9 +265,11 @@ async def generate_pdf_from_markdown(markdown: str, job: dict) -> bytes:
         return pdf_bytes
 
     except ImportError:
-        logger.warning("weasyprint not installed, using fallback PDF generation")
-        # Fallback: return markdown as plain text in PDF-like format
-        return markdown.encode("utf-8")
+        logger.warning("weasyprint_not_installed")
+        raise HTTPException(
+            status_code=501,
+            detail="PDF generation unavailable - weasyprint not installed"
+        )
     except Exception as e:
         logger.error(f"PDF generation failed: {e}")
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {str(e)}")
@@ -282,7 +285,7 @@ async def convert_markdown_to_html(markdown: str, job: dict) -> str:
             extras=["tables", "fenced-code-blocks", "header-ids", "toc", "strike"]
         )
 
-        query = job.get("query", "Research Report")
+        query = html.escape(job.get("query", "Research Report"))
         created_at = job.get("created_at", datetime.utcnow().isoformat())
 
         return f"""
@@ -410,7 +413,7 @@ async def convert_markdown_to_html(markdown: str, job: dict) -> str:
         <!DOCTYPE html>
         <html>
         <head><title>Research Report</title></head>
-        <body><pre>{markdown}</pre></body>
+        <body><pre>{html.escape(markdown)}</pre></body>
         </html>
         """
 
