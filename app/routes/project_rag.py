@@ -486,17 +486,17 @@ async def stream_project_rag_query(
                     "id": s.source_id,
                     "title": s.title,
                     "content_preview": s.content[:200] if s.content else "",
-                    "similarity_score": s.similarity_score,
+                    "similarity_score": s.similarity,
                     "source_type": s.source_type
                 }
-                for s in result.sources
+                for s in result.sources_used
             ]
             yield f"event: sources\ndata: {json.dumps(sources_data)}\n\n"
             await asyncio.sleep(0)  # Allow event to flush
 
             # Stream the response tokens
             # For now, chunk the response into smaller pieces for streaming effect
-            response_text = result.response
+            response_text = result.answer
             chunk_size = 20  # Characters per chunk for smooth streaming
 
             for i in range(0, len(response_text), chunk_size):
@@ -509,8 +509,7 @@ async def stream_project_rag_query(
                 citations_data = [
                     {
                         "source_id": c.source_id,
-                        "text": c.cited_text,
-                        "context": c.context
+                        "text": c.excerpt
                     }
                     for c in result.citations
                 ]

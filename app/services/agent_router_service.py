@@ -327,7 +327,7 @@ class AgentRouterService:
                 cache_data = result.data[0]
                 # Increment hit count
                 self.supabase.rpc(
-                    "increment_router_cache_hit",
+                    "increment_cache_hit",
                     {"p_cache_id": cache_data["id"]}
                 ).execute()
 
@@ -368,7 +368,7 @@ class AgentRouterService:
         try:
             # Use pgvector similarity search via Supabase RPC
             result = self.supabase.rpc(
-                "match_router_cache",
+                "get_cached_routing",
                 {
                     "query_embedding": query_embedding,
                     "match_threshold": match_threshold,
@@ -388,7 +388,7 @@ class AgentRouterService:
 
                 # Increment hit count for the matched cache entry
                 self.supabase.rpc(
-                    "increment_router_cache_hit",
+                    "increment_cache_hit",
                     {"p_cache_id": cache_data["id"]}
                 ).execute()
 

@@ -249,11 +249,9 @@ class PriorityTaskQueue:
             QueueItem or None if empty
         """
         with self._lock:
-            # Find first non-removed item
-            for item in self._heap:
-                if not item.removed:
-                    return item
-            return None
+            while self._heap and self._heap[0].removed:
+                heapq.heappop(self._heap)
+            return self._heap[0] if self._heap else None
 
     def pop_batch(self, count: int) -> List[QueueItem]:
         """

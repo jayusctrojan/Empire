@@ -82,8 +82,9 @@ def get_job_report_info(job_id: int) -> dict:
     return result.data
 
 
-def sanitize_filename(query: str, max_length: int = 50) -> str:
+def sanitize_filename(query: Optional[str], max_length: int = 50) -> str:
     """Create a safe filename from query"""
+    query = "" if query is None else str(query)
     # Remove special characters
     safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in query)
     # Truncate and clean
@@ -157,12 +158,13 @@ async def generate_pdf_from_markdown(markdown: str, job: dict) -> bytes:
         # Convert markdown to HTML
         html_content = markdown2.markdown(
             markdown,
-            extras=["tables", "fenced-code-blocks", "header-ids", "toc"]
+            extras=["tables", "fenced-code-blocks", "header-ids", "toc"],
+            safe_mode="escape"
         )
 
         # Wrap in complete HTML document with styling
-        query = html.escape(job.get("query", "Research Report"))
-        created_at = job.get("created_at", datetime.utcnow().isoformat())
+        query = html.escape(job.get("query") or "Research Report")
+        created_at = job.get("created_at") or datetime.utcnow().isoformat()
 
         full_html = f"""
         <!DOCTYPE html>
@@ -282,11 +284,12 @@ async def convert_markdown_to_html(markdown: str, job: dict) -> str:
 
         html_content = markdown2.markdown(
             markdown,
-            extras=["tables", "fenced-code-blocks", "header-ids", "toc", "strike"]
+            extras=["tables", "fenced-code-blocks", "header-ids", "toc", "strike"],
+            safe_mode="escape"
         )
 
-        query = html.escape(job.get("query", "Research Report"))
-        created_at = job.get("created_at", datetime.utcnow().isoformat())
+        query = html.escape(job.get("query") or "Research Report")
+        created_at = job.get("created_at") or datetime.utcnow().isoformat()
 
         return f"""
         <!DOCTYPE html>

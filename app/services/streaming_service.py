@@ -36,7 +36,7 @@ logger = structlog.get_logger(__name__)
 STREAM_CHUNKS = Counter(
     'empire_stream_chunks_total',
     'Total chunks streamed',
-    ['stream_type', 'stream_id']
+    ['stream_type']
 )
 
 STREAM_BYTES = Counter(
@@ -171,9 +171,10 @@ class StreamBuffer:
     - Automatic cleanup
     """
 
-    def __init__(self, max_size: int = 1000, chunk_timeout: float = 30.0):
+    def __init__(self, max_size: int = 1000, chunk_timeout: float = 30.0, max_replay_chunks: int = 100):
         self.max_size = max_size
         self.chunk_timeout = chunk_timeout
+        self.max_replay_chunks = max_replay_chunks
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=max_size)
         self._chunks: List[StreamChunk] = []
         self._lock = asyncio.Lock()
@@ -192,6 +193,8 @@ class StreamBuffer:
             )
             async with self._lock:
                 self._chunks.append(chunk)
+                if len(self._chunks) > self.max_replay_chunks:
+                    self._chunks = self._chunks[-self.max_replay_chunks:]
         except asyncio.TimeoutError:
             raise RuntimeError("Buffer full, backpressure timeout")
 
@@ -465,8 +468,7 @@ class StreamingService:
         stream.bytes_sent += chunk_bytes
 
         STREAM_CHUNKS.labels(
-            stream_type=stream.stream_type.value,
-            stream_id=stream_id
+            stream_type=stream.stream_type.value
         ).inc()
         STREAM_BYTES.labels(stream_type=stream.stream_type.value).inc(chunk_bytes)
 
@@ -494,7 +496,7 @@ class StreamingService:
         """Distribute chunk to local subscribers"""
         for queue in self._subscribers.get(stream_id, []):
             try:
-                await queue.put(chunk_data)
+                queue.put_nowait(chunk_data)
             except asyncio.QueueFull:
                 logger.warning("Subscriber queue full, dropping chunk")
 
@@ -525,9 +527,11 @@ class StreamingService:
 
         try:
             # First, send any buffered chunks
+            last_seen_sequence = -1
             buffer = self._buffers.get(stream_id)
             if buffer:
                 for chunk in buffer.get_all_chunks():
+                    last_seen_sequence = chunk.sequence
                     yield chunk.to_dict()
 
             # Then stream new chunks
@@ -535,6 +539,9 @@ class StreamingService:
                 chunk_data = await queue.get()
                 if chunk_data is None:  # End of stream
                     break
+                if chunk_data.get("sequence", 0) <= last_seen_sequence:
+                    continue
+                last_seen_sequence = chunk_data.get("sequence", 0)
                 yield chunk_data
 
         finally:

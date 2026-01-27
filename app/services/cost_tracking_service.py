@@ -4,6 +4,7 @@ Tracks API, compute, and storage costs across all services with budget alerts
 """
 
 import os
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
@@ -667,16 +668,20 @@ class CostTrackingService:
         if "websocket" in channels:
             try:
                 dispatcher = get_notification_dispatcher()
-                dispatcher.notify_alert(
-                    alert_type="budget_alert",
-                    severity=severity,
-                    message=message,
-                    metadata={
-                        "service": service.value,
-                        "current_spending": current_spending,
-                        "monthly_budget": monthly_budget,
-                        "usage_percent": usage_percent
-                    }
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: dispatcher.notify_alert(
+                        alert_type="budget_alert",
+                        severity=severity,
+                        message=message,
+                        metadata={
+                            "service": service.value,
+                            "current_spending": current_spending,
+                            "monthly_budget": monthly_budget,
+                            "usage_percent": usage_percent
+                        }
+                    )
                 )
                 logger.info("Budget alert WebSocket notification sent")
             except Exception as e:

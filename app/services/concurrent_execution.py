@@ -661,8 +661,10 @@ class ConcurrentExecutionEngine:
                 result = task_group.apply_async()
 
                 try:
-                    # Wait for all tasks in batch to complete
-                    results = result.get(timeout=self.config.task_timeout * len(batch))
+                    # Wait for all tasks in batch to complete (offload blocking call)
+                    results = await asyncio.to_thread(
+                        result.get, timeout=self.config.task_timeout * len(batch)
+                    )
 
                     # Process results
                     for task_key, task_result in zip(batch, results):
