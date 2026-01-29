@@ -653,6 +653,9 @@ def get_worker_monitor_sync() -> WorkerMonitor:
     """Get or create worker monitor (sync version for signal handlers).
 
     Note: Attempts initialization. Redis may not be available in all sync contexts.
+
+    Raises:
+        RuntimeError: If called from an async context where asyncio.run() cannot be used.
     """
     global _monitor_instance
     if _monitor_instance is None:
@@ -660,6 +663,10 @@ def get_worker_monitor_sync() -> WorkerMonitor:
         try:
             asyncio.run(_monitor_instance.initialize())
         except RuntimeError:
-            # Event loop already running — initialize() must be called separately
-            logger.warning("Cannot initialize worker monitor synchronously in async context")
+            # Event loop already running — reset instance and raise
+            _monitor_instance = None
+            raise RuntimeError(
+                "Cannot initialize worker monitor synchronously in async context. "
+                "Use get_worker_monitor() from async code instead."
+            )
     return _monitor_instance

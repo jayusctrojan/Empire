@@ -459,6 +459,7 @@ async def stream_project_rag_query(
                 project_weight=request.project_weight,
                 global_weight=request.global_weight,
                 min_similarity=request.min_similarity,
+                include_project_sources=True,
                 include_global_kb=request.include_global_kb,
                 enable_query_expansion=request.enable_query_expansion,
                 num_query_variations=request.num_query_variations,
@@ -532,12 +533,12 @@ async def stream_project_rag_query(
             )
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "stream_rag_query_failed",
                 project_id=project_id,
                 error=str(e)
             )
-            error_data = {"error": str(e), "type": type(e).__name__}
+            error_data = {"error": "An internal error occurred", "type": "InternalError"}
             yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
 
     return StreamingResponse(

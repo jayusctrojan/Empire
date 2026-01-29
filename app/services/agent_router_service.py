@@ -12,6 +12,7 @@ Author: Claude Code
 Date: 2025-01-25
 """
 
+import asyncio
 import os
 import json
 import hashlib
@@ -366,15 +367,17 @@ class AgentRouterService:
             return None
 
         try:
-            # Use pgvector similarity search via Supabase RPC
-            result = self.supabase.rpc(
-                "get_cached_routing",
-                {
-                    "query_embedding": query_embedding,
-                    "match_threshold": match_threshold,
-                    "match_count": match_count
-                }
-            ).execute()
+            # Use pgvector similarity search via Supabase RPC (wrap sync call)
+            result = await asyncio.to_thread(
+                lambda: self.supabase.rpc(
+                    "get_cached_routing",
+                    {
+                        "query_embedding": query_embedding,
+                        "match_threshold": match_threshold,
+                        "match_count": match_count
+                    }
+                ).execute()
+            )
 
             if result.data and len(result.data) > 0:
                 cache_data = result.data[0]
@@ -383,16 +386,27 @@ class AgentRouterService:
                 logger.info(
                     "semantic_cache_hit",
                     similarity_score=similarity_score,
-                    cache_id=cache_data.get("id")
+                    cache_id=cache_data.get("cache_id")
                 )
 
-                # Increment hit count for the matched cache entry
-                self.supabase.rpc(
-                    "increment_cache_hit",
-                    {"p_cache_id": cache_data["id"]}
-                ).execute()
+                # Increment hit count for the matched cache entry (wrap sync call)
+                await asyncio.to_thread(
+                    lambda: self.supabase.rpc(
+                        "increment_cache_hit",
+                        {"p_cache_id": cache_data.get("cache_id")}
+                    ).execute()
+                )
 
-                return RouterCacheEntry.from_dict(cache_data)
+                # Transform RPC response fields to match RouterCacheEntry expectations
+                transformed = {
+                    "query_hash": "",  # Not returned by semantic search
+                    "query_text": "",  # Not returned by semantic search
+                    "selected_agent": cache_data.get("selected_workflow"),
+                    "confidence": cache_data.get("confidence_score", 0.0),
+                    "reasoning": cache_data.get("reasoning"),
+                }
+
+                return RouterCacheEntry.from_dict(transformed)
 
         except Exception as e:
             # Log but don't fail - semantic search is an optimization

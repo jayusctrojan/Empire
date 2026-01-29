@@ -475,8 +475,10 @@ class StreamingService:
         # Broadcast via Redis for cross-instance
         await self._publish_chunk(stream_id, chunk)
 
-        # Distribute to local subscribers
-        await self._distribute_chunk(stream_id, chunk.to_dict())
+        # Only distribute locally if Redis not available
+        # (Redis pubsub listener handles distribution when Redis is connected)
+        if not self._redis:
+            await self._distribute_chunk(stream_id, chunk.to_dict())
 
         if is_final:
             await self.close_stream(stream_id)

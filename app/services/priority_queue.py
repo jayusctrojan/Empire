@@ -200,7 +200,7 @@ class PriorityTaskQueue:
 
             # Update metrics
             QUEUE_SIZE.labels(queue_name=self.name).set(self.size)
-            QUEUE_ENQUEUED.labels(queue_name=self.name, priority=str(priority)).inc()
+            QUEUE_ENQUEUED.labels(queue_name=self.name, priority=str(int(priority))).inc()
 
             logger.debug(
                 "Task enqueued",
@@ -366,19 +366,23 @@ class PriorityTaskQueue:
             items: List of dicts with task_id, task_key, task_type, priority, etc.
 
         Returns:
-            Number of tasks added
+            Number of tasks actually added (excludes duplicates)
         """
         added = 0
         for item in items:
+            task_key = item["task_key"]
+            # Check if task already exists before pushing
+            is_new = task_key not in self._task_map
             self.push(
                 task_id=item["task_id"],
-                task_key=item["task_key"],
+                task_key=task_key,
                 task_type=item.get("task_type", "unknown"),
                 priority=item.get("priority", Priority.NORMAL),
                 job_id=item.get("job_id", 0),
                 metadata=item.get("metadata")
             )
-            added += 1
+            if is_new:
+                added += 1
         return added
 
     def clear(self) -> int:
@@ -647,13 +651,16 @@ class PriorityCalculator:
 
 _queue_manager: Optional[PriorityQueueManager] = None
 _default_queue: Optional[PriorityTaskQueue] = None
+_singleton_lock = threading.Lock()
 
 
 def get_priority_queue_manager() -> PriorityQueueManager:
-    """Get or create the queue manager singleton"""
+    """Get or create the queue manager singleton (thread-safe)"""
     global _queue_manager
     if _queue_manager is None:
-        _queue_manager = PriorityQueueManager()
+        with _singleton_lock:
+            if _queue_manager is None:
+                _queue_manager = PriorityQueueManager()
     return _queue_manager
 
 
@@ -663,8 +670,10 @@ def get_priority_queue(name: str = "default") -> PriorityTaskQueue:
 
 
 def get_default_priority_queue() -> PriorityTaskQueue:
-    """Get the default priority queue"""
+    """Get the default priority queue (thread-safe)"""
     global _default_queue
     if _default_queue is None:
-        _default_queue = PriorityTaskQueue("default")
+        with _singleton_lock:
+            if _default_queue is None:
+                _default_queue = PriorityTaskQueue("default")
     return _default_queue

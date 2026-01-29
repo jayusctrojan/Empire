@@ -1033,7 +1033,7 @@ class ConcurrentExecutionEngine:
                 ready = self.get_ready_tasks(graph)
 
                 # Dispatch tasks up to current concurrency limit
-                available_slots = current_max - len(running)
+                available_slots = max(0, current_max - len(running))
                 for task_key in ready[:available_slots]:
                     if task_key not in running:
                         node = graph[task_key]
