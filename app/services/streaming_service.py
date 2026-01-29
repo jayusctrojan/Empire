@@ -140,6 +140,9 @@ class StreamInfo:
     source: str = ""  # e.g., "llm", "report_generation"
     resource_id: Optional[str] = None  # e.g., job_id, task_id
 
+    # Track if final chunk was sent to prevent duplicates
+    final_sent: bool = False
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
@@ -376,8 +379,9 @@ class StreamingService:
         stream = self._streams[stream_id]
         buffer = self._buffers.get(stream_id)
 
-        # Send final chunk
-        if buffer and not buffer.is_closed():
+        # Send final chunk only if not already sent
+        if buffer and not buffer.is_closed() and not stream.final_sent:
+            stream.final_sent = True
             final_chunk = StreamChunk(
                 data={"status": "complete", "error": error},
                 sequence=stream.chunks_sent,
@@ -471,6 +475,10 @@ class StreamingService:
             stream_type=stream.stream_type.value
         ).inc()
         STREAM_BYTES.labels(stream_type=stream.stream_type.value).inc(chunk_bytes)
+
+        # Mark final_sent if this is the final chunk
+        if is_final:
+            stream.final_sent = True
 
         # Broadcast via Redis for cross-instance
         await self._publish_chunk(stream_id, chunk)
@@ -669,12 +677,16 @@ class StreamingService:
 # ==============================================================================
 
 _streaming_service: Optional[StreamingService] = None
+_streaming_service_lock: asyncio.Lock = asyncio.Lock()
 
 
 async def get_streaming_service() -> StreamingService:
-    """Get or create the streaming service singleton"""
+    """Get or create the streaming service singleton (async-safe)"""
     global _streaming_service
     if _streaming_service is None:
-        _streaming_service = StreamingService()
-        await _streaming_service.initialize()
+        async with _streaming_service_lock:
+            # Double-check after acquiring lock
+            if _streaming_service is None:
+                _streaming_service = StreamingService()
+                await _streaming_service.initialize()
     return _streaming_service

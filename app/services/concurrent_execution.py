@@ -674,6 +674,7 @@ class ConcurrentExecutionEngine:
                         if task_result and task_result.get("success"):
                             node.status = ExecutionStatus.COMPLETE
                             node.result = task_result
+                            node.error = None  # Clear any previous error from retries
                             completed += 1
                         else:
                             # Track failure for potential retry
@@ -762,7 +763,7 @@ class ConcurrentExecutionEngine:
 
         error_lower = error_message.lower()
 
-        # Non-retryable errors
+        # Non-retryable errors (include both spaced and no-space variants)
         non_retryable_patterns = [
             "validation error",
             "invalid input",
@@ -774,7 +775,9 @@ class ConcurrentExecutionEngine:
             "invalid credentials",
             "schema error",
             "type error",
-            "value error"
+            "typeerror",
+            "value error",
+            "valueerror"
         ]
 
         for pattern in non_retryable_patterns:
@@ -953,13 +956,15 @@ class ConcurrentExecutionEngine:
         self,
         initial_concurrency: int
     ) -> DynamicConcurrencyController:
-        """Get or create the concurrency controller."""
-        if (self._concurrency_controller is None or
-                self._concurrency_controller.current_concurrency != initial_concurrency):
-            self._concurrency_controller = DynamicConcurrencyController(
-                initial_concurrency=initial_concurrency,
-                config=self.dynamic_config
-            )
+        """Create a fresh concurrency controller for each job.
+
+        Always creates a new instance to prevent leaking state (cooldown/history)
+        from previous jobs.
+        """
+        self._concurrency_controller = DynamicConcurrencyController(
+            initial_concurrency=initial_concurrency,
+            config=self.dynamic_config
+        )
         return self._concurrency_controller
 
     async def execute_job_adaptive(

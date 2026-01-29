@@ -670,10 +670,15 @@ def get_priority_queue(name: str = "default") -> PriorityTaskQueue:
 
 
 def get_default_priority_queue() -> PriorityTaskQueue:
-    """Get the default priority queue (thread-safe)"""
+    """Get the default priority queue (thread-safe).
+
+    Uses the same instance as get_priority_queue("default") to ensure
+    both accessors return the same queue.
+    """
     global _default_queue
     if _default_queue is None:
         with _singleton_lock:
             if _default_queue is None:
-                _default_queue = PriorityTaskQueue("default")
+                # Use the manager's queue to ensure consistency
+                _default_queue = get_priority_queue_manager().get_queue("default")
     return _default_queue

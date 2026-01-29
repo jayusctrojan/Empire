@@ -18,6 +18,7 @@ Date: 2025-01-24
 
 import asyncio
 import json
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Set
@@ -205,21 +206,35 @@ class WorkerMonitor:
         self._redis = redis.from_url(redis_url, decode_responses=True)
 
     async def _load_workers_from_redis(self) -> None:
-        """Load worker state from Redis"""
+        """Load worker state from Redis using SCAN (non-blocking)"""
         if not self._redis:
             return
 
         try:
-            keys = await self._redis.keys(f"{self.REDIS_PREFIX}*")
-            for key in keys:
-                data = await self._redis.get(key)
-                if data:
-                    worker = WorkerInfo.from_dict(json.loads(data))
-                    self._workers[worker.worker_id] = worker
+            # Use SCAN instead of KEYS to avoid blocking Redis
+            cursor = 0
+            pattern = f"{self.REDIS_PREFIX}*"
+            while True:
+                cursor, keys = await self._redis.scan(
+                    cursor=cursor,
+                    match=pattern,
+                    count=100
+                )
+                for key in keys:
+                    data = await self._redis.get(key)
+                    if data:
+                        worker = WorkerInfo.from_dict(json.loads(data))
+                        self._workers[worker.worker_id] = worker
+                if cursor == 0:
+                    break
 
             logger.info("Loaded workers from Redis", count=len(self._workers))
         except Exception as e:
-            logger.error(f"Failed to load workers from Redis: {e}")
+            logger.exception(
+                "Failed to load workers from Redis",
+                error=str(e),
+                workers_loaded=len(self._workers)
+            )
 
     async def _save_worker(self, worker: WorkerInfo) -> None:
         """Save worker state to Redis"""
@@ -604,8 +619,12 @@ def setup_celery_worker_signals(monitor: WorkerMonitor) -> None:
         cpu = psutil.cpu_percent()
         memory = psutil.virtual_memory().percent
 
-        # Count active tasks (approximate)
-        active = len(sender.pool._pool) if hasattr(sender, 'pool') else 0
+        # Count active tasks using Celery's stable worker state API
+        active = (
+            len(sender.state.active_requests)
+            if hasattr(sender, 'state') and hasattr(sender.state, 'active_requests')
+            else 0
+        )
 
         run_async(monitor.send_heartbeat(
             worker_id=sender.hostname,
@@ -638,14 +657,25 @@ def setup_celery_worker_signals(monitor: WorkerMonitor) -> None:
 # ==============================================================================
 
 _monitor_instance: Optional[WorkerMonitor] = None
+_monitor_init_lock = threading.Lock()
 
 
 async def get_worker_monitor() -> WorkerMonitor:
-    """Get or create the worker monitor singleton"""
+    """Get or create the worker monitor singleton (thread-safe)"""
     global _monitor_instance
     if _monitor_instance is None:
-        _monitor_instance = WorkerMonitor()
-        await _monitor_instance.initialize()
+        # Use to_thread to safely acquire the lock from async context
+        def _create_instance():
+            global _monitor_instance
+            with _monitor_init_lock:
+                if _monitor_instance is None:
+                    _monitor_instance = WorkerMonitor()
+                    return True  # Needs initialization
+            return False  # Already exists
+
+        needs_init = await asyncio.to_thread(_create_instance)
+        if needs_init:
+            await _monitor_instance.initialize()
     return _monitor_instance
 
 
@@ -658,15 +688,16 @@ def get_worker_monitor_sync() -> WorkerMonitor:
         RuntimeError: If called from an async context where asyncio.run() cannot be used.
     """
     global _monitor_instance
-    if _monitor_instance is None:
-        _monitor_instance = WorkerMonitor()
-        try:
-            asyncio.run(_monitor_instance.initialize())
-        except RuntimeError:
-            # Event loop already running — reset instance and raise
-            _monitor_instance = None
-            raise RuntimeError(
-                "Cannot initialize worker monitor synchronously in async context. "
-                "Use get_worker_monitor() from async code instead."
-            )
+    with _monitor_init_lock:
+        if _monitor_instance is None:
+            _monitor_instance = WorkerMonitor()
+            try:
+                asyncio.run(_monitor_instance.initialize())
+            except RuntimeError as err:
+                # Event loop already running — reset instance and raise
+                _monitor_instance = None
+                raise RuntimeError(
+                    "Cannot initialize worker monitor synchronously in async context. "
+                    "Use get_worker_monitor() from async code instead."
+                ) from err
     return _monitor_instance

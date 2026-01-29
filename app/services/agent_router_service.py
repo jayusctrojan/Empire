@@ -336,7 +336,10 @@ class AgentRouterService:
 
             # Semantic similarity search with embeddings
             if embedding is not None:
-                similar_result = await self._semantic_cache_lookup(embedding)
+                similar_result = await self._semantic_cache_lookup(
+                    embedding,
+                    match_threshold=self.similarity_threshold
+                )
                 if similar_result:
                     return similar_result
 

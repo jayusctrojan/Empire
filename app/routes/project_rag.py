@@ -457,7 +457,7 @@ async def stream_project_rag_query(
                 project_source_limit=request.project_source_limit,
                 global_kb_limit=request.global_kb_limit if request.include_global_kb else 0,
                 project_weight=request.project_weight,
-                global_weight=request.global_weight,
+                global_weight=request.global_weight if request.include_global_kb else 0,
                 min_similarity=request.min_similarity,
                 include_project_sources=True,
                 include_global_kb=request.include_global_kb,
@@ -481,10 +481,11 @@ async def stream_project_rag_query(
                 config=config
             )
 
-            # Emit sources event
+            # Emit sources event (consistent with non-streaming endpoints)
             sources_data = [
                 {
-                    "id": s.source_id,
+                    "id": s.id,
+                    "source_id": s.source_id,
                     "title": s.title,
                     "content_preview": s.content[:200] if s.content else "",
                     "similarity_score": s.similarity,
