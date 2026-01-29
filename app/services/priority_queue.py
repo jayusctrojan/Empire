@@ -167,7 +167,7 @@ class PriorityTaskQueue:
         priority: int = Priority.NORMAL,
         job_id: int = 0,
         metadata: Optional[Dict[str, Any]] = None
-    ) -> None:
+    ) -> bool:
         """
         Add a task to the queue.
 
@@ -178,13 +178,19 @@ class PriorityTaskQueue:
             priority: Priority level (1-10, higher = more urgent)
             job_id: Job ID the task belongs to
             metadata: Additional task metadata
+
+        Returns:
+            True if task was newly added, False if it already existed (priority updated)
         """
         with self._lock:
             # Check if task already exists
             if task_key in self._task_map:
-                logger.warning(f"Task {task_key} already in queue, updating priority")
-                self.update_priority(task_key, priority)
-                return
+                logger.warning(
+                    "Task already in queue, updating priority",
+                    task_key=task_key
+                )
+                self._update_priority_locked(task_key, priority)
+                return False
 
             item = QueueItem.create(
                 task_id=task_id,
@@ -208,6 +214,7 @@ class PriorityTaskQueue:
                 priority=priority,
                 queue_size=self.size
             )
+            return True
 
     def pop(self) -> Optional[QueueItem]:
         """
@@ -294,6 +301,50 @@ class PriorityTaskQueue:
                 return True
             return False
 
+    def _update_priority_locked(self, task_key: str, new_priority: int) -> bool:
+        """
+        Internal: Update priority while lock is already held.
+
+        Args:
+            task_key: Task key to update
+            new_priority: New priority level
+
+        Returns:
+            True if task was found and updated
+        """
+        if task_key not in self._task_map:
+            return False
+
+        old_item = self._task_map[task_key]
+
+        if old_item.priority == new_priority:
+            return True
+
+        # Mark old entry as removed
+        old_item.removed = True
+
+        # Create new entry with updated priority
+        new_item = QueueItem.create(
+            task_id=old_item.task_id,
+            task_key=task_key,
+            task_type=old_item.task_type,
+            priority=new_priority,
+            job_id=old_item.job_id,
+            metadata=old_item.metadata
+        )
+
+        heapq.heappush(self._heap, new_item)
+        self._task_map[task_key] = new_item
+
+        logger.debug(
+            "Task priority updated",
+            task_key=task_key,
+            old_priority=old_item.priority,
+            new_priority=new_priority
+        )
+
+        return True
+
     def update_priority(self, task_key: str, new_priority: int) -> bool:
         """
         Update the priority of a task in the queue.
@@ -309,38 +360,7 @@ class PriorityTaskQueue:
             True if task was found and updated
         """
         with self._lock:
-            if task_key not in self._task_map:
-                return False
-
-            old_item = self._task_map[task_key]
-
-            if old_item.priority == new_priority:
-                return True
-
-            # Mark old entry as removed
-            old_item.removed = True
-
-            # Create new entry with updated priority
-            new_item = QueueItem.create(
-                task_id=old_item.task_id,
-                task_key=task_key,
-                task_type=old_item.task_type,
-                priority=new_priority,
-                job_id=old_item.job_id,
-                metadata=old_item.metadata
-            )
-
-            heapq.heappush(self._heap, new_item)
-            self._task_map[task_key] = new_item
-
-            logger.debug(
-                "Task priority updated",
-                task_key=task_key,
-                old_priority=old_item.priority,
-                new_priority=new_priority
-            )
-
-            return True
+            return self._update_priority_locked(task_key, new_priority)
 
     def contains(self, task_key: str) -> bool:
         """Check if a task is in the queue"""
@@ -370,18 +390,16 @@ class PriorityTaskQueue:
         """
         added = 0
         for item in items:
-            task_key = item["task_key"]
-            # Check if task already exists before pushing
-            is_new = task_key not in self._task_map
-            self.push(
+            # push() returns True if newly added, False if duplicate (atomically checked)
+            was_new = self.push(
                 task_id=item["task_id"],
-                task_key=task_key,
+                task_key=item["task_key"],
                 task_type=item.get("task_type", "unknown"),
                 priority=item.get("priority", Priority.NORMAL),
                 job_id=item.get("job_id", 0),
                 metadata=item.get("metadata")
             )
-            if is_new:
+            if was_new:
                 added += 1
         return added
 

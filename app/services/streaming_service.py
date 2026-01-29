@@ -91,20 +91,29 @@ class StreamChunk:
     metadata: Optional[Dict[str, Any]] = None
 
     def to_sse(self) -> str:
-        """Convert to SSE format"""
+        """Convert to SSE format.
+
+        Handles multiline payloads by emitting one 'data:' line per line of content,
+        as per the SSE specification.
+        """
         if isinstance(self.data, dict):
             data_str = json.dumps(self.data)
         else:
             data_str = str(self.data)
 
-        lines = [
-            f"id: {self.sequence}",
-            f"data: {data_str}",
-            ""
-        ]
+        # Build the SSE message
+        lines = [f"id: {self.sequence}"]
 
+        # Insert event type before data lines if this is the final chunk
         if self.is_final:
-            lines.insert(1, "event: complete")
+            lines.append("event: complete")
+
+        # Handle multiline data - each line needs its own "data:" prefix
+        for data_line in data_str.split("\n"):
+            lines.append(f"data: {data_line}")
+
+        # Trailing blank line to signal end of message
+        lines.append("")
 
         return "\n".join(lines)
 
@@ -400,9 +409,15 @@ class StreamingService:
         else:
             stream.status = StreamStatus.COMPLETED
 
-        # Notify subscribers
+        # Notify subscribers (non-blocking to avoid stalling on full queues)
         for queue in self._subscribers.get(stream_id, []):
-            await queue.put(None)  # Signal end of stream
+            try:
+                queue.put_nowait(None)  # Signal end of stream
+            except asyncio.QueueFull:
+                logger.warning(
+                    "Subscriber queue full, end-of-stream signal not delivered",
+                    stream_id=stream_id
+                )
 
         # Record metrics
         duration = (datetime.utcnow() - stream.created_at).total_seconds()

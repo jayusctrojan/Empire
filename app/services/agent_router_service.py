@@ -317,20 +317,24 @@ class AgentRouterService:
             return None
 
         try:
-            # Try exact hash match first
-            result = self.supabase.table("agent_router_cache").select("*").eq(
-                "query_hash", query_hash
-            ).eq("is_active", True).gt(
-                "expires_at", datetime.utcnow().isoformat()
-            ).execute()
+            # Try exact hash match first (wrap sync call to avoid blocking)
+            result = await asyncio.to_thread(
+                lambda: self.supabase.table("agent_router_cache").select("*").eq(
+                    "query_hash", query_hash
+                ).eq("is_active", True).gt(
+                    "expires_at", datetime.utcnow().isoformat()
+                ).execute()
+            )
 
             if result.data:
                 cache_data = result.data[0]
-                # Increment hit count
-                self.supabase.rpc(
-                    "increment_cache_hit",
-                    {"p_cache_id": cache_data["id"]}
-                ).execute()
+                # Increment hit count (wrap sync call)
+                await asyncio.to_thread(
+                    lambda: self.supabase.rpc(
+                        "increment_cache_hit",
+                        {"p_cache_id": cache_data["id"]}
+                    ).execute()
+                )
 
                 return RouterCacheEntry.from_dict(cache_data)
 

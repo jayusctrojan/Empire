@@ -244,8 +244,11 @@ class WorkerMonitor:
         try:
             key = f"{self.REDIS_PREFIX}{worker.worker_id}"
             await self._redis.set(key, json.dumps(worker.to_dict()))
-        except Exception as e:
-            logger.error(f"Failed to save worker to Redis: {e}")
+        except Exception:
+            logger.exception(
+                "Failed to save worker to Redis",
+                worker_id=worker.worker_id
+            )
 
     async def _save_all_workers(self) -> None:
         """Save all workers to Redis"""
@@ -261,8 +264,8 @@ class WorkerMonitor:
                 await self._update_worker_statuses()
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.error(f"Cleanup loop error: {e}")
+            except Exception:
+                logger.exception("Cleanup loop error")
 
     # ==========================================================================
     # Worker Registration
@@ -294,7 +297,9 @@ class WorkerMonitor:
         if worker_id in self._workers:
             worker = self._workers[worker_id]
             worker.last_heartbeat = now
-            worker.queues = queues or worker.queues
+            # Only update queues if explicitly provided (None means keep existing)
+            if queues is not None:
+                worker.queues = queues
             worker.status = WorkerStatus.HEALTHY
         else:
             worker = WorkerInfo(

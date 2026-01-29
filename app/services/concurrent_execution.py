@@ -662,14 +662,22 @@ class ConcurrentExecutionEngine:
 
                 try:
                     # Wait for all tasks in batch to complete (offload blocking call)
+                    # Use propagate=False to handle per-task failures without raising
                     results = await asyncio.to_thread(
-                        result.get, timeout=self.config.task_timeout * len(batch)
+                        lambda: result.get(
+                            timeout=self.config.task_timeout * len(batch),
+                            propagate=False
+                        )
                     )
 
                     # Process results
                     for task_key, task_result in zip(batch, results):
                         node = graph[task_key]
                         node.completed_at = datetime.utcnow()
+
+                        # Handle exception results from propagate=False
+                        if isinstance(task_result, Exception):
+                            task_result = {"success": False, "error": str(task_result)}
 
                         if task_result and task_result.get("success"):
                             node.status = ExecutionStatus.COMPLETE
