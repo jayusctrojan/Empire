@@ -338,8 +338,8 @@ class AgentRouterService:
 
                 return RouterCacheEntry.from_dict(cache_data)
 
-            # Semantic similarity search with embeddings
-            if embedding is not None:
+            # Semantic similarity search with embeddings (only if enabled)
+            if self.use_semantic_cache and embedding is not None:
                 similar_result = await self._semantic_cache_lookup(
                     embedding,
                     match_threshold=self.similarity_threshold

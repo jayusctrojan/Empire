@@ -16,7 +16,7 @@ Date: 2025-01-24
 
 import heapq
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -86,7 +86,7 @@ class QueueItem:
     priority: int = field(compare=False)
     job_id: int = field(compare=False)
     metadata: Dict[str, Any] = field(default_factory=dict, compare=False)
-    enqueued_at: datetime = field(default_factory=datetime.utcnow, compare=False)
+    enqueued_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc), compare=False)
     removed: bool = field(default=False, compare=False)
 
     @classmethod
@@ -100,7 +100,8 @@ class QueueItem:
         metadata: Optional[Dict[str, Any]] = None
     ) -> "QueueItem":
         """Factory method to create a queue item with proper sort key"""
-        timestamp = datetime.utcnow().timestamp()
+        now = datetime.now(timezone.utc)
+        timestamp = now.timestamp()
         return cls(
             sort_key=(-priority, timestamp, task_key),
             task_id=task_id,
@@ -109,7 +110,7 @@ class QueueItem:
             priority=priority,
             job_id=job_id,
             metadata=metadata or {},
-            enqueued_at=datetime.utcnow()
+            enqueued_at=now
         )
 
     def to_dict(self) -> Dict[str, Any]:

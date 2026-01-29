@@ -671,7 +671,7 @@ class ConcurrentExecutionEngine:
                     )
 
                     # Process results
-                    for task_key, task_result in zip(batch, results):
+                    for task_key, task_result in zip(batch, results, strict=True):
                         node = graph[task_key]
                         node.completed_at = datetime.utcnow()
 

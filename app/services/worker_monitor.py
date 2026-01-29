@@ -593,11 +593,7 @@ def setup_celery_worker_signals(monitor: WorkerMonitor) -> None:
 
     def run_async(coro):
         """Helper to run async in sync context"""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-        return loop.run_until_complete(coro)
+        return asyncio.run(coro)
 
     @worker_ready.connect
     def on_worker_ready(sender, **kwargs):

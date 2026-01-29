@@ -205,7 +205,7 @@ class StreamBuffer:
             )
             async with self._lock:
                 self._chunks.append(chunk)
-                if len(self._chunks) > self.max_replay_chunks:
+                if self.max_replay_chunks > 0 and len(self._chunks) > self.max_replay_chunks:
                     self._chunks = self._chunks[-self.max_replay_chunks:]
         except asyncio.TimeoutError:
             raise RuntimeError("Buffer full, backpressure timeout")
@@ -317,9 +317,9 @@ class StreamingService:
                     data = json.loads(message["data"])
                     await self._distribute_chunk(stream_id, data)
         except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            logger.error(f"PubSub listener error: {e}")
+            raise  # Don't swallow cancellation
+        except Exception:
+            logger.exception("pubsub_listener_error")
         finally:
             await pubsub.unsubscribe()
 
