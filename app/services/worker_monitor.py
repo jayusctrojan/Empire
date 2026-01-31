@@ -590,10 +590,31 @@ def setup_celery_worker_signals(monitor: WorkerMonitor) -> None:
         task_failure
     )
     import asyncio
+    import atexit
+
+    # Background event loop for efficient async execution in sync context
+    _background_loop: asyncio.AbstractEventLoop = None
+    _background_thread: threading.Thread = None
+
+    def _get_background_loop() -> asyncio.AbstractEventLoop:
+        """Get or create the background event loop thread."""
+        nonlocal _background_loop, _background_thread
+        if _background_loop is None:
+            _background_loop = asyncio.new_event_loop()
+            _background_thread = threading.Thread(
+                target=_background_loop.run_forever,
+                daemon=True,
+                name="worker-monitor-async"
+            )
+            _background_thread.start()
+            atexit.register(_background_loop.call_soon_threadsafe, _background_loop.stop)
+        return _background_loop
 
     def run_async(coro):
-        """Helper to run async in sync context"""
-        return asyncio.run(coro)
+        """Helper to run async in sync context (reuses background loop)."""
+        loop = _get_background_loop()
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        return future.result(timeout=30)
 
     @worker_ready.connect
     def on_worker_ready(sender, **kwargs):

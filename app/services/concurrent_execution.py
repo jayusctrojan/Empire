@@ -18,7 +18,7 @@ Date: 2025-01-10
 import asyncio
 import time
 from typing import Dict, Any, Optional, List, Set, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -217,7 +217,7 @@ class DynamicConcurrencyController:
         if self._last_adjustment_time is None:
             return False
 
-        elapsed = (datetime.utcnow() - self._last_adjustment_time).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - self._last_adjustment_time).total_seconds()
         return elapsed < self._config.cooldown_after_adjustment_seconds
 
     async def evaluate_and_adjust(self) -> Tuple[int, str]:
@@ -270,7 +270,7 @@ class DynamicConcurrencyController:
 
         # Record adjustment if changed
         if self._current_concurrency != old_concurrency:
-            self._last_adjustment_time = datetime.utcnow()
+            self._last_adjustment_time = datetime.now(timezone.utc)
             self._adjustment_history.append({
                 "timestamp": self._last_adjustment_time.isoformat(),
                 "old_concurrency": old_concurrency,
@@ -494,7 +494,7 @@ class ConcurrentExecutionEngine:
         """
         max_concurrent = max_concurrent or self.config.max_concurrent_tasks
         metrics = ExecutionMetrics(job_id=job_id)
-        metrics.start_time = datetime.utcnow()
+        metrics.start_time = datetime.now(timezone.utc)
 
         logger.info(
             "Starting concurrent job execution",
@@ -555,7 +555,7 @@ class ConcurrentExecutionEngine:
                 self._update_job_progress(job_id, graph)
 
             # Calculate final metrics
-            metrics.end_time = datetime.utcnow()
+            metrics.end_time = datetime.now(timezone.utc)
             metrics.total_duration = (
                 metrics.end_time - metrics.start_time
             ).total_seconds()
@@ -649,7 +649,7 @@ class ConcurrentExecutionEngine:
                 # Mark tasks as queued
                 for task_key in batch:
                     graph[task_key].status = ExecutionStatus.QUEUED
-                    graph[task_key].started_at = datetime.utcnow()
+                    graph[task_key].started_at = datetime.now(timezone.utc)
 
                 # Create Celery group for parallel execution
                 task_group = group(
@@ -675,7 +675,7 @@ class ConcurrentExecutionEngine:
                     # Process results
                     for task_key, task_result in zip(batch, results, strict=True):
                         node = graph[task_key]
-                        node.completed_at = datetime.utcnow()
+                        node.completed_at = datetime.now(timezone.utc)
 
                         # Handle exception results from propagate=False
                         if isinstance(task_result, Exception):
@@ -717,7 +717,7 @@ class ConcurrentExecutionEngine:
                     )
                     for task_key in batch:
                         node = graph[task_key]
-                        node.completed_at = datetime.utcnow()
+                        node.completed_at = datetime.now(timezone.utc)
 
                         # Check if we should retry the whole batch
                         if (self.config.enable_partial_retry and
@@ -846,7 +846,7 @@ class ConcurrentExecutionEngine:
 
         max_concurrent = max_concurrent or self.config.max_concurrent_tasks
         metrics = ExecutionMetrics(job_id=job_id)
-        metrics.start_time = datetime.utcnow()
+        metrics.start_time = datetime.now(timezone.utc)
 
         logger.info(
             "Starting dynamic job execution",
@@ -873,7 +873,7 @@ class ConcurrentExecutionEngine:
                     if task_key not in running:
                         node = graph[task_key]
                         node.status = ExecutionStatus.RUNNING
-                        node.started_at = datetime.utcnow()
+                        node.started_at = datetime.now(timezone.utc)
 
                         # Dispatch task
                         result = execute_single_task.delay(node.task_id)
@@ -887,7 +887,7 @@ class ConcurrentExecutionEngine:
                     result = pending_results[task_key]
                     if result.ready():
                         node = graph[task_key]
-                        node.completed_at = datetime.utcnow()
+                        node.completed_at = datetime.now(timezone.utc)
 
                         try:
                             task_result = result.get(timeout=1)
@@ -933,7 +933,7 @@ class ConcurrentExecutionEngine:
                 await self._async_sleep(self.config.poll_interval)
 
             # Finalize
-            metrics.end_time = datetime.utcnow()
+            metrics.end_time = datetime.now(timezone.utc)
             metrics.total_duration = (
                 metrics.end_time - metrics.start_time
             ).total_seconds()
@@ -1007,7 +1007,7 @@ class ConcurrentExecutionEngine:
         controller = self._get_concurrency_controller(initial_concurrency)
 
         metrics = ExecutionMetrics(job_id=job_id)
-        metrics.start_time = datetime.utcnow()
+        metrics.start_time = datetime.now(timezone.utc)
 
         logger.info(
             "Starting adaptive job execution",
@@ -1025,19 +1025,19 @@ class ConcurrentExecutionEngine:
             running: Set[str] = set()
             pending_results: Dict[str, Any] = {}
             concurrency_samples: List[int] = []
-            last_adjustment_check = datetime.utcnow()
+            last_adjustment_check = datetime.now(timezone.utc)
 
             while True:
                 # Dynamic concurrency adjustment
                 current_max = controller.current_concurrency
                 if enable_dynamic_adjustment:
                     time_since_check = (
-                        datetime.utcnow() - last_adjustment_check
+                        datetime.now(timezone.utc) - last_adjustment_check
                     ).total_seconds()
 
                     if time_since_check >= self.dynamic_config.adjustment_interval_seconds:
                         current_max, reason = await controller.evaluate_and_adjust()
-                        last_adjustment_check = datetime.utcnow()
+                        last_adjustment_check = datetime.now(timezone.utc)
 
                         if "scale" in reason:
                             logger.debug(
@@ -1057,7 +1057,7 @@ class ConcurrentExecutionEngine:
                     if task_key not in running:
                         node = graph[task_key]
                         node.status = ExecutionStatus.RUNNING
-                        node.started_at = datetime.utcnow()
+                        node.started_at = datetime.now(timezone.utc)
 
                         result = execute_single_task.delay(node.task_id)
                         pending_results[task_key] = result
@@ -1075,7 +1075,7 @@ class ConcurrentExecutionEngine:
                     result = pending_results[task_key]
                     if result.ready():
                         node = graph[task_key]
-                        node.completed_at = datetime.utcnow()
+                        node.completed_at = datetime.now(timezone.utc)
 
                         try:
                             task_result = result.get(timeout=1)
@@ -1090,7 +1090,11 @@ class ConcurrentExecutionEngine:
                                     if task_result else "Unknown"
                                 )
                                 metrics.failed_tasks += 1
-                        except Exception as e:
+                        except TimeoutError as e:
+                            node.status = ExecutionStatus.FAILED
+                            node.error = f"Result retrieval timeout: {e}"
+                            metrics.failed_tasks += 1
+                        except Exception as e:  # noqa: BLE001
                             node.status = ExecutionStatus.FAILED
                             node.error = str(e)
                             metrics.failed_tasks += 1
@@ -1122,7 +1126,7 @@ class ConcurrentExecutionEngine:
                 await self._async_sleep(self.config.poll_interval)
 
             # Finalize metrics
-            metrics.end_time = datetime.utcnow()
+            metrics.end_time = datetime.now(timezone.utc)
             metrics.total_duration = (
                 metrics.end_time - metrics.start_time
             ).total_seconds()
@@ -1176,7 +1180,7 @@ class ConcurrentExecutionEngine:
         """Update job status in database"""
         update_data = {
             "status": status.value,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
 
         if error_message:
@@ -1210,7 +1214,7 @@ class ConcurrentExecutionEngine:
             "completed_tasks": completed,
             "progress_percentage": round(progress, 2),
             "current_task_key": current_task,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }).eq("id", job_id).execute()
 
     def _store_metrics(self, metrics: ExecutionMetrics):
