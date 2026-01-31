@@ -20,7 +20,7 @@ import asyncio
 import json
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Set
 from dataclasses import dataclass, field
 from enum import Enum
@@ -74,8 +74,8 @@ class WorkerInfo:
     status: WorkerStatus = WorkerStatus.HEALTHY
 
     # Registration
-    registered_at: datetime = field(default_factory=datetime.utcnow)
-    last_heartbeat: datetime = field(default_factory=datetime.utcnow)
+    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_heartbeat: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Task tracking
     active_tasks: int = 0
@@ -292,7 +292,7 @@ class WorkerMonitor:
         Returns:
             WorkerInfo for the registered worker
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if worker_id in self._workers:
             worker = self._workers[worker_id]
@@ -375,7 +375,7 @@ class WorkerMonitor:
             return False
 
         worker = self._workers[worker_id]
-        worker.last_heartbeat = datetime.utcnow()
+        worker.last_heartbeat = datetime.now(timezone.utc)
         worker.active_tasks = active_tasks
         worker.cpu_usage = cpu_usage
         worker.memory_usage = memory_usage
@@ -427,7 +427,7 @@ class WorkerMonitor:
 
     async def _update_worker_statuses(self) -> None:
         """Update worker statuses based on heartbeat age"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for worker in self._workers.values():
             if worker.status == WorkerStatus.OFFLINE:
@@ -522,7 +522,7 @@ class WorkerMonitor:
 
     async def _cleanup_offline_workers(self) -> None:
         """Remove workers that have been offline too long"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         cutoff = now - timedelta(seconds=self.config.offline_retention)
 
         to_remove = []

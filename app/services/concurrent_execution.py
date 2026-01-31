@@ -663,9 +663,11 @@ class ConcurrentExecutionEngine:
                 try:
                     # Wait for all tasks in batch to complete (offload blocking call)
                     # Use propagate=False to handle per-task failures without raising
+                    # Bind variables explicitly to avoid closure capture issues
+                    batch_timeout = self.config.task_timeout * len(batch)
                     results = await asyncio.to_thread(
-                        lambda: result.get(
-                            timeout=self.config.task_timeout * len(batch),
+                        lambda r=result, t=batch_timeout: r.get(
+                            timeout=t,
                             propagate=False
                         )
                     )
@@ -708,7 +710,11 @@ class ConcurrentExecutionEngine:
                                 failed += 1
 
                 except Exception as e:
-                    logger.error(f"Batch execution failed: {e}")
+                    logger.exception(
+                        "batch_execution_failed",
+                        error=str(e),
+                        batch_size=len(batch)
+                    )
                     for task_key in batch:
                         node = graph[task_key]
                         node.completed_at = datetime.utcnow()
@@ -1144,7 +1150,11 @@ class ConcurrentExecutionEngine:
             }
 
         except Exception as e:
-            logger.error("Adaptive execution failed", job_id=job_id, error=str(e))
+            logger.exception(
+                "adaptive_execution_failed",
+                job_id=job_id,
+                error=str(e)
+            )
             self._update_job_status(job_id, JobStatus.FAILED, str(e))
             return {
                 "success": False,

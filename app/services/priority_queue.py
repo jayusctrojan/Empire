@@ -17,7 +17,7 @@ Date: 2025-01-24
 import heapq
 import threading
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List, Tuple
+from typing import ClassVar, Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from enum import IntEnum
 
@@ -154,7 +154,7 @@ class PriorityTaskQueue:
     def is_empty(self) -> bool:
         """Check if queue is empty"""
         with self._lock:
-            return self.size == 0
+            return len(self._task_map) == 0
 
     # ==========================================================================
     # Core Operations
@@ -605,7 +605,7 @@ class PriorityCalculator:
     """
 
     # Base priorities by task type
-    TYPE_PRIORITIES = {
+    TYPE_PRIORITIES: ClassVar[Dict[str, int]] = {
         "retrieval_rag": Priority.NORMAL,
         "retrieval_nlq": Priority.NORMAL,
         "retrieval_graph": Priority.HIGH,
