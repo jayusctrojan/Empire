@@ -21,6 +21,7 @@ Updated: 2026-02-01 (reverted to V1 API for reliability)
 import os
 import asyncio
 import base64
+import threading
 import httpx
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Literal
@@ -28,9 +29,9 @@ from enum import Enum
 from dataclasses import dataclass, field
 from datetime import datetime
 
-import structlog
+from app.core.logging_config import get_logger
 
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 # =============================================================================
@@ -102,14 +103,6 @@ class LlamaParseConfig:
     # Page formatting
     page_separator: str = "\n\n---\n\n"
     page_prefix: str = "## Page {pageNumber}\n\n"
-
-    def get_headers(self) -> Dict[str, str]:
-        """Get API headers"""
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
 
 
 # =============================================================================
@@ -567,7 +560,7 @@ class LlamaParseService:
                 logger.warning("Upload error", attempt=attempt + 1, error=str(e))
 
             if attempt < self.config.max_retries - 1:
-                await asyncio.sleep(self.config.retry_delay * (attempt + 1))
+                await asyncio.sleep(self.config.retry_delay * (2 ** attempt))
 
         return None
 
@@ -658,6 +651,10 @@ class LlamaParseService:
 
         except Exception as e:
             logger.exception("Failed to fetch result", error=str(e))
+            # Return partial result if we have any content
+            if result.get("text") or result.get("markdown"):
+                result["fetch_error"] = str(e)
+                return result
 
         return None
 
@@ -835,14 +832,18 @@ class LlamaParseService:
 # =============================================================================
 
 _llamaparse_service: Optional[LlamaParseService] = None
+_llamaparse_lock = threading.Lock()
 
 
 def get_llamaparse_service(config: Optional[LlamaParseConfig] = None) -> LlamaParseService:
-    """Get singleton LlamaParse service instance"""
+    """Get singleton LlamaParse service instance (thread-safe)"""
     global _llamaparse_service
 
     if _llamaparse_service is None:
-        _llamaparse_service = LlamaParseService(config)
+        with _llamaparse_lock:
+            # Double-checked locking
+            if _llamaparse_service is None:
+                _llamaparse_service = LlamaParseService(config)
     elif config is not None:
         logger.debug("LlamaParse singleton already exists; ignoring new config")
 
