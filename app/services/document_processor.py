@@ -1,6 +1,12 @@
 """
 Empire v7.3 - Universal Document Processing Pipeline
 Extracts text and structured data from all supported document types
+
+PDF Processing:
+- Primary: LlamaParse (Standard mode for clean PDFs, Premium mode for scanned/complex)
+- Fallback: PyPDF (local extraction)
+
+Updated: 2026-01-30 - LlamaParse integration as primary PDF parser
 """
 
 import os
@@ -10,6 +16,19 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 from io import BytesIO
 from enum import Enum
+
+# LlamaParse service (primary PDF parser)
+try:
+    from app.services.llamaparse_service import (
+        get_llamaparse_service,
+        LlamaParseService,
+        ParseMode,
+        detect_document_complexity
+    )
+    LLAMAPARSE_SUPPORT = True
+except ImportError:
+    LLAMAPARSE_SUPPORT = False
+    logging.warning("LlamaParse service not available")
 
 # Document processing libraries
 try:
@@ -257,13 +276,15 @@ class DocumentProcessor:
         track_pages: bool
     ) -> Dict[str, Any]:
         """
-        Process PDF using PyPDF with LlamaIndex fallback
+        Process PDF using LlamaParse (primary) with PyPDF fallback.
 
         Extraction order:
-        1. Try LlamaIndex REST API (clean PDFs)
-        2. Try PyPDF (local extraction)
-        3. Try Mistral OCR (scanned PDFs)
-        4. Try Tesseract OCR (fallback)
+        1. Try LlamaParse (auto-detects Standard vs Premium mode)
+        2. Fallback to PyPDF (local extraction)
+
+        LlamaParse modes:
+        - Standard (parse_page_with_llm): Clean PDFs with selectable text
+        - Premium (parse_page_with_agent): Scanned/complex PDFs, bank statements, forms
         """
         result = {
             "extraction_method": None,
@@ -278,12 +299,47 @@ class DocumentProcessor:
             "errors": []
         }
 
+        # Try LlamaParse first (primary parser)
+        if LLAMAPARSE_SUPPORT:
+            try:
+                llamaparse = get_llamaparse_service()
+                parse_result = await llamaparse.parse_document(
+                    file_path=file_path,
+                    auto_detect_mode=True,  # Auto-select Standard vs Premium
+                    extract_tables=extract_tables,
+                    extract_images=extract_images
+                )
+
+                if parse_result["success"]:
+                    result["extraction_method"] = f"llamaparse:{parse_result['mode_used']}"
+                    result["content"]["text"] = parse_result["content"]["text"]
+                    result["content"]["pages"] = parse_result["content"]["pages"]
+                    result["content"]["tables"] = parse_result["content"]["tables"]
+                    result["content"]["structure"] = parse_result["content"]["structure"]
+                    result["metadata"] = parse_result["metadata"]
+                    result["metadata"]["llamaparse_complexity"] = parse_result.get("complexity")
+
+                    logger.info(
+                        f"LlamaParse succeeded: {parse_result['mode_used']}, "
+                        f"{len(result['content']['text'])} chars, "
+                        f"{parse_result['metadata'].get('page_count', 0)} pages"
+                    )
+                    return result
+                else:
+                    logger.warning(f"LlamaParse failed: {parse_result.get('errors')}, falling back to PyPDF")
+                    result["errors"].extend(parse_result.get("errors", []))
+
+            except Exception as e:
+                logger.warning(f"LlamaParse error: {e}, falling back to PyPDF")
+                result["errors"].append(f"LlamaParse failed: {str(e)}")
+
+        # Fallback to PyPDF
         if not PDF_SUPPORT:
-            result["errors"].append("PDF processing not available - pypdf not installed")
+            result["errors"].append("PDF processing not available - neither LlamaParse nor pypdf available")
             return result
 
         try:
-            # Try PyPDF first (fast, local)
+            logger.info(f"Using PyPDF fallback for: {file_path}")
             reader = PdfReader(file_path)
             result["extraction_method"] = ExtractionMethod.PYPDF.value
 
@@ -292,14 +348,16 @@ class DocumentProcessor:
 
             for page_num, page in enumerate(reader.pages, start=1):
                 try:
-                    page_text = page.extract_text()
+                    page_text = page.extract_text() or ""
 
                     if track_pages:
                         page_data = {
                             "page_number": page_num,
                             "text": page_text,
+                            "markdown": page_text,  # PyPDF doesn't produce markdown
                             "tables": [],
-                            "images": []
+                            "images": [],
+                            "metadata": {}
                         }
 
                         # Extract images from page if requested
@@ -330,8 +388,8 @@ class DocumentProcessor:
 
             # If no text was extracted, PDF might be scanned - log warning
             if len(result["content"]["text"].strip()) < 50:
-                logger.warning(f"Very little text extracted from PDF - might be scanned. Consider OCR.")
-                result["errors"].append("Low text extraction - PDF may be scanned/image-based")
+                logger.warning(f"Very little text extracted from PDF - might be scanned. LlamaParse Premium recommended.")
+                result["errors"].append("Low text extraction - PDF may be scanned/image-based. Try LlamaParse Premium mode.")
 
             return result
 
