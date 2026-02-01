@@ -182,12 +182,12 @@ def detect_document_complexity(
 
                 # Check for multi-column (short lines with consistent lengths)
                 if lines:
-                    avg_line_length = sum(len(l) for l in lines) / len(lines)
+                    avg_line_length = sum(len(line) for line in lines) / len(lines)
                     if avg_line_length < 60 and len(lines) > 20:
                         result.has_multi_column = True
 
             except Exception as e:
-                logger.warning(f"Error sampling page {i}: {e}")
+                logger.warning("Error sampling page", page=i, error=str(e))
 
         # Calculate text density
         result.estimated_text_density = total_chars / (sample_pages * expected_chars_per_page)
@@ -230,7 +230,7 @@ def detect_document_complexity(
         )
 
     except Exception as e:
-        logger.warning(f"Complexity detection failed, defaulting to PREMIUM: {e}")
+        logger.warning("Complexity detection failed, defaulting to PREMIUM", error=str(e))
         result.recommended_mode = ParseMode.PREMIUM
         result.confidence = 0.5
 
@@ -446,7 +446,7 @@ class LlamaParseService:
             return result
 
         except Exception as e:
-            logger.error(f"LlamaParse failed: {e}", exc_info=True)
+            logger.exception("LlamaParse failed", error=str(e))
             result["errors"].append(str(e))
             return result
 
@@ -463,7 +463,20 @@ class LlamaParseService:
         Build LlamaParse V1 API options.
 
         V1 API uses premium_mode boolean instead of tiers.
+
+        Note: extract_tables and extract_images parameters are accepted for API
+        compatibility but are not used by V1 API (tables are auto-extracted in
+        Premium mode). They are preserved here for potential future V2 migration.
         """
+        # Log if callers pass unsupported options (for awareness during migration)
+        if extract_tables or extract_images or kwargs:
+            logger.debug(
+                "V1 API ignores extract_tables/extract_images/kwargs",
+                extract_tables=extract_tables,
+                extract_images=extract_images,
+                extra_kwargs=list(kwargs.keys()) if kwargs else None
+            )
+
         # Determine if premium mode should be used
         use_premium = mode in [
             ParseMode.PREMIUM,
@@ -544,11 +557,14 @@ class LlamaParseService:
                     return job_id
                 else:
                     logger.warning(
-                        f"Upload failed (attempt {attempt + 1}): {response.status_code} - {response.text}"
+                        "Upload failed",
+                        attempt=attempt + 1,
+                        status_code=response.status_code,
+                        response_text=response.text
                     )
 
             except Exception as e:
-                logger.warning(f"Upload error (attempt {attempt + 1}): {e}")
+                logger.warning("Upload error", attempt=attempt + 1, error=str(e))
 
             if attempt < self.config.max_retries - 1:
                 await asyncio.sleep(self.config.retry_delay * (attempt + 1))
@@ -563,7 +579,7 @@ class LlamaParseService:
 
         max_polls = int(self.config.parse_timeout / self.config.poll_interval)
 
-        for poll in range(max_polls):
+        for _poll in range(max_polls):
             try:
                 response = await client.get(
                     f"{self.config.base_url}/job/{job_id}",
@@ -578,16 +594,16 @@ class LlamaParseService:
                         # Fetch full result with all content types
                         return await self._fetch_full_result(job_id, result)
                     elif status == "ERROR":
-                        logger.error(f"Parse job failed: {result.get('error', 'Unknown error')}")
+                        logger.error("Parse job failed", error=result.get('error', 'Unknown error'))
                         return None
                     # else: PENDING/processing, continue polling
 
             except Exception as e:
-                logger.warning(f"Poll error: {e}")
+                logger.warning("Poll error", error=str(e))
 
             await asyncio.sleep(self.config.poll_interval)
 
-        logger.error(f"Parse job timed out after {self.config.parse_timeout}s")
+        logger.error("Parse job timed out", timeout_seconds=self.config.parse_timeout)
         return None
 
     async def _fetch_full_result(
@@ -641,7 +657,7 @@ class LlamaParseService:
             return result
 
         except Exception as e:
-            logger.error(f"Failed to fetch result: {e}")
+            logger.exception("Failed to fetch result", error=str(e))
 
         return None
 

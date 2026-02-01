@@ -388,7 +388,7 @@ class DocumentProcessor:
 
             # If no text was extracted, PDF might be scanned - log warning
             if len(result["content"]["text"].strip()) < 50:
-                logger.warning(f"Very little text extracted from PDF - might be scanned. LlamaParse Premium recommended.")
+                logger.warning("Very little text extracted from PDF - might be scanned. LlamaParse Premium recommended.")
                 result["errors"].append("Low text extraction - PDF may be scanned/image-based. Try LlamaParse Premium mode.")
 
             return result

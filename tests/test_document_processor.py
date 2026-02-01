@@ -75,7 +75,8 @@ class TestPDFProcessing:
         """Test successful PDF processing"""
         processor = DocumentProcessor()
 
-        with patch('app.services.document_processor.PDF_SUPPORT', True), \
+        with patch('app.services.document_processor.LLAMAPARSE_SUPPORT', False), \
+             patch('app.services.document_processor.PDF_SUPPORT', True), \
              patch('app.services.document_processor.PdfReader', return_value=mock_pdf_document, create=True):
             result = await processor._process_pdf(
                 file_path="test.pdf",
@@ -95,7 +96,8 @@ class TestPDFProcessing:
         """Test PDF processing with page tracking"""
         processor = DocumentProcessor()
 
-        with patch('app.services.document_processor.PDF_SUPPORT', True), \
+        with patch('app.services.document_processor.LLAMAPARSE_SUPPORT', False), \
+             patch('app.services.document_processor.PDF_SUPPORT', True), \
              patch('app.services.document_processor.PdfReader', return_value=mock_pdf_document, create=True):
             result = await processor._process_pdf(
                 file_path="test.pdf",
@@ -116,7 +118,8 @@ class TestPDFProcessing:
         """Test PDF processing when pypdf not available"""
         processor = DocumentProcessor()
 
-        with patch('app.services.document_processor.PDF_SUPPORT', False):
+        with patch('app.services.document_processor.LLAMAPARSE_SUPPORT', False), \
+             patch('app.services.document_processor.PDF_SUPPORT', False):
             result = await processor._process_pdf(
                 file_path="test.pdf",
                 extract_tables=True,
@@ -133,7 +136,8 @@ class TestPDFProcessing:
         """Test PDF processing with page-level errors"""
         processor = DocumentProcessor()
 
-        with patch('app.services.document_processor.PDF_SUPPORT', True), \
+        with patch('app.services.document_processor.LLAMAPARSE_SUPPORT', False), \
+             patch('app.services.document_processor.PDF_SUPPORT', True), \
              patch('app.services.document_processor.PdfReader', return_value=mock_pdf_document_with_errors, create=True):
             result = await processor._process_pdf(
                 file_path="test.pdf",
