@@ -843,6 +843,8 @@ def get_llamaparse_service(config: Optional[LlamaParseConfig] = None) -> LlamaPa
 
     if _llamaparse_service is None:
         _llamaparse_service = LlamaParseService(config)
+    elif config is not None:
+        logger.debug("LlamaParse singleton already exists; ignoring new config")
 
     return _llamaparse_service
 

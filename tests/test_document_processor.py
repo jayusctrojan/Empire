@@ -336,7 +336,8 @@ class TestDocumentProcessorWorkflow:
         """Test complete PDF document processing"""
         processor = DocumentProcessor()
 
-        with patch('app.services.document_processor.PDF_SUPPORT', True), \
+        with patch('app.services.document_processor.LLAMAPARSE_SUPPORT', False), \
+             patch('app.services.document_processor.PDF_SUPPORT', True), \
              patch('app.services.document_processor.PdfReader', return_value=mock_pdf_document, create=True), \
              patch('os.path.exists', return_value=True):
             result = await processor.process_document(
