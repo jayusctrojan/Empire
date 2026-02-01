@@ -1,21 +1,21 @@
 """
 Empire v7.3 - LlamaParse Document Parsing Service
 
-Unified PDF parsing layer using LlamaParse v2 API with intelligent tier selection:
-- Fast tier: Clean PDFs (contracts, reports, statements with selectable text)
-- Agentic tier: Scanned/visually complex PDFs (bank statements, forms, dense layouts)
-- Agentic Plus tier: Multimodal/layout-aware parsing for complex documents
+Unified PDF parsing layer using LlamaParse V1 API for reliable parsing:
+- Standard mode: Clean PDFs (contracts, reports, statements with selectable text)
+- Premium mode: Scanned/visually complex PDFs (bank statements, forms, dense layouts)
 
 Output:
 - Clean, normalized text suitable for RAG
 - Structured tables (Markdown or JSON)
 - Page and block-level metadata (page number, coordinates, section hierarchy)
 
-API Reference: https://developers.llamaindex.ai/python/cloud/llamaparse/api-v2-guide/
+NOTE: V1 API is used instead of V2 because V2 has unreliable result fetching.
+V1 endpoint: https://api.cloud.llamaindex.ai/api/parsing
 
 Author: Claude Code
 Date: 2026-01-30
-Updated: 2026-02-01 (migrated to v2 API)
+Updated: 2026-02-01 (reverted to V1 API for reliability)
 """
 
 import os
@@ -69,9 +69,9 @@ class ResultType(str, Enum):
 class LlamaParseConfig:
     """Configuration for LlamaParse service"""
 
-    # API configuration
+    # API configuration (V1 API for reliability)
     api_key: str = field(default_factory=lambda: os.getenv("LLAMA_CLOUD_API_KEY", ""))
-    base_url: str = "https://api.cloud.llamaindex.ai/api/v2"
+    base_url: str = "https://api.cloud.llamaindex.ai/api/parsing"
 
     # Default parsing options
     default_mode: ParseMode = ParseMode.STANDARD
@@ -460,81 +460,73 @@ class LlamaParseService:
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Build LlamaParse API v2 configuration.
+        Build LlamaParse V1 API options.
 
-        API v2 uses a simplified tier-based system instead of complex parse modes.
-        See: https://developers.llamaindex.ai/python/cloud/llamaparse/api-v2-guide/
+        V1 API uses premium_mode boolean instead of tiers.
         """
-        # Map parse mode to v2 tier
-        mode_to_tier = {
-            ParseMode.FAST: ParseTier.FAST,
-            ParseMode.STANDARD: ParseTier.FAST,
-            ParseMode.PREMIUM: ParseTier.AGENTIC,
-            ParseMode.PREMIUM_DOCUMENT: ParseTier.AGENTIC,
-            ParseMode.MULTIMODAL: ParseTier.AGENTIC_PLUS,
-            ParseMode.LAYOUT: ParseTier.AGENTIC_PLUS,
+        # Determine if premium mode should be used
+        use_premium = mode in [
+            ParseMode.PREMIUM,
+            ParseMode.PREMIUM_DOCUMENT,
+            ParseMode.MULTIMODAL,
+            ParseMode.LAYOUT
+        ]
+
+        # Build V1 options
+        options = {
+            "language": self.config.language,
         }
 
-        tier = mode_to_tier.get(mode, ParseTier.AGENTIC)
+        if use_premium:
+            options["premium_mode"] = True
 
-        # Build v2 configuration object
-        configuration = {
-            "tier": tier.value,
-            "version": "latest"
-        }
+        if parsing_instructions:
+            options["parsing_instruction"] = parsing_instructions
 
-        # Add custom prompt for agentic tiers only
-        if tier in [ParseTier.AGENTIC, ParseTier.AGENTIC_PLUS] and parsing_instructions:
-            configuration["agentic_options"] = {
-                "custom_prompt": parsing_instructions
-            }
-
-        # Add page ranges if specified (v2 uses 1-based indexing)
         if target_pages:
-            configuration["page_ranges"] = {
-                "target_pages": target_pages
-            }
+            options["target_pages"] = target_pages
 
         logger.debug(
-            "Built v2 configuration",
-            tier=tier.value,
-            has_custom_prompt=bool(parsing_instructions),
-            has_page_ranges=bool(target_pages)
+            "Built V1 parse options",
+            premium_mode=use_premium,
+            has_instructions=bool(parsing_instructions),
+            has_target_pages=bool(target_pages)
         )
 
-        return configuration
+        return options
 
     async def _upload_document(
         self,
         file_content: bytes,
         filename: str,
-        configuration: Dict[str, Any]
+        options: Dict[str, Any]
     ) -> Optional[str]:
         """
-        Upload document to LlamaParse v2 API and get job ID.
+        Upload document to LlamaParse V1 API and get job ID.
 
-        v2 API expects multipart form with:
+        V1 API expects multipart form with:
         - file: The PDF file
-        - configuration: JSON string with tier, version, and options
+        - Other options as form data fields
         """
-        import json
-
         client = await self._get_client()
 
-        # Prepare multipart upload with v2 format
+        # Prepare multipart upload with V1 format
         files = {
             "file": (filename, file_content, "application/pdf")
         }
 
-        # v2 API expects configuration as JSON string
-        data = {
-            "configuration": json.dumps(configuration)
-        }
+        # V1 API expects options as form data
+        data = {}
+        for key, value in options.items():
+            if isinstance(value, bool):
+                data[key] = "true" if value else "false"
+            else:
+                data[key] = str(value)
 
         for attempt in range(self.config.max_retries):
             try:
                 response = await client.post(
-                    f"{self.config.base_url}/parse/upload",
+                    f"{self.config.base_url}/upload",
                     headers={"Authorization": f"Bearer {self.config.api_key}"},
                     files=files,
                     data=data,
@@ -547,7 +539,7 @@ class LlamaParseService:
                     logger.info(
                         "Document uploaded successfully",
                         job_id=job_id,
-                        tier=configuration.get("tier")
+                        premium_mode=options.get("premium_mode", False)
                     )
                     return job_id
                 else:
@@ -564,31 +556,31 @@ class LlamaParseService:
         return None
 
     async def _poll_for_result(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Poll for parse job completion"""
+        """Poll for parse job completion using V1 API"""
 
         client = await self._get_client()
-        headers = self.config.get_headers()
+        headers = {"Authorization": f"Bearer {self.config.api_key}"}
 
         max_polls = int(self.config.parse_timeout / self.config.poll_interval)
 
         for poll in range(max_polls):
             try:
                 response = await client.get(
-                    f"{self.config.base_url}/parse/{job_id}",
+                    f"{self.config.base_url}/job/{job_id}",
                     headers=headers
                 )
 
                 if response.status_code == 200:
                     result = response.json()
-                    status = result.get("status", "").lower()
+                    status = result.get("status", "").upper()
 
-                    if status == "completed":
+                    if status == "SUCCESS":
                         # Fetch full result with all content types
-                        return await self._fetch_full_result(job_id)
-                    elif status in ["failed", "error"]:
+                        return await self._fetch_full_result(job_id, result)
+                    elif status == "ERROR":
                         logger.error(f"Parse job failed: {result.get('error', 'Unknown error')}")
                         return None
-                    # else: pending/processing, continue polling
+                    # else: PENDING/processing, continue polling
 
             except Exception as e:
                 logger.warning(f"Poll error: {e}")
@@ -598,34 +590,55 @@ class LlamaParseService:
         logger.error(f"Parse job timed out after {self.config.parse_timeout}s")
         return None
 
-    async def _fetch_full_result(self, job_id: str) -> Optional[Dict[str, Any]]:
+    async def _fetch_full_result(
+        self,
+        job_id: str,
+        job_status: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         """
-        Fetch complete parse result with all content types.
+        Fetch complete parse result with all content types using V1 API.
 
-        v2 API expand options: text, markdown, pages, images_content_metadata
+        V1 API uses separate endpoints for each result type:
+        - /job/{job_id}/result/text
+        - /job/{job_id}/result/markdown
         """
         client = await self._get_client()
-        headers = self.config.get_headers()
+        headers = {"Authorization": f"Bearer {self.config.api_key}"}
+
+        result = {
+            "text": "",
+            "markdown": "",
+            "num_pages": job_status.get("num_pages", 0) if job_status else 0,
+            "credits_used": job_status.get("credits_used", 0) if job_status else 0
+        }
 
         try:
-            # Request all content types using v2 expand params
-            response = await client.get(
-                f"{self.config.base_url}/parse/{job_id}",
-                headers=headers,
-                params={
-                    "expand": "text,markdown"
-                }
+            # Fetch text result
+            text_response = await client.get(
+                f"{self.config.base_url}/job/{job_id}/result/text",
+                headers=headers
             )
+            if text_response.status_code == 200:
+                text_data = text_response.json()
+                result["text"] = text_data.get("text", "")
 
-            if response.status_code == 200:
-                result = response.json()
-                logger.info(
-                    "Parse result fetched",
-                    job_id=job_id,
-                    num_pages=result.get("num_pages"),
-                    credits_used=result.get("credits_used")
-                )
-                return result
+            # Fetch markdown result
+            md_response = await client.get(
+                f"{self.config.base_url}/job/{job_id}/result/markdown",
+                headers=headers
+            )
+            if md_response.status_code == 200:
+                md_data = md_response.json()
+                result["markdown"] = md_data.get("markdown", "")
+
+            logger.info(
+                "Parse result fetched",
+                job_id=job_id,
+                num_pages=result.get("num_pages"),
+                text_len=len(result.get("text", "")),
+                markdown_len=len(result.get("markdown", ""))
+            )
+            return result
 
         except Exception as e:
             logger.error(f"Failed to fetch result: {e}")
