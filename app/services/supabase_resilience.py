@@ -17,7 +17,7 @@ Date: 2025-01-15
 
 import os
 import asyncio
-from typing import Any, Dict, List, Optional, TypeVar, Callable
+from typing import Any, Dict, List, Optional, TypeVar, Callable, Union
 from datetime import datetime
 
 import structlog
@@ -319,7 +319,7 @@ class ResilientSupabaseClient:
     async def insert(
         self,
         table: str,
-        data: Dict[str, Any] | List[Dict[str, Any]],
+        data: Union[Dict[str, Any], List[Dict[str, Any]]],
         upsert: bool = False,
     ) -> List[Dict[str, Any]]:
         """

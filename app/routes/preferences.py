@@ -16,6 +16,7 @@ from app.services.user_preference_service import (
 )
 from app.services.conversation_memory_service import ConversationMemoryService
 from app.core.database import get_supabase
+from app.middleware.clerk_auth import verify_clerk_token
 
 
 router = APIRouter(prefix="/preferences", tags=["Preferences"])
@@ -106,19 +107,30 @@ def get_preference_service() -> UserPreferenceService:
     return UserPreferenceService(memory_service=memory_service)
 
 
+def verify_user_access(user: dict, user_id: str):
+    """Verify the authenticated user can access the requested user's preferences"""
+    if user.get("user_id") != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot access another user's preferences"
+        )
+
+
 # ==================== Endpoints ====================
 
 @router.post("/", response_model=PreferenceResponse, status_code=status.HTTP_201_CREATED)
 async def set_preference(
     user_id: str,
     request: SetPreferenceRequest,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Set a user preference.
 
     Creates new preference or updates existing one.
     """
+    verify_user_access(user, user_id)
     preference = await service.set_preference(
         user_id=user_id,
         category=request.category,
@@ -143,11 +155,13 @@ async def get_preference(
     user_id: str,
     category: str,
     key: str,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Get a specific preference by category and key.
     """
+    verify_user_access(user, user_id)
     preference = await service.get_preference(
         user_id=user_id,
         category=category,
@@ -167,11 +181,13 @@ async def get_preference(
 async def get_preferences_by_category(
     user_id: str,
     category: str,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Get all preferences in a category.
     """
+    verify_user_access(user, user_id)
     preferences = await service.get_preferences_by_category(
         user_id=user_id,
         category=category
@@ -186,11 +202,13 @@ async def get_preferences_by_category(
 @router.get("/user/{user_id}", response_model=PreferenceListResponse)
 async def get_all_preferences(
     user_id: str,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Get all preferences for a user.
     """
+    verify_user_access(user, user_id)
     preferences = await service.get_all_preferences(user_id=user_id)
 
     return PreferenceListResponse(
@@ -204,11 +222,13 @@ async def delete_preference(
     user_id: str,
     category: str,
     key: str,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Delete a specific preference.
     """
+    verify_user_access(user, user_id)
     success = await service.delete_preference(
         user_id=user_id,
         category=category,
@@ -228,13 +248,15 @@ async def delete_preference(
 async def learn_from_interaction(
     user_id: str,
     request: LearnFromInteractionRequest,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Learn user preferences from interactions.
 
     Respects user's opt-out settings for preference learning.
     """
+    verify_user_access(user, user_id)
     preference = await service.learn_preference_from_interaction(
         user_id=user_id,
         interaction_type=request.interaction_type,
@@ -253,7 +275,8 @@ async def learn_from_interaction(
 async def extract_preferences_from_conversation(
     user_id: str,
     request: ExtractPreferencesRequest,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Extract user preferences from conversation using Claude NLP (Task 34.2).
@@ -268,6 +291,7 @@ async def extract_preferences_from_conversation(
 
     **Note**: Requires ANTHROPIC_API_KEY to be set.
     """
+    verify_user_access(user, user_id)
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
     preferences = await service.extract_preferences_from_conversation(
@@ -287,7 +311,8 @@ async def extract_preferences_from_conversation(
 @router.get("/boost/{user_id}", response_model=ContentPreferencesResponse)
 async def get_content_preferences_for_boosting(
     user_id: str,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Get user's content preferences formatted for search result boosting (Task 34.4).
@@ -300,6 +325,7 @@ async def get_content_preferences_for_boosting(
 
     Use this endpoint before search to get boost parameters.
     """
+    verify_user_access(user, user_id)
     boost_data = await service.get_content_preferences(user_id)
 
     return ContentPreferencesResponse(**boost_data)
@@ -310,13 +336,15 @@ async def get_content_preferences_for_boosting(
 @router.get("/privacy/{user_id}", response_model=PrivacySettingsResponse)
 async def get_privacy_settings(
     user_id: str,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Get user's privacy settings.
 
     Returns opt-out status for learning, tracking, and analytics.
     """
+    verify_user_access(user, user_id)
     settings = await service.get_privacy_settings(user_id)
 
     return PrivacySettingsResponse(**settings)
@@ -326,7 +354,8 @@ async def get_privacy_settings(
 async def set_privacy_setting(
     user_id: str,
     request: SetPrivacySettingRequest,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Set a privacy setting.
@@ -336,6 +365,7 @@ async def set_privacy_setting(
     - opt_out_interaction_tracking
     - opt_out_analytics
     """
+    verify_user_access(user, user_id)
     success = await service.set_privacy_setting(
         user_id=user_id,
         setting_key=request.setting_key,
@@ -357,13 +387,15 @@ async def set_privacy_setting(
 @router.get("/export/{user_id}", response_model=Dict[str, Any])
 async def export_preferences(
     user_id: str,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Export all user preferences as JSON.
 
     Returns preferences grouped by category for easy import elsewhere.
     """
+    verify_user_access(user, user_id)
     export_data = await service.export_preferences(user_id)
 
     return export_data
@@ -373,13 +405,15 @@ async def export_preferences(
 async def import_preferences(
     user_id: str,
     request: ImportPreferencesRequest,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Import preferences from exported data.
 
     Returns count of successfully imported preferences.
     """
+    verify_user_access(user, user_id)
     count = await service.import_preferences(
         user_id=user_id,
         preferences_data=request.preferences_data
@@ -442,7 +476,8 @@ class MemoryCommandResponse(BaseModel):
 async def memory_command(
     user_id: str,
     request: MemoryCommandRequest,
-    service: UserPreferenceService = Depends(get_preference_service)
+    service: UserPreferenceService = Depends(get_preference_service),
+    user: dict = Depends(verify_clerk_token)
 ):
     """
     Handle /memory chat command for easy memory control.
@@ -455,6 +490,7 @@ async def memory_command(
 
     This provides a simple chat-like interface for users to control their privacy settings.
     """
+    verify_user_access(user, user_id)
     action = request.action
 
     if action == MemoryAction.STATUS:

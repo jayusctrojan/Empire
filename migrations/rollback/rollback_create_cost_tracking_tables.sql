@@ -129,8 +129,10 @@ RAISE NOTICE 'Dropped cost_entries table';
 -- Permissions are automatically revoked when tables are dropped
 -- No explicit REVOKE needed
 
+COMMIT;
+
 -- ============================================================================
--- PHASE 8: VERIFICATION
+-- PHASE 8: VERIFICATION (Run after COMMIT)
 -- ============================================================================
 
 DO $$
@@ -143,13 +145,11 @@ BEGIN
       AND table_name IN ('cost_entries', 'budget_configs', 'cost_reports', 'cost_alerts');
 
     IF table_count = 0 THEN
-        RAISE NOTICE '✅ All cost tracking tables successfully removed';
+        RAISE NOTICE '[OK] All cost tracking tables successfully removed';
     ELSE
-        RAISE WARNING '⚠️  % cost tracking tables still exist', table_count;
+        RAISE WARNING '[WARN] % cost tracking tables still exist', table_count;
     END IF;
 END $$;
-
-COMMIT;
 
 -- ============================================================================
 -- POST-ROLLBACK CHECKLIST

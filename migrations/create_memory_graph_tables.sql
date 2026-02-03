@@ -237,7 +237,7 @@ BEGIN
     ORDER BY umn.embedding <=> query_embedding
     LIMIT match_count;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 -- ============================================================================
 -- Graph Traversal Function
@@ -312,7 +312,7 @@ BEGIN
     FROM graph_traversal gt
     ORDER BY gt.depth, gt.node_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 -- ============================================================================
 -- Get Related Memories Function
@@ -360,21 +360,68 @@ BEGIN
     ORDER BY e.strength DESC, n.importance_score DESC
     LIMIT p_max_results;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- ============================================================================
+-- Atomic Increment Functions (Race Condition Fix)
+-- ============================================================================
+
+-- Atomic increment for mention_count in user_memory_nodes
+CREATE OR REPLACE FUNCTION increment_node_mention_count(
+    p_node_id UUID,
+    p_user_id TEXT
+) RETURNS INTEGER AS $$
+DECLARE
+    new_count INTEGER;
+BEGIN
+    UPDATE public.user_memory_nodes
+    SET mention_count = mention_count + 1,
+        last_mentioned_at = NOW(),
+        updated_at = NOW()
+    WHERE id = p_node_id
+      AND user_id = p_user_id
+    RETURNING mention_count INTO new_count;
+
+    RETURN COALESCE(new_count, 0);
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
+
+-- Atomic increment for observation_count in user_memory_edges
+CREATE OR REPLACE FUNCTION increment_edge_observation_count(
+    p_edge_id UUID,
+    p_user_id TEXT
+) RETURNS INTEGER AS $$
+DECLARE
+    new_count INTEGER;
+BEGIN
+    UPDATE public.user_memory_edges
+    SET observation_count = observation_count + 1,
+        last_observed_at = NOW(),
+        updated_at = NOW()
+    WHERE id = p_edge_id
+      AND user_id = p_user_id
+    RETURNING observation_count INTO new_count;
+
+    RETURN COALESCE(new_count, 0);
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 -- ============================================================================
 -- Grants
 -- ============================================================================
 
 -- Grant execute on functions
+-- Note: Write functions (increment_*) only granted to authenticated users for security
+GRANT EXECUTE ON FUNCTION increment_node_mention_count(UUID, TEXT) TO authenticated;
+
+GRANT EXECUTE ON FUNCTION increment_edge_observation_count(UUID, TEXT) TO authenticated;
+
+-- Read-only functions can be accessed by authenticated users
 GRANT EXECUTE ON FUNCTION match_user_memories(vector(768), TEXT, DECIMAL, INTEGER) TO authenticated;
-GRANT EXECUTE ON FUNCTION match_user_memories(vector(768), TEXT, DECIMAL, INTEGER) TO anon;
 
 GRANT EXECUTE ON FUNCTION traverse_memory_graph(TEXT, UUID, INTEGER, TEXT[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION traverse_memory_graph(TEXT, UUID, INTEGER, TEXT[]) TO anon;
 
 GRANT EXECUTE ON FUNCTION get_related_memories(TEXT, UUID, INTEGER) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_related_memories(TEXT, UUID, INTEGER) TO anon;
 
 -- ============================================================================
 -- Verification Query
