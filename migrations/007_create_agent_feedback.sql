@@ -93,20 +93,20 @@ ALTER TABLE public.agent_feedback ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own feedback"
 ON public.agent_feedback
 FOR SELECT
-USING (created_by = auth.uid() OR created_by IS NULL);
+USING (created_by = auth.uid()::uuid OR created_by IS NULL);
 
 -- Users can insert their own feedback
 CREATE POLICY "Users can insert their own feedback"
 ON public.agent_feedback
 FOR INSERT
-WITH CHECK (created_by = auth.uid() OR created_by IS NULL);
+WITH CHECK (created_by = auth.uid()::uuid OR created_by IS NULL);
 
 -- Users can update their own feedback
 CREATE POLICY "Users can update their own feedback"
 ON public.agent_feedback
 FOR UPDATE
-USING (created_by = auth.uid())
-WITH CHECK (created_by = auth.uid());
+USING (created_by = auth.uid()::uuid)
+WITH CHECK (created_by = auth.uid()::uuid);
 
 -- Service role has full access
 CREATE POLICY "Service role has full access to feedback"
