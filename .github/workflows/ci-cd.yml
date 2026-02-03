@@ -289,8 +289,11 @@ jobs:
           SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
         run: |
           echo "Running database migrations..."
-          python scripts/run_migrations.py || echo "Migration script not found or failed (non-blocking)"
-        continue-on-error: true
+          if [ -f "scripts/run_migrations.py" ]; then
+            python scripts/run_migrations.py
+          else
+            echo "Migration script not found - skipping migrations"
+          fi
 
   # ========================================
   # Seed Test Data (Production - Manual Only)
@@ -375,7 +378,7 @@ jobs:
   notify-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [lint, test-unit, deploy-production]
+    needs: [lint, test-unit, deploy-production, migrate-database]
     if: failure() && github.ref == 'refs/heads/main'
 
     steps:

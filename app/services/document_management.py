@@ -96,7 +96,8 @@ def process_document_upload(
             content_type = content_type_map.get(file_type.lower(), 'application/octet-stream')
 
             # Upload to B2 with checksum verification
-            upload_result = asyncio.get_event_loop().run_until_complete(
+            # Use asyncio.run() for cleaner async execution from sync context
+            upload_result = asyncio.run(
                 b2_service.upload_file(
                     file_data=file_data,
                     filename=filename,
@@ -280,7 +281,7 @@ def delete_document(
                     b2_file_name = document.get("file_path", "")
 
                     # Use the underlying B2 service for deletion
-                    asyncio.get_event_loop().run_until_complete(
+                    asyncio.run(
                         b2_service.b2_service.delete_file(
                             file_id=b2_file_id,
                             file_name=b2_file_name
@@ -407,7 +408,7 @@ def reprocess_document(
                         local_file_path = tf.name
 
                     # Download from B2
-                    asyncio.get_event_loop().run_until_complete(
+                    asyncio.run(
                         b2_service.download_file(
                             file_id=b2_file_id,
                             file_name=b2_file_path,
@@ -433,7 +434,7 @@ def reprocess_document(
             if local_file_path:
                 try:
                     processor = get_document_processor()
-                    extraction_result = asyncio.get_event_loop().run_until_complete(
+                    extraction_result = asyncio.run(
                         processor.process_document(local_file_path)
                     )
 
@@ -514,7 +515,7 @@ def reprocess_document(
                     chunk_ids = [c["chunk_id"] for c in chunks_to_embed.data]
 
                     # Generate embeddings in batch
-                    embedding_results = asyncio.get_event_loop().run_until_complete(
+                    embedding_results = asyncio.run(
                         embedding_service.generate_embeddings_batch(
                             texts=chunk_texts,
                             chunk_ids=chunk_ids,
