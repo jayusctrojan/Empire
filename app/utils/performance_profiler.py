@@ -411,7 +411,6 @@ class PerformanceProfiler:
 
         # Calculate percentiles
         sorted_durations = sorted(durations)
-        n = len(sorted_durations)
 
         def percentile(data: List[float], p: float) -> float:
             if not data:
@@ -534,7 +533,7 @@ class Benchmark:
             parse_pdf()
         with bench.section("chunking"):
             chunk_text()
-        print(bench.report())
+        logger.info("benchmark_complete", **bench.report())
     """
 
     def __init__(self, name: str):

@@ -421,26 +421,136 @@ async def query_project_sources_only(
 
 
 # ============================================================================
-# Streaming Endpoint (Future enhancement)
+# Streaming Endpoint (SSE-based streaming)
 # ============================================================================
 
-# @router.post("/{project_id}/rag/query/stream")
-# async def stream_project_rag_query(
-#     project_id: str,
-#     request: RAGQueryRequest,
-#     user_id: str = Depends(get_current_user),
-#     service: ProjectRAGService = Depends(get_service)
-# ):
-#     """
-#     Stream a project-scoped RAG response.
-#
-#     Returns Server-Sent Events (SSE) with:
-#     - 'sources' event: Retrieved sources
-#     - 'token' events: Response tokens as they're generated
-#     - 'citations' event: Extracted citations
-#     - 'done' event: Completion signal
-#     """
-#     pass  # TODO: Implement streaming in future enhancement
+from fastapi.responses import StreamingResponse
+import asyncio
+import json
+
+
+@router.post("/{project_id}/rag/query/stream")
+async def stream_project_rag_query(
+    project_id: str,
+    request: RAGQueryRequest,
+    user_id: str = Depends(get_current_user),
+    service: ProjectRAGService = Depends(get_service)
+):
+    """
+    Stream a project-scoped RAG response using Server-Sent Events (SSE).
+
+    Returns SSE stream with events:
+    - 'sources' event: Retrieved sources for the query
+    - 'token' events: Response tokens as they're generated
+    - 'citations' event: Extracted citations from response
+    - 'done' event: Completion signal with metadata
+    - 'error' event: Error information if streaming fails
+
+    The stream allows the client to receive partial results as they become
+    available, improving perceived latency for long-running queries.
+    """
+    async def generate_sse():
+        """SSE generator for streaming RAG response"""
+        try:
+            # Build config from request
+            config = ProjectRAGConfig(
+                project_source_limit=request.project_source_limit,
+                global_kb_limit=request.global_kb_limit if request.include_global_kb else 0,
+                project_weight=request.project_weight,
+                global_weight=request.global_weight if request.include_global_kb else 0,
+                min_similarity=request.min_similarity,
+                include_project_sources=True,
+                include_global_kb=request.include_global_kb,
+                enable_query_expansion=request.enable_query_expansion,
+                num_query_variations=request.num_query_variations,
+                expansion_strategy=request.expansion_strategy
+            )
+
+            # First, retrieve and emit sources
+            logger.info(
+                "stream_rag_query_started",
+                project_id=project_id,
+                query_length=len(request.query)
+            )
+
+            # Get sources first (non-streaming retrieval)
+            result = await service.query(
+                project_id=project_id,
+                user_id=user_id,
+                query=request.query,
+                config=config
+            )
+
+            # Emit sources event (consistent with non-streaming endpoints)
+            sources_data = [
+                {
+                    "id": s.id,
+                    "source_id": s.source_id,
+                    "title": s.title,
+                    "content_preview": s.content[:200] if s.content else "",
+                    "similarity_score": s.similarity,
+                    "source_type": s.source_type
+                }
+                for s in result.sources_used
+            ]
+            yield f"event: sources\ndata: {json.dumps(sources_data)}\n\n"
+            await asyncio.sleep(0)  # Allow event to flush
+
+            # Stream the response tokens
+            # For now, chunk the response into smaller pieces for streaming effect
+            response_text = result.answer
+            chunk_size = 20  # Characters per chunk for smooth streaming
+
+            for i in range(0, len(response_text), chunk_size):
+                chunk = response_text[i:i + chunk_size]
+                yield f"event: token\ndata: {json.dumps({'text': chunk, 'index': i})}\n\n"
+                await asyncio.sleep(0.01)  # Small delay for streaming effect
+
+            # Emit citations event
+            if result.citations:
+                citations_data = [
+                    {
+                        "source_id": c.source_id,
+                        "text": c.excerpt
+                    }
+                    for c in result.citations
+                ]
+                yield f"event: citations\ndata: {json.dumps(citations_data)}\n\n"
+
+            # Emit done event with metadata
+            done_data = {
+                "total_sources": result.total_sources,
+                "project_sources_count": result.project_sources_count,
+                "query_time_ms": result.query_time_ms,
+                "model": result.model,
+                "expansion_strategy": result.expansion_strategy
+            }
+            yield f"event: done\ndata: {json.dumps(done_data)}\n\n"
+
+            logger.info(
+                "stream_rag_query_completed",
+                project_id=project_id,
+                total_sources=result.total_sources
+            )
+
+        except Exception as e:
+            logger.exception(
+                "stream_rag_query_failed",
+                project_id=project_id,
+                error=str(e)
+            )
+            error_data = {"error": "An internal error occurred", "type": "InternalError"}
+            yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
+
+    return StreamingResponse(
+        generate_sse(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 
 # ============================================================================

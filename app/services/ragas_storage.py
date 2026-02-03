@@ -17,6 +17,9 @@ import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from supabase import create_client, Client
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 # Table schema for ragas_evaluations
@@ -175,7 +178,7 @@ class RAGASStorageService:
             return None
 
         except Exception as e:
-            print(f"Error retrieving evaluation {evaluation_id}: {str(e)}")
+            logger.error("evaluation_retrieval_failed", evaluation_id=evaluation_id, error=str(e))
             return None
 
     def get_latest_evaluation(self) -> Optional[Dict[str, Any]]:
@@ -202,7 +205,7 @@ class RAGASStorageService:
             return None
 
         except Exception as e:
-            print(f"Error retrieving latest evaluation: {str(e)}")
+            logger.error("latest_evaluation_retrieval_failed", error=str(e))
             return None
 
     def get_evaluations_by_date_range(
@@ -235,7 +238,7 @@ class RAGASStorageService:
             return response.data if response.data else []
 
         except Exception as e:
-            print(f"Error retrieving evaluations by date range: {str(e)}")
+            logger.error("evaluations_by_date_range_retrieval_failed", start_date=start_date, end_date=end_date, error=str(e))
             return []
 
     def get_evaluations_with_filters(
@@ -284,7 +287,7 @@ class RAGASStorageService:
             return response.data if response.data else []
 
         except Exception as e:
-            print(f"Error retrieving evaluations with filters: {str(e)}")
+            logger.error("evaluations_with_filters_retrieval_failed", error=str(e))
             return []
 
     def get_trend_data(
@@ -329,5 +332,5 @@ class RAGASStorageService:
             return sorted(trend_data, key=lambda x: x["timestamp"])
 
         except Exception as e:
-            print(f"Error retrieving trend data: {str(e)}")
+            logger.error("trend_data_retrieval_failed", metric_name=metric_name, days=days, error=str(e))
             return []

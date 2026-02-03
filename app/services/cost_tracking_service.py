@@ -4,6 +4,7 @@ Tracks API, compute, and storage costs across all services with budget alerts
 """
 
 import os
+import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
@@ -14,6 +15,8 @@ import json
 
 from prometheus_client import Counter, Gauge, Histogram
 from app.core.database import get_supabase
+from app.services.notification_dispatcher import NotificationDispatcher, get_notification_dispatcher
+from app.services.email_service import get_email_service
 
 logger = logging.getLogger(__name__)
 
@@ -602,7 +605,7 @@ class CostTrackingService:
         usage_percent: float,
         channels: List[str]
     ):
-        """Send budget alert notification"""
+        """Send budget alert notification via configured channels"""
         message = (
             f"⚠️ Budget Alert: {service.value}\n"
             f"Current spending: ${current_spending:.2f}\n"
@@ -612,13 +615,101 @@ class CostTrackingService:
 
         logger.warning(message)
 
-        # TODO: Integrate with notification service
-        # - Email notifications
-        # - Slack webhooks
-        # - PagerDuty alerts
+        # Determine alert severity
+        severity = "warning" if usage_percent < 100 else "critical"
 
-        # For now, log the alert
-        # In production, this would send actual notifications
+        # Send email notifications
+        if "email" in channels:
+            try:
+                email_service = get_email_service()
+                # Get admin email from environment
+                admin_emails = os.getenv("BUDGET_ALERT_EMAILS", "").split(",")
+                admin_emails = [e.strip() for e in admin_emails if e.strip()]
+
+                if admin_emails:
+                    html_content = f"""
+                    <h2 style="color: {'#ff6b6b' if severity == 'critical' else '#ffa502'};">
+                        Budget Alert: {service.value}
+                    </h2>
+                    <table style="border-collapse: collapse; width: 100%;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Service</strong></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">{service.value}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Current Spending</strong></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${current_spending:.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Monthly Budget</strong></td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${monthly_budget:.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Usage</strong></td>
+                            <td style="padding: 8px; border: 1px solid #ddd; color: {'#ff6b6b' if severity == 'critical' else '#ffa502'};">
+                                {usage_percent:.1f}%
+                            </td>
+                        </tr>
+                    </table>
+                    <p style="margin-top: 20px; color: #666;">
+                        Timestamp: {datetime.utcnow().isoformat()}Z
+                    </p>
+                    """
+                    email_service.send_email(
+                        to_emails=admin_emails,
+                        subject=f"[{severity.upper()}] Budget Alert: {service.value} at {usage_percent:.1f}%",
+                        html_content=html_content
+                    )
+                    logger.info(f"Budget alert email sent to {len(admin_emails)} recipients")
+            except Exception as e:
+                logger.error(f"Failed to send budget alert email: {e}")
+
+        # Send WebSocket notification via NotificationDispatcher
+        if "websocket" in channels:
+            try:
+                dispatcher = get_notification_dispatcher()
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: dispatcher.notify_alert(
+                        alert_type="budget_alert",
+                        severity=severity,
+                        message=message,
+                        metadata={
+                            "service": service.value,
+                            "current_spending": current_spending,
+                            "monthly_budget": monthly_budget,
+                            "usage_percent": usage_percent
+                        }
+                    )
+                )
+                logger.info("Budget alert WebSocket notification sent")
+            except Exception as e:
+                logger.error(f"Failed to send budget alert WebSocket notification: {e}")
+
+        # Slack webhook integration
+        if "slack" in channels:
+            try:
+                slack_webhook_url = os.getenv("SLACK_BUDGET_ALERT_WEBHOOK")
+                if slack_webhook_url:
+                    import httpx
+                    slack_payload = {
+                        "text": message,
+                        "attachments": [{
+                            "color": "#ff6b6b" if severity == "critical" else "#ffa502",
+                            "fields": [
+                                {"title": "Service", "value": service.value, "short": True},
+                                {"title": "Usage", "value": f"{usage_percent:.1f}%", "short": True},
+                                {"title": "Spending", "value": f"${current_spending:.2f}", "short": True},
+                                {"title": "Budget", "value": f"${monthly_budget:.2f}", "short": True}
+                            ]
+                        }]
+                    }
+                    async with httpx.AsyncClient() as client:
+                        await client.post(slack_webhook_url, json=slack_payload)
+                    logger.info("Budget alert Slack notification sent")
+            except Exception as e:
+                logger.error(f"Failed to send budget alert Slack notification: {e}")
 
     async def _get_budget_status(
         self,

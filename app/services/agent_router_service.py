@@ -12,6 +12,7 @@ Author: Claude Code
 Date: 2025-01-25
 """
 
+import asyncio
 import os
 import json
 import hashlib
@@ -316,27 +317,107 @@ class AgentRouterService:
             return None
 
         try:
-            # Try exact hash match first
-            result = self.supabase.table("agent_router_cache").select("*").eq(
-                "query_hash", query_hash
-            ).eq("is_active", True).gt(
-                "expires_at", datetime.utcnow().isoformat()
-            ).execute()
+            # Try exact hash match first (wrap sync call to avoid blocking)
+            result = await asyncio.to_thread(
+                lambda: self.supabase.table("agent_router_cache").select("*").eq(
+                    "query_hash", query_hash
+                ).eq("is_active", True).gt(
+                    "expires_at", datetime.utcnow().isoformat()
+                ).execute()
+            )
 
             if result.data:
                 cache_data = result.data[0]
-                # Increment hit count
-                self.supabase.rpc(
-                    "increment_router_cache_hit",
-                    {"p_cache_id": cache_data["id"]}
-                ).execute()
+                # Increment hit count (wrap sync call)
+                await asyncio.to_thread(
+                    lambda: self.supabase.rpc(
+                        "increment_cache_hit",
+                        {"p_cache_id": cache_data["id"]}
+                    ).execute()
+                )
 
                 return RouterCacheEntry.from_dict(cache_data)
 
-            # TODO: Implement semantic similarity search with embeddings
+            # Semantic similarity search with embeddings (only if enabled)
+            if self.use_semantic_cache and embedding is not None:
+                similar_result = await self._semantic_cache_lookup(
+                    embedding,
+                    match_threshold=self.similarity_threshold
+                )
+                if similar_result:
+                    return similar_result
 
         except Exception as e:
             logger.warning("Cache lookup failed", error=str(e))
+
+        return None
+
+    async def _semantic_cache_lookup(
+        self,
+        query_embedding: List[float],
+        match_threshold: float = 0.85,
+        match_count: int = 1
+    ) -> Optional[RouterCacheEntry]:
+        """
+        Perform semantic similarity search on cached query embeddings.
+        Uses pgvector cosine similarity to find similar cached queries.
+
+        Args:
+            query_embedding: The embedding vector of the current query
+            match_threshold: Minimum similarity score (0-1) to consider a match
+            match_count: Maximum number of matches to return
+
+        Returns:
+            RouterCacheEntry if a similar cached query is found, None otherwise
+        """
+        if not self.supabase:
+            return None
+
+        try:
+            # Use pgvector similarity search via Supabase RPC (wrap sync call)
+            result = await asyncio.to_thread(
+                lambda: self.supabase.rpc(
+                    "get_cached_routing",
+                    {
+                        "query_embedding": query_embedding,
+                        "match_threshold": match_threshold,
+                        "match_count": match_count
+                    }
+                ).execute()
+            )
+
+            if result.data and len(result.data) > 0:
+                cache_data = result.data[0]
+                similarity_score = cache_data.get("similarity", 0)
+
+                logger.info(
+                    "semantic_cache_hit",
+                    similarity_score=similarity_score,
+                    cache_id=cache_data.get("cache_id")
+                )
+
+                # Increment hit count for the matched cache entry (wrap sync call)
+                await asyncio.to_thread(
+                    lambda: self.supabase.rpc(
+                        "increment_cache_hit",
+                        {"p_cache_id": cache_data.get("cache_id")}
+                    ).execute()
+                )
+
+                # Transform RPC response fields to match RouterCacheEntry expectations
+                transformed = {
+                    "query_hash": "",  # Not returned by semantic search
+                    "query_text": "",  # Not returned by semantic search
+                    "selected_agent": cache_data.get("selected_workflow"),
+                    "confidence": cache_data.get("confidence_score", 0.0),
+                    "reasoning": cache_data.get("reasoning"),
+                }
+
+                return RouterCacheEntry.from_dict(transformed)
+
+        except Exception as e:
+            # Log but don't fail - semantic search is an optimization
+            logger.debug("semantic_cache_lookup_failed", error=str(e))
 
         return None
 

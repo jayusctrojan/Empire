@@ -496,8 +496,8 @@ def reprocess_document(
                         try:
                             import os
                             os.unlink(local_file_path)
-                        except:
-                            pass
+                        except OSError:
+                            pass  # File may already be deleted or inaccessible
 
         # Generate new embeddings if update_embeddings
         if update_embeddings:
@@ -581,8 +581,8 @@ def reprocess_document(
                 "processing_status": "processing_failed",
                 "updated_at": datetime.utcnow().isoformat()
             }).eq("document_id", document_id).execute()
-        except:
-            pass
+        except Exception as status_error:
+            logger.warning("Failed to update document status to processing_failed", document_id=document_id, error=str(status_error))
         raise
 
 

@@ -15,6 +15,9 @@ from celery import Celery
 from celery.signals import task_prerun, task_postrun, task_failure, task_success, task_retry
 from prometheus_client import Counter, Histogram
 from dotenv import load_dotenv
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 load_dotenv()
 
@@ -190,8 +193,8 @@ SOURCE_PRIORITY = {
     "epub": PRIORITY_LOW,         # EPUB = slower processing
 
     # Very slow processing - background priority (transcription required)
-    "audio": PRIORITY_BACKGROUND, # Audio = Soniox transcription (very slow)
-    "video": PRIORITY_BACKGROUND, # Video = transcription (very slow)
+    "audio": PRIORITY_BACKGROUND,  # Audio = Soniox transcription (very slow)
+    "video": PRIORITY_BACKGROUND,  # Video = transcription (very slow)
     "mp3": PRIORITY_BACKGROUND,   # MP3 audio files
     "wav": PRIORITY_BACKGROUND,   # WAV audio files
     "m4a": PRIORITY_BACKGROUND,   # M4A audio files
@@ -243,7 +246,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
     Uses unified StatusBroadcaster for Redis Pub/Sub and database persistence.
     """
     _task_start_times[task_id] = time.time()
-    print(f"📋 Task started: {task.name} [{task_id}]")
+    logger.info("task_started", task_name=task.name, task_id=task_id)
 
     # Task 12: Use unified StatusBroadcaster
     try:
@@ -254,7 +257,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(task.name)
@@ -274,12 +277,12 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
             document_id=document_id,
             query_id=query_id,
             user_id=user_id,
-            session_id=_session_id,
+            session_id=task_kwargs.get('session_id'),
             metadata=metadata if metadata else None
         )
     except Exception as e:
         # Don't let broadcast errors break task execution
-        print(f"⚠️  Status broadcast failed for task start: {e}")
+        logger.warning("status_broadcast_failed_task_start", error=str(e))
 
     # Task 189: Create OpenTelemetry span for task execution
     if TRACING_ENABLED:
@@ -324,7 +327,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
 
             _task_spans[task_id] = span
         except Exception as e:
-            print(f"⚠️  OpenTelemetry span creation failed: {e}")
+            logger.warning("opentelemetry_span_creation_failed", error=str(e))
 
 
 @task_postrun.connect
@@ -340,7 +343,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, stat
         CELERY_TASK_DURATION.labels(task_name=task.name).observe(duration)
         del _task_start_times[task_id]
 
-    print(f"✅ Task completed: {task.name} [{task_id}]")
+    logger.info("task_completed", task_name=task.name, task_id=task_id)
     CELERY_TASKS.labels(task_name=task.name, status='success').inc()
 
     # Task 12: Use unified StatusBroadcaster
@@ -352,7 +355,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, stat
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(task.name)
@@ -381,7 +384,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, stat
         )
     except Exception as e:
         # Don't let broadcast errors break task execution
-        print(f"⚠️  Status broadcast failed for task completion: {e}")
+        logger.warning("status_broadcast_failed_task_completion", error=str(e))
 
     # Task 189: Close OpenTelemetry span on success
     if TRACING_ENABLED and task_id in _task_spans:
@@ -392,7 +395,7 @@ def task_postrun_handler(sender=None, task_id=None, task=None, retval=None, stat
             span.set_status(Status(StatusCode.OK))
             span.end()
         except Exception as e:
-            print(f"⚠️  OpenTelemetry span close failed: {e}")
+            logger.warning("opentelemetry_span_close_failed", error=str(e))
 
 
 @task_success.connect
@@ -409,7 +412,7 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
     Uses unified StatusBroadcaster for Redis Pub/Sub and database persistence.
     Also routes to Dead Letter Queue if all retries exhausted.
     """
-    print(f"❌ Task failed: {sender.name} [{task_id}]: {exception}")
+    logger.error("task_failed", task_name=sender.name, task_id=task_id, exception=str(exception))
     CELERY_TASKS.labels(task_name=sender.name, status='failure').inc()
 
     # Calculate duration if available
@@ -433,7 +436,7 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(sender.name)
@@ -461,11 +464,11 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
         )
     except Exception as e:
         # Don't let broadcast errors break task execution
-        print(f"⚠️  Status broadcast failed for task failure: {e}")
+        logger.warning("status_broadcast_failed_task_failure", error=str(e))
 
     # If task has no more retries, send to Dead Letter Queue
     if task_state and retry_count >= max_retries:
-        print(f"💀 Task {task_id} exhausted all retries - routing to Dead Letter Queue")
+        logger.warning("task_exhausted_retries_routing_to_dlq", task_id=task_id, retry_count=retry_count, max_retries=max_retries)
 
         # Route to DLQ by applying to dead_letter queue
         send_to_dead_letter_queue.apply_async(
@@ -494,7 +497,7 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
             span.record_exception(exception)
             span.end()
         except Exception as e:
-            print(f"⚠️  OpenTelemetry span close failed on error: {e}")
+            logger.warning("opentelemetry_span_close_failed_on_error", error=str(e))
 
 
 @task_retry.connect
@@ -504,7 +507,7 @@ def task_retry_handler(sender=None, request=None, reason=None, einfo=None, **kwa
     Uses unified StatusBroadcaster for Redis Pub/Sub and database persistence.
     """
     task_id = request.id if request else None
-    print(f"🔄 Task retrying: {sender.name} [{task_id}]: {reason}")
+    logger.info("task_retrying", task_name=sender.name, task_id=task_id, reason=str(reason))
     CELERY_TASKS.labels(task_name=sender.name, status='retry').inc()
 
     # Task 12: Use unified StatusBroadcaster
@@ -516,7 +519,7 @@ def task_retry_handler(sender=None, request=None, reason=None, einfo=None, **kwa
         document_id = task_kwargs.get('document_id')
         query_id = task_kwargs.get('query_id') or task_kwargs.get('task_id')
         user_id = task_kwargs.get('user_id')
-        _session_id = task_kwargs.get('session_id')  # Reserved for future use
+        # session_id reserved for future use: task_kwargs.get('session_id')
 
         # Determine task type from task name
         task_type = get_task_type_from_name(sender.name)
@@ -542,7 +545,7 @@ def task_retry_handler(sender=None, request=None, reason=None, einfo=None, **kwa
         )
     except Exception as e:
         # Don't let broadcast errors break task execution
-        print(f"⚠️  Status broadcast failed for task retry: {e}")
+        logger.warning("status_broadcast_failed_task_retry", error=str(e))
 
 
 # Health check task
@@ -571,7 +574,7 @@ def send_to_dead_letter_queue(failed_task_info: dict):
     import json
     from datetime import datetime
 
-    print(f"💀 Dead Letter Queue: Processing failed task {failed_task_info.get('task_name')}")
+    logger.info("dlq_processing_failed_task", task_name=failed_task_info.get('task_name'))
 
     dlq_entry = {
         'task_id': failed_task_info.get('task_id'),
@@ -593,15 +596,15 @@ def send_to_dead_letter_queue(failed_task_info: dict):
         result = supabase_storage.client.table("dead_letter_queue").insert(dlq_entry).execute()
 
         if result.data:
-            print(f"💾 DLQ entry stored in database: {dlq_entry['task_id']}")
+            logger.info("dlq_entry_stored_in_database", task_id=dlq_entry['task_id'])
             dlq_entry['db_id'] = result.data[0].get('id')
         else:
-            print(f"⚠️ Failed to store DLQ entry in database")
+            logger.warning("dlq_entry_store_failed")
 
     except Exception as db_error:
         # Log error but don't fail - also log to console as backup
-        print(f"⚠️ Database storage failed: {db_error}")
-        print(f"💀 DLQ Entry (console backup): {json.dumps(dlq_entry, indent=2)}")
+        logger.warning("dlq_database_storage_failed", error=str(db_error))
+        logger.info("dlq_entry_console_backup", dlq_entry=dlq_entry)
 
     return dlq_entry
 
@@ -660,7 +663,7 @@ def inspect_dead_letter_queue(status: str = None, limit: int = 50, offset: int =
         }
 
     except Exception as e:
-        print(f"❌ Failed to query DLQ: {e}")
+        logger.error("dlq_query_failed", error=str(e))
         return {
             'status': 'error',
             'message': f'Database query failed: {str(e)}',
@@ -686,7 +689,7 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
     """
     from datetime import datetime
 
-    print(f"🔄 Retrying task from DLQ: {task_name} (original ID: {task_id})")
+    logger.info("dlq_retrying_task", task_name=task_name, original_task_id=task_id)
 
     # Get the task by name
     task = celery_app.tasks.get(task_name)
@@ -694,7 +697,7 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
     if task:
         # Re-submit the task with original arguments
         result = task.apply_async(args=args, kwargs=kwargs)
-        print(f"✅ Task resubmitted with new ID: {result.id}")
+        logger.info("task_resubmitted", new_task_id=result.id)
 
         # Update DLQ entry status in database
         if dlq_db_id:
@@ -711,9 +714,9 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
                     .eq('id', dlq_db_id) \
                     .execute()
 
-                print(f"💾 Updated DLQ entry status to 'retried'")
+                logger.info("dlq_entry_status_updated_to_retried")
             except Exception as db_error:
-                print(f"⚠️ Failed to update DLQ status: {db_error}")
+                logger.warning("dlq_status_update_failed", error=str(db_error))
 
         return {
             'status': 'success',
@@ -723,7 +726,7 @@ def retry_from_dead_letter_queue(task_id: str, task_name: str, args: list, kwarg
             'dlq_db_id': dlq_db_id
         }
     else:
-        print(f"❌ Task {task_name} not found")
+        logger.error("task_not_found", task_name=task_name)
         return {
             'status': 'error',
             'message': f'Task {task_name} not found',
@@ -788,7 +791,7 @@ def update_dlq_status(dlq_db_id: str, new_status: str, notes: str = None):
             }
 
     except Exception as e:
-        print(f"❌ Failed to update DLQ status: {e}")
+        logger.error("dlq_status_update_failed", error=str(e))
         return {
             'status': 'error',
             'message': str(e)

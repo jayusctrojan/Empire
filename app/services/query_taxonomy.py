@@ -23,18 +23,19 @@ Usage:
     taxonomy = get_query_taxonomy()
     decision = taxonomy.classify_query("What is this document about?")
 
-    print(f"Type: {decision.query_type}")
-    print(f"Pipeline: {decision.target_pipeline}")
-    print(f"Confidence: {decision.confidence}")
+    logger.info("taxonomy_decision",
+        query_type=decision.query_type,
+        pipeline=decision.target_pipeline,
+        confidence=decision.confidence)
 """
 
 import re
-import logging
+import structlog
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from enum import Enum
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class QueryType(str, Enum):
@@ -127,7 +128,7 @@ class QueryTaxonomy:
         # Custom patterns (extensibility)
         self.custom_patterns: Dict[str, List[str]] = {}
 
-        logger.info("Initialized QueryTaxonomy")
+        logger.info("query_taxonomy_initialized")
 
     def normalize_query(self, query: str) -> str:
         """
@@ -306,7 +307,7 @@ class QueryTaxonomy:
             self.custom_patterns[query_type.value] = []
 
         self.custom_patterns[query_type.value].append(pattern)
-        logger.info(f"Added custom pattern for {query_type.value}: {pattern}")
+        logger.info("custom_pattern_added", query_type=query_type.value, pattern=pattern)
 
     def register_pattern(self, query_type: QueryType, pattern: str):
         """
