@@ -460,8 +460,8 @@ COMMIT;
 -- END OF MIGRATION
 -- ============================================================================
 
-RAISE NOTICE '✅ Audit logs table created successfully';
-RAISE NOTICE '📊 Created 10 indexes for query performance';
-RAISE NOTICE '🔒 RLS enabled - admin-only access';
-RAISE NOTICE '🛠️  Created 3 helper functions for logging';
-RAISE NOTICE '✨ Sample data inserted for testing';
+-- ✅ Audit logs table created successfully
+-- 📊 Created 10 indexes for query performance
+-- 🔒 RLS enabled - admin-only access
+-- 🛠️  Created 3 helper functions for logging
+-- ✨ Sample data inserted for testing

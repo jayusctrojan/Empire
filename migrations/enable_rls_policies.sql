@@ -36,8 +36,7 @@ ALTER TABLE batch_operations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_document_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE crewai_executions ENABLE ROW LEVEL SECURITY;
 
--- Log RLS enablement
-RAISE NOTICE 'RLS enabled on 14 user-facing tables';
+-- RLS enabled on 14 user-facing tables
 
 -- ============================================================================
 -- PHASE 2: CREATE RLS POLICIES FOR DATA ISOLATION
@@ -130,7 +129,7 @@ CREATE POLICY user_crewai_executions_policy ON crewai_executions
     current_setting('app.user_role', TRUE) = 'admin'
   );
 
-RAISE NOTICE 'Created RLS policies for 9 tables with direct user ownership';
+-- Created RLS policies for 9 tables with direct user ownership
 
 -- ----------------------------------------------------------------------------
 -- PATTERN 2: Foreign Key Ownership via Documents
@@ -172,7 +171,7 @@ CREATE POLICY user_processing_tasks_policy ON processing_tasks
     current_setting('app.user_role', TRUE) = 'admin'
   );
 
-RAISE NOTICE 'Created RLS policies for 3 tables with FK ownership via documents';
+-- Created RLS policies for 3 tables with FK ownership via documents
 
 -- ----------------------------------------------------------------------------
 -- PATTERN 3: Foreign Key Ownership via Chat Sessions
@@ -202,7 +201,7 @@ CREATE POLICY user_chat_feedback_policy ON chat_feedback
     current_setting('app.user_role', TRUE) = 'admin'
   );
 
-RAISE NOTICE 'Created RLS policies for 2 tables with FK ownership via chat_sessions';
+-- Created RLS policies for 2 tables with FK ownership via chat_sessions
 
 -- ============================================================================
 -- PHASE 3: CREATE PERFORMANCE INDEXES FOR RLS COLUMNS
@@ -227,7 +226,7 @@ CREATE INDEX IF NOT EXISTS idx_processing_tasks_document_id ON processing_tasks(
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_chat_feedback_session_id ON chat_feedback(session_id);
 
-RAISE NOTICE 'Created performance indexes for RLS columns';
+-- Created performance indexes for RLS columns
 
 -- ============================================================================
 -- PHASE 4: VERIFICATION QUERIES
