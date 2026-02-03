@@ -292,7 +292,7 @@ jobs:
           if [ -f "scripts/run_migrations.py" ]; then
             python scripts/run_migrations.py
           else
-            echo "Migration script not found - skipping migrations"
+            echo "::warning::Migration script not found at scripts/run_migrations.py - skipping migrations"
           fi
 
   # ========================================

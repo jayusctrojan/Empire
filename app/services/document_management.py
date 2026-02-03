@@ -24,6 +24,27 @@ from app.services.embedding_service import get_embedding_service, EmbeddingServi
 logger = structlog.get_logger(__name__)
 
 
+def _run_async(coro):
+    """
+    Run an async coroutine from sync context.
+
+    Handles both cases:
+    - When no event loop is running: uses _run_async()
+    - When already in an event loop: uses nest_asyncio or a thread pool
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No event loop running - safe to use _run_async()
+        return _run_async(coro)
+
+    # Already in an event loop - use run_in_executor to avoid blocking
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        future = pool.submit(asyncio.run, coro)
+        return future.result()
+
+
 def process_document_upload(
     file_path: str,
     filename: str,
@@ -96,8 +117,8 @@ def process_document_upload(
             content_type = content_type_map.get(file_type.lower(), 'application/octet-stream')
 
             # Upload to B2 with checksum verification
-            # Use asyncio.run() for cleaner async execution from sync context
-            upload_result = asyncio.run(
+            # Use _run_async() for cleaner async execution from sync context
+            upload_result = _run_async(
                 b2_service.upload_file(
                     file_data=file_data,
                     filename=filename,
@@ -281,7 +302,7 @@ def delete_document(
                     b2_file_name = document.get("file_path", "")
 
                     # Use the underlying B2 service for deletion
-                    asyncio.run(
+                    _run_async(
                         b2_service.b2_service.delete_file(
                             file_id=b2_file_id,
                             file_name=b2_file_name
@@ -408,7 +429,7 @@ def reprocess_document(
                         local_file_path = tf.name
 
                     # Download from B2
-                    asyncio.run(
+                    _run_async(
                         b2_service.download_file(
                             file_id=b2_file_id,
                             file_name=b2_file_path,
@@ -434,7 +455,7 @@ def reprocess_document(
             if local_file_path:
                 try:
                     processor = get_document_processor()
-                    extraction_result = asyncio.run(
+                    extraction_result = _run_async(
                         processor.process_document(local_file_path)
                     )
 
@@ -515,7 +536,7 @@ def reprocess_document(
                     chunk_ids = [c["chunk_id"] for c in chunks_to_embed.data]
 
                     # Generate embeddings in batch
-                    embedding_results = asyncio.run(
+                    embedding_results = _run_async(
                         embedding_service.generate_embeddings_batch(
                             texts=chunk_texts,
                             chunk_ids=chunk_ids,

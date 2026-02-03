@@ -89,6 +89,9 @@ class SummarySection(str, Enum):
     APPENDIX = "appendix"
 
 
+# LLM Model Configuration
+CLAUDE_MODEL = "claude-sonnet-4-5-20250514"
+
 # Color scheme for PDF styling
 COLORS = {
     "primary": HexColor("#1a365d"),      # Dark blue
@@ -975,7 +978,7 @@ class ContentSummarizerAgentService:
         async with AgentMetricsContext(
             AgentID.CONTENT_SUMMARIZER,
             "generate_summary",
-            model="claude-sonnet-4-5-20250514"
+            model=CLAUDE_MODEL
         ) as metrics_ctx:
             try:
                 # Step 1: Extract and structure content
@@ -1074,7 +1077,7 @@ class ContentSummarizerAgentService:
             try:
                 # Use LLM to extract key concepts
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5-20250514",
+                    model=CLAUDE_MODEL,
                     max_tokens=2000,
                     messages=[{
                         "role": "user",
@@ -1096,7 +1099,7 @@ Respond in this exact JSON format:
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.CONTENT_SUMMARIZER,
-                    "claude-sonnet-4-5-20250514",
+                    CLAUDE_MODEL,
                     "success",
                     input_tokens,
                     output_tokens
@@ -1114,7 +1117,7 @@ Respond in this exact JSON format:
 
             except Exception as e:
                 logger.warning("LLM extraction failed", error=str(e))
-                track_llm_call(AgentID.CONTENT_SUMMARIZER, "claude-sonnet-4-5-20250514", "failure")
+                track_llm_call(AgentID.CONTENT_SUMMARIZER, CLAUDE_MODEL, "failure")
 
         # Fallback extraction if LLM failed
         if not key_concepts:
@@ -1232,7 +1235,7 @@ Respond in this exact JSON format:
         if self.llm:
             try:
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5-20250514",
+                    model=CLAUDE_MODEL,
                     max_tokens=500,
                     messages=[{
                         "role": "user",
@@ -1256,7 +1259,7 @@ Write in a professional, business tone."""
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.CONTENT_SUMMARIZER,
-                    "claude-sonnet-4-5-20250514",
+                    CLAUDE_MODEL,
                     "success",
                     input_tokens,
                     output_tokens
@@ -1264,7 +1267,7 @@ Write in a professional, business tone."""
                 return response.content[0].text
             except Exception as e:
                 logger.warning("LLM summary generation failed", error=str(e))
-                track_llm_call(AgentID.CONTENT_SUMMARIZER, "claude-sonnet-4-5-20250514", "failure")
+                track_llm_call(AgentID.CONTENT_SUMMARIZER, CLAUDE_MODEL, "failure")
 
         # Fallback
         return f"""This {extracted.source_type} titled "{extracted.title}" provides comprehensive coverage of key business and technical concepts. The material spans approximately {extracted.word_count} words and covers {len(extracted.key_concepts)} main topics.
@@ -1276,7 +1279,7 @@ Key areas of focus include: {', '.join(extracted.key_concepts[:5])}. The content
         if self.llm:
             try:
                 response = await self.llm.messages.create(
-                    model="claude-sonnet-4-5-20250514",
+                    model=CLAUDE_MODEL,
                     max_tokens=400,
                     messages=[{
                         "role": "user",
@@ -1294,7 +1297,7 @@ Focus on actionable takeaways that readers can reference quickly."""
                 output_tokens = getattr(response.usage, 'output_tokens', 0) if hasattr(response, 'usage') else 0
                 track_llm_call(
                     AgentID.CONTENT_SUMMARIZER,
-                    "claude-sonnet-4-5-20250514",
+                    CLAUDE_MODEL,
                     "success",
                     input_tokens,
                     output_tokens
@@ -1302,7 +1305,7 @@ Focus on actionable takeaways that readers can reference quickly."""
                 return response.content[0].text
             except Exception as e:
                 logger.warning("LLM quick reference failed", error=str(e))
-                track_llm_call(AgentID.CONTENT_SUMMARIZER, "claude-sonnet-4-5-20250514", "failure")
+                track_llm_call(AgentID.CONTENT_SUMMARIZER, CLAUDE_MODEL, "failure")
 
         return f"Key topics: {', '.join(extracted.key_concepts[:5])}. Refer to the detailed sections above for comprehensive information."
 
