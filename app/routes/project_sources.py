@@ -402,6 +402,19 @@ async def list_project_sources(
 
 
 # Static routes must come BEFORE dynamic path parameters
+# Health check endpoint (must be before /{project_id}/sources/{source_id})
+@router.get("/sources/health", tags=["Health"])
+async def project_sources_health():
+    """Health check for project sources service"""
+    return {
+        "status": "healthy",
+        "service": "project_sources",
+        "max_file_size_mb": 100,
+        "max_sources_per_project": 100,
+        "max_storage_per_project_mb": 500
+    }
+
+
 @router.get("/{project_id}/sources/stats", response_model=ProjectSourceStats)
 async def get_project_source_stats(
     project_id: str,
@@ -658,19 +671,3 @@ async def retry_failed_source(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retry source: {str(e)}"
         )
-
-
-# ============================================================================
-# Health Check
-# ============================================================================
-
-@router.get("/sources/health", tags=["Health"])
-async def project_sources_health():
-    """Health check for project sources service"""
-    return {
-        "status": "healthy",
-        "service": "project_sources",
-        "max_file_size_mb": 100,
-        "max_sources_per_project": 100,
-        "max_storage_per_project_mb": 500
-    }
