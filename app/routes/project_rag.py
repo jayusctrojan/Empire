@@ -294,7 +294,7 @@ async def query_project_rag(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"RAG query failed: {str(e)}"
+            detail="An internal error occurred while processing RAG query"
         )
 
 
@@ -416,7 +416,7 @@ async def query_project_sources_only(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"RAG query failed: {str(e)}"
+            detail="An internal error occurred while processing sources-only RAG query"
         )
 
 
@@ -681,5 +681,5 @@ async def preview_sources(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Source preview failed: {str(e)}"
+            detail="An internal error occurred while previewing sources"
         )
