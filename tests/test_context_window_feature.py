@@ -69,8 +69,8 @@ def sample_context():
         total_tokens=5000,
         max_tokens=200000,
         threshold_percent=80,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
 
 
@@ -89,7 +89,7 @@ def sample_messages():
             token_count=50,
             is_protected=False,
             position=i,
-            created_at=datetime.utcnow() - timedelta(minutes=5 - i)
+            created_at=datetime.now(timezone.utc) - timedelta(minutes=5 - i)
         ))
     return messages
 

@@ -75,10 +75,11 @@ COMPACTION_COST = Counter(
 # Configuration Constants
 # ==============================================================================
 
-# Model costs per 1K tokens (approximate)
+# Model costs per 1K tokens (approximate, as of 2024)
+# Note: Consider replacing with runtime/config lookup to avoid drift
 MODEL_COSTS = {
-    "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125},
-    "claude-3-5-haiku-20241022": {"input": 0.00025, "output": 0.00125},
+    "claude-3-haiku-20240307": {"input": 0.0008, "output": 0.004},
+    "claude-3-5-haiku-20241022": {"input": 0.0008, "output": 0.004},
     "claude-3-sonnet-20240229": {"input": 0.003, "output": 0.015},
     "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
 }
@@ -662,22 +663,28 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                 "id", condensed_ids
             ).execute()
 
-            # Get the minimum position of remaining messages
+            # Get remaining messages to determine summary position
             # Summary should be inserted BEFORE remaining messages chronologically
-            msg_result = supabase.table("context_messages").select(
-                "position"
+            remaining_msgs = supabase.table("context_messages").select(
+                "id", "position"
             ).eq("context_id", context.id).order(
                 "position", desc=False
-            ).limit(1).execute()
+            ).execute()
 
-            # Insert summary at position before remaining messages
-            # If no remaining messages, start at 0
+            # Insert summary at position 0, shifting existing messages up if needed
             summary_position = 0
-            if msg_result.data:
-                min_remaining_position = msg_result.data[0]["position"]
-                # Place summary right before the first remaining message
-                # Clamp to 0 to avoid negative positions when min_remaining_position is 0
-                summary_position = max(0, min_remaining_position - 1)
+            if remaining_msgs.data:
+                min_remaining_position = remaining_msgs.data[0]["position"]
+                if min_remaining_position == 0:
+                    # Position 0 is taken - shift all remaining messages up by 1
+                    # to make room for the summary at position 0
+                    for msg in remaining_msgs.data:
+                        supabase.table("context_messages").update({
+                            "position": msg["position"] + 1
+                        }).eq("id", msg["id"]).execute()
+                else:
+                    # There's room before the first remaining message
+                    summary_position = min_remaining_position - 1
 
             # Insert summary message
             supabase.table("context_messages").insert({

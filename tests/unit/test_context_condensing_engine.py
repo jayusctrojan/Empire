@@ -43,8 +43,8 @@ class TestContextCondensingEngine:
             max_tokens=200000,
             threshold_percent=80,
             last_compaction_at=None,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
 
     @pytest.fixture
@@ -59,7 +59,7 @@ class TestContextCondensingEngine:
                 token_count=1000,
                 is_protected=i == 0,  # First message is protected
                 position=i,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             for i in range(10)
         ]
