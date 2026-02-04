@@ -25,7 +25,6 @@ DIM='\033[2m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PID_DIR="${PROJECT_ROOT}/.pids"
-LOG_DIR="${PROJECT_ROOT}/logs"
 
 # Default options
 FORCE_KILL=false
@@ -217,8 +216,9 @@ stop_fastapi() {
         if [ -n "$orphaned" ]; then
             print_warning "Found orphaned uvicorn process: $orphaned"
             if [ "$FORCE_KILL" = true ]; then
+                # shellcheck disable=SC2086
                 kill -9 $orphaned 2>/dev/null || true
-                print_success "Force killed orphaned process"
+                print_success "Force killed orphaned process(es)"
             fi
         fi
         return 0

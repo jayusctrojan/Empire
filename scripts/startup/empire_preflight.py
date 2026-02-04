@@ -528,7 +528,7 @@ Examples:
         sys.exit(0)
     else:
         print()
-        print(colored(f"  ✗ Preflight check failed", Colors.RED))
+        print(colored("  ✗ Preflight check failed", Colors.RED))
 
         # Show which required services failed
         failed_required = [

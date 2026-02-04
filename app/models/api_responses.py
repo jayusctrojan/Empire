@@ -17,7 +17,7 @@ Usage:
         return success_response(data=item)
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field
@@ -63,7 +63,7 @@ class ValidationError(BaseModel):
 class ResponseMeta(BaseModel):
     """Response metadata for tracking and debugging"""
     request_id: str = Field(..., description="Unique request identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Response timestamp")
     version: str = Field(default="v1", description="API version")
     duration_ms: Optional[float] = Field(None, description="Request processing time in milliseconds")
 
@@ -125,7 +125,7 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="Overall health status")
     version: str = Field(..., description="Application version")
     environment: str = Field(..., description="Current environment")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     services: Optional[Dict[str, str]] = Field(None, description="Individual service status")
 
 

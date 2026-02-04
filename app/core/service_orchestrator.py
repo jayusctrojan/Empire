@@ -19,7 +19,6 @@ from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
 
 import httpx
 import structlog
-import yaml
 from prometheus_client import Counter, Gauge, Histogram
 
 from app.models.preflight import (
@@ -1024,7 +1023,7 @@ class ServiceOrchestrator:
         optional_results = await self.check_optional_services()
         all_services.update(optional_results)
 
-        for name, check in optional_results.items():
+        for check in optional_results.values():
             if check.status != ServiceStatus.RUNNING and check.fallback_message:
                 degraded_features.append(check.fallback_message)
 
@@ -1152,12 +1151,12 @@ class ServiceOrchestrator:
         cloud_services = ["supabase", "redis", "llamaindex", "crewai", "anthropic",
                          "arcade", "soniox", "openai", "llamacloud"]
         if service_name in cloud_services:
-            logger.info(f"Service {service_name} is cloud-based, skipping local start")
+            logger.info("Service is cloud-based, skipping local start", service=service_name)
             return True
 
         # Check if we have a startup command
         if not config or not config.startup_command:
-            logger.warning(f"No startup command configured for {service_name}")
+            logger.warning("No startup command configured", service=service_name)
             return False
 
         try:
@@ -1172,17 +1171,19 @@ class ServiceOrchestrator:
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
-                logger.info(f"Successfully started {service_name}",
+                logger.info("Successfully started service",
+                           service=service_name,
                            stdout=stdout.decode() if stdout else None)
                 return True
             else:
-                logger.error(f"Failed to start {service_name}",
+                logger.error("Failed to start service",
+                            service=service_name,
                             returncode=process.returncode,
                             stderr=stderr.decode() if stderr else None)
                 return False
 
         except Exception as e:
-            logger.error(f"Error starting {service_name}", error=str(e))
+            logger.error("Error starting service", service=service_name, error=str(e))
             return False
 
     def clear_cache(self):

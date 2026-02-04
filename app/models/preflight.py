@@ -9,7 +9,7 @@ Provides models for:
 - Graceful degradation state
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
@@ -64,7 +64,7 @@ class ServiceHealthCheck(BaseModel):
     latency_ms: Optional[float] = Field(None, description="Health check latency in milliseconds")
     error_message: Optional[str] = Field(None, description="Error message if status is error")
     details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the service")
-    last_checked: datetime = Field(default_factory=datetime.utcnow, description="When the check was performed")
+    last_checked: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When the check was performed")
     fallback_message: Optional[str] = Field(None, description="Message about fallback behavior when unavailable")
 
     class Config:
@@ -106,7 +106,7 @@ class PreflightResult(BaseModel):
     all_important_healthy: bool = Field(..., description="Whether all important services are healthy")
     services: Dict[str, ServiceHealthCheck] = Field(..., description="Health check results by service name")
     startup_time_ms: float = Field(..., description="Total time for preflight checks")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="When preflight was run")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When preflight was run")
     degraded_features: List[str] = Field(default_factory=list, description="Features unavailable due to service issues")
     warnings: List[str] = Field(default_factory=list, description="Non-blocking warnings")
     errors: List[str] = Field(default_factory=list, description="Blocking errors")
