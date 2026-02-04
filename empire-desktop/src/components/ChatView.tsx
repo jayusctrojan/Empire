@@ -13,7 +13,6 @@ export function ChatView() {
     messages,
     isStreaming,
     streamingContent,
-    streamingSources,
     streamingMessageId,
     activeConversationId,
     activeProjectId,

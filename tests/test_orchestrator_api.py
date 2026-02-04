@@ -98,7 +98,6 @@ def test_client():
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestCoordinateEndpoint:
     """Tests for POST /api/orchestrator/coordinate."""
 
@@ -177,7 +176,6 @@ class TestCoordinateEndpoint:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestClassifyEndpoint:
     """Tests for POST /api/orchestrator/classify."""
 
@@ -240,7 +238,6 @@ class TestClassifyEndpoint:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestAnalyzeEndpoint:
     """Tests for POST /api/orchestrator/analyze."""
 
@@ -292,7 +289,6 @@ class TestAnalyzeEndpoint:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestAgentsEndpoints:
     """Tests for agent listing endpoints."""
 
@@ -369,7 +365,6 @@ class TestAgentsEndpoints:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestHealthEndpoint:
     """Tests for GET /api/orchestrator/health."""
 
@@ -404,7 +399,6 @@ class TestHealthEndpoint:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestStatsEndpoint:
     """Tests for GET /api/orchestrator/stats."""
 
@@ -436,7 +430,6 @@ class TestStatsEndpoint:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestInfoEndpoints:
     """Tests for department and asset type info endpoints."""
 
@@ -474,7 +467,6 @@ class TestInfoEndpoints:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestModelValidation:
     """Tests for Pydantic model validation."""
 
@@ -511,7 +503,6 @@ class TestModelValidation:
 # ============================================================================
 
 
-@pytest.mark.skip(reason="Requires env vars (SUPABASE_URL, REDIS_URL) not available in CI")
 class TestErrorHandling:
     """Tests for error handling."""
 
