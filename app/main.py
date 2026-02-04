@@ -29,7 +29,6 @@ from app.routes import health as health_router  # Task 190: Enhanced Health Chec
 from app.routes import feedback as feedback_router  # Task 188: Agent Feedback System
 
 # PENDING FEATURES (to be implemented in future releases):
-# - Feature 011: Chat Context Window Management (context_window_router)
 # - Task 206: Automatic Checkpoint System (checkpoints_router)
 # - Task 207: Session Memory & Persistence (session_memory_router)
 
@@ -643,9 +642,6 @@ app.include_router(feedback_router.router)  # Feedback router has /api/feedback 
 # =============================================================================
 # PENDING FEATURES (to be implemented in future releases)
 # =============================================================================
-# Feature 011: Chat Context Window Management - Progress bar and token tracking
-#   Route: /api/context-window (context_window_router)
-#
 # Task 206: Automatic Checkpoint System - Session checkpoints and crash recovery
 #   Route: /api/checkpoints (checkpoints_router)
 #
