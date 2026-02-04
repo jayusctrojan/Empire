@@ -416,7 +416,10 @@ class ServiceOrchestrator:
         start = time.perf_counter()
         try:
             if self._connection_manager and self._connection_manager.supabase:
-                self._connection_manager.supabase.table("documents").select("id").limit(1).execute()
+                # Use asyncio.to_thread to avoid blocking the event loop
+                await asyncio.to_thread(
+                    lambda: self._connection_manager.supabase.table("documents").select("id").limit(1).execute()
+                )
                 latency = (time.perf_counter() - start) * 1000
                 return ServiceHealthCheck(
                     name="supabase",
@@ -450,9 +453,10 @@ class ServiceOrchestrator:
         start = time.perf_counter()
         try:
             if self._connection_manager and self._connection_manager.redis:
-                self._connection_manager.redis.ping()
+                # Use asyncio.to_thread to avoid blocking the event loop
+                await asyncio.to_thread(self._connection_manager.redis.ping)
                 latency = (time.perf_counter() - start) * 1000
-                info = self._connection_manager.redis.info("server")
+                info = await asyncio.to_thread(self._connection_manager.redis.info, "server")
                 return ServiceHealthCheck(
                     name="redis",
                     status=ServiceStatus.RUNNING,
@@ -486,7 +490,8 @@ class ServiceOrchestrator:
         config = self.inventory.get_service("neo4j")
         try:
             if self._connection_manager and self._connection_manager.neo4j_driver:
-                self._connection_manager.neo4j_driver.verify_connectivity()
+                # Use asyncio.to_thread to avoid blocking the event loop
+                await asyncio.to_thread(self._connection_manager.neo4j_driver.verify_connectivity)
                 latency = (time.perf_counter() - start) * 1000
                 return ServiceHealthCheck(
                     name="neo4j",
@@ -524,7 +529,8 @@ class ServiceOrchestrator:
         try:
             from app.services.b2_storage import get_b2_service
             b2_service = get_b2_service()
-            b2_service.check_connection()
+            # Use asyncio.to_thread to avoid blocking the event loop
+            await asyncio.to_thread(b2_service.check_connection)
             latency = (time.perf_counter() - start) * 1000
             return ServiceHealthCheck(
                 name="b2",
@@ -561,7 +567,8 @@ class ServiceOrchestrator:
         config = self.inventory.get_service("celery")
         try:
             from app.celery_app import celery_app
-            celery_ping = celery_app.control.ping(timeout=2.0)
+            # Use asyncio.to_thread to avoid blocking the event loop
+            celery_ping = await asyncio.to_thread(celery_app.control.ping, timeout=2.0)
             latency = (time.perf_counter() - start) * 1000
 
             if celery_ping:

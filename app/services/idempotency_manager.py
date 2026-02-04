@@ -302,7 +302,7 @@ class IdempotencyManager:
             key=idempotency_key,
             operation=operation,
             status=IdempotencyStatus.COMPLETED,
-            result={"data": result} if not isinstance(result, dict) else result,
+            result={"data": result},  # Always wrap under "data" for consistent retrieval
             created_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + ttl,
             request_hash=request_hash

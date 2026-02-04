@@ -11,7 +11,7 @@ Provides models for:
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, ClassVar, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -68,7 +68,7 @@ class ServiceHealthCheck(BaseModel):
     fallback_message: Optional[str] = Field(None, description="Message about fallback behavior when unavailable")
 
     class Config:
-        json_schema_extra = {
+        json_schema_extra: ClassVar[Dict[str, Any]] = {
             "example": {
                 "name": "supabase",
                 "status": "running",
@@ -112,7 +112,7 @@ class PreflightResult(BaseModel):
     errors: List[str] = Field(default_factory=list, description="Blocking errors")
 
     class Config:
-        json_schema_extra = {
+        json_schema_extra: ClassVar[Dict[str, Any]] = {
             "example": {
                 "ready": True,
                 "all_required_healthy": True,

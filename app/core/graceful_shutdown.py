@@ -514,28 +514,35 @@ class GracefulShutdown:
         """
         start_time = time.time()
 
-        # Calculate per-phase timeouts from overall timeout
-        # Default to config values if no overall timeout specified
-        phase_timeout = timeout // 6 if timeout else None
+        # Calculate deadline for timeout-based shutdown
+        # Use deadline approach to honor caller's total timeout across all phases
+        deadline = start_time + timeout if timeout else None
+
+        def get_remaining_timeout() -> Optional[int]:
+            """Get remaining time until deadline, minimum 1 second per phase."""
+            if deadline is None:
+                return None
+            remaining = int(deadline - time.time())
+            return max(1, remaining)  # At least 1 second per phase
 
         try:
             # Phase 1: Prepare
             await self.prepare_shutdown(reason)
 
             # Phase 2: Drain requests
-            await self.drain_requests(timeout=phase_timeout)
+            await self.drain_requests(timeout=get_remaining_timeout())
 
             # Phase 3: Drain Celery
-            await self.drain_celery_tasks(timeout=phase_timeout)
+            await self.drain_celery_tasks(timeout=get_remaining_timeout())
 
             # Phase 4: Cancel background tasks
-            await self.cancel_background_tasks(timeout=phase_timeout)
+            await self.cancel_background_tasks(timeout=get_remaining_timeout())
 
             # Phase 5: Flush data
-            await self.flush_data(timeout=phase_timeout)
+            await self.flush_data(timeout=get_remaining_timeout())
 
             # Phase 6: Close connections
-            await self.close_connections(timeout=phase_timeout)
+            await self.close_connections(timeout=get_remaining_timeout())
 
             # Complete
             self.progress.phase = ShutdownPhase.COMPLETE

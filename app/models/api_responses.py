@@ -18,7 +18,7 @@ Usage:
 """
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any, ClassVar, Dict, Generic, List, Optional, TypeVar, Union
 
 from pydantic import BaseModel, Field
 from fastapi.responses import JSONResponse
@@ -39,7 +39,7 @@ class ErrorDetail(BaseModel):
     help_url: Optional[str] = Field(None, description="URL to documentation or help")
 
     class Config:
-        json_schema_extra = {
+        json_schema_extra: ClassVar[Dict[str, Any]] = {
             "example": {
                 "code": "VALIDATION_ERROR",
                 "message": "Invalid email format",
@@ -103,7 +103,7 @@ class APIResponse(BaseModel, Generic[T]):
     pagination: Optional[PaginationMeta] = Field(None, description="Pagination info for lists")
 
     class Config:
-        json_schema_extra = {
+        json_schema_extra: ClassVar[Dict[str, Any]] = {
             "example": {
                 "success": True,
                 "data": {"id": "123", "name": "Example"},

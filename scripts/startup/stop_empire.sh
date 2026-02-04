@@ -160,8 +160,8 @@ show_status() {
 prepare_shutdown() {
     print_step "Preparing for shutdown..."
 
-    # Try to notify FastAPI about shutdown
-    local response=$(curl -s -X POST "http://localhost:8000/api/preflight/shutdown/prepare" 2>/dev/null || echo "")
+    # Try to notify FastAPI about shutdown (with timeouts to fail fast if unresponsive)
+    local response=$(curl -s --connect-timeout 2 --max-time 5 -X POST "http://localhost:8000/api/preflight/shutdown/prepare" 2>/dev/null || echo "")
 
     if [ -n "$response" ]; then
         print_success "Shutdown prepared - no new requests accepted"
@@ -178,8 +178,8 @@ drain_requests() {
     local elapsed=0
 
     while [ $elapsed -lt $DRAIN_TIMEOUT ]; do
-        # Check drain status
-        local response=$(curl -s "http://localhost:8000/api/preflight/shutdown/status" 2>/dev/null || echo "")
+        # Check drain status (with timeouts to fail fast if unresponsive)
+        local response=$(curl -s --connect-timeout 2 --max-time 5 "http://localhost:8000/api/preflight/shutdown/status" 2>/dev/null || echo "")
 
         if [ -z "$response" ]; then
             # API not responding, assume drained

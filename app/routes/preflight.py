@@ -222,7 +222,7 @@ async def get_startup_progress(
 )
 async def start_service(
     service_name: str,
-    request: ServiceStartRequest = None,
+    _request: ServiceStartRequest = None,  # Reserved for future use
     orchestrator: ServiceOrchestrator = Depends(get_service_orchestrator)
 ):
     """
@@ -259,7 +259,7 @@ async def start_service(
 
         # Parse command to avoid shell=True, use DEVNULL to avoid buffer issues
         cmd_parts = shlex.split(service_config.startup_command)
-        process = subprocess.Popen(
+        subprocess.Popen(
             cmd_parts,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
@@ -455,14 +455,26 @@ async def drain_requests(
     except Exception:
         _shutdown_state["pending_tasks"] = 0
 
-    # Calculate progress
+    # Calculate progress and check timeout
+    elapsed = time.time() - (_shutdown_state.get("start_time") or time.time())
+
+    # Check if timeout exceeded
+    if elapsed >= request.timeout_seconds:
+        _shutdown_state["phase"] = ShutdownPhase.STOPPED
+        return ShutdownProgress(
+            phase=ShutdownPhase.STOPPED,
+            progress_percent=100,
+            message=f"Drain timeout exceeded ({request.timeout_seconds}s)",
+            pending_tasks=_shutdown_state["pending_tasks"],
+            connections_open=0,
+            data_flushed=False
+        )
+
     if _shutdown_state["pending_tasks"] == 0:
         _shutdown_state["phase"] = ShutdownPhase.CLOSING_CONNECTIONS
         progress = 80
     else:
         progress = 50
-
-    elapsed = time.time() - (_shutdown_state.get("start_time") or time.time())
 
     return ShutdownProgress(
         phase=_shutdown_state["phase"],

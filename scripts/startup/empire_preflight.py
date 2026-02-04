@@ -19,7 +19,7 @@ import asyncio
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -120,8 +120,8 @@ class ServiceChecker:
             from supabase import create_client
             client = create_client(url, key)
 
-            # Simple query test
-            result = client.table("documents_v2").select("id").limit(1).execute()
+            # Simple query test - connectivity check only
+            client.table("documents_v2").select("id").limit(1).execute()
 
             latency = (time.time() - start) * 1000
             return True, latency, f"Connected to {url[:30]}..."
@@ -352,7 +352,7 @@ class ServiceChecker:
     async def run_all_checks(
         self,
         required_only: bool = False
-    ) -> Dict[str, Dict]:
+    ) -> Tuple[Dict[str, Dict], bool]:
         """
         Run all health checks.
 
@@ -360,7 +360,7 @@ class ServiceChecker:
             required_only: Only check required services
 
         Returns:
-            Results dictionary
+            Tuple of (results dict, all_required_healthy bool)
         """
         # Required services
         required = [
@@ -506,7 +506,7 @@ Examples:
         import json
         output = {
             "success": all_required_healthy,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "duration_ms": round(total_time, 1),
             "services": results
         }
