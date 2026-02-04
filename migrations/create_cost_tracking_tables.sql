@@ -54,10 +54,12 @@ CREATE INDEX IF NOT EXISTS idx_cost_entries_session_id ON cost_entries(session_i
 CREATE INDEX IF NOT EXISTS idx_cost_entries_service_timestamp ON cost_entries(service, timestamp DESC);
 
 -- Composite index for monthly reports
-CREATE INDEX IF NOT EXISTS idx_cost_entries_month_service ON cost_entries(
-    DATE_TRUNC('month', timestamp),
-    service
-);
+-- NOTE: DATE_TRUNC is STABLE not IMMUTABLE, so can't be used in index expression
+-- Use idx_cost_entries_service_timestamp for monthly queries instead
+-- CREATE INDEX IF NOT EXISTS idx_cost_entries_month_service ON cost_entries(
+--     DATE_TRUNC('month', timestamp),
+--     service
+-- );
 
 -- ============================================================================
 -- Table: budget_configs

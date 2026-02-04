@@ -89,31 +89,34 @@ CREATE TRIGGER trigger_agent_feedback_updated_at
 -- Enable RLS
 ALTER TABLE public.agent_feedback ENABLE ROW LEVEL SECURITY;
 
--- Users can view feedback they created
-CREATE POLICY "Users can view their own feedback"
-ON public.agent_feedback
-FOR SELECT
-USING (created_by = auth.uid()::uuid OR created_by IS NULL);
+-- Only create policies if auth schema exists (Supabase environment)
+DO $$
+BEGIN
+    -- Check if auth schema exists (Supabase provides this)
+    IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+        -- Users can view feedback they created
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view their own feedback' AND tablename = 'agent_feedback') THEN
+            EXECUTE 'CREATE POLICY "Users can view their own feedback" ON public.agent_feedback FOR SELECT USING (created_by::text = auth.uid()::text OR created_by IS NULL)';
+        END IF;
 
--- Users can insert their own feedback
-CREATE POLICY "Users can insert their own feedback"
-ON public.agent_feedback
-FOR INSERT
-WITH CHECK (created_by = auth.uid()::uuid OR created_by IS NULL);
+        -- Users can insert their own feedback
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can insert their own feedback' AND tablename = 'agent_feedback') THEN
+            EXECUTE 'CREATE POLICY "Users can insert their own feedback" ON public.agent_feedback FOR INSERT WITH CHECK (created_by::text = auth.uid()::text OR created_by IS NULL)';
+        END IF;
 
--- Users can update their own feedback
-CREATE POLICY "Users can update their own feedback"
-ON public.agent_feedback
-FOR UPDATE
-USING (created_by = auth.uid()::uuid)
-WITH CHECK (created_by = auth.uid()::uuid);
+        -- Users can update their own feedback
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can update their own feedback' AND tablename = 'agent_feedback') THEN
+            EXECUTE 'CREATE POLICY "Users can update their own feedback" ON public.agent_feedback FOR UPDATE USING (created_by::text = auth.uid()::text) WITH CHECK (created_by::text = auth.uid()::text)';
+        END IF;
 
--- Service role has full access
-CREATE POLICY "Service role has full access to feedback"
-ON public.agent_feedback
-FOR ALL
-USING (auth.role() = 'service_role')
-WITH CHECK (auth.role() = 'service_role');
+        -- Service role has full access
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service role has full access to feedback' AND tablename = 'agent_feedback') THEN
+            EXECUTE 'CREATE POLICY "Service role has full access to feedback" ON public.agent_feedback FOR ALL USING (auth.role() = ''service_role'') WITH CHECK (auth.role() = ''service_role'')';
+        END IF;
+    ELSE
+        RAISE NOTICE 'Auth schema not found, skipping RLS policies for agent_feedback';
+    END IF;
+END $$;
 
 -- =============================================================================
 -- Part 5: Comments for documentation

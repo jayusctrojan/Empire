@@ -194,7 +194,7 @@ RETURNS TABLE (
 WITH RECURSIVE descendants AS (
     -- Base case: the starting step
     SELECT
-        el.id,
+        el.id AS step_id,
         el.parent_step_id,
         el.agent_id,
         el.step_name,
@@ -206,7 +206,7 @@ WITH RECURSIVE descendants AS (
 
     -- Recursive case: child steps
     SELECT
-        el.id,
+        el.id AS step_id,
         el.parent_step_id,
         el.agent_id,
         el.step_name,
