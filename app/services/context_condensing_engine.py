@@ -9,7 +9,7 @@ Task: 203 - Implement Intelligent Context Condensing Engine
 import os
 import time
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
@@ -246,7 +246,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
             if last_compaction:
                 last_time = datetime.fromisoformat(last_compaction.decode())
                 cooldown_end = last_time + timedelta(seconds=COMPACTION_COOLDOWN_SECONDS)
-                if datetime.utcnow() < cooldown_end:
+                if datetime.now(timezone.utc) < cooldown_end:
                     return False
 
             return True
@@ -315,7 +315,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                     success=False,
                     error_message="Compaction already in progress for this conversation",
                     model_used=model,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
 
             # Update progress
@@ -339,7 +339,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                     success=False,
                     error_message="Context or messages not found",
                     model_used=model,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
 
             pre_tokens = context.total_tokens
@@ -385,7 +385,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                     duration_ms=int((time.time() - start_time) * 1000),
                     success=True,
                     model_used=model,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(timezone.utc)
                 )
 
             await self._update_progress(conversation_id, 30, "Preparing for summarization")
@@ -455,7 +455,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                 cost_usd=cost_usd,
                 model_used=model,
                 success=True,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
 
             await self._log_compaction(context.id, result)
@@ -517,7 +517,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                 success=False,
                 error_message=str(e),
                 model_used=model,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
 
         finally:
@@ -698,8 +698,8 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
 
             supabase.table("conversation_contexts").update({
                 "total_tokens": new_total,
-                "last_compaction_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat()
+                "last_compaction_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", context.id).execute()
 
         except Exception as e:
@@ -754,7 +754,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
             # Use SET NX (only set if not exists)
             result = redis.set(
                 lock_key,
-                datetime.utcnow().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
                 ex=COMPACTION_LOCK_TTL,
                 nx=True
             )
@@ -798,7 +798,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
             progress_data = json.dumps({
                 "percent": percent,
                 "stage": stage,
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat()
             })
 
             redis.setex(progress_key, COMPACTION_PROGRESS_TTL, progress_data)
@@ -815,7 +815,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
         try:
             redis = get_redis()
             key = LAST_COMPACTION_KEY.format(conversation_id=conversation_id)
-            redis.setex(key, LAST_COMPACTION_TTL, datetime.utcnow().isoformat())
+            redis.setex(key, LAST_COMPACTION_TTL, datetime.now(timezone.utc).isoformat())
         except Exception as e:
             logger.warning(
                 "Failed to set last compaction time",

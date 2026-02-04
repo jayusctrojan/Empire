@@ -8,7 +8,7 @@ Task: 206 - Implement Automatic Checkpoint System
 
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 import structlog
@@ -114,7 +114,7 @@ class CheckpointService:
             }
 
             # Calculate expiration
-            expires_at = datetime.utcnow() + timedelta(days=CHECKPOINT_EXPIRATION_DAYS)
+            expires_at = datetime.now(timezone.utc) + timedelta(days=CHECKPOINT_EXPIRATION_DAYS)
 
             # Insert into database
             supabase = get_supabase()
@@ -128,7 +128,7 @@ class CheckpointService:
                 "label": label,
                 "auto_tag": primary_tag,
                 "is_abnormal_close": is_abnormal_close,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "expires_at": expires_at.isoformat(),
             }
 
@@ -152,7 +152,7 @@ class CheckpointService:
                 label=label,
                 auto_tag=CheckpointAutoTag(primary_tag) if primary_tag else None,
                 is_abnormal_close=is_abnormal_close,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
                 expires_at=expires_at
             )
 
@@ -220,7 +220,7 @@ class CheckpointService:
             ).eq(
                 "user_id", user_id
             ).gt(
-                "expires_at", datetime.utcnow().isoformat()
+                "expires_at", datetime.now(timezone.utc).isoformat()
             ).order(
                 "created_at", desc=True
             ).range(offset, offset + limit - 1).execute()
@@ -240,7 +240,7 @@ class CheckpointService:
             ).eq(
                 "user_id", user_id
             ).gt(
-                "expires_at", datetime.utcnow().isoformat()
+                "expires_at", datetime.now(timezone.utc).isoformat()
             ).execute()
 
             total = count_result.count if count_result.count else len(result.data)
@@ -406,7 +406,7 @@ class CheckpointService:
                 "metadata": checkpoint_data.get("metadata", {}),
                 "project_id": checkpoint_data.get("project_id"),
                 "restored_from": checkpoint_id,
-                "restored_at": datetime.utcnow()
+                "restored_at": datetime.now(timezone.utc)
             }
 
         except Exception as e:
@@ -445,7 +445,7 @@ class CheckpointService:
             ).eq(
                 "is_abnormal_close", True
             ).gt(
-                "expires_at", datetime.utcnow().isoformat()
+                "expires_at", datetime.now(timezone.utc).isoformat()
             ).order(
                 "created_at", desc=True
             ).limit(1).execute()
@@ -612,7 +612,7 @@ class CheckpointService:
         Returns:
             Generated label string
         """
-        timestamp = datetime.utcnow().strftime("%H:%M:%S")
+        timestamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
 
         # Priority-based label generation
         if "code" in tags:
@@ -728,7 +728,7 @@ class CheckpointService:
 
             # Delete expired checkpoints
             result = supabase.table("session_checkpoints").delete().lt(
-                "expires_at", datetime.utcnow().isoformat()
+                "expires_at", datetime.now(timezone.utc).isoformat()
             ).execute()
 
             deleted_count = len(result.data) if result.data else 0
@@ -760,7 +760,7 @@ class CheckpointService:
         try:
             redis = get_redis()
             key = LAST_CHECKPOINT_KEY.format(conversation_id=conversation_id)
-            redis.setex(key, CHECKPOINT_CACHE_TTL, datetime.utcnow().isoformat())
+            redis.setex(key, CHECKPOINT_CACHE_TTL, datetime.now(timezone.utc).isoformat())
             return True
         except Exception as e:
             logger.warning(
@@ -919,7 +919,7 @@ class CheckpointService:
                     position=row["position"],
                     created_at=datetime.fromisoformat(
                         row["created_at"].replace("Z", "+00:00")
-                    ) if row.get("created_at") else datetime.utcnow()
+                    ) if row.get("created_at") else datetime.now(timezone.utc)
                 ))
 
             # Create checkpoint
@@ -1038,7 +1038,7 @@ class CheckpointService:
                         "token_count": msg.token_count,
                         "is_protected": msg.is_protected,
                         "position": i,
-                        "created_at": msg.created_at.isoformat() if msg.created_at else datetime.utcnow().isoformat()
+                        "created_at": msg.created_at.isoformat() if msg.created_at else datetime.now(timezone.utc).isoformat()
                     }).execute()
 
                 # Step 3: Only after successful inserts, delete old messages
@@ -1053,7 +1053,7 @@ class CheckpointService:
                 supabase.table("conversation_contexts").update({
                     "total_tokens": total_tokens,
                     "message_count": len(messages),
-                    "updated_at": datetime.utcnow().isoformat()
+                    "updated_at": datetime.now(timezone.utc).isoformat()
                 }).eq("id", context_id).execute()
 
             logger.info(

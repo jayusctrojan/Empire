@@ -10,7 +10,7 @@ Task: 209 - Compact Command & API (rate limiting, history)
 from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 import json
 import time
@@ -529,7 +529,7 @@ async def trigger_compaction(
         return CompactionResultResponse(
             success=True,
             log={
-                "id": str(datetime.utcnow().timestamp()),
+                "id": str(datetime.now(timezone.utc).timestamp()),
                 "context_id": conversation_id,
                 "pre_tokens": result.pre_tokens,
                 "post_tokens": result.post_tokens,
@@ -579,7 +579,7 @@ async def trigger_async_compaction(
             user_id=user_id,
             trigger=trigger,
             fast=request.fast,
-            queued_at=datetime.utcnow().isoformat()
+            queued_at=datetime.now(timezone.utc).isoformat()
         )
 
         logger.info(
@@ -637,7 +637,7 @@ async def get_compaction_progress(
         )
         return CompactionStatusResponse(
             success=False,
-            status="error",
+            status="failed",
             error=str(e)
         )
 
@@ -726,18 +726,21 @@ async def get_compaction_history(
         supabase = get_supabase()
 
         # Query compaction_logs table with pagination
+        # Filter by both context_id and user_id for security
         # First get total count
         count_result = supabase.table("compaction_logs") \
             .select("id", count="exact") \
             .eq("context_id", conversation_id) \
+            .eq("user_id", user_id) \
             .execute()
 
         total_count = count_result.count if count_result.count else 0
 
-        # Get paginated history records
+        # Get paginated history records (scoped to user)
         history_result = supabase.table("compaction_logs") \
             .select("*") \
             .eq("context_id", conversation_id) \
+            .eq("user_id", user_id) \
             .order("created_at", desc=True) \
             .range(skip, skip + limit - 1) \
             .execute()

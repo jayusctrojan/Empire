@@ -6,7 +6,7 @@ Feature: Chat Context Window Management (011)
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 import structlog
@@ -246,7 +246,7 @@ class ContextManagerService:
             # Update context total tokens with calculated value
             supabase.table("conversation_contexts").update({
                 "total_tokens": new_total,
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", context.id).execute()
 
             # Build updated status
@@ -269,7 +269,7 @@ class ContextManagerService:
                 ),
                 is_compacting=False,
                 last_compaction_at=context.last_compaction_at,
-                last_updated=datetime.utcnow()
+                last_updated=datetime.now(timezone.utc)
             )
 
             # Cache the updated status
@@ -512,7 +512,7 @@ class ContextManagerService:
             estimated_messages_remaining=self.token_counter.estimate_messages_remaining(available),
             is_compacting=False,
             last_compaction_at=context.last_compaction_at,
-            last_updated=datetime.utcnow()
+            last_updated=datetime.now(timezone.utc)
         )
 
     # ===========================================================================
