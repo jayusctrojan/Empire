@@ -266,8 +266,8 @@ class TestContextCondensingEngine:
             output_tokens=1000
         )
 
-        # Expected: (10000/1000 * 0.00025) + (1000/1000 * 0.00125)
-        expected = (10 * 0.00025) + (1 * 0.00125)
+        # Expected: (10000/1000 * 0.0008) + (1000/1000 * 0.004)
+        expected = (10 * 0.0008) + (1 * 0.004)
         assert abs(cost - expected) < 0.0001
 
     def test_calculate_cost_sonnet(self, engine):

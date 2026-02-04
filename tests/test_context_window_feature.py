@@ -879,7 +879,7 @@ class TestContextWindowAPIRoutes:
             yield engine
 
     @pytest.fixture
-    def client(self, mock_context_manager, mock_condensing_engine):
+    def client(self, _mock_context_manager, _mock_condensing_engine):
         """Create test client with mocked services."""
         from app.main import app
         from app.middleware.auth import get_current_user
