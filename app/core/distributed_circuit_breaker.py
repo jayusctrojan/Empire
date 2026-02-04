@@ -384,7 +384,10 @@ class DistributedCircuitBreaker:
 
         if state.state == CircuitState.HALF_OPEN:
             # Allow limited calls in half-open
+            # Reserve a slot before returning True to prevent concurrent bypass
             if state.half_open_calls < self.config.half_open_max_calls:
+                state.half_open_calls += 1
+                await self._save_state(state)
                 return True
 
             CIRCUIT_REJECTIONS.labels(service=self.service_name).inc()
@@ -400,7 +403,7 @@ class DistributedCircuitBreaker:
 
         if state.state == CircuitState.HALF_OPEN:
             state.success_count += 1
-            state.half_open_calls += 1
+            # Note: half_open_calls already incremented in can_execute()
 
             # Check if we've hit success threshold
             if state.consecutive_successes >= self.config.success_threshold:

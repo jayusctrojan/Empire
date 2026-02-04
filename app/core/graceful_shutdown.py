@@ -336,15 +336,20 @@ class GracefulShutdown:
             self.progress.errors.append(f"Celery drain error: {str(e)}")
             return False
 
-    async def cancel_background_tasks(self) -> int:
+    async def cancel_background_tasks(self, timeout: Optional[int] = None) -> int:
         """
         Cancel all tracked background asyncio tasks.
+
+        Args:
+            timeout: Max seconds to wait for cancellation (default 5s)
 
         Returns:
             Number of tasks cancelled
         """
         if not self._background_tasks:
             return 0
+
+        timeout = timeout or 5
 
         cancelled = 0
         for task in self._background_tasks.copy():
@@ -357,7 +362,7 @@ class GracefulShutdown:
             try:
                 await asyncio.wait_for(
                     asyncio.gather(*self._background_tasks, return_exceptions=True),
-                    timeout=5.0
+                    timeout=float(timeout)
                 )
             except asyncio.TimeoutError:
                 logger.warning("Some background tasks did not cancel in time")
@@ -509,24 +514,28 @@ class GracefulShutdown:
         """
         start_time = time.time()
 
+        # Calculate per-phase timeouts from overall timeout
+        # Default to config values if no overall timeout specified
+        phase_timeout = timeout // 6 if timeout else None
+
         try:
             # Phase 1: Prepare
             await self.prepare_shutdown(reason)
 
             # Phase 2: Drain requests
-            await self.drain_requests()
+            await self.drain_requests(timeout=phase_timeout)
 
             # Phase 3: Drain Celery
-            await self.drain_celery_tasks()
+            await self.drain_celery_tasks(timeout=phase_timeout)
 
             # Phase 4: Cancel background tasks
-            await self.cancel_background_tasks()
+            await self.cancel_background_tasks(timeout=phase_timeout)
 
             # Phase 5: Flush data
-            await self.flush_data()
+            await self.flush_data(timeout=phase_timeout)
 
             # Phase 6: Close connections
-            await self.close_connections()
+            await self.close_connections(timeout=phase_timeout)
 
             # Complete
             self.progress.phase = ShutdownPhase.COMPLETE
