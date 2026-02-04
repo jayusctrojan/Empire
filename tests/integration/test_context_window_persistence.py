@@ -567,7 +567,7 @@ class TestCompactionPersistence:
         self, real_redis, test_conversation_id
     ):
         """Test that compaction lock is properly stored in Redis."""
-        lock_key = f"compaction:lock:{test_conversation_id}"
+        lock_key = f"context:{test_conversation_id}:compaction_lock"
 
         # Set a lock
         real_redis.set(lock_key, "locked", ex=300)  # 5 minute expiry
@@ -586,7 +586,7 @@ class TestCompactionPersistence:
         self, real_redis, test_conversation_id
     ):
         """Test that compaction progress is stored in Redis."""
-        progress_key = f"compaction:progress:{test_conversation_id}"
+        progress_key = f"context:{test_conversation_id}:compaction_progress"
 
         # Set progress data
         progress_data = {

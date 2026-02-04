@@ -23,6 +23,7 @@ class CompactionTrigger(str, Enum):
     AUTO = "auto"
     MANUAL = "manual"
     FORCE = "force"
+    ERROR_RECOVERY = "error_recovery"
 
 
 class MessageRole(str, Enum):

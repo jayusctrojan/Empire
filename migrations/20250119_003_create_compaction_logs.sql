@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.compaction_logs (
     messages_condensed INTEGER NOT NULL CHECK (messages_condensed >= 0),
     model_used VARCHAR(50) NOT NULL,
     duration_ms INTEGER NOT NULL CHECK (duration_ms >= 0),
-    triggered_by VARCHAR(20) NOT NULL CHECK (triggered_by IN ('auto', 'manual', 'force')),
+    triggered_by VARCHAR(20) NOT NULL CHECK (triggered_by IN ('auto', 'manual', 'force', 'error_recovery')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -31,7 +31,7 @@ COMMENT ON COLUMN public.compaction_logs.summary_preview IS 'First 500 chars of 
 COMMENT ON COLUMN public.compaction_logs.messages_condensed IS 'Number of messages summarized';
 COMMENT ON COLUMN public.compaction_logs.model_used IS 'AI model used: claude-sonnet-4 or claude-haiku';
 COMMENT ON COLUMN public.compaction_logs.duration_ms IS 'Compaction duration in milliseconds';
-COMMENT ON COLUMN public.compaction_logs.triggered_by IS 'Trigger type: auto, manual, or force';
+COMMENT ON COLUMN public.compaction_logs.triggered_by IS 'Trigger type: auto, manual, force, or error_recovery';
 
 -- Create indexes for efficient lookups
 CREATE INDEX IF NOT EXISTS idx_compaction_context ON public.compaction_logs(context_id);

@@ -182,7 +182,7 @@ export interface ContextWindowUpdate {
 }
 
 // Compaction Event Types (Feature 011 - Task 204)
-export type CompactionTrigger = 'auto' | 'manual' | 'threshold' | 'error_recovery'
+export type CompactionTrigger = 'auto' | 'manual' | 'force' | 'error_recovery'
 
 export interface CompactionEvent {
   id: string
