@@ -13,15 +13,15 @@
 -- =============================================================================
 
 -- Index for user's chat sessions (most common query)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_sessions_user_id
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id
 ON chat_sessions (user_id);
 
 -- Index for recent sessions per user
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_sessions_user_updated
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_updated
 ON chat_sessions (user_id, updated_at DESC);
 
 -- Index for session lookup by ID with status
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_sessions_id_status
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_id_status
 ON chat_sessions (id, status)
 WHERE status = 'active';
 
@@ -30,11 +30,11 @@ WHERE status = 'active';
 -- =============================================================================
 
 -- Index for messages in a session (ordered)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_session_created
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session_created
 ON chat_messages (session_id, created_at DESC);
 
 -- Index for messages by user
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_user_id
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id
 ON chat_messages (user_id);
 
 -- =============================================================================
@@ -42,12 +42,12 @@ ON chat_messages (user_id);
 -- =============================================================================
 
 -- Index for documents by status (for processing queue)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_status_created
+CREATE INDEX IF NOT EXISTS idx_documents_status_created
 ON documents_v2 (status, created_at)
 WHERE status IN ('pending', 'processing');
 
 -- Index for user's documents
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_user_id
+CREATE INDEX IF NOT EXISTS idx_documents_user_id
 ON documents_v2 (user_id);
 
 -- Index for document search by title (requires pg_trgm extension)
@@ -63,7 +63,7 @@ BEGIN
 END $$;
 
 -- Index for document type filtering
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_type
+CREATE INDEX IF NOT EXISTS idx_documents_type
 ON documents_v2 (document_type);
 
 -- =============================================================================
@@ -120,16 +120,16 @@ END $$;
 -- =============================================================================
 
 -- Index for performance analysis by time
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_query_perf_log_created
+CREATE INDEX IF NOT EXISTS idx_query_perf_log_created
 ON query_performance_log (created_at DESC);
 
 -- Index for slow query analysis
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_query_perf_log_duration
+CREATE INDEX IF NOT EXISTS idx_query_perf_log_duration
 ON query_performance_log (duration_ms DESC)
 WHERE duration_ms > 1000;
 
 -- Index for query type analysis
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_query_perf_log_type
+CREATE INDEX IF NOT EXISTS idx_query_perf_log_type
 ON query_performance_log (query_type);
 
 -- =============================================================================
@@ -137,15 +137,15 @@ ON query_performance_log (query_type);
 -- =============================================================================
 
 -- Index for user activity lookup
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_user
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user
 ON audit_logs (user_id, created_at DESC);
 
 -- Index for event type filtering
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_event
+CREATE INDEX IF NOT EXISTS idx_audit_logs_event
 ON audit_logs (event_type, created_at DESC);
 
 -- Index for resource-specific audits
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_resource
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource
 ON audit_logs (resource_type, resource_id);
 
 -- =============================================================================
@@ -153,11 +153,11 @@ ON audit_logs (resource_type, resource_id);
 -- =============================================================================
 
 -- Index for record manager hash lookups
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_record_manager_hash
+CREATE INDEX IF NOT EXISTS idx_record_manager_hash
 ON record_manager_v2 (content_hash);
 
 -- Index for record manager document association
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_record_manager_doc
+CREATE INDEX IF NOT EXISTS idx_record_manager_doc
 ON record_manager_v2 (document_id);
 
 -- =============================================================================
@@ -165,7 +165,7 @@ ON record_manager_v2 (document_id);
 -- =============================================================================
 
 -- Partial index for active documents only
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_active
+CREATE INDEX IF NOT EXISTS idx_documents_active
 ON documents_v2 (id, title, updated_at)
 WHERE status = 'completed' AND deleted_at IS NULL;
 
@@ -178,11 +178,11 @@ WHERE status = 'completed' AND deleted_at IS NULL;
 -- =============================================================================
 
 -- Index for session + message queries
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_session_user
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session_user
 ON chat_messages (session_id, user_id, created_at DESC);
 
 -- Index for document + status queries
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_documents_user_status
+CREATE INDEX IF NOT EXISTS idx_documents_user_status
 ON documents_v2 (user_id, status, updated_at DESC);
 
 -- =============================================================================
