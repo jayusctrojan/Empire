@@ -118,7 +118,7 @@ export function useContextWindow(options: UseContextWindowOptions = {}): UseCont
         conversationId: data.conversation_id,
         currentTokens: data.current_tokens,
         maxTokens: data.max_tokens,
-        reservedTokens: data.reserved_tokens,
+        reservedTokens: data.reserved_tokens ?? 10000,
         thresholdPercent: data.threshold_percent,
         usagePercent: data.usage_percent,
         status: data.status as ContextStatus,

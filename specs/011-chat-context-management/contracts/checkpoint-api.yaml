@@ -10,6 +10,9 @@ servers:
   - url: /api/v1
     description: Empire API v1
 
+security:
+  - bearerAuth: []
+
 tags:
   - name: Checkpoints
     description: Session checkpoint operations
@@ -241,6 +244,12 @@ paths:
           description: No recovery pending
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
   schemas:
     CheckpointListResponse:
       type: object

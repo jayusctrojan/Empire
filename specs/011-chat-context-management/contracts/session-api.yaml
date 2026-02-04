@@ -10,6 +10,9 @@ servers:
   - url: /api/v1
     description: Empire API v1
 
+security:
+  - bearerAuth: []
+
 tags:
   - name: Sessions
     description: Session listing and management
@@ -253,6 +256,12 @@ paths:
                 $ref: '#/components/schemas/CheckpointTimelineResponse'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
   schemas:
     SessionListResponse:
       type: object

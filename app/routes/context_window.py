@@ -442,6 +442,27 @@ async def websocket_context_updates(
         await websocket.close(code=4001, reason="Authentication required")
         return
 
+    # Verify user has access to this conversation before accepting WebSocket
+    try:
+        service = get_context_manager()
+        status_result = await service.get_context_status(conversation_id, user_id)
+        if not status_result.success:
+            logger.warning(
+                "websocket_conversation_access_denied",
+                conversation_id=conversation_id,
+                user_id=user_id
+            )
+            await websocket.close(code=4003, reason="Access denied to conversation")
+            return
+    except Exception as e:
+        logger.warning(
+            "websocket_ownership_check_failed",
+            conversation_id=conversation_id,
+            error=str(e)
+        )
+        await websocket.close(code=4003, reason="Failed to verify conversation access")
+        return
+
     await ws_manager.connect(websocket, conversation_id)
 
     try:

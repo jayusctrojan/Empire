@@ -10,6 +10,9 @@ servers:
   - url: /api/v1
     description: Empire API v1
 
+security:
+  - bearerAuth: []
+
 tags:
   - name: Context
     description: Context window management operations
@@ -221,6 +224,12 @@ paths:
                       $ref: '#/components/schemas/CompactionResult'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
   schemas:
     ContextWindowStatus:
       type: object

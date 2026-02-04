@@ -291,11 +291,11 @@ class TokenCounter:
                 model=self.model
             ).inc()
 
-            # Track threshold breaches
-            if usage_percent >= 70 and usage_percent < 85:
-                CONTEXT_THRESHOLD_BREACHES.labels(threshold_type="warning").inc()
-            elif usage_percent >= 85:
-                CONTEXT_THRESHOLD_BREACHES.labels(threshold_type="critical").inc()
+            # Note: Threshold breach counting removed from get_status() to avoid
+            # metric inflation. get_status() is called frequently for status checks,
+            # not just on threshold crossing events. CONTEXT_STATUS_UPDATES already
+            # tracks status distribution. Use update_context_usage_metric() to
+            # track threshold breaches on actual state transitions when adding messages.
 
             # Update usage gauge if conversation_id provided
             if conversation_id:

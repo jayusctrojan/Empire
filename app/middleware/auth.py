@@ -205,6 +205,10 @@ async def validate_token(token: str) -> str:
     Raises:
         Exception: If token validation fails
     """
+    # Reject empty/blank tokens early
+    if not token or not token.strip():
+        raise ValueError("Missing token")
+
     rbac_service = get_rbac_service()
 
     # Check if API key (emp_xxx format)
@@ -238,7 +242,8 @@ async def validate_token(token: str) -> str:
         raise
     except Exception as e:
         logger.error("ws_jwt_auth_failed", error=str(e))
-        raise ValueError(f"JWT validation failed: {str(e)}") from e
+        # Don't expose internal error details to clients
+        raise ValueError("JWT validation failed") from e
 
 
 async def require_role(

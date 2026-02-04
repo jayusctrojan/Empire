@@ -662,16 +662,21 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                 "id", condensed_ids
             ).execute()
 
-            # Get the next position (after remaining messages)
+            # Get the minimum position of remaining messages
+            # Summary should be inserted BEFORE remaining messages chronologically
             msg_result = supabase.table("context_messages").select(
                 "position"
             ).eq("context_id", context.id).order(
-                "position", desc=True
+                "position", desc=False
             ).limit(1).execute()
 
-            next_position = 0
+            # Insert summary at position before remaining messages
+            # If no remaining messages, start at 0
+            summary_position = 0
             if msg_result.data:
-                next_position = msg_result.data[0]["position"] + 1
+                min_remaining_position = msg_result.data[0]["position"]
+                # Place summary right before the first remaining message
+                summary_position = min_remaining_position - 1
 
             # Insert summary message
             supabase.table("context_messages").insert({
@@ -681,7 +686,7 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
                 "content": summary,
                 "token_count": summary_token_count,
                 "is_protected": False,
-                "position": next_position,
+                "position": summary_position,
                 "metadata": json.dumps({
                     "is_summary": True,
                     "condensed_message_ids": condensed_ids,

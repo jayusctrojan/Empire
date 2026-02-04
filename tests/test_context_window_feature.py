@@ -566,7 +566,7 @@ class TestCheckpointService:
             from app.services.checkpoint_service import CheckpointService
 
             # Create a real service but mock its internal method
-            checkpoint_service = CheckpointService()
+            _checkpoint_service = CheckpointService()  # noqa: F841 - instantiation test
 
             # Test the response model structure
             result = CheckpointResponse(

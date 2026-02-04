@@ -110,10 +110,17 @@ async def cleanup_test_data(real_supabase, real_redis, test_conversation_id, tes
             "conversation_id", f"{TEST_PREFIX}%"
         ).execute()
 
-        # Delete test context messages
-        real_supabase.table("context_messages").delete().like(
-            "context_id", f"{TEST_PREFIX}%"
+        # Find context IDs for prefixed conversations (context_id is UUID, not prefixed string)
+        ctx_rows = real_supabase.table("conversation_contexts").select("id").like(
+            "conversation_id", f"{TEST_PREFIX}%"
         ).execute()
+        ctx_ids = [row["id"] for row in (ctx_rows.data or [])]
+
+        # Delete test context messages using the found context IDs
+        if ctx_ids:
+            real_supabase.table("context_messages").delete().in_(
+                "context_id", ctx_ids
+            ).execute()
 
         # Delete test conversation contexts
         real_supabase.table("conversation_contexts").delete().like(
