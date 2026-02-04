@@ -144,6 +144,33 @@ class MigrationRunner:
 
         except psycopg2.Error as e:
             error_msg = str(e)
+
+            # Check if this is an "already exists" error - treat as success (idempotency)
+            already_exists_patterns = [
+                'already exists',
+                'duplicate key value violates unique constraint',
+            ]
+
+            is_already_exists = any(pattern in error_msg.lower() for pattern in already_exists_patterns)
+
+            if is_already_exists:
+                logger.warning(f"⚠️  Object already exists in {migration_name}, treating as success")
+                try:
+                    conn.rollback()
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            INSERT INTO schema_migrations (migration_name, success, applied_at, error_message)
+                            VALUES (%s, TRUE, CURRENT_TIMESTAMP, %s)
+                            ON CONFLICT (migration_name) DO UPDATE SET
+                                success = TRUE,
+                                applied_at = CURRENT_TIMESTAMP,
+                                error_message = %s
+                        """, (migration_name, f"Already exists: {error_msg}", f"Already exists: {error_msg}"))
+                        conn.commit()
+                except Exception as record_error:
+                    logger.error(f"❌ Failed to record migration: {record_error}")
+                return True
+
             logger.error(f"❌ Failed to apply {migration_name}: {error_msg}")
 
             # Record failure (use upsert to handle re-runs)
