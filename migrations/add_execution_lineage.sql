@@ -263,9 +263,9 @@ WITH RECURSIVE derived AS (
     -- Base case: steps that used this artifact as input
     SELECT
         au_out.artifact_id,
-        la.name,
+        la.name AS artifact_name,
         la.artifact_type,
-        1 AS depth
+        1 AS derivation_depth
     FROM artifact_usage au_in
     INNER JOIN artifact_usage au_out ON au_in.step_id = au_out.step_id
     INNER JOIN lineage_artifacts la ON au_out.artifact_id = la.id
@@ -279,9 +279,9 @@ WITH RECURSIVE derived AS (
     -- Recursive case: artifacts derived from derived artifacts
     SELECT
         au_out.artifact_id,
-        la.name,
+        la.name AS artifact_name,
         la.artifact_type,
-        d.depth + 1
+        d.derivation_depth + 1
     FROM derived d
     INNER JOIN artifact_usage au_in ON au_in.artifact_id = d.artifact_id
     INNER JOIN artifact_usage au_out ON au_in.step_id = au_out.step_id
@@ -289,7 +289,7 @@ WITH RECURSIVE derived AS (
     WHERE au_in.usage_type = 'input'
     AND au_out.usage_type = 'output'
     AND au_out.artifact_id != d.artifact_id
-    AND d.depth < 10  -- Limit recursion depth
+    AND d.derivation_depth < 10  -- Limit recursion depth
 )
 SELECT DISTINCT * FROM derived ORDER BY derivation_depth;
 $$ LANGUAGE SQL;
