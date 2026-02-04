@@ -247,7 +247,7 @@ async def health_check():
             "status": "healthy",
             "service": "context_window",
             "token_counter_available": service.token_counter is not None,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -256,7 +256,7 @@ async def health_check():
             "status": "unhealthy",
             "service": "context_window",
             "error": str(e),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 

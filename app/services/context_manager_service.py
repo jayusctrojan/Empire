@@ -481,7 +481,12 @@ class ContextManagerService:
                 return result.data[0]["position"] + 1
             return 0
 
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "Failed to get next message position, defaulting to 0",
+                context_id=context_id,
+                error=str(e)
+            )
             return 0
 
     def _build_status(

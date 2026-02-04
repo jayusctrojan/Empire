@@ -676,7 +676,8 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
             if msg_result.data:
                 min_remaining_position = msg_result.data[0]["position"]
                 # Place summary right before the first remaining message
-                summary_position = min_remaining_position - 1
+                # Clamp to 0 to avoid negative positions when min_remaining_position is 0
+                summary_position = max(0, min_remaining_position - 1)
 
             # Insert summary message
             supabase.table("context_messages").insert({

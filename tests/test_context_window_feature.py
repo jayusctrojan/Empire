@@ -566,7 +566,7 @@ class TestCheckpointService:
             from app.services.checkpoint_service import CheckpointService
 
             # Create a real service but mock its internal method
-            _checkpoint_service = CheckpointService()  # noqa: F841 - instantiation test
+            _checkpoint_service = CheckpointService()  # instantiation test
 
             # Test the response model structure
             result = CheckpointResponse(
@@ -1081,7 +1081,7 @@ class TestModelConfiguration:
 
         assert len(MODEL_COSTS) > 0
 
-        for model, costs in MODEL_COSTS.items():
+        for _model, costs in MODEL_COSTS.items():
             assert "input" in costs
             assert "output" in costs
             assert costs["input"] > 0
