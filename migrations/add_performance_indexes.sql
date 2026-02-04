@@ -24,7 +24,11 @@ BEGIN
 
         -- Recent documents query
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'documents_v2' AND column_name = 'created_at') THEN
-            EXECUTE 'CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents_v2(created_at DESC) WHERE deleted_at IS NULL';
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'documents_v2' AND column_name = 'deleted_at') THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents_v2(created_at DESC) WHERE deleted_at IS NULL';
+            ELSE
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents_v2(created_at DESC)';
+            END IF;
         END IF;
 
         -- Document type filtering
@@ -72,7 +76,12 @@ BEGIN
         -- User chat sessions (recent first)
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_sessions' AND column_name = 'user_id')
            AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_sessions' AND column_name = 'updated_at') THEN
-            EXECUTE 'CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id_updated ON chat_sessions(user_id, updated_at DESC) WHERE deleted_at IS NULL';
+            -- Check if deleted_at column exists before using in WHERE clause
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_sessions' AND column_name = 'deleted_at') THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id_updated ON chat_sessions(user_id, updated_at DESC) WHERE deleted_at IS NULL';
+            ELSE
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id_updated ON chat_sessions(user_id, updated_at DESC)';
+            END IF;
         END IF;
     END IF;
 
