@@ -401,7 +401,6 @@ async def prepare_shutdown():
 
     Call this before /shutdown/drain for orderly shutdown.
     """
-    global _shutdown_state
     _shutdown_state["phase"] = ShutdownPhase.DRAINING
     _shutdown_state["start_time"] = time.time()
 
@@ -432,8 +431,6 @@ async def drain_requests(
 
     Returns progress of the drain operation.
     """
-    global _shutdown_state
-
     if request.force:
         _shutdown_state["phase"] = ShutdownPhase.STOPPED
         return ShutdownProgress(
@@ -494,8 +491,6 @@ async def drain_requests(
 )
 async def get_shutdown_status():
     """Get the current shutdown status."""
-    global _shutdown_state
-
     phase_progress = {
         ShutdownPhase.RUNNING: 0,
         ShutdownPhase.DRAINING: 25,
@@ -555,5 +550,3 @@ async def list_services(
             for s in orchestrator.inventory.infrastructure
         ]
     }
-
-

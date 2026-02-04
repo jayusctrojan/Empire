@@ -636,6 +636,7 @@ class ServiceOrchestrator:
     ) -> ServiceHealthCheck:
         """Generic HTTP service health check"""
         config = self.inventory.get_service(name)
+        service_type = config.type if config else ServiceType.SERVICE
         start = time.perf_counter()
         try:
             if self._http_client:
@@ -647,7 +648,7 @@ class ServiceOrchestrator:
                         name=name,
                         status=ServiceStatus.RUNNING,
                         category=category,
-                        type=ServiceType.SERVICE,
+                        type=service_type,
                         latency_ms=round(latency, 2),
                         details={"url": health_url},
                         fallback_message=config.fallback if config else None
@@ -657,7 +658,7 @@ class ServiceOrchestrator:
                         name=name,
                         status=ServiceStatus.ERROR,
                         category=category,
-                        type=ServiceType.SERVICE,
+                        type=service_type,
                         latency_ms=round(latency, 2),
                         error_message=f"HTTP {response.status_code}",
                         fallback_message=config.fallback if config else None
@@ -667,7 +668,7 @@ class ServiceOrchestrator:
                     name=name,
                     status=ServiceStatus.UNKNOWN,
                     category=category,
-                    type=ServiceType.SERVICE,
+                    type=service_type,
                     error_message="HTTP client not initialized",
                     fallback_message=config.fallback if config else None
                 )
@@ -677,7 +678,7 @@ class ServiceOrchestrator:
                 name=name,
                 status=ServiceStatus.ERROR,
                 category=category,
-                type=ServiceType.SERVICE,
+                type=service_type,
                 latency_ms=round(latency, 2),
                 error_message="Timeout",
                 fallback_message=config.fallback if config else None
@@ -688,7 +689,7 @@ class ServiceOrchestrator:
                 name=name,
                 status=ServiceStatus.ERROR,
                 category=category,
-                type=ServiceType.SERVICE,
+                type=service_type,
                 latency_ms=round(latency, 2),
                 error_message=str(e),
                 fallback_message=config.fallback if config else None
@@ -844,14 +845,25 @@ class ServiceOrchestrator:
         if checker:
             result = await checker()
         else:
-            # Unknown service
-            result = ServiceHealthCheck(
-                name=service_name,
-                status=ServiceStatus.UNKNOWN,
-                category=ServiceCategory.OPTIONAL,
-                type=ServiceType.SERVICE,
-                error_message=f"Unknown service: {service_name}"
-            )
+            # No checker - use inventory config if available
+            config = self.inventory.get_service(service_name)
+            if config:
+                result = ServiceHealthCheck(
+                    name=service_name,
+                    status=ServiceStatus.UNKNOWN,
+                    category=config.category,
+                    type=config.type,
+                    error_message="No health checker configured",
+                    fallback_message=config.fallback,
+                )
+            else:
+                result = ServiceHealthCheck(
+                    name=service_name,
+                    status=ServiceStatus.UNKNOWN,
+                    category=ServiceCategory.OPTIONAL,
+                    type=ServiceType.SERVICE,
+                    error_message=f"Unknown service: {service_name}"
+                )
 
         # Cache result and update metrics
         self._set_cached(service_name, result)
@@ -1167,30 +1179,29 @@ class ServiceOrchestrator:
             return False
 
         try:
-            # Parse and execute the startup command
+            # Parse and execute the startup command (non-blocking for long-running services)
             cmd_parts = config.startup_command.split()
             process = await asyncio.create_subprocess_exec(
                 *cmd_parts,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL
             )
 
-            stdout, stderr = await process.communicate()
+            # Brief sleep to allow process to start or fail immediately
+            await asyncio.sleep(0.5)
 
-            if process.returncode == 0:
-                logger.info("Successfully started service",
-                           service=service_name,
-                           stdout=stdout.decode() if stdout else None)
-                return True
-            else:
+            # Check if process failed immediately (returncode is None if still running)
+            if process.returncode is not None and process.returncode != 0:
                 logger.error("Failed to start service",
                             service=service_name,
-                            returncode=process.returncode,
-                            stderr=stderr.decode() if stderr else None)
+                            returncode=process.returncode)
                 return False
 
+            logger.info("Successfully started service", service=service_name)
+            return True
+
         except Exception as e:
-            logger.error("Error starting service", service=service_name, error=str(e))
+            logger.exception("Error starting service", service=service_name, error=str(e))
             return False
 
     def clear_cache(self):

@@ -210,11 +210,14 @@ class IdempotencyManager:
             return None
 
         try:
-            result = self.supabase.table("idempotency_keys").select("*").eq(
-                "key", key
-            ).gt(
-                "expires_at", datetime.now(timezone.utc).isoformat()
-            ).execute()
+            def _query():
+                return self.supabase.table("idempotency_keys").select("*").eq(
+                    "key", key
+                ).gt(
+                    "expires_at", datetime.now(timezone.utc).isoformat()
+                ).execute()
+
+            result = await asyncio.to_thread(_query)
 
             if result.data:
                 row = result.data[0]
