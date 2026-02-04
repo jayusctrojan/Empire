@@ -127,11 +127,15 @@ class MigrationRunner:
                 cursor.execute(sql)
                 conn.commit()
 
-            # Record success
+            # Record success (use upsert to handle previously failed migrations)
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO schema_migrations (migration_name, success)
-                    VALUES (%s, TRUE)
+                    INSERT INTO schema_migrations (migration_name, success, applied_at, error_message)
+                    VALUES (%s, TRUE, CURRENT_TIMESTAMP, NULL)
+                    ON CONFLICT (migration_name) DO UPDATE SET
+                        success = TRUE,
+                        applied_at = CURRENT_TIMESTAMP,
+                        error_message = NULL
                 """, (migration_name,))
                 conn.commit()
 
@@ -142,14 +146,18 @@ class MigrationRunner:
             error_msg = str(e)
             logger.error(f"❌ Failed to apply {migration_name}: {error_msg}")
 
-            # Record failure
+            # Record failure (use upsert to handle re-runs)
             try:
                 conn.rollback()
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         INSERT INTO schema_migrations (migration_name, success, error_message)
                         VALUES (%s, FALSE, %s)
-                    """, (migration_name, error_msg))
+                        ON CONFLICT (migration_name) DO UPDATE SET
+                            success = FALSE,
+                            error_message = %s,
+                            applied_at = CURRENT_TIMESTAMP
+                    """, (migration_name, error_msg, error_msg))
                     conn.commit()
             except Exception as record_error:
                 logger.error(f"❌ Failed to record migration failure: {record_error}")
