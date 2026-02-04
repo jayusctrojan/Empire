@@ -390,7 +390,7 @@ class TestFullShutdownSequence:
             shutdown_order.append("celery")
             return True
 
-        async def mock_cancel_tasks():
+        async def mock_cancel_tasks(*args, **kwargs):
             shutdown_order.append("tasks")
             return 0
 
