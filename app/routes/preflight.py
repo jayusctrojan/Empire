@@ -12,6 +12,9 @@ Provides:
 - GET  /api/preflight/shutdown/status    - Check shutdown progress
 """
 
+import asyncio
+import shlex
+import subprocess
 import time
 from typing import Optional
 
@@ -234,8 +237,6 @@ async def start_service(
     - Whether it's now healthy
     - Startup time in milliseconds
     """
-    import subprocess
-
     service_config = orchestrator.inventory.get_service(service_name)
 
     if not service_config:
@@ -254,13 +255,14 @@ async def start_service(
 
     try:
         # Execute startup command
-        logger.info(f"Starting service: {service_name}", command=service_config.startup_command)
+        logger.info("Starting service", service=service_name, command=service_config.startup_command)
 
+        # Parse command to avoid shell=True, use DEVNULL to avoid buffer issues
+        cmd_parts = shlex.split(service_config.startup_command)
         process = subprocess.Popen(
-            service_config.startup_command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            cmd_parts,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )
 
         # Wait briefly for service to start
@@ -279,7 +281,7 @@ async def start_service(
         )
 
     except Exception as e:
-        logger.error(f"Failed to start service: {service_name}", error=str(e))
+        logger.error("Failed to start service", service=service_name, error=str(e))
         return ServiceStartResponse(
             service_name=service_name,
             started=False,
@@ -543,5 +545,3 @@ async def list_services(
     }
 
 
-# Import asyncio at the top level for the start_service endpoint
-import asyncio

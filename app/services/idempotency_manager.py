@@ -23,7 +23,8 @@ Usage:
 import hashlib
 import json
 import time
-from datetime import datetime, timedelta
+import asyncio
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, Optional, Union
 
@@ -80,7 +81,7 @@ class IdempotencyEntry(BaseModel):
     status: IdempotencyStatus = Field(default=IdempotencyStatus.IN_PROGRESS)
     result: Optional[Dict[str, Any]] = Field(None, description="Cached result")
     error: Optional[str] = Field(None, description="Error if failed")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: Optional[datetime] = Field(None, description="When the entry expires")
     request_hash: Optional[str] = Field(None, description="Hash of the request for verification")
 
@@ -166,7 +167,8 @@ class IdempotencyManager:
 
         try:
             redis_key = self._make_redis_key(key)
-            data = self.redis.get(redis_key)
+            # Use asyncio.to_thread for sync Redis client
+            data = await asyncio.to_thread(self.redis.get, redis_key)
 
             if data:
                 entry_dict = json.loads(data)
@@ -191,7 +193,9 @@ class IdempotencyManager:
             redis_key = self._make_redis_key(entry.key)
             ttl = ttl_seconds or int(self.default_ttl.total_seconds())
 
-            self.redis.setex(
+            # Use asyncio.to_thread for sync Redis client
+            await asyncio.to_thread(
+                self.redis.setex,
                 redis_key,
                 ttl,
                 entry.model_dump_json()
@@ -209,7 +213,7 @@ class IdempotencyManager:
             result = self.supabase.table("idempotency_keys").select("*").eq(
                 "key", key
             ).gt(
-                "expires_at", datetime.utcnow().isoformat()
+                "expires_at", datetime.now(timezone.utc).isoformat()
             ).execute()
 
             if result.data:
@@ -299,8 +303,8 @@ class IdempotencyManager:
             operation=operation,
             status=IdempotencyStatus.COMPLETED,
             result={"data": result} if not isinstance(result, dict) else result,
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + ttl,
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + ttl,
             request_hash=request_hash
         )
 
@@ -340,8 +344,8 @@ class IdempotencyManager:
             operation=operation,
             status=IdempotencyStatus.FAILED,
             error=error,
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + ttl,
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + ttl,
             request_hash=request_hash
         )
 
@@ -368,8 +372,8 @@ class IdempotencyManager:
             key=idempotency_key,
             operation=operation,
             status=IdempotencyStatus.IN_PROGRESS,
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(minutes=5),  # 5 min lock
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),  # 5 min lock
             request_hash=request_hash
         )
 
@@ -429,7 +433,6 @@ class IdempotencyManager:
 
             elif cached.status == IdempotencyStatus.IN_PROGRESS:
                 # Request is in flight - wait briefly and check again
-                import asyncio
                 await asyncio.sleep(1)
 
                 # Check again
@@ -497,11 +500,11 @@ class IdempotencyManager:
 
         try:
             result = self.supabase.table("idempotency_keys").delete().lt(
-                "expires_at", datetime.utcnow().isoformat()
+                "expires_at", datetime.now(timezone.utc).isoformat()
             ).execute()
 
             count = len(result.data) if result.data else 0
-            logger.info(f"Cleaned up {count} expired idempotency entries")
+            logger.info("Cleaned up expired idempotency entries", count=count)
             return count
 
         except Exception as e:

@@ -23,7 +23,7 @@ Usage:
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
@@ -104,8 +104,8 @@ class VersionedRecord(BaseModel):
     """A record with version tracking"""
     id: str
     version: int = Field(default=1, ge=1)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class LockResult(BaseModel):
@@ -190,7 +190,7 @@ async def update_with_lock(
     update_data = {
         **updates,
         "version": expected_version + 1,
-        "updated_at": datetime.utcnow().isoformat()
+        "updated_at": datetime.now(timezone.utc).isoformat()
     }
 
     # Attempt update with version check
@@ -332,15 +332,17 @@ async def batch_update_with_lock(
     results = []
 
     for update in updates:
-        record_id = update.pop(id_column)
-        expected_version = update.pop("version")
+        # Copy to avoid mutating caller-provided dicts
+        update_copy = update.copy()
+        record_id = update_copy.pop(id_column)
+        expected_version = update_copy.pop("version")
 
         try:
             result = await update_with_lock(
                 supabase=supabase,
                 table=table,
                 record_id=record_id,
-                updates=update,
+                updates=update_copy,
                 expected_version=expected_version,
                 id_column=id_column
             )
@@ -383,7 +385,7 @@ async def create_versioned_record(
     Returns:
         Created record with version
     """
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     record_data = {
         **data,
         "version": 1,

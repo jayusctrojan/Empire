@@ -17,7 +17,7 @@ Usage:
 import asyncio
 import signal
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Set
 
@@ -220,7 +220,7 @@ class GracefulShutdown:
 
         self._is_shutting_down = True
         self.progress.phase = ShutdownPhase.PREPARING
-        self.progress.started_at = datetime.utcnow()
+        self.progress.started_at = datetime.now(timezone.utc)
         self.progress.reason = reason
 
         SHUTDOWN_INITIATED.labels(reason=reason.value).inc()
@@ -530,7 +530,7 @@ class GracefulShutdown:
 
             # Complete
             self.progress.phase = ShutdownPhase.COMPLETE
-            self.progress.completed_at = datetime.utcnow()
+            self.progress.completed_at = datetime.now(timezone.utc)
             SHUTDOWN_PHASE.set(5)
 
         except Exception as e:
