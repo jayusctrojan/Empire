@@ -7,7 +7,7 @@ Task: 203 - Implement Intelligent Context Condensing Engine
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.services.context_condensing_engine import (
     ContextCondensingEngine,
@@ -349,7 +349,8 @@ class TestCooldownMechanism:
     @pytest.mark.asyncio
     async def test_check_cooldown_in_cooldown(self, engine):
         """Test cooldown when still in cooldown period."""
-        recent_time = datetime.utcnow().isoformat()
+        # Must use timezone-aware datetime to match actual storage format
+        recent_time = datetime.now(timezone.utc).isoformat()
 
         with patch('app.services.context_condensing_engine.get_redis') as mock_redis:
             mock_redis_instance = MagicMock()
@@ -362,8 +363,9 @@ class TestCooldownMechanism:
     @pytest.mark.asyncio
     async def test_check_cooldown_expired(self, engine):
         """Test cooldown when cooldown period has passed."""
+        # Must use timezone-aware datetime to match actual storage format
         old_time = (
-            datetime.utcnow() - timedelta(seconds=COMPACTION_COOLDOWN_SECONDS + 10)
+            datetime.now(timezone.utc) - timedelta(seconds=COMPACTION_COOLDOWN_SECONDS + 10)
         ).isoformat()
 
         with patch('app.services.context_condensing_engine.get_redis') as mock_redis:

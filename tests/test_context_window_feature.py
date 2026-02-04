@@ -15,7 +15,7 @@ Tests cover:
 import pytest
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from uuid import uuid4
 from fastapi.testclient import TestClient
@@ -326,8 +326,8 @@ class TestContextCondensingEngine:
     @pytest.mark.asyncio
     async def test_should_not_compact_during_cooldown(self, condensing_engine, mock_redis):
         """Test that compaction respects cooldown period."""
-        # Set recent compaction time
-        recent_time = datetime.utcnow() - timedelta(seconds=10)
+        # Set recent compaction time (must be timezone-aware to match actual storage format)
+        recent_time = datetime.now(timezone.utc) - timedelta(seconds=10)
         mock_redis.get.return_value = recent_time.isoformat().encode()
 
         with patch('app.services.context_condensing_engine.get_redis', return_value=mock_redis):
