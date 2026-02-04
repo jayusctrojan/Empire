@@ -425,7 +425,6 @@ Provide a structured summary with sections for Context, Decisions, Technical Det
             )
 
             # Calculate metrics
-            condensed_tokens = sum(msg.token_count for msg in condensable_messages)
             protected_tokens = sum(
                 msg.token_count for msg in messages if msg.is_protected
             )

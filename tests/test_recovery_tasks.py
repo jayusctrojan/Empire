@@ -82,26 +82,11 @@ class TestOrphanedDocumentRecovery:
 
         assert result["found"] == 2
 
+    @pytest.mark.skip(reason="Test incomplete - needs assertions for status update verification")
     def test_recover_resets_status_to_pending(self, mock_supabase, orphaned_documents):
         """Test that recovery resets document status to pending"""
-        from app.tasks.recovery_tasks import recover_orphaned_documents
-
-        update_calls = []
-
-        def capture_update(data):
-            update_calls.append(data)
-            return MagicMock(eq=MagicMock(return_value=MagicMock(
-                execute=MagicMock(return_value=MagicMock(data=[{}]))
-            )))
-
-        mock_supabase.table.return_value.select.return_value.eq.return_value.lt.return_value.limit.return_value.execute.return_value.data = orphaned_documents
-        mock_supabase.table.return_value.update = capture_update
-
-        with patch('app.tasks.recovery_tasks.get_supabase', return_value=mock_supabase):
-            # Directly call the task function
-            from app.tasks.recovery_tasks import recover_orphaned_documents
-            # The task would call update with status=pending
-            pass
+        # TODO: Complete test with assertions that verify status is reset to pending
+        pass
 
     def test_recover_respects_max_age(self, mock_supabase):
         """Test that recovery respects max_age parameter"""
@@ -164,7 +149,7 @@ class TestWALReplayTask:
 class TestIdempotencyCleanupTask:
     """Tests for idempotency key cleanup task"""
 
-    def test_cleanup_expired_keys(self, mock_supabase):
+    def test_cleanup_expired_keys(self):
         """Test cleaning up expired idempotency keys"""
         from app.tasks.recovery_tasks import cleanup_idempotency_keys
 

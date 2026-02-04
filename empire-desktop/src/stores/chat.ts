@@ -235,10 +235,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setCompacting: (isCompacting) => set({ isCompacting }),
 
   addCompactionEvent: (event) =>
-    set((state) => ({
-      compactionEvents: [...state.compactionEvents, event],
-      isCompacting: false,
-    })),
+    set((state) => {
+      if (state.activeConversationId && event.conversationId !== state.activeConversationId) {
+        return state
+      }
+      return {
+        compactionEvents: [...state.compactionEvents, event],
+        isCompacting: false,
+      }
+    }),
 
   setCompactionEvents: (events) => set({ compactionEvents: events }),
 

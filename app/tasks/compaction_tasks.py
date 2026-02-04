@@ -205,7 +205,7 @@ def compact_context(
 
         # Retry on transient errors
         if self.request.retries < self.max_retries:
-            raise self.retry(exc=e)
+            raise self.retry(exc=e) from e
 
         return {
             "success": False,

@@ -238,7 +238,7 @@ async def validate_token(token: str) -> str:
         raise
     except Exception as e:
         logger.error("ws_jwt_auth_failed", error=str(e))
-        raise ValueError(f"JWT validation failed: {str(e)}")
+        raise ValueError(f"JWT validation failed: {str(e)}") from e
 
 
 async def require_role(

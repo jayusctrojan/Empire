@@ -168,7 +168,7 @@ def recover_orphaned_documents(
         logger.error("Orphaned document recovery failed", error=str(e))
 
         # Retry with exponential backoff
-        raise self.retry(exc=e)
+        raise self.retry(exc=e) from e
 
 
 # =============================================================================
@@ -242,7 +242,7 @@ def replay_pending_wal_entries(
     except Exception as e:
         RECOVERY_TASKS_TOTAL.labels(task_type="wal_replay", result="error").inc()
         logger.error("WAL replay failed", error=str(e))
-        raise self.retry(exc=e)
+        raise self.retry(exc=e) from e
 
 
 # =============================================================================
@@ -303,7 +303,7 @@ def cleanup_idempotency_keys(self) -> Dict[str, Any]:
     except Exception as e:
         RECOVERY_TASKS_TOTAL.labels(task_type="idempotency_cleanup", result="error").inc()
         logger.error("Idempotency cleanup failed", error=str(e))
-        raise self.retry(exc=e)
+        raise self.retry(exc=e) from e
 
 
 # =============================================================================
@@ -365,7 +365,7 @@ def cleanup_wal_entries(self, days: int = 7) -> Dict[str, Any]:
     except Exception as e:
         RECOVERY_TASKS_TOTAL.labels(task_type="wal_cleanup", result="error").inc()
         logger.error("WAL cleanup failed", error=str(e))
-        raise self.retry(exc=e)
+        raise self.retry(exc=e) from e
 
 
 # =============================================================================
@@ -493,7 +493,7 @@ def check_data_consistency(
     except Exception as e:
         RECOVERY_TASKS_TOTAL.labels(task_type="consistency_check", result="error").inc()
         logger.error("Consistency check failed", error=str(e))
-        raise self.retry(exc=e)
+        raise self.retry(exc=e) from e
 
 
 # =============================================================================

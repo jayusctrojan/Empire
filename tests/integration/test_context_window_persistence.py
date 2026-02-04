@@ -635,7 +635,7 @@ class TestEndToEndPersistence:
         await create_test_chat_session(real_supabase, test_conversation_id, test_user_id)
 
         service = ContextManagerService()
-        context = await service.create_context(
+        await service.create_context(
             conversation_id=test_conversation_id,
             user_id=test_user_id,
             max_tokens=100000

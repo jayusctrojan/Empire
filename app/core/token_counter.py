@@ -8,7 +8,6 @@ Feature: Chat Context Window Management (011)
 import os
 from typing import Optional, List
 from datetime import datetime
-from functools import lru_cache
 import structlog
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -118,8 +117,8 @@ class TokenCounter:
             except ImportError:
                 logger.warning("tiktoken not installed, falling back to estimation")
                 self._encoding = None
-            except Exception as e:
-                logger.error("Failed to load tiktoken encoding", error=str(e))
+            except Exception:
+                logger.exception("Failed to load tiktoken encoding")
                 self._encoding = None
         return self._encoding
 
