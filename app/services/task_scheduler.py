@@ -806,7 +806,7 @@ def get_task_scheduler() -> TaskScheduler:
         try:
             recovered = _scheduler_instance.recover_schedules()
             if recovered > 0:
-                logger.info(f"Recovered {recovered} scheduled tasks from database")
-        except Exception as e:
-            logger.warning(f"Failed to recover schedules on startup: {e}")
+                logger.info("schedule_recovery_complete", recovered_count=recovered)
+        except Exception:
+            logger.exception("Failed to recover schedules on startup")
     return _scheduler_instance

@@ -28,10 +28,10 @@ CREATE TABLE IF NOT EXISTS router_cache (
 CREATE INDEX IF NOT EXISTS idx_router_cache_query_hash
 ON router_cache (query_hash);
 
--- Index for expiration cleanup
+-- Index for expiration cleanup (plain index - queries use runtime WHERE clause)
+-- Note: Cannot use NOW() in partial index as it's STABLE, not IMMUTABLE
 CREATE INDEX IF NOT EXISTS idx_router_cache_expires_at
-ON router_cache (expires_at)
-WHERE expires_at > NOW();
+ON router_cache (expires_at);
 
 -- Index for semantic similarity search (if pgvector is available)
 DO $$
@@ -48,24 +48,27 @@ END $$;
 -- =============================================================================
 
 -- Function to increment cache hit count
+-- Uses SET search_path to prevent search-path hijacking in SECURITY DEFINER
 CREATE OR REPLACE FUNCTION increment_cache_hit(p_cache_id UUID)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    UPDATE router_cache
+    UPDATE public.router_cache
     SET hit_count = hit_count + 1,
-        updated_at = NOW()
+        updated_at = pg_catalog.now()
     WHERE id = p_cache_id;
 END;
 $$;
 
 -- Function to get cached routing with semantic similarity
+-- Uses SET search_path to prevent search-path hijacking in SECURITY DEFINER
 CREATE OR REPLACE FUNCTION get_cached_routing(
-    query_embedding vector(1536),
-    match_threshold float DEFAULT 0.85,
-    match_count int DEFAULT 1
+    p_query_embedding vector(1536),
+    p_match_threshold float DEFAULT 0.85,
+    p_match_count int DEFAULT 1
 )
 RETURNS TABLE (
     cache_id UUID,
@@ -76,6 +79,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
     RETURN QUERY
@@ -83,16 +87,26 @@ BEGIN
         rc.id as cache_id,
         rc.query_text,
         rc.routing_decision,
-        1 - (rc.query_embedding <=> query_embedding) as similarity,
+        1 - (rc.query_embedding <=> p_query_embedding) as similarity,
         rc.hit_count
-    FROM router_cache rc
-    WHERE rc.expires_at > NOW()
+    FROM public.router_cache rc
+    WHERE rc.expires_at > pg_catalog.now()
         AND rc.query_embedding IS NOT NULL
-        AND 1 - (rc.query_embedding <=> query_embedding) >= match_threshold
-    ORDER BY rc.query_embedding <=> query_embedding
-    LIMIT match_count;
+        AND 1 - (rc.query_embedding <=> p_query_embedding) >= p_match_threshold
+    ORDER BY rc.query_embedding <=> p_query_embedding
+    LIMIT p_match_count;
 END;
 $$;
+
+-- =============================================================================
+-- FUNCTION PRIVILEGES (restrict to service_role only)
+-- =============================================================================
+
+REVOKE ALL ON FUNCTION increment_cache_hit(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION increment_cache_hit(UUID) TO service_role;
+
+REVOKE ALL ON FUNCTION get_cached_routing(vector(1536), float, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION get_cached_routing(vector(1536), float, int) TO service_role;
 
 -- =============================================================================
 -- ROW LEVEL SECURITY

@@ -189,7 +189,7 @@ class ContentPrepAgent:
 
         # Early exit for single file (US-004: Standalone Pass-Through)
         if len(files) == 1:
-            self.logger.info("single_file_passthrough", file=files[0].get("filename"))
+            self.logger.info("single_file_passthrough", file=files[0].get("filename") or files[0].get("file_name"))
             elapsed_ms = int((time.time() - start_time) * 1000)
             return {
                 "content_sets": [],
@@ -361,7 +361,8 @@ class ContentPrepAgent:
         prefix_groups: dict[str, list[dict]] = {}
 
         for file_info in files:
-            filename = file_info.get("filename", "")
+            # Backward compatible: support both "filename" and "file_name" keys
+            filename = file_info.get("filename") or file_info.get("file_name", "")
             prefix = self._extract_prefix(filename)
             if prefix:
                 if prefix not in prefix_groups:
@@ -376,9 +377,14 @@ class ContentPrepAgent:
                 content_set = self._create_content_set(prefix, group_files)
                 if content_set:
                     content_sets.append(content_set)
-                    grouped_files.update(f.get("filename", "") for f in group_files)
+                    grouped_files.update(
+                        (f.get("filename") or f.get("file_name", "")) for f in group_files
+                    )
 
-        remaining = [f for f in files if f.get("filename", "") not in grouped_files]
+        remaining = [
+            f for f in files
+            if (f.get("filename") or f.get("file_name", "")) not in grouped_files
+        ]
         return content_sets, remaining
 
     def _extract_prefix(self, filename: str) -> Optional[str]:
@@ -438,11 +444,12 @@ class ContentPrepAgent:
         sequences_found = []
 
         for file_info in files:
-            filename = file_info.get("filename", "")
+            # Backward compatible: support both "filename" and "file_name" keys
+            filename = file_info.get("filename") or file_info.get("file_name", "")
             sequence, pattern = self._extract_sequence(filename)
 
             content_file = ContentFile(
-                b2_path=file_info.get("filename", ""),
+                b2_path=file_info.get("filename") or file_info.get("file_name", ""),
                 filename=filename,
                 sequence_number=sequence,
                 detection_pattern=pattern,
@@ -580,8 +587,11 @@ class ContentPrepAgent:
             else:
                 sets_data = data.get("content_sets", [])
 
-            # Create file lookup for quick access
-            file_lookup = {f.get("filename", ""): f for f in original_files}
+            # Create file lookup for quick access (support both key formats)
+            file_lookup = {
+                (f.get("filename") or f.get("file_name", "")): f
+                for f in original_files
+            }
 
             for set_data in sets_data:
                 if not isinstance(set_data, dict):

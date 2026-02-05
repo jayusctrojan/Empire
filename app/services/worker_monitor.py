@@ -681,32 +681,46 @@ def setup_celery_worker_signals(monitor: WorkerMonitor) -> None:
 _monitor_instance: Optional[WorkerMonitor] = None
 _monitor_initialized: bool = False
 _monitor_init_lock = threading.Lock()
+_monitor_async_init_lock: Optional[asyncio.Lock] = None
+
+
+def _get_async_init_lock() -> asyncio.Lock:
+    """Get or create the async initialization lock (must be called from async context)."""
+    global _monitor_async_init_lock
+    if _monitor_async_init_lock is None:
+        _monitor_async_init_lock = asyncio.Lock()
+    return _monitor_async_init_lock
 
 
 async def get_worker_monitor() -> WorkerMonitor:
-    """Get or create the worker monitor singleton (thread-safe)"""
+    """Get or create the worker monitor singleton (thread-safe and async-safe)"""
     global _monitor_instance, _monitor_initialized
 
     # Fast path: already initialized
     if _monitor_initialized and _monitor_instance is not None:
         return _monitor_instance
 
-    # Use to_thread to safely acquire the lock from async context
+    # Use to_thread to safely acquire the thread lock from async context
     def _create_instance():
-        global _monitor_instance, _monitor_initialized
+        global _monitor_instance
         with _monitor_init_lock:
-            # Double-check after acquiring lock
-            if _monitor_initialized and _monitor_instance is not None:
-                return False  # Already initialized
             if _monitor_instance is None:
                 _monitor_instance = WorkerMonitor()
-            return True  # Needs initialization
+                return True  # Needs initialization
+            return False  # Instance exists
 
-    needs_init = await asyncio.to_thread(_create_instance)
-    if needs_init:
-        await _monitor_instance.initialize()
-        # Mark as initialized only after initialize() completes
-        _monitor_initialized = True
+    instance_created = await asyncio.to_thread(_create_instance)
+
+    # Use async lock to serialize initialization (prevents concurrent initialize() calls)
+    async with _get_async_init_lock():
+        # Double-check after acquiring async lock
+        if _monitor_initialized:
+            return _monitor_instance
+
+        if instance_created or not _monitor_initialized:
+            await _monitor_instance.initialize()
+            _monitor_initialized = True
+
     return _monitor_instance
 
 
