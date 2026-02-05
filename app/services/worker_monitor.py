@@ -682,13 +682,16 @@ _monitor_instance: Optional[WorkerMonitor] = None
 _monitor_initialized: bool = False
 _monitor_init_lock = threading.Lock()
 _monitor_async_init_lock: Optional[asyncio.Lock] = None
+_async_lock_init_guard = threading.Lock()
 
 
 def _get_async_init_lock() -> asyncio.Lock:
-    """Get or create the async initialization lock (must be called from async context)."""
+    """Get or create the async initialization lock (thread-safe lazy creation)."""
     global _monitor_async_init_lock
     if _monitor_async_init_lock is None:
-        _monitor_async_init_lock = asyncio.Lock()
+        with _async_lock_init_guard:
+            if _monitor_async_init_lock is None:
+                _monitor_async_init_lock = asyncio.Lock()
     return _monitor_async_init_lock
 
 

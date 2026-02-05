@@ -114,16 +114,18 @@ GRANT EXECUTE ON FUNCTION get_cached_routing(vector(1536), float, int) TO servic
 
 ALTER TABLE router_cache ENABLE ROW LEVEL SECURITY;
 
--- Service role can do everything
-CREATE POLICY IF NOT EXISTS "Service role full access to router_cache"
+-- Service role can do everything (idempotent: DROP then CREATE)
+DROP POLICY IF EXISTS "Service role full access to router_cache" ON router_cache;
+CREATE POLICY "Service role full access to router_cache"
 ON router_cache
 FOR ALL
 TO service_role
 USING (true)
 WITH CHECK (true);
 
--- Users can read their own cache entries
-CREATE POLICY IF NOT EXISTS "Users can read own router_cache"
+-- Users can read their own cache entries (idempotent: DROP then CREATE)
+DROP POLICY IF EXISTS "Users can read own router_cache" ON router_cache;
+CREATE POLICY "Users can read own router_cache"
 ON router_cache
 FOR SELECT
 TO authenticated
