@@ -205,14 +205,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("websocket_manager_initialization_failed", error=str(e))
 
-    # Recover persisted task schedules
+    # Initialize task scheduler (recovers persisted schedules automatically on first access)
     try:
         from app.services.task_scheduler import get_task_scheduler
-        scheduler = get_task_scheduler()
-        recovered = scheduler.recover_schedules()
-        logger.info("task_scheduler_recovery_complete", recovered_count=recovered)
+        get_task_scheduler()  # Recovery happens inside get_task_scheduler()
     except Exception as e:
-        logger.warning("task_scheduler_recovery_failed", error=str(e))
+        logger.warning("task_scheduler_initialization_failed", error=str(e))
 
     yield
 

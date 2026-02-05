@@ -794,9 +794,19 @@ _scheduler_instance: Optional[TaskScheduler] = None
 
 
 def get_task_scheduler() -> TaskScheduler:
-    """Get or create task scheduler singleton"""
+    """Get or create task scheduler singleton.
+
+    On first call, recovers persisted schedules from the database.
+    """
     global _scheduler_instance
     if _scheduler_instance is None:
         supabase = get_supabase_client()
         _scheduler_instance = TaskScheduler(supabase)
+        # Recover persisted schedules on startup
+        try:
+            recovered = _scheduler_instance.recover_schedules()
+            if recovered > 0:
+                logger.info("schedule_recovery_complete", recovered_count=recovered)
+        except Exception:
+            logger.exception("Failed to recover schedules on startup")
     return _scheduler_instance
