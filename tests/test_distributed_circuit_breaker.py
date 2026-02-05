@@ -169,7 +169,7 @@ class TestCircuitStates:
 
         # Now check can_execute - should transition to half-open after timeout
         # Since timeout is 0, it should transition immediately
-        can_exec = await breaker.can_execute()
+        await breaker.can_execute()
 
         state = await breaker._get_state()
         assert state.state in [CircuitState.HALF_OPEN, CircuitState.OPEN]

@@ -294,16 +294,21 @@ class DistributedCircuitBreaker:
         finally:
             self._lock_owner = None
 
-    async def _get_state(self) -> CircuitBreakerState:
+    async def _get_state(self, *, force_refresh: bool = False) -> CircuitBreakerState:
         """
         Get current state from Redis with local caching.
+
+        Args:
+            force_refresh: If True, bypass local cache and read from Redis.
+                          Use this when holding a lock to ensure fresh state.
 
         Returns:
             Current circuit breaker state
         """
-        # Check local cache
+        # Check local cache (skip if force_refresh requested)
         now = time.time()
         if (
+            not force_refresh and
             self._local_state is not None and
             now - self._local_state_time < self._cache_ttl
         ):
@@ -379,8 +384,11 @@ class DistributedCircuitBreaker:
 
         Args:
             new_state: Target state
+
+        Note: This method is always called from lock-protected paths,
+              so we use force_refresh to ensure fresh state from Redis.
         """
-        state = await self._get_state()
+        state = await self._get_state(force_refresh=True)
         old_state = state.state
 
         if old_state == new_state:
@@ -436,7 +444,7 @@ class DistributedCircuitBreaker:
                     if await self._acquire_lock(timeout=2.0):
                         try:
                             # Re-read state under lock to avoid race
-                            state = await self._get_state()
+                            state = await self._get_state(force_refresh=True)
                             # Another caller may have already transitioned
                             if state.state == CircuitState.OPEN:
                                 state.state = CircuitState.HALF_OPEN
@@ -474,7 +482,7 @@ class DistributedCircuitBreaker:
             if await self._acquire_lock(timeout=2.0):
                 try:
                     # Re-read state under lock to avoid race
-                    state = await self._get_state()
+                    state = await self._get_state(force_refresh=True)
                     if state.half_open_calls < self.config.half_open_max_calls:
                         state.half_open_calls += 1
                         await self._save_state(state)
@@ -494,7 +502,7 @@ class DistributedCircuitBreaker:
             return
 
         try:
-            state = await self._get_state()
+            state = await self._get_state(force_refresh=True)
             state.last_success_time = time.time()
             state.consecutive_successes += 1
 
@@ -539,7 +547,7 @@ class DistributedCircuitBreaker:
             return
 
         try:
-            state = await self._get_state()
+            state = await self._get_state(force_refresh=True)
             state.failure_count += 1
             state.last_failure_time = time.time()
             state.consecutive_successes = 0
@@ -627,8 +635,8 @@ class DistributedCircuitBreaker:
             "success_count": state.success_count,
             "success_threshold": self.config.success_threshold,
             "consecutive_successes": state.consecutive_successes,
-            "time_in_state_seconds": round(time_in_state, 1) if time_in_state else None,
-            "time_until_half_open_seconds": round(time_until_half_open, 1) if time_until_half_open else None,
+            "time_in_state_seconds": round(time_in_state, 1) if time_in_state is not None else None,
+            "time_until_half_open_seconds": round(time_until_half_open, 1) if time_until_half_open is not None else None,
             "half_open_calls": state.half_open_calls,
             "half_open_max_calls": self.config.half_open_max_calls,
             "last_failure": datetime.fromtimestamp(state.last_failure_time).isoformat() if state.last_failure_time else None,
