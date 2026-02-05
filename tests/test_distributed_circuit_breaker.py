@@ -47,7 +47,10 @@ def mock_redis():
         storage[key] = value
         return True
 
-    def mock_set(key, value):
+    def mock_set(key, value, nx=False, ex=None):
+        # Support nx (only set if not exists) for distributed locking
+        if nx and key in storage:
+            return False  # Key already exists, lock not acquired
         storage[key] = value
         return True
 
