@@ -238,6 +238,29 @@ class DistributedCircuitBreaker:
         """Generate Redis key"""
         return f"{self._key_prefix}:{suffix}"
 
+    async def _acquire_lock(self, timeout: float = 5.0) -> bool:
+        """Acquire distributed lock for state modifications."""
+        try:
+            # Use SET NX with expiry for atomic lock acquisition
+            result = await asyncio.to_thread(
+                self.redis.set,
+                self._lock_key,
+                "1",
+                nx=True,
+                ex=int(timeout)
+            )
+            return result is True
+        except Exception as e:
+            logger.warning("Failed to acquire circuit breaker lock", error=str(e))
+            return False
+
+    async def _release_lock(self):
+        """Release distributed lock."""
+        try:
+            await asyncio.to_thread(self.redis.delete, self._lock_key)
+        except Exception as e:
+            logger.warning("Failed to release circuit breaker lock", error=str(e))
+
     async def _get_state(self) -> CircuitBreakerState:
         """
         Get current state from Redis with local caching.
@@ -383,12 +406,17 @@ class DistributedCircuitBreaker:
             return False
 
         if state.state == CircuitState.HALF_OPEN:
-            # Allow limited calls in half-open
-            # Reserve a slot before returning True to prevent concurrent bypass
-            if state.half_open_calls < self.config.half_open_max_calls:
-                state.half_open_calls += 1
-                await self._save_state(state)
-                return True
+            # Use distributed lock to atomically reserve half-open slot
+            if await self._acquire_lock(timeout=2.0):
+                try:
+                    # Re-read state under lock to avoid race
+                    state = await self._get_state()
+                    if state.half_open_calls < self.config.half_open_max_calls:
+                        state.half_open_calls += 1
+                        await self._save_state(state)
+                        return True
+                finally:
+                    await self._release_lock()
 
             CIRCUIT_REJECTIONS.labels(service=self.service_name).inc()
             return False
@@ -397,27 +425,34 @@ class DistributedCircuitBreaker:
 
     async def record_success(self):
         """Record a successful call"""
-        state = await self._get_state()
-        state.last_success_time = time.time()
-        state.consecutive_successes += 1
+        if not await self._acquire_lock(timeout=2.0):
+            logger.warning("Could not acquire lock for record_success", service=self.service_name)
+            return
 
-        if state.state == CircuitState.HALF_OPEN:
-            state.success_count += 1
-            # Note: half_open_calls already incremented in can_execute()
+        try:
+            state = await self._get_state()
+            state.last_success_time = time.time()
+            state.consecutive_successes += 1
 
-            # Check if we've hit success threshold
-            if state.consecutive_successes >= self.config.success_threshold:
-                await self._transition_to(CircuitState.CLOSED)
-                return
+            if state.state == CircuitState.HALF_OPEN:
+                state.success_count += 1
+                # Note: half_open_calls already incremented in can_execute()
 
-        await self._save_state(state)
+                # Check if we've hit success threshold
+                if state.consecutive_successes >= self.config.success_threshold:
+                    await self._transition_to(CircuitState.CLOSED)
+                    return
 
-        logger.debug(
-            "Circuit breaker success recorded",
-            service=self.service_name,
-            state=state.state.value,
-            consecutive_successes=state.consecutive_successes
-        )
+            await self._save_state(state)
+
+            logger.debug(
+                "Circuit breaker success recorded",
+                service=self.service_name,
+                state=state.state.value,
+                consecutive_successes=state.consecutive_successes
+            )
+        finally:
+            await self._release_lock()
 
     async def record_failure(self, exception: Optional[Exception] = None):
         """
@@ -435,33 +470,40 @@ class DistributedCircuitBreaker:
             )
             return
 
-        state = await self._get_state()
-        state.failure_count += 1
-        state.last_failure_time = time.time()
-        state.consecutive_successes = 0
-
-        if state.state == CircuitState.HALF_OPEN:
-            state.half_open_calls += 1
-            # Any failure in half-open immediately opens circuit
-            await self._transition_to(CircuitState.OPEN)
+        if not await self._acquire_lock(timeout=2.0):
+            logger.warning("Could not acquire lock for record_failure", service=self.service_name)
             return
 
-        if state.state == CircuitState.CLOSED:
-            # Check if we've hit failure threshold
-            if state.failure_count >= self.config.failure_threshold:
+        try:
+            state = await self._get_state()
+            state.failure_count += 1
+            state.last_failure_time = time.time()
+            state.consecutive_successes = 0
+
+            if state.state == CircuitState.HALF_OPEN:
+                state.half_open_calls += 1
+                # Any failure in half-open immediately opens circuit
                 await self._transition_to(CircuitState.OPEN)
                 return
 
-        await self._save_state(state)
+            if state.state == CircuitState.CLOSED:
+                # Check if we've hit failure threshold
+                if state.failure_count >= self.config.failure_threshold:
+                    await self._transition_to(CircuitState.OPEN)
+                    return
 
-        logger.warning(
-            "Circuit breaker failure recorded",
-            service=self.service_name,
-            state=state.state.value,
-            failure_count=state.failure_count,
-            threshold=self.config.failure_threshold,
-            error=str(exception) if exception else None
-        )
+            await self._save_state(state)
+
+            logger.warning(
+                "Circuit breaker failure recorded",
+                service=self.service_name,
+                state=state.state.value,
+                failure_count=state.failure_count,
+                threshold=self.config.failure_threshold,
+                error=str(exception) if exception else None
+            )
+        finally:
+            await self._release_lock()
 
     async def force_open(self):
         """Force the circuit to open state"""
