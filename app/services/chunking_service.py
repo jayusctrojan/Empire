@@ -390,8 +390,7 @@ class MarkdownChunkerStrategy:
         if not self.is_markdown_content(text):
             logger.info(
                 "Text does not meet markdown threshold, using sentence splitting",
-                doc_id=document_id,
-                threshold=self.config.min_headers_threshold
+                extra={"doc_id": document_id, "threshold": self.config.min_headers_threshold}
             )
             # Fallback to sentence splitting
             if self._sentence_splitter and LLAMAINDEX_SUPPORT:
@@ -415,8 +414,7 @@ class MarkdownChunkerStrategy:
         sections = self._split_by_headers(text)
         logger.info(
             "Markdown document split by headers",
-            doc_id=document_id,
-            section_count=len(sections)
+            extra={"doc_id": document_id, "section_count": len(sections)}
         )
 
         chunks = []
@@ -458,9 +456,11 @@ class MarkdownChunkerStrategy:
 
         logger.info(
             "Markdown chunking complete",
-            doc_id=document_id,
-            total_chunks=len(chunks),
-            header_split_chunks=sum(1 for c in chunks if c.metadata.is_header_split)
+            extra={
+                "doc_id": document_id,
+                "total_chunks": len(chunks),
+                "header_split_chunks": sum(1 for c in chunks if c.metadata.is_header_split)
+            }
         )
 
         return chunks

@@ -973,9 +973,9 @@ class AgentInteractionService:
 
             # For now, escalate to all agents in the crew
             # In production, you'd have a designated supervisor agent
-            for agent_id in agent_ids:
-                # Send escalation event
-                self.supabase.table("crewai_agent_interactions").insert({
+            # Batch insert all escalation events
+            escalation_records = [
+                {
                     "execution_id": execution_id,
                     "from_agent_id": conflict["from_agent_id"],
                     "to_agent_id": agent_id,
@@ -989,7 +989,10 @@ class AgentInteractionService:
                     },
                     "priority": 10,  # Highest priority
                     "metadata": {"escalated_conflict_id": str(conflict_id)}
-                }).execute()
+                }
+                for agent_id in agent_ids
+            ]
+            self.supabase.table("crewai_agent_interactions").insert(escalation_records).execute()
 
             logger.info(
                 "Conflict escalated",
