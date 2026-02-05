@@ -13,6 +13,7 @@ export function ChatView() {
     messages,
     isStreaming,
     streamingContent,
+    streamingMessageId,
     activeConversationId,
     activeProjectId,
     isKBMode,
@@ -133,9 +134,10 @@ export function ChatView() {
           }
         }
 
-        // Finalize the message
-        const finalContent = useChatStore.getState().streamingContent
-        const finalSources = useChatStore.getState().streamingSources
+        // Finalize the message - get fresh state for final values
+        const state = useChatStore.getState()
+        const finalContent = state.streamingContent
+        const finalSources = state.streamingSources
 
         updateStoreMessage(assistantMessageId, {
           content: finalContent,
@@ -261,13 +263,13 @@ export function ChatView() {
               <MessageBubble
                 key={message.id}
                 message={
-                  message.id === useChatStore.getState().streamingMessageId
+                  message.id === streamingMessageId
                     ? { ...message, content: streamingContent || message.content }
                     : message
                 }
                 isStreaming={
                   isStreaming &&
-                  message.id === useChatStore.getState().streamingMessageId
+                  message.id === streamingMessageId
                 }
                 isKBMode={isKBMode}
                 onRegenerate={
