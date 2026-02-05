@@ -679,25 +679,34 @@ def setup_celery_worker_signals(monitor: WorkerMonitor) -> None:
 # ==============================================================================
 
 _monitor_instance: Optional[WorkerMonitor] = None
+_monitor_initialized: bool = False
 _monitor_init_lock = threading.Lock()
 
 
 async def get_worker_monitor() -> WorkerMonitor:
     """Get or create the worker monitor singleton (thread-safe)"""
-    global _monitor_instance
-    if _monitor_instance is None:
-        # Use to_thread to safely acquire the lock from async context
-        def _create_instance():
-            global _monitor_instance
-            with _monitor_init_lock:
-                if _monitor_instance is None:
-                    _monitor_instance = WorkerMonitor()
-                    return True  # Needs initialization
-            return False  # Already exists
+    global _monitor_instance, _monitor_initialized
 
-        needs_init = await asyncio.to_thread(_create_instance)
-        if needs_init:
-            await _monitor_instance.initialize()
+    # Fast path: already initialized
+    if _monitor_initialized and _monitor_instance is not None:
+        return _monitor_instance
+
+    # Use to_thread to safely acquire the lock from async context
+    def _create_instance():
+        global _monitor_instance, _monitor_initialized
+        with _monitor_init_lock:
+            # Double-check after acquiring lock
+            if _monitor_initialized and _monitor_instance is not None:
+                return False  # Already initialized
+            if _monitor_instance is None:
+                _monitor_instance = WorkerMonitor()
+            return True  # Needs initialization
+
+    needs_init = await asyncio.to_thread(_create_instance)
+    if needs_init:
+        await _monitor_instance.initialize()
+        # Mark as initialized only after initialize() completes
+        _monitor_initialized = True
     return _monitor_instance
 
 
@@ -709,17 +718,27 @@ def get_worker_monitor_sync() -> WorkerMonitor:
     Raises:
         RuntimeError: If called from an async context where asyncio.run() cannot be used.
     """
-    global _monitor_instance
+    global _monitor_instance, _monitor_initialized
+
+    # Fast path: already initialized
+    if _monitor_initialized and _monitor_instance is not None:
+        return _monitor_instance
+
     with _monitor_init_lock:
+        # Double-check after acquiring lock
+        if _monitor_initialized and _monitor_instance is not None:
+            return _monitor_instance
         if _monitor_instance is None:
             _monitor_instance = WorkerMonitor()
-            try:
-                asyncio.run(_monitor_instance.initialize())
-            except RuntimeError as err:
-                # Event loop already running — reset instance and raise
-                _monitor_instance = None
-                raise RuntimeError(
-                    "Cannot initialize worker monitor synchronously in async context. "
-                    "Use get_worker_monitor() from async code instead."
-                ) from err
+        try:
+            asyncio.run(_monitor_instance.initialize())
+            _monitor_initialized = True
+        except RuntimeError as err:
+            # Event loop already running — reset instance and raise
+            _monitor_instance = None
+            _monitor_initialized = False
+            raise RuntimeError(
+                "Cannot initialize worker monitor synchronously in async context. "
+                "Use get_worker_monitor() from async code instead."
+            ) from err
     return _monitor_instance
