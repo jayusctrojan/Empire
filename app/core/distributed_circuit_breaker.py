@@ -260,7 +260,7 @@ class DistributedCircuitBreaker:
                 nx=True,
                 ex=int(timeout)
             )
-            if result is True:
+            if result:  # Use truthiness check instead of identity
                 self._lock_owner = lock_id
                 return True
             return False
