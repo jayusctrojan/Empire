@@ -185,6 +185,67 @@ async def get_current_user_optional(
     return await get_current_user(authorization=authorization, rbac_service=rbac_service)
 
 
+async def validate_token(token: str) -> str:
+    """
+    Validate a token string and return the user_id.
+
+    This function is designed for WebSocket authentication where the token
+    is passed as a query parameter rather than in headers.
+
+    Supports:
+    1. API Key: emp_xxx format
+    2. JWT Token: Raw JWT string (without Bearer prefix)
+
+    Args:
+        token: Token string to validate
+
+    Returns:
+        user_id: Validated user ID
+
+    Raises:
+        Exception: If token validation fails
+    """
+    # Reject empty/blank tokens early
+    if not token or not token.strip():
+        raise ValueError("Missing token")
+
+    rbac_service = get_rbac_service()
+
+    # Check if API key (emp_xxx format)
+    if token.startswith("emp_"):
+        key_record = await rbac_service.validate_api_key(token)
+
+        if not key_record:
+            logger.warning("ws_api_key_invalid", key_prefix=token[:12])
+            raise ValueError("Invalid or expired API key")
+
+        user_id = key_record["user_id"]
+        logger.debug("ws_api_key_auth_success", user_id=user_id)
+        return user_id
+
+    # Otherwise treat as JWT token
+    from app.middleware.clerk_auth import clerk_client
+
+    try:
+        # Verify the session token with Clerk
+        session = clerk_client.sessions.verify_token(token)
+
+        if not session:
+            logger.warning("ws_jwt_invalid")
+            raise ValueError("Invalid or expired JWT token")
+
+        user_id = session.user_id
+        logger.debug("ws_jwt_auth_success", user_id=user_id)
+        return user_id
+
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error("ws_jwt_auth_failed", error=str(e))
+        # Don't expose internal error details to clients
+        raise ValueError("JWT validation failed") from e
+
+
 async def require_role(
     required_role: str,
     current_user: str = Depends(get_current_user),

@@ -24,12 +24,11 @@ load_dotenv()
 # Import routers
 from app.api import upload, notifications
 from app.api.routes import query
-from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator, entity_extraction, llama_index, circuit_breakers, workflow_management, asset_generators, graph_agent, rag_metrics, report_downloads  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001), Task 155: Entity Extraction, Task 156: LlamaIndex Integration Hardening, Task 159: Circuit Breaker Management, Task 158: Workflow Management, Task 43: Asset Generators, Task 107: Graph Agent, Task 149: RAG Metrics, Report Downloads API
+from app.routes import sessions, preferences, costs, rbac, documents, users, monitoring, crewai, agent_interactions, crewai_assets, audit, feature_flags, websocket, agent_router, status, chat_files, content_summarizer, department_classifier, document_analysis, multi_agent_orchestration, embeddings, hybrid_search, reranking, query_expansion, semantic_cache, knowledge_graph, conversation_memory, context_management, context_window, projects, project_sources, project_rag, studio_cko, studio_assets, studio_classifications, studio_feedback, conversations, research_projects, content_prep, orchestrator, entity_extraction, llama_index, circuit_breakers, workflow_management, asset_generators, graph_agent, rag_metrics, report_downloads  # Task 28: Session & Preference Management, Task 30: Cost Tracking, Task 31: RBAC, Task 32: Bulk Document Management, Task 33: User Management, Task 34: Analytics Dashboard, Task 35: CrewAI Multi-Agent Integration, Task 39: Inter-Agent Messaging, Task 40: CrewAI Asset Storage, Task 41.5: Audit Logging, Task 3.2: Feature Flags, Task 10.2: WebSocket Endpoints, Task 17: Agent Router, Task 11: REST Status Polling, Task 21: Chat File Upload, Task 42: Content Summarizer Agent, Task 44: Department Classifier Agent, Task 45: Document Analysis Agents, Task 46: Multi-Agent Orchestration, Task 26: Embedding Generation, Task 27: Hybrid Search, Task 29: Reranking, Task 28: Query Expansion, Task 30: Semantic Cache, Task 31: Knowledge Graph, Task 32: Conversation Memory, Task 33: Context Management, Feature 011: Context Window Management, Projects CRUD, Task 60: Project Sources CRUD, Task 64: Project RAG, Task 72: AI Studio CKO, Task 79: AI Studio Feedback, Conversations CRUD, Task 91-100: Research Projects (Agent Harness), Task 47: Content Prep Agent (AGENT-016), Task 133: Orchestrator API (AGENT-001), Task 155: Entity Extraction, Task 156: LlamaIndex Integration Hardening, Task 159: Circuit Breaker Management, Task 158: Workflow Management, Task 43: Asset Generators, Task 107: Graph Agent, Task 149: RAG Metrics, Report Downloads API
 from app.routes import health as health_router  # Task 190: Enhanced Health Checks
 from app.routes import feedback as feedback_router  # Task 188: Agent Feedback System
 
 # PENDING FEATURES (to be implemented in future releases):
-# - Feature 011: Chat Context Window Management (context_window_router)
 # - Task 206: Automatic Checkpoint System (checkpoints_router)
 # - Task 207: Session Memory & Persistence (session_memory_router)
 
@@ -576,6 +575,9 @@ app.include_router(conversation_memory.router)  # Conversation Memory router has
 # Task 33: Context Management Service (context windows, weighted retrieval, graph traversal)
 app.include_router(context_management.router)  # Context Management router has /api/context prefix
 
+# Feature 011: Chat Context Window Management (Tasks 201-211)
+app.include_router(context_window.router)  # Context Window router has /api/context-window prefix
+
 # Projects CRUD API (NotebookLM-style project management - persistent storage)
 app.include_router(projects.router)  # Projects router has /api/projects prefix
 
@@ -640,9 +642,6 @@ app.include_router(feedback_router.router)  # Feedback router has /api/feedback 
 # =============================================================================
 # PENDING FEATURES (to be implemented in future releases)
 # =============================================================================
-# Feature 011: Chat Context Window Management - Progress bar and token tracking
-#   Route: /api/context-window (context_window_router)
-#
 # Task 206: Automatic Checkpoint System - Session checkpoints and crash recovery
 #   Route: /api/checkpoints (checkpoints_router)
 #

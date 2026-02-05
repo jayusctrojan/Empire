@@ -1,0 +1,466 @@
+openapi: 3.1.0
+info:
+  title: Checkpoint API
+  description: API for managing session checkpoints and crash recovery
+  version: 1.0.0
+  contact:
+    name: Empire Development
+
+servers:
+  - url: /api/v1
+    description: Empire API v1
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Checkpoints
+    description: Session checkpoint operations
+  - name: Recovery
+    description: Crash recovery operations
+
+paths:
+  /checkpoints/{conversation_id}:
+    get:
+      tags:
+        - Checkpoints
+      summary: List checkpoints for conversation
+      description: Returns all checkpoints for a conversation, sorted by creation date
+      operationId: listCheckpoints
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Checkpoints retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckpointListResponse'
+        '404':
+          description: Conversation not found
+
+    post:
+      tags:
+        - Checkpoints
+      summary: Create manual checkpoint
+      description: Creates a new checkpoint with optional label (/save-progress command)
+      operationId: createCheckpoint
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCheckpointRequest'
+      responses:
+        '201':
+          description: Checkpoint created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckpointResponse'
+        '400':
+          description: Invalid request
+        '429':
+          description: Checkpoint limit reached (max 50 per conversation)
+
+  /checkpoints/{conversation_id}/{checkpoint_id}:
+    get:
+      tags:
+        - Checkpoints
+      summary: Get checkpoint details
+      description: Returns full checkpoint data including conversation state
+      operationId: getCheckpoint
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: checkpoint_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Checkpoint retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckpointDetailResponse'
+        '404':
+          description: Checkpoint not found
+
+    delete:
+      tags:
+        - Checkpoints
+      summary: Delete checkpoint
+      description: Removes a specific checkpoint
+      operationId: deleteCheckpoint
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: checkpoint_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Checkpoint deleted successfully
+        '404':
+          description: Checkpoint not found
+
+  /checkpoints/{conversation_id}/auto:
+    post:
+      tags:
+        - Checkpoints
+      summary: Create auto-checkpoint
+      description: Internal endpoint for automatic checkpoint creation on trigger events
+      operationId: createAutoCheckpoint
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoCheckpointRequest'
+      responses:
+        '201':
+          description: Auto-checkpoint created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckpointResponse'
+        '429':
+          description: Checkpoint limit reached
+
+  /recovery/check:
+    get:
+      tags:
+        - Recovery
+      summary: Check for crash recovery
+      description: Checks if any sessions ended abnormally and need recovery
+      operationId: checkRecovery
+      responses:
+        '200':
+          description: Recovery check completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryCheckResponse'
+
+  /recovery/{conversation_id}/restore:
+    post:
+      tags:
+        - Recovery
+      summary: Restore from checkpoint
+      description: Restores conversation to a specific checkpoint state
+      operationId: restoreFromCheckpoint
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                checkpoint_id:
+                  type: string
+                  format: uuid
+              required:
+                - checkpoint_id
+      responses:
+        '200':
+          description: Conversation restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreResponse'
+        '404':
+          description: Checkpoint not found
+        '409':
+          description: Restore conflict (conversation modified)
+
+  /recovery/{conversation_id}/dismiss:
+    post:
+      tags:
+        - Recovery
+      summary: Dismiss recovery prompt
+      description: Marks recovery as dismissed, user chose not to restore
+      operationId: dismissRecovery
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Recovery dismissed
+        '404':
+          description: No recovery pending
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+  schemas:
+    CheckpointListResponse:
+      type: object
+      properties:
+        checkpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckpointSummary'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    CheckpointSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          nullable: true
+        auto_tag:
+          type: string
+          enum: [code, decision, error_resolution, manual]
+          nullable: true
+        token_count:
+          type: integer
+        message_count:
+          type: integer
+        is_abnormal_close:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    CheckpointResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          nullable: true
+        auto_tag:
+          type: string
+          nullable: true
+        token_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        message:
+          type: string
+          example: "Checkpoint saved successfully"
+
+    CheckpointDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          nullable: true
+        auto_tag:
+          type: string
+          nullable: true
+        token_count:
+          type: integer
+        is_abnormal_close:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        checkpoint_data:
+          $ref: '#/components/schemas/CheckpointData'
+
+    CheckpointData:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckpointMessage'
+        context_state:
+          type: object
+          properties:
+            total_tokens:
+              type: integer
+            max_tokens:
+              type: integer
+            compaction_count:
+              type: integer
+        metadata:
+          type: object
+          properties:
+            model:
+              type: string
+            checkpoint_reason:
+              type: string
+
+    CheckpointMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        token_count:
+          type: integer
+        is_protected:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    CreateCheckpointRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 200
+          description: User-provided label for the checkpoint
+          example: "completed auth feature"
+
+    AutoCheckpointRequest:
+      type: object
+      properties:
+        auto_tag:
+          type: string
+          enum: [code, decision, error_resolution]
+          description: Automatic tag based on trigger event
+        trigger_event:
+          type: string
+          description: What triggered the auto-checkpoint
+          example: "file_write_detected"
+      required:
+        - auto_tag
+        - trigger_event
+
+    RecoveryCheckResponse:
+      type: object
+      properties:
+        has_recovery:
+          type: boolean
+          description: Whether any sessions need recovery
+        recoverable_sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecoverableSession'
+
+    RecoverableSession:
+      type: object
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        checkpoint_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          nullable: true
+        auto_tag:
+          type: string
+          nullable: true
+        last_message_preview:
+          type: string
+          maxLength: 200
+        token_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    RestoreResponse:
+      type: object
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        restored_from_checkpoint:
+          type: string
+          format: uuid
+        token_count:
+          type: integer
+        message_count:
+          type: integer
+        restored_at:
+          type: string
+          format: date-time
+        message:
+          type: string
+          example: "Conversation restored successfully"
