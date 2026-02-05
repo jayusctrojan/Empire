@@ -17,6 +17,7 @@ Usage:
         return success_response(data=item)
 """
 
+import uuid
 from datetime import datetime, timezone
 from typing import Any, ClassVar, Dict, Generic, List, Optional, TypeVar, Union
 
@@ -168,8 +169,6 @@ def success_response(
     Returns:
         APIResponse with success=True
     """
-    import uuid
-
     if meta is None and request_id:
         meta = ResponseMeta(request_id=request_id)
     elif meta is None:
@@ -207,8 +206,6 @@ def error_response(
     Returns:
         JSONResponse with error details
     """
-    import uuid
-
     response = APIResponse(
         success=False,
         error=ErrorDetail(
@@ -243,8 +240,6 @@ def validation_error_response(
     Returns:
         JSONResponse with validation errors
     """
-    import uuid
-
     error_details = [
         ErrorDetail(
             code="VALIDATION_ERROR",
@@ -334,8 +329,6 @@ def task_submitted_response(
     Returns:
         APIResponse with task info
     """
-    import uuid
-
     return APIResponse(
         success=True,
         data=TaskResponse(

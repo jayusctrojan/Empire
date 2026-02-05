@@ -615,13 +615,15 @@ def setup_signal_handlers(shutdown_coordinator: GracefulShutdown):
         shutdown_coordinator: The shutdown coordinator instance
     """
     loop = asyncio.get_event_loop()
+    _shutdown_task: Optional[asyncio.Task] = None
 
     def handle_signal(sig):
+        nonlocal _shutdown_task
         reason = ShutdownReason.SIGTERM if sig == signal.SIGTERM else ShutdownReason.SIGINT
         logger.info(f"Received {sig.name}, initiating shutdown")
 
-        # Schedule shutdown coroutine
-        asyncio.ensure_future(shutdown_coordinator.initiate_shutdown(reason=reason))
+        # Schedule shutdown coroutine and store task to prevent GC
+        _shutdown_task = asyncio.ensure_future(shutdown_coordinator.initiate_shutdown(reason=reason))
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, lambda s=sig: handle_signal(s))

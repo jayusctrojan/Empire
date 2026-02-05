@@ -263,7 +263,7 @@ stop_celery() {
         if [ -n "$orphaned" ]; then
             print_warning "Found orphaned Celery process: $orphaned"
             if [ "$FORCE_KILL" = true ]; then
-                kill -9 $orphaned 2>/dev/null || true
+                pkill -9 -f "celery.*app.celery_app" 2>/dev/null || true
                 print_success "Force killed orphaned process"
             fi
         fi

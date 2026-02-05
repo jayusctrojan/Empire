@@ -26,7 +26,7 @@ import time
 import asyncio
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, Optional, Union
+from typing import Any, Callable, ClassVar, Coroutine, Dict, Optional, Union
 
 import structlog
 from pydantic import BaseModel, Field
@@ -86,7 +86,7 @@ class IdempotencyEntry(BaseModel):
     request_hash: Optional[str] = Field(None, description="Hash of the request for verification")
 
     class Config:
-        json_schema_extra = {
+        json_schema_extra: ClassVar[Dict[str, Any]] = {
             "example": {
                 "key": "user-123-create-message-abc",
                 "operation": "create_message",

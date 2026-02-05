@@ -373,7 +373,7 @@ class TestFullShutdownSequence:
     """Tests for full shutdown sequence"""
 
     @pytest.mark.asyncio
-    async def test_full_shutdown_order(self, mock_celery_app, mock_redis, mock_neo4j):
+    async def test_full_shutdown_order(self, mock_celery_app, mock_redis):
         """Test that shutdown happens in correct order"""
         shutdown_order = []
 
@@ -381,10 +381,6 @@ class TestFullShutdownSequence:
             celery_app=mock_celery_app,
             redis_client=mock_redis
         )
-
-        original_drain_celery = coordinator.drain_celery_tasks
-        original_cancel_tasks = coordinator.cancel_background_tasks
-        original_close_connections = coordinator.close_connections
 
         async def mock_drain_celery(*args, **kwargs):
             shutdown_order.append("celery")
