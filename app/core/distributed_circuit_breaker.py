@@ -27,6 +27,7 @@ Usage:
 import asyncio
 import json
 import time
+import uuid
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, Optional, TypeVar, Union
@@ -50,7 +51,9 @@ def _get_or_create_counter(name: str, description: str, labels: list) -> Counter
         return Counter(name, description, labels)
     except ValueError:
         # Metric already exists, retrieve it from registry
-        return REGISTRY._names_to_collectors.get(name.replace("_total", ""))
+        # Use registry lock to prevent race conditions
+        with REGISTRY._lock:
+            return REGISTRY._names_to_collectors.get(name.replace("_total", ""))
 
 
 def _get_or_create_gauge(name: str, description: str, labels: list) -> Gauge:
@@ -59,7 +62,9 @@ def _get_or_create_gauge(name: str, description: str, labels: list) -> Gauge:
         return Gauge(name, description, labels)
     except ValueError:
         # Metric already exists, retrieve it from registry
-        return REGISTRY._names_to_collectors.get(name)
+        # Use registry lock to prevent race conditions
+        with REGISTRY._lock:
+            return REGISTRY._names_to_collectors.get(name)
 
 
 CIRCUIT_STATE_CHANGES = _get_or_create_counter(
@@ -227,6 +232,9 @@ class DistributedCircuitBreaker:
         self._local_state_time: float = 0
         self._cache_ttl: float = 1.0  # Cache state for 1 second
 
+        # Lock ownership tracking
+        self._lock_owner: Optional[str] = None
+
         logger.debug(
             "Distributed circuit breaker initialized",
             service=service_name,
@@ -241,25 +249,50 @@ class DistributedCircuitBreaker:
     async def _acquire_lock(self, timeout: float = 5.0) -> bool:
         """Acquire distributed lock for state modifications."""
         try:
+            # Generate unique owner ID for safe lock release
+            lock_id = str(uuid.uuid4())
+
             # Use SET NX with expiry for atomic lock acquisition
             result = await asyncio.to_thread(
                 self.redis.set,
                 self._lock_key,
-                "1",
+                lock_id,
                 nx=True,
                 ex=int(timeout)
             )
-            return result is True
+            if result is True:
+                self._lock_owner = lock_id
+                return True
+            return False
         except Exception as e:
             logger.warning("Failed to acquire circuit breaker lock", error=str(e))
             return False
 
     async def _release_lock(self):
-        """Release distributed lock."""
+        """Release distributed lock only if we own it (using Lua script for atomicity)."""
+        if not self._lock_owner:
+            return
+
         try:
-            await asyncio.to_thread(self.redis.delete, self._lock_key)
+            # Lua script to atomically check owner and delete
+            lua_script = """
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+                return redis.call("del", KEYS[1])
+            else
+                return 0
+            end
+            """
+            await asyncio.to_thread(
+                self.redis.eval,
+                lua_script,
+                1,
+                self._lock_key,
+                self._lock_owner
+            )
         except Exception as e:
             logger.warning("Failed to release circuit breaker lock", error=str(e))
+        finally:
+            self._lock_owner = None
 
     async def _get_state(self) -> CircuitBreakerState:
         """
@@ -399,8 +432,39 @@ class DistributedCircuitBreaker:
             if state.last_state_change:
                 elapsed = time.time() - state.last_state_change
                 if elapsed >= self.config.timeout_seconds:
-                    await self._transition_to(CircuitState.HALF_OPEN)
-                    return True
+                    # Atomic transition to HALF_OPEN with slot reservation
+                    if await self._acquire_lock(timeout=2.0):
+                        try:
+                            # Re-read state under lock to avoid race
+                            state = await self._get_state()
+                            # Another caller may have already transitioned
+                            if state.state == CircuitState.OPEN:
+                                state.state = CircuitState.HALF_OPEN
+                                state.last_state_change = time.time()
+                                state.half_open_calls = 1  # Reserve first slot
+                                state.consecutive_successes = 0
+                                await self._save_state(state)
+                                CIRCUIT_STATE_CHANGES.labels(
+                                    service=self.service_name,
+                                    from_state=CircuitState.OPEN.value,
+                                    to_state=CircuitState.HALF_OPEN.value
+                                ).inc()
+                                logger.info(
+                                    "Circuit breaker state transition",
+                                    service=self.service_name,
+                                    from_state=CircuitState.OPEN.value,
+                                    to_state=CircuitState.HALF_OPEN.value,
+                                    failure_count=state.failure_count
+                                )
+                                return True
+                            elif state.state == CircuitState.HALF_OPEN:
+                                # Already transitioned, try to get a slot
+                                if state.half_open_calls < self.config.half_open_max_calls:
+                                    state.half_open_calls += 1
+                                    await self._save_state(state)
+                                    return True
+                        finally:
+                            await self._release_lock()
 
             CIRCUIT_REJECTIONS.labels(service=self.service_name).inc()
             return False
@@ -481,7 +545,7 @@ class DistributedCircuitBreaker:
             state.consecutive_successes = 0
 
             if state.state == CircuitState.HALF_OPEN:
-                state.half_open_calls += 1
+                # Note: half_open_calls already incremented in can_execute()
                 # Any failure in half-open immediately opens circuit
                 await self._transition_to(CircuitState.OPEN)
                 return
@@ -507,17 +571,35 @@ class DistributedCircuitBreaker:
 
     async def force_open(self):
         """Force the circuit to open state"""
-        await self._transition_to(CircuitState.OPEN)
+        if await self._acquire_lock(timeout=2.0):
+            try:
+                await self._transition_to(CircuitState.OPEN)
+            finally:
+                await self._release_lock()
+        else:
+            logger.warning("Could not acquire lock for force_open", service=self.service_name)
 
     async def force_close(self):
         """Force the circuit to closed state"""
-        await self._transition_to(CircuitState.CLOSED)
+        if await self._acquire_lock(timeout=2.0):
+            try:
+                await self._transition_to(CircuitState.CLOSED)
+            finally:
+                await self._release_lock()
+        else:
+            logger.warning("Could not acquire lock for force_close", service=self.service_name)
 
     async def reset(self):
         """Reset the circuit breaker to initial state"""
-        state = CircuitBreakerState(service_name=self.service_name)
-        await self._save_state(state)
-        logger.info("Circuit breaker reset", service=self.service_name)
+        if await self._acquire_lock(timeout=2.0):
+            try:
+                state = CircuitBreakerState(service_name=self.service_name)
+                await self._save_state(state)
+                logger.info("Circuit breaker reset", service=self.service_name)
+            finally:
+                await self._release_lock()
+        else:
+            logger.warning("Could not acquire lock for reset", service=self.service_name)
 
     async def get_status(self) -> Dict[str, Any]:
         """

@@ -60,10 +60,23 @@ def mock_redis():
             return 1
         return 0
 
+    def mock_eval(script, num_keys, *args):
+        """Mock Lua script evaluation for safe lock release."""
+        # Simulate the lock release Lua script
+        if num_keys == 1 and len(args) >= 2:
+            key = args[0]
+            expected_value = args[1]
+            if storage.get(key) == expected_value:
+                if key in storage:
+                    del storage[key]
+                    return 1
+        return 0
+
     mock.get.side_effect = mock_get
     mock.set.side_effect = mock_set
     mock.setex.side_effect = mock_setex
     mock.delete.side_effect = mock_delete
+    mock.eval.side_effect = mock_eval
     mock.incr.return_value = 1
     mock.expire.return_value = True
 
