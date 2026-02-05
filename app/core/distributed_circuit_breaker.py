@@ -533,8 +533,9 @@ class DistributedCircuitBreaker:
         Args:
             exception: The exception that occurred (if any)
         """
-        # Check if exception should be excluded
-        if exception and type(exception) in self.config.excluded_exceptions:
+        # Check if exception should be excluded (use isinstance for subclass support)
+        excluded = tuple(self.config.excluded_exceptions)
+        if exception and excluded and isinstance(exception, excluded):
             logger.debug(
                 "Excluded exception, not counting as failure",
                 service=self.service_name,

@@ -43,11 +43,11 @@ def mock_redis():
     def mock_get(key):
         return storage.get(key)
 
-    def mock_setex(key, ttl, value):
+    def mock_setex(key, _ttl, value):
         storage[key] = value
         return True
 
-    def mock_set(key, value, nx=False, ex=None):
+    def mock_set(key, value, nx=False, _ex=None):
         # Support nx (only set if not exists) for distributed locking
         if nx and key in storage:
             return False  # Key already exists, lock not acquired
@@ -60,7 +60,7 @@ def mock_redis():
             return 1
         return 0
 
-    def mock_eval(script, num_keys, *args):
+    def mock_eval(_script, num_keys, *args):
         """Mock Lua script evaluation for safe lock release."""
         # Simulate the lock release Lua script
         if num_keys == 1 and len(args) >= 2:
