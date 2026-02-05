@@ -429,8 +429,7 @@ class MarkdownChunkerStrategy:
                 # Oversized section: use sentence splitting
                 logger.debug(
                     "Section exceeds max_chunk_size, using sentence splitting",
-                    header=section.header_text,
-                    tokens=token_count
+                    extra={"header": section.header_text, "tokens": token_count}
                 )
                 section_chunks = self._chunk_oversized_section(
                     section, document_id, chunk_index

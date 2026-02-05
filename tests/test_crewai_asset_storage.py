@@ -96,7 +96,7 @@ tools:
   - terraform
   - ansible
 llm_config:
-  model: claude-sonnet-4-20250514
+  model: claude-sonnet-4-5-20250929
   temperature: 0.3
 """
         result = await storage.store_agent_config(

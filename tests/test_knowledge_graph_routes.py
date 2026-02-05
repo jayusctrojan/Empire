@@ -380,7 +380,7 @@ class TestCypherGenerationService:
         from app.services.cypher_generation_service import CypherGenerationConfig
 
         config = CypherGenerationConfig()
-        assert config.model == "claude-sonnet-4-20250514"
+        assert config.model == "claude-sonnet-4-5-20250929"
         assert config.max_tokens == 1024
         assert config.temperature == 0.0
 

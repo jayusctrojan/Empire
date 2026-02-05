@@ -40,7 +40,7 @@ logger = structlog.get_logger(__name__)
 class ReportConfig:
     """Configuration for report generation"""
     # Model settings
-    model: str = "claude-sonnet-4-20250514"
+    model: str = "claude-sonnet-4-5-20250929"
     max_tokens: int = 8192
     temperature: float = 0.3
 

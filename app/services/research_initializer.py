@@ -131,7 +131,7 @@ class ResearchInitializerService:
     def __init__(self, supabase: Client, anthropic: AsyncAnthropic):
         self.supabase = supabase
         self.anthropic = anthropic
-        self.model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        self.model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5-20250929")
 
     async def initialize_job(self, job_id: int) -> bool:
         """

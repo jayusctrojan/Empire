@@ -777,7 +777,7 @@ async def asset_generators_health(
         generators_count=len(generators_list),
         generators=generators_health,
         llm_available=llm_available,
-        llm_model="claude-sonnet-4-5-20250514",
+        llm_model="claude-sonnet-4-5-20250929",
         output_base_path=service.output_base_path,
         supported_departments=[d.value for d in Department],
         supported_asset_types=[t.value for t in AssetType],

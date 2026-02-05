@@ -56,7 +56,7 @@ CONTEXT_THRESHOLD_BREACHES = Counter(
 # Model context limits for Claude models
 MODEL_CONTEXT_LIMITS = {
     "claude-opus-4-20250514": 200000,
-    "claude-sonnet-4-20250514": 200000,
+    "claude-sonnet-4-5-20250929": 200000,
     "claude-3-opus-20240229": 200000,
     "claude-3-5-sonnet-20241022": 200000,
     "claude-3-5-sonnet-20240620": 200000,

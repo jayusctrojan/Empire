@@ -140,6 +140,15 @@ class CostTrackingService:
     # Pricing configurations (USD)
     PRICING = {
         ServiceProvider.ANTHROPIC: {
+            "claude-sonnet-4-5-20250929": {
+                "input": 0.000003,  # $3 per 1M tokens
+                "output": 0.000015,  # $15 per 1M tokens
+            },
+            "claude-haiku-4-5-20251001": {
+                "input": 0.000001,  # $1 per 1M tokens
+                "output": 0.000005,  # $5 per 1M tokens
+            },
+            # Legacy model IDs (kept for historical cost lookups)
             "claude-3-5-sonnet-20241022": {
                 "input": 0.000003,  # $3 per 1M tokens
                 "output": 0.000015,  # $15 per 1M tokens

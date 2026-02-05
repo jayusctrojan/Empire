@@ -335,7 +335,7 @@ class TestResilientAnthropicClient:
 
         with pytest.raises(ValueError, match="not initialized"):
             await client.messages.create(
-                model="claude-sonnet-4-5-20250514",
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=100,
                 messages=[{"role": "user", "content": "Hello"}],
             )
@@ -352,7 +352,7 @@ class TestResilientAnthropicClient:
             )
 
             result = await client.messages.create(
-                model="claude-sonnet-4-5-20250514",
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=100,
                 messages=[{"role": "user", "content": "Hello"}],
             )

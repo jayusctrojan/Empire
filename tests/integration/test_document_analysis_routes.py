@@ -178,7 +178,7 @@ def mock_workflow_service(mock_research_result, mock_strategy_result, mock_fact_
             "agent_id": "AGENT-009",
             "name": "Senior Research Analyst",
             "description": "Extract topics, entities, facts, quality assessment",
-            "model": "claude-sonnet-4-5-20250514",
+            "model": "claude-sonnet-4-5-20250929",
             "temperature": 0.3,
             "capabilities": ["topic_extraction", "entity_extraction", "fact_extraction", "quality_assessment"]
         },
@@ -186,7 +186,7 @@ def mock_workflow_service(mock_research_result, mock_strategy_result, mock_fact_
             "agent_id": "AGENT-010",
             "name": "Content Strategist",
             "description": "Generate executive summaries and recommendations",
-            "model": "claude-sonnet-4-5-20250514",
+            "model": "claude-sonnet-4-5-20250929",
             "temperature": 0.5,
             "capabilities": ["executive_summary", "findings", "recommendations"]
         },
@@ -194,7 +194,7 @@ def mock_workflow_service(mock_research_result, mock_strategy_result, mock_fact_
             "agent_id": "AGENT-011",
             "name": "Fact Checker",
             "description": "Verify claims with confidence scores",
-            "model": "claude-sonnet-4-5-20250514",
+            "model": "claude-sonnet-4-5-20250929",
             "temperature": 0.1,
             "capabilities": ["claim_verification", "credibility_assessment"]
         }
