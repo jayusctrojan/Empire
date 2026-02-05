@@ -115,7 +115,7 @@ class TestContextManagerService:
         conversation_id = str(uuid4())
         user_id = "test-user"
         context_id = str(uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Configure mock to return proper data
         mock_supabase.execute.return_value = Mock(data=[{
@@ -159,7 +159,7 @@ class TestContextManagerService:
             "estimated_messages_remaining": 1950,
             "is_compacting": False,
             "last_compaction_at": None,
-            "last_updated": datetime.utcnow().isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
         mock_redis.get.return_value = json.dumps(cached_status)
 
@@ -423,10 +423,10 @@ class TestCheckpointService:
             token_count=100,
             is_protected=False,
             position=5,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
-        messages = sample_messages + [code_message]
+        messages = [*sample_messages, code_message]
         tags = checkpoint_service._detect_content_tags(messages)
 
         assert "code" in tags
@@ -443,7 +443,7 @@ class TestCheckpointService:
             token_count=50,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         tags = checkpoint_service._detect_content_tags([decision_message])
@@ -462,7 +462,7 @@ class TestCheckpointService:
             token_count=30,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         tags = checkpoint_service._detect_content_tags([error_message])
@@ -481,7 +481,7 @@ class TestCheckpointService:
             token_count=30,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         tags = checkpoint_service._detect_content_tags([milestone_message])
@@ -501,10 +501,10 @@ class TestCheckpointService:
             token_count=50,
             is_protected=False,
             position=5,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
-        messages = sample_messages + [code_message]
+        messages = [*sample_messages, code_message]
         label = checkpoint_service._generate_auto_label(
             messages=messages,
             tags=["code"],
@@ -540,7 +540,7 @@ class TestCheckpointService:
 
         checkpoint_id = str(uuid4())
         conversation_id = str(uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_at = now + timedelta(days=30)  # 30-day TTL
 
         # Create a mock checkpoint response with all required fields
@@ -682,7 +682,7 @@ class TestContextErrorRecoveryService:
             token_count=50,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         result = recovery_service._is_essential_message(code_message)
@@ -701,7 +701,7 @@ class TestContextErrorRecoveryService:
             token_count=30,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         result = recovery_service._is_essential_message(error_message)
@@ -720,7 +720,7 @@ class TestContextErrorRecoveryService:
             token_count=30,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         result = recovery_service._is_essential_message(path_message)
@@ -739,7 +739,7 @@ class TestContextErrorRecoveryService:
             token_count=30,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         result = recovery_service._is_essential_message(decision_message)
@@ -758,7 +758,7 @@ class TestContextErrorRecoveryService:
             token_count=10,
             is_protected=False,
             position=0,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
 
         result = recovery_service._is_essential_message(casual_message)
@@ -801,7 +801,7 @@ class TestContextErrorRecoveryService:
         mock_redis.get.return_value = json.dumps({
             "percent": 50,
             "stage": "Processing",
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.now(timezone.utc).isoformat()
         })
 
         with patch('app.services.context_error_recovery_service.get_redis', return_value=mock_redis):
@@ -879,8 +879,7 @@ class TestContextWindowAPIRoutes:
             yield engine
 
     @pytest.fixture
-    @pytest.mark.usefixtures("mock_context_manager", "mock_condensing_engine")
-    def client(self):
+    def client(self, mock_context_manager, mock_condensing_engine):  # noqa: ARG002
         """Create test client with mocked services."""
         from app.main import app
         from app.middleware.auth import get_current_user
