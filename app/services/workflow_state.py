@@ -192,6 +192,10 @@ class WorkflowStateManager:
         """
         Create a new workflow context.
 
+        Note: This is a synchronous method that does not acquire self._lock.
+        It must only be called from the event loop thread (not from executors
+        or background threads) to avoid races with async savepoint/rollback methods.
+
         Args:
             workflow_id: Unique workflow identifier
             job_id: Associated job ID
@@ -216,7 +220,10 @@ class WorkflowStateManager:
         return context
 
     def get_context(self, workflow_id: str) -> Optional[WorkflowContext]:
-        """Get an existing workflow context"""
+        """Get an existing workflow context.
+
+        Note: Synchronous — must only be called from the event loop thread.
+        """
         return self._contexts.get(workflow_id)
 
     def update_context(
@@ -229,6 +236,8 @@ class WorkflowStateManager:
     ) -> Optional[WorkflowContext]:
         """
         Update workflow context.
+
+        Note: Synchronous — must only be called from the event loop thread.
 
         Args:
             workflow_id: Workflow to update
@@ -264,7 +273,8 @@ class WorkflowStateManager:
         workflow_id: str,
         savepoint_type: SavepointType = SavepointType.AUTOMATIC,
         description: str = "",
-        agent_state: Optional[Dict[str, Any]] = None
+        agent_state: Optional[Dict[str, Any]] = None,
+        set_agent_id: Optional[str] = None
     ) -> Optional[WorkflowSavepoint]:
         """
         Create a savepoint for the current workflow state.
@@ -274,6 +284,7 @@ class WorkflowStateManager:
             savepoint_type: Type of savepoint
             description: Optional description
             agent_state: Optional agent-specific state
+            set_agent_id: Optional agent ID to set atomically before snapshotting
 
         Returns:
             Created savepoint or None if workflow not found
@@ -284,6 +295,10 @@ class WorkflowStateManager:
                 logger.warning("Cannot create savepoint: workflow not found", workflow_id=workflow_id)
                 return None
 
+            # Atomically set agent_id before snapshotting (avoids TOCTOU race)
+            if set_agent_id is not None:
+                context.current_agent = set_agent_id
+
             # Capture previous state for rollback on DB failure
             previous_sequence = self._sequence_counters.get(workflow_id, 0)
             previous_last_savepoint_at = context.last_savepoint_at
@@ -292,14 +307,17 @@ class WorkflowStateManager:
             self._sequence_counters[workflow_id] = previous_sequence + 1
             sequence = self._sequence_counters[workflow_id]
 
-            # Create savepoint from current state snapshot
+            # Create savepoint from current state snapshot (include job_id for restore)
+            state_snapshot = deepcopy(context.state)
+            state_snapshot["_job_id"] = context.job_id
+
             savepoint = WorkflowSavepoint(
                 savepoint_id=str(uuid.uuid4()),
                 workflow_id=workflow_id,
                 phase=context.current_phase,
                 agent_id=context.current_agent,
                 savepoint_type=savepoint_type,
-                workflow_state=deepcopy(context.state),
+                workflow_state=state_snapshot,
                 agent_state=agent_state or {},
                 artifacts=deepcopy(context.artifacts),
                 description=description,
@@ -320,12 +338,11 @@ class WorkflowStateManager:
             )
         except Exception:
             logger.exception("Failed to store savepoint", workflow_id=workflow_id)
-            # Rollback in-memory state on DB failure
+            # Rollback in-memory state on DB failure — only remove the savepoint ID;
+            # leave sequence counter and timestamp untouched to stay monotonically increasing
             async with self._lock:
                 if savepoint.savepoint_id in context.savepoints:
                     context.savepoints.remove(savepoint.savepoint_id)
-                context.last_savepoint_at = previous_last_savepoint_at
-                self._sequence_counters[workflow_id] = previous_sequence
             return None
 
         logger.info(
@@ -345,16 +362,12 @@ class WorkflowStateManager:
         agent_input: Dict[str, Any]
     ) -> Optional[WorkflowSavepoint]:
         """Create a savepoint before agent execution"""
-        async with self._lock:
-            context = self._contexts.get(workflow_id)
-            if context:
-                context.current_agent = agent_id
-
         return await self.create_savepoint(
             workflow_id=workflow_id,
             savepoint_type=SavepointType.PRE_AGENT,
             description=f"Before executing {agent_id}",
-            agent_state={"input": agent_input}
+            agent_state={"input": agent_input},
+            set_agent_id=agent_id
         )
 
     async def create_post_agent_savepoint(
@@ -418,20 +431,25 @@ class WorkflowStateManager:
         # Single lock region for all in-memory state mutations
         async with self._lock:
             # Get or create context
+            restored_job_id = savepoint.workflow_state.get("_job_id", 0)
             context = self._contexts.get(workflow_id)
             if not context:
                 context = WorkflowContext(
                     workflow_id=workflow_id,
-                    job_id=0,  # Will be restored from state
+                    job_id=restored_job_id,
                     current_phase=savepoint.phase,
                     current_agent=savepoint.agent_id
                 )
                 self._contexts[workflow_id] = context
 
-            # Restore state
+            # Restore state (strip internal _job_id key before restoring)
+            restored_state = deepcopy(savepoint.workflow_state)
+            restored_state.pop("_job_id", None)
+
             context.current_phase = savepoint.phase
             context.current_agent = savepoint.agent_id
-            context.state = deepcopy(savepoint.workflow_state)
+            context.job_id = restored_job_id
+            context.state = restored_state
             context.artifacts = deepcopy(savepoint.artifacts)
             context.rollback_count += 1
 
@@ -689,6 +707,13 @@ class WorkflowStateManager:
 
         deleted = len(result.data or [])
         logger.info("Deleted workflow savepoints", workflow_id=workflow_id, count=deleted)
+
+        # Clean up in-memory state to stay consistent with DB
+        async with self._lock:
+            context = self._contexts.get(workflow_id)
+            if context:
+                context.savepoints.clear()
+            self._sequence_counters.pop(workflow_id, None)
 
         return deleted
 
