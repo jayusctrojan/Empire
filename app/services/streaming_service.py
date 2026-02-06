@@ -96,7 +96,10 @@ class StreamChunk:
         Handles multiline payloads by emitting one 'data:' line per line of content,
         as per the SSE specification.
         """
-        if isinstance(self.data, dict):
+        if isinstance(self.data, (bytes, bytearray)):
+            import base64
+            data_str = base64.b64encode(self.data).decode("ascii")
+        elif isinstance(self.data, dict):
             data_str = json.dumps(self.data)
         else:
             data_str = str(self.data)
@@ -119,12 +122,19 @@ class StreamChunk:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
+        data = self.data
+        encoding = None
+        if isinstance(self.data, (bytes, bytearray)):
+            import base64
+            data = base64.b64encode(self.data).decode("ascii")
+            encoding = "base64"
         return {
-            "data": self.data,
+            "data": data,
             "sequence": self.sequence,
             "timestamp": self.timestamp.isoformat(),
             "is_final": self.is_final,
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            "data_encoding": encoding
         }
 
 

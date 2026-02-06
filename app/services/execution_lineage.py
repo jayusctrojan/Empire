@@ -349,6 +349,10 @@ class DatabaseLineageStore(LineageStore):
             lambda: self._client.table("execution_lineage").upsert(data).execute()
         )
 
+        # Persist artifacts for DB-backed store consistency
+        for artifact in step.input_artifacts + step.output_artifacts:
+            await self.save_artifact(artifact)
+
         logger.debug("saved_execution_step", step_id=str(step.id), workflow_id=str(step.workflow_id))
 
     async def get_step(self, step_id: UUID) -> Optional[ExecutionStep]:
@@ -602,7 +606,7 @@ class ExecutionLineageTracker:
 
         step.status = ExecutionStatus.SKIPPED
         step.completed_at = datetime.utcnow()
-        step.metrics["skip_reason"] = reason
+        step.parameters["skip_reason"] = reason
 
         await self._store.save_step(step)
 

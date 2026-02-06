@@ -15,6 +15,7 @@ Author: Claude Code
 Date: 2025-01-24
 """
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -176,6 +177,7 @@ class WorkflowStateManager:
         self.supabase = supabase
         self._contexts: Dict[str, WorkflowContext] = {}
         self._sequence_counters: Dict[str, int] = {}
+        self._lock = asyncio.Lock()
 
     # ==========================================================================
     # Context Management
@@ -276,42 +278,43 @@ class WorkflowStateManager:
         Returns:
             Created savepoint or None if workflow not found
         """
-        context = self._contexts.get(workflow_id)
-        if not context:
-            logger.warning("Cannot create savepoint: workflow not found", workflow_id=workflow_id)
-            return None
+        async with self._lock:
+            context = self._contexts.get(workflow_id)
+            if not context:
+                logger.warning("Cannot create savepoint: workflow not found", workflow_id=workflow_id)
+                return None
 
-        # Increment sequence
-        self._sequence_counters[workflow_id] = self._sequence_counters.get(workflow_id, 0) + 1
-        sequence = self._sequence_counters[workflow_id]
+            # Increment sequence
+            self._sequence_counters[workflow_id] = self._sequence_counters.get(workflow_id, 0) + 1
+            sequence = self._sequence_counters[workflow_id]
 
-        # Create savepoint
-        savepoint = WorkflowSavepoint(
-            savepoint_id=str(uuid.uuid4()),
-            workflow_id=workflow_id,
-            phase=context.current_phase,
-            agent_id=context.current_agent,
-            savepoint_type=savepoint_type,
-            workflow_state=deepcopy(context.state),
-            agent_state=agent_state or {},
-            artifacts=deepcopy(context.artifacts),
-            description=description,
-            sequence_number=sequence,
-            checksum=self._calculate_checksum(context.state)
-        )
+            # Create savepoint
+            savepoint = WorkflowSavepoint(
+                savepoint_id=str(uuid.uuid4()),
+                workflow_id=workflow_id,
+                phase=context.current_phase,
+                agent_id=context.current_agent,
+                savepoint_type=savepoint_type,
+                workflow_state=deepcopy(context.state),
+                agent_state=agent_state or {},
+                artifacts=deepcopy(context.artifacts),
+                description=description,
+                sequence_number=sequence,
+                checksum=self._calculate_checksum(context.state)
+            )
 
-        # Store in database
-        try:
-            self.supabase.table("workflow_savepoints").insert(
-                savepoint.to_dict()
-            ).execute()
-        except Exception as e:
-            logger.error(f"Failed to store savepoint: {e}")
-            return None
+            # Store in database
+            try:
+                self.supabase.table("workflow_savepoints").insert(
+                    savepoint.to_dict()
+                ).execute()
+            except Exception as e:
+                logger.error(f"Failed to store savepoint: {e}")
+                return None
 
-        # Update context
-        context.savepoints.append(savepoint.savepoint_id)
-        context.last_savepoint_at = datetime.utcnow()
+            # Update context
+            context.savepoints.append(savepoint.savepoint_id)
+            context.last_savepoint_at = datetime.utcnow()
 
         logger.info(
             "Savepoint created",
@@ -390,16 +393,17 @@ class WorkflowStateManager:
             logger.error("Savepoint validation failed", savepoint_id=savepoint_id)
             return None
 
-        # Get or create context
-        context = self._contexts.get(workflow_id)
-        if not context:
-            context = WorkflowContext(
-                workflow_id=workflow_id,
-                job_id=0,  # Will be restored from state
-                current_phase=savepoint.phase,
-                current_agent=savepoint.agent_id
-            )
-            self._contexts[workflow_id] = context
+        async with self._lock:
+            # Get or create context
+            context = self._contexts.get(workflow_id)
+            if not context:
+                context = WorkflowContext(
+                    workflow_id=workflow_id,
+                    job_id=0,  # Will be restored from state
+                    current_phase=savepoint.phase,
+                    current_agent=savepoint.agent_id
+                )
+                self._contexts[workflow_id] = context
 
         # Create recovery savepoint before rollback
         await self.create_savepoint(
@@ -408,18 +412,19 @@ class WorkflowStateManager:
             description=f"Pre-rollback state (rolling back to {savepoint_id})"
         )
 
-        # Restore state
-        context.current_phase = savepoint.phase
-        context.current_agent = savepoint.agent_id
-        context.state = deepcopy(savepoint.workflow_state)
-        context.artifacts = deepcopy(savepoint.artifacts)
-        context.rollback_count += 1
+        async with self._lock:
+            # Restore state
+            context.current_phase = savepoint.phase
+            context.current_agent = savepoint.agent_id
+            context.state = deepcopy(savepoint.workflow_state)
+            context.artifacts = deepcopy(savepoint.artifacts)
+            context.rollback_count += 1
 
-        # Invalidate savepoints after the target
-        await self._invalidate_savepoints_after(workflow_id, savepoint.sequence_number)
+            # Invalidate savepoints after the target
+            await self._invalidate_savepoints_after(workflow_id, savepoint.sequence_number)
 
-        # Reset sequence counter
-        self._sequence_counters[workflow_id] = savepoint.sequence_number
+            # Reset sequence counter
+            self._sequence_counters[workflow_id] = savepoint.sequence_number
 
         logger.info(
             "Workflow rolled back",

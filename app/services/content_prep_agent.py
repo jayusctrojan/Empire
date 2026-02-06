@@ -619,7 +619,7 @@ class ContentPrepAgent:
                             filename=filename,
                             sequence_number=idx + 1,  # Use LLM-determined order
                             detection_pattern="llm",
-                            file_type=file_meta.get("file_type", ""),
+                            file_type=filename.rsplit(".", 1)[-1] if "." in filename else "",
                             size_bytes=file_meta.get("size", 0),
                             metadata={"llm_detected": True}
                         ))
