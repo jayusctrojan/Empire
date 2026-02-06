@@ -47,8 +47,7 @@ MESSAGES_RECEIVED = Counter(
 
 ACTIVE_SUBSCRIPTIONS = Gauge(
     'empire_agent_subscriptions',
-    'Number of active agent subscriptions',
-    []
+    'Number of active agent subscriptions'
 )
 
 
@@ -330,7 +329,7 @@ class AgentMessageBus:
 
         self._subscriptions[agent_id].append(subscription)
 
-        ACTIVE_SUBSCRIPTIONS.labels().set(
+        ACTIVE_SUBSCRIPTIONS.set(
             sum(len(subs) for subs in self._subscriptions.values())
         )
 
@@ -359,7 +358,7 @@ class AgentMessageBus:
             # Remove all subscriptions
             del self._subscriptions[agent_id]
 
-        ACTIVE_SUBSCRIPTIONS.labels().set(
+        ACTIVE_SUBSCRIPTIONS.set(
             sum(len(subs) for subs in self._subscriptions.values())
         )
 
