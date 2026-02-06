@@ -140,6 +140,18 @@ class CostTrackingService:
     # Pricing configurations (USD)
     PRICING = {
         ServiceProvider.ANTHROPIC: {
+            "claude-sonnet-4-5-20250929": {
+                "input": 0.000003,  # $3 per 1M tokens (≤200K)
+                "input_above_200k": 0.000006,  # $6 per 1M tokens (>200K)
+                "output": 0.000015,  # $15 per 1M tokens (≤200K)
+                "output_above_200k": 0.0000225,  # $22.50 per 1M tokens (>200K)
+                "tier_threshold": 200_000,  # Token threshold for tiered pricing
+            },
+            "claude-haiku-4-5-20251001": {
+                "input": 0.000001,  # $1 per 1M tokens
+                "output": 0.000005,  # $5 per 1M tokens
+            },
+            # Legacy model IDs (kept for historical cost lookups)
             "claude-3-5-sonnet-20241022": {
                 "input": 0.000003,  # $3 per 1M tokens
                 "output": 0.000015,  # $15 per 1M tokens
@@ -300,14 +312,23 @@ class CostTrackingService:
             CostEntry if successful
         """
         try:
-            # Get pricing for model
+            # Get pricing for model (requires fully-qualified model IDs matching PRICING keys,
+            # e.g. "claude-sonnet-4-5-20250929" not aliases like "claude-sonnet-4-5")
             if service not in self.PRICING or model not in self.PRICING[service]:
                 logger.warning(f"No pricing configured for {service.value}/{model}")
                 return None
 
             pricing = self.PRICING[service][model]
-            input_cost = (input_tokens / 1_000_000) * pricing.get("input", 0)
-            output_cost = (output_tokens / 1_000_000) * pricing.get("output", 0)
+            tier_threshold = pricing.get("tier_threshold")
+
+            # Volume pricing: when input exceeds threshold, all tokens use higher rate
+            if tier_threshold and input_tokens > tier_threshold:
+                input_cost = (input_tokens / 1_000_000) * pricing.get("input_above_200k", pricing.get("input", 0))
+                output_cost = (output_tokens / 1_000_000) * pricing.get("output_above_200k", pricing.get("output", 0))
+            else:
+                input_cost = (input_tokens / 1_000_000) * pricing.get("input", 0)
+                output_cost = (output_tokens / 1_000_000) * pricing.get("output", 0)
+
             total_cost = input_cost + output_cost
 
             return await self.record_cost(

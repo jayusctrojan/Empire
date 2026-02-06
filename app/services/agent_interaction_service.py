@@ -227,7 +227,10 @@ class AgentInteractionService:
                 .single() \
                 .execute()
 
-            total_agents = len(crew_response.data["agent_ids"]) if crew_response.data and crew_response.data.get("agent_ids") else 0
+            if not crew_response.data:
+                raise ValueError(f"Crew {crew_id} not found")
+            agent_ids = crew_response.data.get("agent_ids") or []
+            total_agents = len(agent_ids)
 
             # Create broadcast interaction
             broadcast_response = self.supabase.table("crewai_agent_interactions").insert({
@@ -965,34 +968,44 @@ class AgentInteractionService:
                 .single() \
                 .execute()
 
-            if crew_response.data and crew_response.data.get("agent_ids"):
-                agent_ids = crew_response.data["agent_ids"]
+            if not crew_response.data or not crew_response.data.get("agent_ids"):
+                raise ValueError(f"No agents found for crew {crew_id} during escalation")
+            agent_ids = crew_response.data["agent_ids"]
 
-                # For now, escalate to all agents in the crew
-                # In production, you'd have a designated supervisor agent
-                for agent_id in agent_ids:
-                    # Send escalation event
-                    self.supabase.table("crewai_agent_interactions").insert({
-                        "execution_id": execution_id,
-                        "from_agent_id": conflict["from_agent_id"],
-                        "to_agent_id": agent_id,
-                        "interaction_type": "event",
-                        "event_type": "agent_error",
-                        "message": f"Conflict escalated: {conflict.get('conflict_type', 'unknown')}",
-                        "event_data": {
-                            "conflict_id": str(conflict_id),
-                            "conflict_type": conflict.get("conflict_type"),
-                            "requires_manual_intervention": True
-                        },
-                        "priority": 10,  # Highest priority
-                        "metadata": {"escalated_conflict_id": str(conflict_id)}
-                    }).execute()
+            # For now, escalate to all agents in the crew
+            # In production, you'd have a designated supervisor agent
+            # Batch insert all escalation events
+            escalation_records = [
+                {
+                    "execution_id": execution_id,
+                    "from_agent_id": conflict["from_agent_id"],
+                    "to_agent_id": agent_id,
+                    "interaction_type": "event",
+                    "event_type": "agent_error",
+                    "message": f"Conflict escalated: {conflict.get('conflict_type', 'unknown')}",
+                    "event_data": {
+                        "conflict_id": str(conflict_id),
+                        "conflict_type": conflict.get("conflict_type"),
+                        "requires_manual_intervention": True
+                    },
+                    "priority": 10,  # Highest priority
+                    "metadata": {"escalated_conflict_id": str(conflict_id)}
+                }
+                for agent_id in agent_ids
+            ]
+            insert_response = self.supabase.table("crewai_agent_interactions").insert(escalation_records).execute()
+            if not insert_response.data:
+                raise ValueError(f"Failed to insert escalation records for conflict {conflict_id}")
 
-                logger.info(
-                    "Conflict escalated",
-                    conflict_id=str(conflict_id),
-                    notified_agents=len(agent_ids)
-                )
+            # Publish escalation events to Redis for WebSocket streaming
+            for record in insert_response.data:
+                self._publish_interaction(UUID(execution_id) if isinstance(execution_id, str) else execution_id, record)
+
+            logger.info(
+                "Conflict escalated",
+                conflict_id=str(conflict_id),
+                notified_agents=len(agent_ids)
+            )
 
         except Exception as e:
             logger.error("Failed to escalate conflict", error=str(e), exc_info=True)
