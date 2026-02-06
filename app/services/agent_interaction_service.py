@@ -993,7 +993,9 @@ class AgentInteractionService:
                 }
                 for agent_id in agent_ids
             ]
-            self.supabase.table("crewai_agent_interactions").insert(escalation_records).execute()
+            insert_response = self.supabase.table("crewai_agent_interactions").insert(escalation_records).execute()
+            if not insert_response.data:
+                raise ValueError(f"Failed to insert escalation records for conflict {conflict_id}")
 
             logger.info(
                 "Conflict escalated",

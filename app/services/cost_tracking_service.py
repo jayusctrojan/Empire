@@ -312,7 +312,8 @@ class CostTrackingService:
             CostEntry if successful
         """
         try:
-            # Get pricing for model
+            # Get pricing for model (requires fully-qualified model IDs matching PRICING keys,
+            # e.g. "claude-sonnet-4-5-20250929" not aliases like "claude-sonnet-4-5")
             if service not in self.PRICING or model not in self.PRICING[service]:
                 logger.warning(f"No pricing configured for {service.value}/{model}")
                 return None
