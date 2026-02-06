@@ -284,8 +284,12 @@ class WorkflowStateManager:
                 logger.warning("Cannot create savepoint: workflow not found", workflow_id=workflow_id)
                 return None
 
+            # Capture previous state for rollback on DB failure
+            previous_sequence = self._sequence_counters.get(workflow_id, 0)
+            previous_last_savepoint_at = context.last_savepoint_at
+
             # Increment sequence
-            self._sequence_counters[workflow_id] = self._sequence_counters.get(workflow_id, 0) + 1
+            self._sequence_counters[workflow_id] = previous_sequence + 1
             sequence = self._sequence_counters[workflow_id]
 
             # Create savepoint from current state snapshot
@@ -316,6 +320,12 @@ class WorkflowStateManager:
             )
         except Exception:
             logger.exception("Failed to store savepoint", workflow_id=workflow_id)
+            # Rollback in-memory state on DB failure
+            async with self._lock:
+                if savepoint.savepoint_id in context.savepoints:
+                    context.savepoints.remove(savepoint.savepoint_id)
+                context.last_savepoint_at = previous_last_savepoint_at
+                self._sequence_counters[workflow_id] = previous_sequence
             return None
 
         logger.info(
@@ -457,11 +467,13 @@ class WorkflowStateManager:
             Restored context or None if no savepoint found
         """
         # Find the last savepoint for the phase
-        result = self.supabase.table("workflow_savepoints").select("*").eq(
-            "workflow_id", workflow_id
-        ).eq("phase", phase.value).eq("is_valid", True).order(
-            "sequence_number", desc=True
-        ).limit(1).execute()
+        result = await asyncio.to_thread(
+            lambda: self.supabase.table("workflow_savepoints").select("*").eq(
+                "workflow_id", workflow_id
+            ).eq("phase", phase.value).eq("is_valid", True).order(
+                "sequence_number", desc=True
+            ).limit(1).execute()
+        )
 
         if not result.data:
             logger.warning(
@@ -489,13 +501,15 @@ class WorkflowStateManager:
         Returns:
             Restored context
         """
-        result = self.supabase.table("workflow_savepoints").select("*").eq(
-            "workflow_id", workflow_id
-        ).eq("agent_id", agent_id).eq(
-            "savepoint_type", SavepointType.PRE_AGENT.value
-        ).eq("is_valid", True).order(
-            "sequence_number", desc=True
-        ).limit(1).execute()
+        result = await asyncio.to_thread(
+            lambda: self.supabase.table("workflow_savepoints").select("*").eq(
+                "workflow_id", workflow_id
+            ).eq("agent_id", agent_id).eq(
+                "savepoint_type", SavepointType.PRE_AGENT.value
+            ).eq("is_valid", True).order(
+                "sequence_number", desc=True
+            ).limit(1).execute()
+        )
 
         if not result.data:
             return None
@@ -541,22 +555,25 @@ class WorkflowStateManager:
         Returns:
             List of savepoints
         """
-        query = self.supabase.table("workflow_savepoints").select("*").eq(
-            "workflow_id", workflow_id
-        )
+        def _query():
+            query = self.supabase.table("workflow_savepoints").select("*").eq(
+                "workflow_id", workflow_id
+            )
+            if valid_only:
+                query = query.eq("is_valid", True)
+            return query.order("sequence_number").execute()
 
-        if valid_only:
-            query = query.eq("is_valid", True)
-
-        result = query.order("sequence_number").execute()
+        result = await asyncio.to_thread(_query)
 
         return [WorkflowSavepoint.from_dict(row) for row in (result.data or [])]
 
     async def get_savepoint(self, savepoint_id: str) -> Optional[WorkflowSavepoint]:
         """Get a specific savepoint by ID"""
-        result = self.supabase.table("workflow_savepoints").select("*").eq(
-            "savepoint_id", savepoint_id
-        ).single().execute()
+        result = await asyncio.to_thread(
+            lambda: self.supabase.table("workflow_savepoints").select("*").eq(
+                "savepoint_id", savepoint_id
+            ).single().execute()
+        )
 
         if result.data:
             return WorkflowSavepoint.from_dict(result.data)
@@ -567,11 +584,13 @@ class WorkflowStateManager:
         workflow_id: str
     ) -> Optional[WorkflowSavepoint]:
         """Get the most recent valid savepoint"""
-        result = self.supabase.table("workflow_savepoints").select("*").eq(
-            "workflow_id", workflow_id
-        ).eq("is_valid", True).order(
-            "sequence_number", desc=True
-        ).limit(1).execute()
+        result = await asyncio.to_thread(
+            lambda: self.supabase.table("workflow_savepoints").select("*").eq(
+                "workflow_id", workflow_id
+            ).eq("is_valid", True).order(
+                "sequence_number", desc=True
+            ).limit(1).execute()
+        )
 
         if result.data:
             return WorkflowSavepoint.from_dict(result.data[0])
@@ -597,19 +616,23 @@ class WorkflowStateManager:
             Number of savepoints removed
         """
         # Get savepoints to keep
-        result = self.supabase.table("workflow_savepoints").select(
-            "savepoint_id"
-        ).eq("workflow_id", workflow_id).order(
-            "sequence_number", desc=True
-        ).limit(keep_count).execute()
+        result = await asyncio.to_thread(
+            lambda: self.supabase.table("workflow_savepoints").select(
+                "savepoint_id"
+            ).eq("workflow_id", workflow_id).order(
+                "sequence_number", desc=True
+            ).limit(keep_count).execute()
+        )
 
         keep_ids = [row["savepoint_id"] for row in (result.data or [])]
 
         # Delete older ones
         if keep_ids:
-            delete_result = self.supabase.table("workflow_savepoints").delete().eq(
-                "workflow_id", workflow_id
-            ).not_.in_("savepoint_id", keep_ids).execute()
+            delete_result = await asyncio.to_thread(
+                lambda: self.supabase.table("workflow_savepoints").delete().eq(
+                    "workflow_id", workflow_id
+                ).not_.in_("savepoint_id", keep_ids).execute()
+            )
 
             deleted = len(delete_result.data or [])
 
@@ -639,9 +662,11 @@ class WorkflowStateManager:
         """
         cutoff = (datetime.utcnow() - timedelta(hours=max_age_hours)).isoformat()
 
-        result = self.supabase.table("workflow_savepoints").delete().lt(
-            "created_at", cutoff
-        ).execute()
+        result = await asyncio.to_thread(
+            lambda: self.supabase.table("workflow_savepoints").delete().lt(
+                "created_at", cutoff
+            ).execute()
+        )
 
         deleted = len(result.data or [])
 
@@ -656,9 +681,11 @@ class WorkflowStateManager:
 
     async def delete_workflow_savepoints(self, workflow_id: str) -> int:
         """Delete all savepoints for a workflow"""
-        result = self.supabase.table("workflow_savepoints").delete().eq(
-            "workflow_id", workflow_id
-        ).execute()
+        result = await asyncio.to_thread(
+            lambda: self.supabase.table("workflow_savepoints").delete().eq(
+                "workflow_id", workflow_id
+            ).execute()
+        )
 
         deleted = len(result.data or [])
         logger.info("Deleted workflow savepoints", workflow_id=workflow_id, count=deleted)
