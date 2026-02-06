@@ -229,7 +229,8 @@ class AgentInteractionService:
 
             if not crew_response.data:
                 raise ValueError(f"Crew {crew_id} not found")
-            total_agents = len(crew_response.data.get("agent_ids", []))
+            agent_ids = crew_response.data.get("agent_ids") or []
+            total_agents = len(agent_ids)
 
             # Create broadcast interaction
             broadcast_response = self.supabase.table("crewai_agent_interactions").insert({

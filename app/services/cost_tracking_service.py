@@ -320,18 +320,12 @@ class CostTrackingService:
             pricing = self.PRICING[service][model]
             tier_threshold = pricing.get("tier_threshold")
 
+            # Volume pricing: when input exceeds threshold, all tokens use higher rate
             if tier_threshold and input_tokens > tier_threshold:
-                # Tiered pricing: base rate for first N tokens, higher rate for rest
-                base_input = (tier_threshold / 1_000_000) * pricing.get("input", 0)
-                overage_input = ((input_tokens - tier_threshold) / 1_000_000) * pricing.get("input_above_200k", pricing.get("input", 0))
-                input_cost = base_input + overage_input
-            else:
-                input_cost = (input_tokens / 1_000_000) * pricing.get("input", 0)
-
-            if tier_threshold and input_tokens > tier_threshold:
-                # Output tiered pricing also applies when input exceeds threshold
+                input_cost = (input_tokens / 1_000_000) * pricing.get("input_above_200k", pricing.get("input", 0))
                 output_cost = (output_tokens / 1_000_000) * pricing.get("output_above_200k", pricing.get("output", 0))
             else:
+                input_cost = (input_tokens / 1_000_000) * pricing.get("input", 0)
                 output_cost = (output_tokens / 1_000_000) * pricing.get("output", 0)
 
             total_cost = input_cost + output_cost
