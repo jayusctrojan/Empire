@@ -53,6 +53,31 @@ END $$;
 -- RPC FUNCTIONS
 -- =============================================================================
 
+-- Drop any existing overloads to avoid "function name is not unique" errors
+-- when CREATE OR REPLACE encounters a different parameter signature.
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN
+        SELECT oid::regprocedure::text AS sig
+        FROM pg_proc
+        WHERE proname = 'get_cached_routing'
+          AND pronamespace = 'public'::regnamespace
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig || ' CASCADE';
+    END LOOP;
+
+    FOR r IN
+        SELECT oid::regprocedure::text AS sig
+        FROM pg_proc
+        WHERE proname = 'increment_cache_hit'
+          AND pronamespace = 'public'::regnamespace
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || r.sig || ' CASCADE';
+    END LOOP;
+END $$;
+
 -- Function to increment cache hit count
 -- Uses SET search_path to prevent search-path hijacking in SECURITY DEFINER
 CREATE OR REPLACE FUNCTION increment_cache_hit(p_cache_id UUID)
