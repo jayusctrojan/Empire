@@ -408,8 +408,8 @@ class ResourceMonitor:
         memory_needed = requirements.estimated_memory_mb
 
         # Check thresholds
-        projected_cpu = usage.cpu_percent + cpu_needed
-        projected_memory = usage.memory_percent + (memory_needed / usage.memory_available_mb * 100)
+        projected_cpu = usage.cpu_percent + reserved_cpu + cpu_needed
+        projected_memory = usage.memory_percent + ((memory_needed + reserved_memory) / max(usage.memory_available_mb, 1) * 100)
 
         # Critical pressure - don't schedule
         if usage.overall_pressure == ResourcePressure.CRITICAL:

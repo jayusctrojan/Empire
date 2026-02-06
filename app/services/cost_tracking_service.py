@@ -726,8 +726,9 @@ class CostTrackingService:
                             ]
                         }]
                     }
-                    async with httpx.AsyncClient() as client:
-                        await client.post(slack_webhook_url, json=slack_payload)
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        resp = await client.post(slack_webhook_url, json=slack_payload)
+                        resp.raise_for_status()
                     logger.info("Budget alert Slack notification sent")
             except Exception as e:
                 logger.error(f"Failed to send budget alert Slack notification: {e}")

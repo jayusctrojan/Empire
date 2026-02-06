@@ -16,6 +16,7 @@ Date: 2025-01-24
 """
 
 import asyncio
+import base64
 import json
 import time
 from datetime import datetime
@@ -96,7 +97,9 @@ class StreamChunk:
         Handles multiline payloads by emitting one 'data:' line per line of content,
         as per the SSE specification.
         """
-        if isinstance(self.data, dict):
+        if isinstance(self.data, (bytes, bytearray)):
+            data_str = base64.b64encode(self.data).decode("ascii")
+        elif isinstance(self.data, dict):
             data_str = json.dumps(self.data)
         else:
             data_str = str(self.data)
@@ -119,13 +122,21 @@ class StreamChunk:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
-        return {
-            "data": self.data,
+        data = self.data
+        encoding = None
+        if isinstance(self.data, (bytes, bytearray)):
+            data = base64.b64encode(self.data).decode("ascii")
+            encoding = "base64"
+        result = {
+            "data": data,
             "sequence": self.sequence,
             "timestamp": self.timestamp.isoformat(),
             "is_final": self.is_final,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
+        if encoding:
+            result["data_encoding"] = encoding
+        return result
 
 
 @dataclass

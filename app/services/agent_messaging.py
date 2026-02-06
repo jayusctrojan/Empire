@@ -36,19 +36,18 @@ logger = structlog.get_logger(__name__)
 MESSAGES_SENT = Counter(
     'empire_agent_messages_sent_total',
     'Total messages sent between agents',
-    ['from_agent', 'to_agent', 'message_type']
+    ['message_type']
 )
 
 MESSAGES_RECEIVED = Counter(
     'empire_agent_messages_received_total',
     'Total messages received by agents',
-    ['agent_id', 'message_type']
+    ['message_type']
 )
 
 ACTIVE_SUBSCRIPTIONS = Gauge(
     'empire_agent_subscriptions',
-    'Number of active agent subscriptions',
-    ['agent_id']
+    'Number of active agent subscriptions'
 )
 
 
@@ -290,7 +289,6 @@ class AgentMessageBus:
                 try:
                     await subscription.callback(message)
                     MESSAGES_RECEIVED.labels(
-                        agent_id=agent_id,
                         message_type=message.message_type.value
                     ).inc()
                 except Exception as e:
@@ -331,8 +329,8 @@ class AgentMessageBus:
 
         self._subscriptions[agent_id].append(subscription)
 
-        ACTIVE_SUBSCRIPTIONS.labels(agent_id=agent_id).set(
-            len(self._subscriptions[agent_id])
+        ACTIVE_SUBSCRIPTIONS.set(
+            sum(len(subs) for subs in self._subscriptions.values())
         )
 
         logger.debug("Agent subscribed", agent_id=agent_id)
@@ -360,12 +358,9 @@ class AgentMessageBus:
             # Remove all subscriptions
             del self._subscriptions[agent_id]
 
-        if agent_id in self._subscriptions:
-            ACTIVE_SUBSCRIPTIONS.labels(agent_id=agent_id).set(
-                len(self._subscriptions[agent_id])
-            )
-        else:
-            ACTIVE_SUBSCRIPTIONS.labels(agent_id=agent_id).set(0)
+        ACTIVE_SUBSCRIPTIONS.set(
+            sum(len(subs) for subs in self._subscriptions.values())
+        )
 
         logger.debug("Agent unsubscribed", agent_id=agent_id)
 
@@ -412,8 +407,6 @@ class AgentMessageBus:
         await self._publish_message(message)
 
         MESSAGES_SENT.labels(
-            from_agent=from_agent,
-            to_agent=to_agent,
             message_type=message_type.value
         ).inc()
 
