@@ -997,6 +997,10 @@ class AgentInteractionService:
             if not insert_response.data:
                 raise ValueError(f"Failed to insert escalation records for conflict {conflict_id}")
 
+            # Publish escalation events to Redis for WebSocket streaming
+            for record in insert_response.data:
+                self._publish_interaction(UUID(execution_id) if isinstance(execution_id, str) else execution_id, record)
+
             logger.info(
                 "Conflict escalated",
                 conflict_id=str(conflict_id),
