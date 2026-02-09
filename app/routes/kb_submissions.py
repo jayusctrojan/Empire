@@ -6,7 +6,7 @@ Agents submit content via POST, CKO reviews via GET/PATCH.
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 
 from app.services.kb_submission_service import get_kb_submission_service
@@ -24,7 +24,9 @@ async def verify_internal_api_key(
     """Validate requests come from authorized internal services (gateway/agents)."""
     import os
     expected = os.getenv("EMPIRE_INTERNAL_API_KEY")
-    if expected and x_api_key != expected:
+    if not expected:
+        raise HTTPException(status_code=500, detail="API key not configured")
+    if x_api_key != expected:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -76,7 +78,7 @@ async def submit_content(req: SubmitRequest):
 async def list_submissions(
     status: Optional[str] = None,
     agent_id: Optional[str] = None,
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     """List submissions. CKO uses this to poll for pending items."""
     service = get_kb_submission_service()

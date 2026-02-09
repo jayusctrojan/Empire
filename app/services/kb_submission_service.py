@@ -196,18 +196,16 @@ class KBSubmissionService:
 
     async def _check_duplicate_url(self, url: str) -> bool:
         """Check if the same URL was submitted within the last 24 hours."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        cutoff_dt = datetime.now(timezone.utc) - timedelta(hours=24)
 
         rows = await self.supabase.select(
             "kb_submissions",
-            columns="id",
+            columns="id,submitted_at",
             filters={"content_url": url},
             limit=1,
         )
-        # Filter by submitted_at >= cutoff in application code since
-        # the resilience wrapper's select doesn't support gte filters.
         return any(
-            row.get("submitted_at", "") >= cutoff
+            (_parse_dt(row.get("submitted_at")) or datetime.min.replace(tzinfo=timezone.utc)) >= cutoff_dt
             for row in rows
         ) if rows else False
 
