@@ -61,7 +61,7 @@ BEGIN
   END IF;
 END $$;
 
--- RLS: service_role gets full access, authenticated users can see own submissions
+-- RLS: service_role gets full access (all client access goes through the API layer)
 ALTER TABLE kb_submissions ENABLE ROW LEVEL SECURITY;
 
 DO $$

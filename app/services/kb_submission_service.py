@@ -5,7 +5,6 @@ Manages the submission pipeline for agent content submissions to the knowledge b
 CKO reviews and processes submissions with full audit trail and duplicate detection.
 """
 
-import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
@@ -115,16 +114,12 @@ class KBSubmissionService:
             "updated_at": now.isoformat(),
         }
 
-        result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("kb_submissions")
-                .insert(insert_data)
-                .execute()
-        )
+        rows = await self.supabase.insert("kb_submissions", insert_data)
 
-        if not result.data:
+        if not rows:
             raise Exception("Failed to create submission")
 
-        submission = _row_to_submission(result.data[0])
+        submission = _row_to_submission(rows[0])
         logger.info("kb_submission_created",
                      submission_id=submission.id,
                      agent_id=agent_id,
@@ -138,28 +133,29 @@ class KBSubmissionService:
         limit: int = 20,
     ) -> List[KBSubmission]:
         """List submissions, optionally filtered by status or agent."""
-        def _query():
-            q = self.supabase.supabase.table("kb_submissions").select("*")
-            if status:
-                q = q.eq("status", status)
-            if agent_id:
-                q = q.eq("agent_id", agent_id)
-            return q.order("submitted_at", desc=True).limit(limit).execute()
+        filters = {}
+        if status:
+            filters["status"] = status
+        if agent_id:
+            filters["agent_id"] = agent_id
 
-        result = await asyncio.to_thread(_query)
-        return [_row_to_submission(row) for row in (result.data or [])]
+        rows = await self.supabase.select(
+            "kb_submissions",
+            filters=filters,
+            order="submitted_at",
+            limit=limit,
+        )
+        return [_row_to_submission(row) for row in rows]
 
     async def get_submission(self, submission_id: str) -> Optional[KBSubmission]:
         """Get a single submission by ID."""
-        result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("kb_submissions")
-                .select("*")
-                .eq("id", submission_id)
-                .limit(1)
-                .execute()
+        rows = await self.supabase.select(
+            "kb_submissions",
+            filters={"id": submission_id},
+            limit=1,
         )
-        if result.data:
-            return _row_to_submission(result.data[0])
+        if rows:
+            return _row_to_submission(rows[0])
         return None
 
     async def process_submission(
@@ -183,17 +179,16 @@ class KBSubmissionService:
             "updated_at": now.isoformat(),
         }
 
-        result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("kb_submissions")
-                .update(update_data)
-                .eq("id", submission_id)
-                .execute()
+        rows = await self.supabase.update(
+            "kb_submissions",
+            update_data,
+            filters={"id": submission_id},
         )
 
-        if not result.data:
+        if not rows:
             return None
 
-        submission = _row_to_submission(result.data[0])
+        submission = _row_to_submission(rows[0])
         logger.info("kb_submission_processed",
                      submission_id=submission_id,
                      decision=decision)
@@ -203,15 +198,18 @@ class KBSubmissionService:
         """Check if the same URL was submitted within the last 24 hours."""
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
 
-        result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("kb_submissions")
-                .select("id")
-                .eq("content_url", url)
-                .gte("submitted_at", cutoff)
-                .limit(1)
-                .execute()
+        rows = await self.supabase.select(
+            "kb_submissions",
+            columns="id",
+            filters={"content_url": url},
+            limit=1,
         )
-        return bool(result.data)
+        # Filter by submitted_at >= cutoff in application code since
+        # the resilience wrapper's select doesn't support gte filters.
+        return any(
+            row.get("submitted_at", "") >= cutoff
+            for row in rows
+        ) if rows else False
 
 
 _service: Optional[KBSubmissionService] = None

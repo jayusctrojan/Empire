@@ -1212,11 +1212,13 @@ Answer with citations."""
                 # Generate title from first user message
                 title_update["title"] = user_message[:50] + ("..." if len(user_message) > 50 else "")
 
+        # Read current count first, then update (avoids nested query race condition)
+        current_count = session_result.data[0].get("message_count", 0) if session_result.data else 0
         await asyncio.to_thread(
             lambda: self.supabase.supabase.table("studio_cko_sessions")
                 .update({
                     **title_update,
-                    "message_count": self.supabase.supabase.table("studio_cko_sessions").select("message_count").eq("id", session_id).execute().data[0]["message_count"] + 2 if session_result.data else 2,
+                    "message_count": current_count + 2,
                     "last_message_at": now.isoformat(),
                     "updated_at": now.isoformat(),
                 })
