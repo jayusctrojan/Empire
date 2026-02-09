@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Copy, Check, RotateCcw, Trash2, ThumbsUp, ThumbsDown, Sparkles, Info } from 'lucide-react'
+import { Copy, Check, RotateCcw, Trash2, ThumbsUp, ThumbsDown, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Message, Source } from '@/types'
 import { CitationPopover } from './CitationPopover'
@@ -13,7 +13,6 @@ interface MessageBubbleProps {
   onRegenerate?: () => void
   onDelete?: () => void
   onRate?: (rating: -1 | 0 | 1, feedback?: string) => void
-  onImprove?: () => void
 }
 
 export function MessageBubble({
@@ -23,7 +22,6 @@ export function MessageBubble({
   onRegenerate,
   onDelete,
   onRate,
-  onImprove,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [showFeedbackInput, setShowFeedbackInput] = useState(false)
@@ -307,16 +305,6 @@ export function MessageBubble({
               </>
             )}
 
-            {/* Improve this button */}
-            {isKBMode && onImprove && (
-              <button
-                onClick={onImprove}
-                className="p-1.5 rounded-lg hover:bg-empire-accent/20 text-empire-text-muted hover:text-empire-accent transition-colors"
-                title="Improve this response in AI Studio"
-              >
-                <Sparkles className="w-4 h-4" />
-              </button>
-            )}
           </div>
         )}
       </div>

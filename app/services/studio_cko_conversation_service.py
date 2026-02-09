@@ -25,8 +25,7 @@ from typing import List, Optional, Dict, Any, AsyncIterator, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import structlog
-from anthropic import AsyncAnthropic
-
+from app.services.llm_client import get_llm_client
 from app.services.supabase_storage import get_supabase_storage
 from app.services.embedding_service import get_embedding_service
 from app.services.query_expansion_service import (
@@ -156,7 +155,7 @@ class CKOConfig:
     expansion_strategy: str = "balanced"
 
     # Claude settings
-    model: str = "claude-sonnet-4-5-20250929"
+    model: str = "moonshotai/Kimi-K2.5-Thinking"
     max_context_tokens: int = 8000
     response_max_tokens: int = 2000
     temperature: float = 0.3
@@ -207,10 +206,8 @@ class StudioCKOConversationService:
         self.supabase = get_supabase_storage()
         self.embedding_service = get_embedding_service()
 
-        # Initialize Claude client
-        self.anthropic_client = AsyncAnthropic(
-            api_key=os.getenv("ANTHROPIC_API_KEY")
-        )
+        # Initialize LLM client (Together AI / Kimi K2.5 Thinking by default)
+        self.llm_client = get_llm_client(provider="together")
 
         # Initialize query expansion service
         try:
@@ -1116,15 +1113,13 @@ If no sources are relevant, acknowledge this honestly."""
 
 Please answer based on the sources above. Include citations like [1], [2] when referencing sources."""
 
-        response = await self.anthropic_client.messages.create(
-            model=config.model,
+        answer = await self.llm_client.generate(
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
             max_tokens=config.response_max_tokens,
             temperature=config.temperature,
-            messages=[{"role": "user", "content": user_prompt}],
-            system=system_prompt
+            model=config.model,
         )
-
-        answer = response.content[0].text
 
         # Extract which sources were actually cited
         used_sources = self._extract_cited_sources(answer, source_map)
@@ -1163,15 +1158,14 @@ Cite sources using [1], [2], etc. format."""
 
 Answer with citations."""
 
-        async with self.anthropic_client.messages.stream(
-            model=config.model,
+        async for text in self.llm_client.stream(
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
             max_tokens=config.response_max_tokens,
             temperature=config.temperature,
-            messages=[{"role": "user", "content": user_prompt}],
-            system=system_prompt
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
+            model=config.model,
+        ):
+            yield text
 
     def _extract_cited_sources(
         self,

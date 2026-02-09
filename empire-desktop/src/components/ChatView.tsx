@@ -37,17 +37,6 @@ export function ChatView() {
     // TODO: Send rating to backend API for AI Studio feedback collection
   }, [rateMessage])
 
-  // Handle improve action - navigate to AI Studio with context
-  const handleImprove = useCallback((messageId: string) => {
-    window.dispatchEvent(new CustomEvent('navigate', {
-      detail: {
-        view: 'ai-studio',
-        tab: 'feedback',
-        context: { messageId, action: 'improve' }
-      }
-    }))
-  }, [])
-
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -234,16 +223,6 @@ export function ChatView() {
             </span>
           )}
         </div>
-        <button
-          className="text-sm text-empire-primary hover:text-empire-accent transition-colors flex items-center gap-1.5"
-          onClick={() => {
-            // Navigate to AI Studio - this would use the app's router
-            window.dispatchEvent(new CustomEvent('navigate', { detail: { view: 'ai-studio' } }))
-          }}
-        >
-          <span>🎨</span>
-          AI Studio
-        </button>
       </div>
 
       {/* Error banner */}
@@ -280,11 +259,6 @@ export function ChatView() {
                 onRate={
                   message.role === 'assistant'
                     ? (rating, feedback) => handleRateMessage(message.id, rating, feedback)
-                    : undefined
-                }
-                onImprove={
-                  message.role === 'assistant'
-                    ? () => handleImprove(message.id)
                     : undefined
                 }
               />

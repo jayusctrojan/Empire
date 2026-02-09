@@ -3,7 +3,6 @@ import { Sidebar } from '@/components/Sidebar'
 import { ChatView } from '@/components/ChatView'
 import { ProjectsView } from '@/components/ProjectsView'
 import { FileUploadsView } from '@/components/FileUploadsView'
-import { AIStudioView } from '@/components/AIStudioView'
 import { SettingsView } from '@/components/SettingsView'
 import { QuickActions } from '@/components/QuickActions'
 import { AuthProvider, ProtectedRoute } from '@/components/auth'
@@ -95,7 +94,6 @@ function MainApp() {
         {activeView === 'chats' && <ChatView />}
         {activeView === 'projects' && <ProjectsView />}
         {activeView === 'uploads' && <FileUploadsView />}
-        {activeView === 'ai-studio' && <AIStudioView />}
         {activeView === 'settings' && <SettingsView />}
       </main>
 
