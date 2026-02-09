@@ -413,8 +413,8 @@ async def get_weights(
         logger.error("Failed to get weights", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get weights: {str(e)}"
-        )
+            detail="Failed to get weights"
+        ) from e
 
 
 @router.put("/weights", response_model=WeightsResponse)
@@ -441,8 +441,8 @@ async def set_department_weight(
         logger.error("Failed to set weight", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to set weight: {str(e)}"
-        )
+            detail="Failed to set weight"
+        ) from e
 
 
 @router.post("/weights/preset", response_model=WeightsResponse)
@@ -474,8 +474,8 @@ async def apply_weight_preset(
         logger.error("Failed to apply preset", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to apply preset: {str(e)}"
-        )
+            detail="Failed to apply preset"
+        ) from e
 
 
 # ============================================================================

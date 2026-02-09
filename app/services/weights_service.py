@@ -7,6 +7,7 @@ how KB search results are ranked (department weights, recency, source
 type preferences, confidence thresholds, etc.).
 """
 
+import asyncio
 import copy
 from typing import Optional, Dict, Any
 import structlog
@@ -93,11 +94,13 @@ class WeightsService:
             Dict with weight configuration
         """
         try:
-            result = self.supabase.client.table("studio_user_weights") \
-                .select("*") \
-                .eq("user_id", user_id) \
-                .limit(1) \
+            result = await asyncio.to_thread(
+                lambda: self.supabase.client.table("studio_user_weights")
+                .select("*")
+                .eq("user_id", user_id)
+                .limit(1)
                 .execute()
+            )
 
             if result.data:
                 row = result.data[0]
@@ -157,12 +160,14 @@ class WeightsService:
             }
 
             # Upsert
-            self.supabase.client.table("studio_user_weights") \
+            await asyncio.to_thread(
+                lambda: self.supabase.client.table("studio_user_weights")
                 .upsert({
                     "user_id": user_id,
                     "weights": weights_json,
-                }, on_conflict="user_id") \
+                }, on_conflict="user_id")
                 .execute()
+            )
 
             logger.info(
                 "Department weight updated",
@@ -207,16 +212,18 @@ class WeightsService:
 
         weights_json = {
             "preset": preset_name,
-            **WEIGHT_PRESETS[preset_name],
+            **copy.deepcopy(WEIGHT_PRESETS[preset_name]),
         }
 
         try:
-            self.supabase.client.table("studio_user_weights") \
+            await asyncio.to_thread(
+                lambda: self.supabase.client.table("studio_user_weights")
                 .upsert({
                     "user_id": user_id,
                     "weights": weights_json,
-                }, on_conflict="user_id") \
+                }, on_conflict="user_id")
                 .execute()
+            )
 
             logger.info(
                 "Preset applied",
@@ -229,8 +236,6 @@ class WeightsService:
                 **weights_json,
             }
 
-        except InvalidPresetError:
-            raise
         except Exception as e:
             logger.error(
                 "Failed to apply preset",

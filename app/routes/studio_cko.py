@@ -221,8 +221,8 @@ async def search_kb(
         logger.error("CKO search failed", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Search failed: {str(e)}"
-        )
+            detail="Search failed"
+        ) from e
 
 
 # ============================================================================
