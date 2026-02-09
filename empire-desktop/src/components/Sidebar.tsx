@@ -10,12 +10,10 @@ import {
   ChevronRight,
   Trash2,
   Upload,
-  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
-import { useAIStudioStore } from '@/stores/aistudio'
 import { UserMenu } from '@/components/auth'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { getConversations, deleteConversation } from '@/lib/database'
@@ -29,7 +27,6 @@ interface SidebarProps {
 export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
   const { sidebarOpen, toggleSidebar, activeView, setActiveView } = useAppStore()
   const { activeConversationId, setActiveConversation, setMessages } = useChatStore()
-  const { pendingClarificationsCount, hasOverdueClarifications } = useAIStudioStore()
 
   const [recentChats, setRecentChats] = useState<Conversation[]>([])
   const [isChatsExpanded, setIsChatsExpanded] = useState(true)
@@ -75,13 +72,6 @@ export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
     { id: 'chats' as const, icon: MessageSquare, label: 'Chats' },
     { id: 'projects' as const, icon: FolderOpen, label: 'Projects' },
     { id: 'uploads' as const, icon: Upload, label: 'File Uploads' },
-    {
-      id: 'ai-studio' as const,
-      icon: Sparkles,
-      label: 'AI Studio',
-      badge: pendingClarificationsCount > 0 ? pendingClarificationsCount : undefined,
-      badgeColor: hasOverdueClarifications ? 'red' : 'yellow'
-    },
     { id: 'settings' as const, icon: Settings, label: 'Settings' },
   ]
 
