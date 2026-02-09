@@ -21,7 +21,9 @@ from app.services.kb_submission_service import (
 @pytest.fixture
 def mock_supabase():
     mock = MagicMock()
-    mock.supabase = MagicMock()
+    mock.select = AsyncMock(return_value=[])
+    mock.insert = AsyncMock(return_value=[])
+    mock.update = AsyncMock(return_value=[])
     return mock
 
 
@@ -62,9 +64,8 @@ class TestCreateSubmission:
     @pytest.mark.asyncio
     async def test_create_url_submission(self, service, mock_supabase):
         row = _make_row()
-        mock_supabase.supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[row])
-        # No duplicate
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.gte.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+        mock_supabase.select = AsyncMock(return_value=[])  # no duplicate
+        mock_supabase.insert = AsyncMock(return_value=[row])
 
         result = await service.create_submission(
             agent_id="kevin",
@@ -79,7 +80,7 @@ class TestCreateSubmission:
     @pytest.mark.asyncio
     async def test_create_text_submission(self, service, mock_supabase):
         row = _make_row(submission_type="document", content_url=None, content_text="Some content")
-        mock_supabase.supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[row])
+        mock_supabase.insert = AsyncMock(return_value=[row])
 
         result = await service.create_submission(
             agent_id="dinesh",
@@ -109,9 +110,8 @@ class TestCreateSubmission:
     @pytest.mark.asyncio
     async def test_duplicate_url_raises(self, service, mock_supabase):
         # Simulate existing submission within 24h
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.gte.return_value.limit.return_value.execute.return_value = MagicMock(
-            data=[{"id": "existing-uuid"}]
-        )
+        recent = datetime.now(timezone.utc).isoformat()
+        mock_supabase.select = AsyncMock(return_value=[{"id": "existing-uuid", "submitted_at": recent}])
 
         with pytest.raises(ValueError, match="Duplicate submission"):
             await service.create_submission(
@@ -130,7 +130,7 @@ class TestListSubmissions:
     @pytest.mark.asyncio
     async def test_list_all(self, service, mock_supabase):
         rows = [_make_row(id=f"uuid-{i}") for i in range(3)]
-        mock_supabase.supabase.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(data=rows)
+        mock_supabase.select = AsyncMock(return_value=rows)
 
         results = await service.list_submissions()
         assert len(results) == 3
@@ -138,7 +138,7 @@ class TestListSubmissions:
     @pytest.mark.asyncio
     async def test_list_by_status(self, service, mock_supabase):
         rows = [_make_row(status="pending")]
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(data=rows)
+        mock_supabase.select = AsyncMock(return_value=rows)
 
         results = await service.list_submissions(status="pending")
         assert len(results) == 1
@@ -147,14 +147,14 @@ class TestListSubmissions:
     @pytest.mark.asyncio
     async def test_list_by_agent(self, service, mock_supabase):
         rows = [_make_row(agent_id="kevin")]
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(data=rows)
+        mock_supabase.select = AsyncMock(return_value=rows)
 
         results = await service.list_submissions(agent_id="kevin")
         assert len(results) == 1
 
     @pytest.mark.asyncio
     async def test_list_empty(self, service, mock_supabase):
-        mock_supabase.supabase.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+        mock_supabase.select = AsyncMock(return_value=[])
 
         results = await service.list_submissions()
         assert results == []
@@ -169,7 +169,7 @@ class TestGetSubmission:
     @pytest.mark.asyncio
     async def test_get_existing(self, service, mock_supabase):
         row = _make_row()
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(data=[row])
+        mock_supabase.select = AsyncMock(return_value=[row])
 
         result = await service.get_submission("test-uuid-123")
         assert result is not None
@@ -177,7 +177,7 @@ class TestGetSubmission:
 
     @pytest.mark.asyncio
     async def test_get_nonexistent(self, service, mock_supabase):
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(data=[])
+        mock_supabase.select = AsyncMock(return_value=[])
 
         result = await service.get_submission("nonexistent")
         assert result is None
@@ -192,7 +192,7 @@ class TestProcessSubmission:
     @pytest.mark.asyncio
     async def test_accept(self, service, mock_supabase):
         row = _make_row(status="accepted", cko_decision="accepted", cko_notes="Good content")
-        mock_supabase.supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[row])
+        mock_supabase.update = AsyncMock(return_value=[row])
 
         result = await service.process_submission("test-uuid-123", "accepted", "Good content")
         assert result.status == "accepted"
@@ -201,7 +201,7 @@ class TestProcessSubmission:
     @pytest.mark.asyncio
     async def test_reject(self, service, mock_supabase):
         row = _make_row(status="rejected", cko_decision="rejected", cko_notes="Duplicate")
-        mock_supabase.supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[row])
+        mock_supabase.update = AsyncMock(return_value=[row])
 
         result = await service.process_submission("test-uuid-123", "rejected", "Duplicate")
         assert result.status == "rejected"
@@ -210,7 +210,7 @@ class TestProcessSubmission:
     @pytest.mark.asyncio
     async def test_defer(self, service, mock_supabase):
         row = _make_row(status="pending", cko_decision="deferred", cko_notes="Need Jay's input")
-        mock_supabase.supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[row])
+        mock_supabase.update = AsyncMock(return_value=[row])
 
         result = await service.process_submission("test-uuid-123", "deferred", "Need Jay's input")
         assert result.cko_decision == "deferred"
@@ -222,7 +222,7 @@ class TestProcessSubmission:
 
     @pytest.mark.asyncio
     async def test_nonexistent_submission(self, service, mock_supabase):
-        mock_supabase.supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(data=[])
+        mock_supabase.update = AsyncMock(return_value=[])
 
         result = await service.process_submission("nonexistent", "accepted")
         assert result is None
