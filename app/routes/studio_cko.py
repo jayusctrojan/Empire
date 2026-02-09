@@ -166,6 +166,66 @@ def get_service() -> StudioCKOConversationService:
 
 
 # ============================================================================
+# Search Response Model
+# ============================================================================
+
+class SearchResponse(BaseModel):
+    """Response from KB search"""
+    sources: List[SourceResponse]
+    total: int
+    query: str
+
+
+# ============================================================================
+# Search Endpoint (must be before /{session_id} routes)
+# ============================================================================
+
+@router.get("/search", response_model=SearchResponse)
+async def search_kb(
+    query: str = Query(..., min_length=1, max_length=2000, description="Search query"),
+    limit: int = Query(10, ge=1, le=50, description="Max results to return"),
+    user_id: str = Depends(get_current_user),
+    service: StudioCKOConversationService = Depends(get_service)
+) -> SearchResponse:
+    """
+    Search the knowledge base directly without creating a session.
+
+    Returns ranked sources matching the query. Uses the same pipeline as
+    the CKO chat (query expansion, embeddings, vector search, dedup/rank)
+    but skips LLM response generation.
+    """
+    try:
+        logger.info("CKO KB search", user_id=user_id, query=query[:100])
+
+        sources = await service.search(query=query, limit=limit)
+
+        return SearchResponse(
+            sources=[
+                SourceResponse(
+                    docId=s.doc_id,
+                    title=s.title,
+                    snippet=s.snippet,
+                    relevanceScore=s.relevance_score,
+                    pageNumber=s.page_number,
+                    department=s.department,
+                    documentType=s.document_type,
+                    chunkIndex=s.chunk_index,
+                )
+                for s in sources
+            ],
+            total=len(sources),
+            query=query,
+        )
+
+    except Exception as e:
+        logger.error("CKO search failed", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}"
+        )
+
+
+# ============================================================================
 # Session Endpoints
 # ============================================================================
 
