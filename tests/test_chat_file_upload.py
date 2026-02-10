@@ -564,14 +564,14 @@ class TestVisionService:
         """Create VisionService with mocked Anthropic client"""
         with patch('app.services.vision_service.AsyncAnthropic'):
             service = VisionService(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-5-20250929",
                 cache_results=True
             )
             service.file_handler = file_handler
             return service
 
     def test_initialization(self, vision_service):
-        assert vision_service.model == "claude-3-5-sonnet-20241022"
+        assert vision_service.model == "claude-sonnet-4-5-20250929"
         assert vision_service.cache_results is True
 
     @pytest.mark.asyncio
