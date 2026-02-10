@@ -30,6 +30,12 @@ from app.services.feedback_service import (
     FeedbackType,
     get_feedback_service,
 )
+from app.services.weights_service import (
+    WeightsService,
+    InvalidPresetError,
+    WEIGHT_PRESETS,
+    get_weights_service,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -168,6 +174,28 @@ class FeedbackSummaryResponse(BaseModel):
     mostCommonType: Optional[str]
 
 
+class WeightsResponse(BaseModel):
+    """User weights configuration"""
+    userId: str
+    preset: str
+    departments: Dict[str, float]
+    recency: float
+    sourceTypes: Dict[str, float]
+    confidence: float
+    verified: float
+
+
+class SetDepartmentWeightRequest(BaseModel):
+    """Request to set a department weight"""
+    department: str = Field(..., min_length=1, max_length=100, description="Department name")
+    weight: float = Field(..., ge=0.0, le=5.0, description="Weight multiplier (0.0-5.0)")
+
+
+class ApplyPresetRequest(BaseModel):
+    """Request to apply a weight preset"""
+    name: str = Field(..., description="Preset name: balanced, finance-heavy, research-heavy")
+
+
 class HealthResponse(BaseModel):
     """Health check response"""
     status: str
@@ -181,6 +209,11 @@ class HealthResponse(BaseModel):
 def get_service() -> FeedbackService:
     """Dependency for feedback service"""
     return get_feedback_service()
+
+
+def get_wt_service() -> WeightsService:
+    """Dependency for weights service"""
+    return get_weights_service()
 
 
 # ============================================================================
@@ -343,6 +376,106 @@ async def get_feedback_summary(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get feedback summary: {str(e)}"
         )
+
+
+# ============================================================================
+# Weights Endpoints (must be before /{feedback_id} to avoid path conflict)
+# ============================================================================
+
+def _weights_to_response(data: Dict[str, Any]) -> WeightsResponse:
+    """Convert weights dict to response model."""
+    return WeightsResponse(
+        userId=data["user_id"],
+        preset=data.get("preset", "balanced"),
+        departments=data.get("departments", {}),
+        recency=data.get("recency", 1.0),
+        sourceTypes=data.get("source_types", {}),
+        confidence=data.get("confidence", 0.5),
+        verified=data.get("verified", 1.0),
+    )
+
+
+@router.get("/weights", response_model=WeightsResponse)
+async def get_weights(
+    user_id: str = Depends(get_current_user),
+    service: WeightsService = Depends(get_wt_service)
+) -> WeightsResponse:
+    """
+    Get the current search weight configuration for the user.
+
+    Weights influence how KB search results are ranked — department
+    emphasis, recency, source type preferences, etc.
+    """
+    try:
+        data = await service.get_weights(user_id)
+        return _weights_to_response(data)
+    except Exception as e:
+        logger.error("Failed to get weights", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get weights"
+        ) from e
+
+
+@router.put("/weights", response_model=WeightsResponse)
+async def set_department_weight(
+    request: SetDepartmentWeightRequest,
+    user_id: str = Depends(get_current_user),
+    service: WeightsService = Depends(get_wt_service)
+) -> WeightsResponse:
+    """
+    Set a department weight.
+
+    Adjusts how strongly results from a specific department are
+    ranked in search. A weight > 1.0 boosts the department, < 1.0
+    de-emphasizes it.
+    """
+    try:
+        data = await service.set_department_weight(
+            user_id=user_id,
+            department=request.department,
+            weight=request.weight,
+        )
+        return _weights_to_response(data)
+    except Exception as e:
+        logger.error("Failed to set weight", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to set weight"
+        ) from e
+
+
+@router.post("/weights/preset", response_model=WeightsResponse)
+async def apply_weight_preset(
+    request: ApplyPresetRequest,
+    user_id: str = Depends(get_current_user),
+    service: WeightsService = Depends(get_wt_service)
+) -> WeightsResponse:
+    """
+    Apply a named weight preset.
+
+    Available presets:
+    - **balanced**: Default equal weighting
+    - **finance-heavy**: Boost finance sources (1.5x), reduce research (0.8x)
+    - **research-heavy**: Boost research sources (1.5x), reduce finance (0.8x)
+    """
+    try:
+        data = await service.apply_preset(
+            user_id=user_id,
+            preset_name=request.name,
+        )
+        return _weights_to_response(data)
+    except InvalidPresetError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error("Failed to apply preset", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to apply preset"
+        ) from e
 
 
 # ============================================================================

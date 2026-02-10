@@ -522,11 +522,9 @@ class TestUtilities:
 class TestFactoryFunction:
     """Tests for factory function"""
 
-    def test_get_parallel_search_service_singleton(self, monkeypatch):
+    def test_get_parallel_search_service_singleton(self):
         """Test that factory returns singleton"""
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-123")
-
-        with patch('app.services.query_expansion_service.AsyncAnthropic'), \
+        with patch('app.services.query_expansion_service.get_llm_client'), \
              patch('app.services.parallel_search_service.get_query_expansion_service'), \
              patch('app.services.parallel_search_service.get_hybrid_search_service'):
             service1 = get_parallel_search_service()

@@ -1,14 +1,13 @@
 """
-Query Expansion Service using Claude Haiku
+Query Expansion Service using Kimi K2.5 Thinking (Together AI)
 
 Expands user queries into multiple variations to improve search recall.
-Uses Claude 3.5 Haiku for fast, cost-effective query generation.
+Uses Kimi K2.5 Thinking via Together AI for fast, cost-effective query generation.
 
 Features:
 - Multiple expansion strategies (synonyms, reformulations, specifics)
 - Configurable temperature and creativity
 - Retry logic with exponential backoff
-- Token usage tracking
 - Caching of expanded queries
 
 Usage:
@@ -22,19 +21,14 @@ Usage:
     )
 """
 
-import os
 import asyncio
 import logging
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
-import json
-
-from anthropic import Anthropic, AsyncAnthropic
-from anthropic.types import Message
-import anthropic
 
 from app.core.langfuse_config import observe
+from app.services.llm_client import get_llm_client, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +47,10 @@ class ExpansionStrategy(Enum):
 class QueryExpansionConfig:
     """Configuration for query expansion service"""
     # Model configuration
-    model: str = "claude-3-5-haiku-20241022"
+    model: str = "moonshotai/Kimi-K2.5-Thinking"
+    provider: str = "together"
     max_tokens: int = 300
     temperature: float = 0.7
-    top_p: float = 0.9
 
     # Expansion parameters
     default_num_variations: int = 5
@@ -91,7 +85,7 @@ class QueryExpansionResult:
 
 
 class QueryExpansionService:
-    """Service for expanding queries using Claude Haiku"""
+    """Service for expanding queries using Kimi K2.5 Thinking (Together AI)"""
 
     def __init__(
         self,
@@ -101,12 +95,8 @@ class QueryExpansionService:
         self.config = config or QueryExpansionConfig()
         self.monitoring = monitoring_service
 
-        # Initialize Anthropic client
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY environment variable not set")
-
-        self.client = AsyncAnthropic(api_key=api_key)
+        # Initialize LLM client via abstraction layer
+        self.client: LLMClient = get_llm_client(self.config.provider)
 
         # Simple in-memory cache
         self._cache: Dict[str, QueryExpansionResult] = {}
@@ -169,15 +159,15 @@ class QueryExpansionService:
         # Generate expansion prompt
         prompt = self._build_prompt(query, num_variations, strategy, custom_instructions)
 
-        # Call Claude Haiku with retry logic
+        # Call LLM with retry logic
         try:
-            response = await self._call_claude_with_retry(
+            response_text = await self._call_llm_with_retry(
                 prompt,
                 temperature or self.config.temperature
             )
 
             # Parse response
-            expanded_queries = self._parse_response(response, num_variations)
+            expanded_queries = self._parse_response_text(response_text, num_variations)
 
             # Add original query if requested
             if include_original and query not in expanded_queries:
@@ -190,7 +180,7 @@ class QueryExpansionService:
                 expanded_queries=expanded_queries,
                 strategy=strategy.value,
                 model_used=self.config.model,
-                tokens_used=response.usage.input_tokens + response.usage.output_tokens,
+                tokens_used=0,
                 duration_ms=duration_ms,
                 metadata={
                     "num_requested": num_variations,
@@ -343,72 +333,65 @@ class QueryExpansionService:
 
         return prompt
 
-    @observe(name="claude_api_call")
-    async def _call_claude_with_retry(
+    @observe(name="llm_query_expansion")
+    async def _call_llm_with_retry(
         self,
         prompt: str,
         temperature: float
-    ) -> Message:
-        """Call Claude API with exponential backoff retry"""
+    ) -> str:
+        """Call LLM with exponential backoff retry"""
 
         last_exception = None
         delay = self.config.initial_retry_delay
 
         for attempt in range(self.config.max_retries):
             try:
-                response = await asyncio.wait_for(
-                    self.client.messages.create(
-                        model=self.config.model,
+                response_text = await asyncio.wait_for(
+                    self.client.generate(
+                        system="You are a search query expansion assistant. Output only the query variations, nothing else.",
+                        messages=[{"role": "user", "content": prompt}],
                         max_tokens=self.config.max_tokens,
                         temperature=temperature,
-                        top_p=self.config.top_p,
-                        messages=[{
-                            "role": "user",
-                            "content": prompt
-                        }]
+                        model=self.config.model,
                     ),
                     timeout=self.config.timeout_seconds
                 )
-                return response
+                return response_text
 
-            except anthropic.RateLimitError as e:
-                last_exception = e
-                logger.warning(f"Rate limit hit (attempt {attempt + 1}/{self.config.max_retries})")
-                if attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(delay)
-                    delay = min(delay * self.config.retry_multiplier, self.config.max_retry_delay)
-
-            except anthropic.APITimeoutError as e:
+            except asyncio.TimeoutError as e:
                 last_exception = e
                 logger.warning(f"API timeout (attempt {attempt + 1}/{self.config.max_retries})")
                 if attempt < self.config.max_retries - 1:
                     await asyncio.sleep(delay)
                     delay = min(delay * self.config.retry_multiplier, self.config.max_retry_delay)
 
-            except anthropic.APIConnectionError as e:
-                last_exception = e
-                logger.warning(f"Connection error (attempt {attempt + 1}/{self.config.max_retries})")
-                if attempt < self.config.max_retries - 1:
-                    await asyncio.sleep(delay)
-                    delay = min(delay * self.config.retry_multiplier, self.config.max_retry_delay)
-
             except Exception as e:
-                # Don't retry on other errors
-                logger.error(f"Unexpected error calling Claude: {e}")
-                raise
+                err_msg = str(e).lower()
+                if "rate" in err_msg and "limit" in err_msg:
+                    last_exception = e
+                    logger.warning(f"Rate limit hit (attempt {attempt + 1}/{self.config.max_retries})")
+                    if attempt < self.config.max_retries - 1:
+                        await asyncio.sleep(delay)
+                        delay = min(delay * self.config.retry_multiplier, self.config.max_retry_delay)
+                elif "connect" in err_msg or "connection" in err_msg:
+                    last_exception = e
+                    logger.warning(f"Connection error (attempt {attempt + 1}/{self.config.max_retries})")
+                    if attempt < self.config.max_retries - 1:
+                        await asyncio.sleep(delay)
+                        delay = min(delay * self.config.retry_multiplier, self.config.max_retry_delay)
+                else:
+                    logger.error(f"Unexpected error calling LLM: {e}")
+                    raise
 
         # All retries exhausted
-        raise last_exception or Exception("Failed to call Claude API after retries")
+        raise last_exception or Exception("Failed to call LLM API after retries")
 
-    def _parse_response(self, response: Message, num_variations: int) -> List[str]:
-        """Parse Claude's response into individual queries"""
+    def _parse_response_text(self, text_content: str, num_variations: int) -> List[str]:
+        """Parse LLM response text into individual queries"""
 
-        # Extract text content
-        if not response.content or len(response.content) == 0:
-            logger.warning("Empty response from Claude")
+        if not text_content or not text_content.strip():
+            logger.warning("Empty response from LLM")
             return []
-
-        text_content = response.content[0].text if hasattr(response.content[0], 'text') else str(response.content[0])
 
         # Split into lines and clean
         lines = text_content.strip().split('\n')

@@ -224,6 +224,71 @@ class StudioCKOConversationService:
         )
 
     # =========================================================================
+    # Public Search (No Session Required)
+    # =========================================================================
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 10,
+        config: Optional[CKOConfig] = None
+    ) -> List[CKOSource]:
+        """
+        Search the global knowledge base without a session.
+
+        Runs the same pipeline as send_message (query expansion → embeddings
+        → vector search → dedup/rank) but skips session management and LLM
+        response generation.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of sources to return
+            config: Optional config override
+
+        Returns:
+            List of CKOSource results ranked by relevance
+        """
+        config = config or self.config
+        config = CKOConfig(
+            global_kb_limit=limit,
+            min_similarity=config.min_similarity,
+            dedupe_threshold=config.dedupe_threshold,
+            rrf_k=config.rrf_k,
+            enable_query_expansion=config.enable_query_expansion,
+            num_query_variations=config.num_query_variations,
+            expansion_strategy=config.expansion_strategy,
+        )
+
+        # Query expansion
+        query_variations = [query]
+        if config.enable_query_expansion and self.query_expansion_service:
+            try:
+                strategy = ExpansionStrategy(config.expansion_strategy)
+                expansion_result = await self.query_expansion_service.expand_query(
+                    query=query,
+                    num_variations=config.num_query_variations,
+                    strategy=strategy,
+                    include_original=True
+                )
+                query_variations = expansion_result.expanded_queries
+            except Exception as e:
+                logger.warning(f"Query expansion failed during search: {e}")
+
+        # Search global KB
+        sources = await self._search_global_kb(
+            query_variations=query_variations,
+            config=config
+        )
+
+        logger.info(
+            "CKO search completed",
+            query=query[:100],
+            results_count=len(sources)
+        )
+
+        return sources
+
+    # =========================================================================
     # Session Management
     # =========================================================================
 

@@ -1,7 +1,7 @@
 """
 Tests for Query Expansion Service
 
-Tests query expansion with Claude Haiku, expansion strategies,
+Tests query expansion with Kimi K2.5 Thinking (Together AI), expansion strategies,
 retry logic, and batch processing.
 
 Run with: python3 -m pytest tests/test_query_expansion_service.py -v
@@ -22,7 +22,8 @@ from app.services.query_expansion_service import (
 def expansion_config():
     """Create test configuration"""
     return QueryExpansionConfig(
-        model="claude-3-5-haiku-20241022",
+        model="moonshotai/Kimi-K2.5-Thinking",
+        provider="together",
         max_tokens=300,
         temperature=0.7,
         default_num_variations=5,
@@ -34,28 +35,25 @@ def expansion_config():
 
 
 @pytest.fixture
-def mock_anthropic_client():
-    """Create mock Anthropic client"""
+def mock_llm_client():
+    """Create mock LLM client"""
     client = Mock()
-    client.messages = Mock()
+    client.generate = AsyncMock(return_value="")
     return client
 
 
 @pytest.fixture
-def query_expansion_service(expansion_config, monkeypatch):
-    """Create query expansion service with mocked Anthropic"""
-    # Set mock API key
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-123")
-
-    with patch('app.services.query_expansion_service.AsyncAnthropic') as mock_client_class:
+def query_expansion_service(expansion_config):
+    """Create query expansion service with mocked LLM client"""
+    with patch('app.services.query_expansion_service.get_llm_client') as mock_factory:
         mock_client = Mock()
-        mock_client_class.return_value = mock_client
+        mock_client.generate = AsyncMock(return_value="")
+        mock_factory.return_value = mock_client
 
         service = QueryExpansionService(
             expansion_config,
             monitoring_service=None
         )
-        service.client = mock_client
 
         yield service
 
@@ -66,7 +64,8 @@ class TestQueryExpansionConfig:
     def test_config_defaults(self):
         """Test default configuration values"""
         config = QueryExpansionConfig()
-        assert config.model == "claude-3-5-haiku-20241022"
+        assert config.model == "moonshotai/Kimi-K2.5-Thinking"
+        assert config.provider == "together"
         assert config.max_tokens == 300
         assert config.temperature == 0.7
         assert config.default_num_variations == 5
@@ -75,11 +74,13 @@ class TestQueryExpansionConfig:
     def test_config_custom_values(self):
         """Test custom configuration values"""
         config = QueryExpansionConfig(
-            model="claude-3-opus-20240229",
+            model="some-other-model",
+            provider="anthropic",
             temperature=0.9,
             max_retries=5
         )
-        assert config.model == "claude-3-opus-20240229"
+        assert config.model == "some-other-model"
+        assert config.provider == "anthropic"
         assert config.temperature == 0.9
         assert config.max_retries == 5
 
@@ -90,20 +91,14 @@ class TestQueryExpansionService:
     @pytest.mark.asyncio
     async def test_expand_query_basic(self, query_expansion_service):
         """Test basic query expansion"""
-        # Mock response
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        query_expansion_service.client.generate = AsyncMock(return_value=(
             "insurance policy California\n"
             "California insurance coverage\n"
             "insurance plan California residents\n"
             "CA insurance policy details\n"
             "California state insurance requirements"
-        ))]
-        mock_response.usage = Mock(input_tokens=50, output_tokens=100)
+        ))
 
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
-
-        # Test expansion
         result = await query_expansion_service.expand_query(
             "California insurance policy",
             num_variations=5,
@@ -114,21 +109,16 @@ class TestQueryExpansionService:
         assert len(result.expanded_queries) == 6  # 5 + original
         assert "California insurance policy" in result.expanded_queries
         assert result.strategy == "balanced"
-        assert result.tokens_used == 150
-        assert result.model_used == "claude-3-5-haiku-20241022"
+        assert result.model_used == "moonshotai/Kimi-K2.5-Thinking"
 
     @pytest.mark.asyncio
     async def test_expand_query_synonyms_strategy(self, query_expansion_service):
         """Test query expansion with synonyms strategy"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        query_expansion_service.client.generate = AsyncMock(return_value=(
             "insurance coverage policy\n"
             "protection policy coverage\n"
             "indemnity policy agreement"
-        ))]
-        mock_response.usage = Mock(input_tokens=40, output_tokens=60)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        ))
 
         result = await query_expansion_service.expand_query(
             "insurance policy",
@@ -144,15 +134,11 @@ class TestQueryExpansionService:
     @pytest.mark.asyncio
     async def test_expand_query_reformulate_strategy(self, query_expansion_service):
         """Test query expansion with reformulation strategy"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        query_expansion_service.client.generate = AsyncMock(return_value=(
             "What is the California insurance policy?\n"
             "Details about insurance policies in California\n"
             "California state insurance policy information"
-        ))]
-        mock_response.usage = Mock(input_tokens=45, output_tokens=70)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        ))
 
         result = await query_expansion_service.expand_query(
             "California insurance policy",
@@ -166,15 +152,11 @@ class TestQueryExpansionService:
     @pytest.mark.asyncio
     async def test_expand_query_question_strategy(self, query_expansion_service):
         """Test query expansion with question strategy"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        query_expansion_service.client.generate = AsyncMock(return_value=(
             "What is a California insurance policy?\n"
             "How do California insurance policies work?\n"
             "Why do I need a California insurance policy?"
-        ))]
-        mock_response.usage = Mock(input_tokens=42, output_tokens=65)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        ))
 
         result = await query_expansion_service.expand_query(
             "California insurance policy",
@@ -189,14 +171,10 @@ class TestQueryExpansionService:
     @pytest.mark.asyncio
     async def test_expand_query_custom_instructions(self, query_expansion_service):
         """Test query expansion with custom instructions"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        query_expansion_service.client.generate = AsyncMock(return_value=(
             "life insurance policy California residents\n"
             "health insurance policy California requirements"
-        ))]
-        mock_response.usage = Mock(input_tokens=60, output_tokens=80)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        ))
 
         result = await query_expansion_service.expand_query(
             "insurance policy",
@@ -205,7 +183,6 @@ class TestQueryExpansionService:
         )
 
         assert len(result.expanded_queries) == 3  # 2 + original
-        assert result.tokens_used == 140
 
     @pytest.mark.asyncio
     async def test_expand_query_empty_query(self, query_expansion_service):
@@ -227,11 +204,9 @@ class TestQueryExpansionService:
     @pytest.mark.asyncio
     async def test_expand_query_caching(self, query_expansion_service):
         """Test query expansion caching"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text="insurance coverage\ninsurance plan")]
-        mock_response.usage = Mock(input_tokens=30, output_tokens=40)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        query_expansion_service.client.generate = AsyncMock(
+            return_value="insurance coverage\ninsurance plan"
+        )
 
         # First call - should hit API
         result1 = await query_expansion_service.expand_query(
@@ -239,7 +214,7 @@ class TestQueryExpansionService:
             num_variations=2
         )
         assert not result1.cached
-        assert query_expansion_service.client.messages.create.call_count == 1
+        assert query_expansion_service.client.generate.call_count == 1
 
         # Second call - should hit cache
         result2 = await query_expansion_service.expand_query(
@@ -247,16 +222,14 @@ class TestQueryExpansionService:
             num_variations=2
         )
         assert result2.cached
-        assert query_expansion_service.client.messages.create.call_count == 1  # No additional call
+        assert query_expansion_service.client.generate.call_count == 1  # No additional call
 
     @pytest.mark.asyncio
     async def test_expand_query_no_include_original(self, query_expansion_service):
         """Test expansion without including original query"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text="coverage plan\nprotection policy")]
-        mock_response.usage = Mock(input_tokens=30, output_tokens=40)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        query_expansion_service.client.generate = AsyncMock(
+            return_value="coverage plan\nprotection policy"
+        )
 
         result = await query_expansion_service.expand_query(
             "insurance",
@@ -270,11 +243,9 @@ class TestQueryExpansionService:
     @pytest.mark.asyncio
     async def test_expand_query_temperature_override(self, query_expansion_service):
         """Test query expansion with custom temperature"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text="query variation")]
-        mock_response.usage = Mock(input_tokens=20, output_tokens=30)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        query_expansion_service.client.generate = AsyncMock(
+            return_value="query variation"
+        )
 
         result = await query_expansion_service.expand_query(
             "test query",
@@ -282,20 +253,16 @@ class TestQueryExpansionService:
         )
 
         # Verify temperature was passed to API
-        call_kwargs = query_expansion_service.client.messages.create.call_args[1]
+        call_kwargs = query_expansion_service.client.generate.call_args[1]
         assert call_kwargs['temperature'] == 0.9
         assert result.metadata['temperature'] == 0.9
 
     @pytest.mark.asyncio
     async def test_expand_query_max_variations_limit(self, query_expansion_service):
         """Test that max_variations limit is enforced"""
-        mock_response = Mock()
         # Generate more variations than max
         variations = "\n".join([f"query variation {i}" for i in range(20)])
-        mock_response.content = [Mock(text=variations)]
-        mock_response.usage = Mock(input_tokens=50, output_tokens=150)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        query_expansion_service.client.generate = AsyncMock(return_value=variations)
 
         result = await query_expansion_service.expand_query(
             "test query",
@@ -312,33 +279,25 @@ class TestRetryLogic:
     @pytest.mark.asyncio
     async def test_retry_on_rate_limit(self, query_expansion_service):
         """Test retry on rate limit error"""
-        from anthropic import RateLimitError
-
-        mock_response = Mock()
-        mock_response.content = [Mock(text="retry success")]
-        mock_response.usage = Mock(input_tokens=20, output_tokens=30)
-
-        # First call fails, second succeeds
-        query_expansion_service.client.messages.create = AsyncMock(
+        # First call fails with rate limit, second succeeds
+        query_expansion_service.client.generate = AsyncMock(
             side_effect=[
-                RateLimitError("Rate limit exceeded", response=Mock(), body=None),
-                mock_response
+                Exception("rate limit exceeded"),
+                "retry success"
             ]
         )
 
         result = await query_expansion_service.expand_query("test query")
 
         assert len(result.expanded_queries) > 0
-        assert query_expansion_service.client.messages.create.call_count == 2
+        assert query_expansion_service.client.generate.call_count == 2
 
     @pytest.mark.asyncio
     async def test_retry_exhausted(self, query_expansion_service):
         """Test behavior when all retries are exhausted"""
-        from anthropic import RateLimitError
-
-        # All calls fail
-        query_expansion_service.client.messages.create = AsyncMock(
-            side_effect=RateLimitError("Rate limit exceeded", response=Mock(), body=None)
+        # All calls fail with rate limit
+        query_expansion_service.client.generate = AsyncMock(
+            side_effect=Exception("rate limit exceeded")
         )
 
         result = await query_expansion_service.expand_query("test query")
@@ -346,7 +305,7 @@ class TestRetryLogic:
         # Should return original query as fallback
         assert result.original_query == "test query"
         assert "error" in result.metadata
-        assert query_expansion_service.client.messages.create.call_count == 2  # max_retries=2
+        assert query_expansion_service.client.generate.call_count == 2  # max_retries=2
 
 
 class TestBatchProcessing:
@@ -355,11 +314,9 @@ class TestBatchProcessing:
     @pytest.mark.asyncio
     async def test_expand_batch(self, query_expansion_service):
         """Test batch expansion of multiple queries"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text="variation 1\nvariation 2")]
-        mock_response.usage = Mock(input_tokens=30, output_tokens=40)
-
-        query_expansion_service.client.messages.create = AsyncMock(return_value=mock_response)
+        query_expansion_service.client.generate = AsyncMock(
+            return_value="variation 1\nvariation 2"
+        )
 
         queries = ["query 1", "query 2", "query 3"]
         results = await query_expansion_service.expand_batch(
@@ -377,18 +334,14 @@ class TestBatchProcessing:
     @pytest.mark.asyncio
     async def test_expand_batch_with_errors(self, query_expansion_service):
         """Test batch expansion with some failures"""
-        from anthropic import APITimeoutError
+        import asyncio
 
-        mock_success = Mock()
-        mock_success.content = [Mock(text="success variation")]
-        mock_success.usage = Mock(input_tokens=20, output_tokens=30)
-
-        # First call succeeds, second fails, third succeeds
-        query_expansion_service.client.messages.create = AsyncMock(
+        # First call succeeds, second times out, third succeeds
+        query_expansion_service.client.generate = AsyncMock(
             side_effect=[
-                mock_success,
-                APITimeoutError("Timeout"),
-                mock_success
+                "success variation",
+                asyncio.TimeoutError("Timeout"),
+                "success variation"
             ]
         )
 
@@ -445,57 +398,51 @@ class TestPromptBuilding:
 class TestUtilities:
     """Tests for utility functions"""
 
-    def test_parse_response_numbered_list(self, query_expansion_service):
+    def test_parse_response_text_numbered_list(self, query_expansion_service):
         """Test parsing response with numbered list"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        text = (
             "1. First query\n"
             "2. Second query\n"
             "3. Third query"
-        ))]
+        )
 
-        queries = query_expansion_service._parse_response(mock_response, 3)
+        queries = query_expansion_service._parse_response_text(text, 3)
 
         assert len(queries) == 3
         assert queries[0] == "First query"
         assert queries[1] == "Second query"
         assert queries[2] == "Third query"
 
-    def test_parse_response_bulleted_list(self, query_expansion_service):
+    def test_parse_response_text_bulleted_list(self, query_expansion_service):
         """Test parsing response with bulleted list"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        text = (
             "- First query\n"
             "• Second query\n"
             "* Third query"
-        ))]
+        )
 
-        queries = query_expansion_service._parse_response(mock_response, 3)
+        queries = query_expansion_service._parse_response_text(text, 3)
 
         assert len(queries) == 3
         assert queries[0] == "First query"
 
-    def test_parse_response_with_quotes(self, query_expansion_service):
+    def test_parse_response_text_with_quotes(self, query_expansion_service):
         """Test parsing response with quoted queries"""
-        mock_response = Mock()
-        mock_response.content = [Mock(text=(
+        text = (
             '"First query"\n'
             "'Second query'\n"
             "Third query"
-        ))]
+        )
 
-        queries = query_expansion_service._parse_response(mock_response, 3)
+        queries = query_expansion_service._parse_response_text(text, 3)
 
         assert len(queries) == 3
         assert queries[0] == "First query"
         assert queries[1] == "Second query"
 
-    def test_parse_response_empty(self, query_expansion_service):
+    def test_parse_response_text_empty(self, query_expansion_service):
         """Test parsing empty response"""
-        mock_response = Mock()
-        mock_response.content = []
-
-        queries = query_expansion_service._parse_response(mock_response, 3)
+        queries = query_expansion_service._parse_response_text("", 3)
 
         assert len(queries) == 0
 
@@ -520,12 +467,17 @@ class TestUtilities:
 class TestFactoryFunction:
     """Tests for factory function"""
 
-    def test_get_query_expansion_service_singleton(self, monkeypatch):
+    def test_get_query_expansion_service_singleton(self):
         """Test that factory returns singleton"""
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-123")
+        with patch('app.services.query_expansion_service.get_llm_client'):
+            # Reset singleton
+            import app.services.query_expansion_service as mod
+            mod._query_expansion_service = None
 
-        with patch('app.services.query_expansion_service.AsyncAnthropic'):
             service1 = get_query_expansion_service()
             service2 = get_query_expansion_service()
 
             assert service1 is service2
+
+            # Clean up singleton
+            mod._query_expansion_service = None
