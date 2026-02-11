@@ -296,7 +296,6 @@ class AudioVideoProcessor:
                 prompt=analysis_prompt,
                 images=[{"data": image_bytes, "mime_type": mime_type}],
                 max_tokens=300,
-                model="gemini-3-flash-preview",
             )
 
             result["analysis"] = analysis

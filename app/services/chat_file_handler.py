@@ -145,7 +145,7 @@ class ChatFileHandler:
     - Validates file types and sizes
     - Generates unique filenames
     - Extracts file metadata
-    - Supports images for Claude Vision API
+    - Supports images for vision analysis (provider-neutral)
     - Supports documents for text extraction
     - Links files to chat sessions
     """

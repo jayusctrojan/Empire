@@ -171,9 +171,10 @@ class VisionService:
         """Analyze an image using primary (Kimi) with Gemini fallback."""
         start_time = datetime.utcnow()
 
-        # Check cache
+        # Check cache (skip when custom_prompt is provided)
         cache_key = f"{file_id}_{analysis_type.value}"
-        if self.cache_results and cache_key in self._cache:
+        use_cache = self.cache_results and custom_prompt is None
+        if use_cache and cache_key in self._cache:
             logger.info("Returning cached analysis", file_id=file_id, analysis_type=analysis_type.value)
             return self._cache[cache_key]
 
@@ -240,7 +241,7 @@ class VisionService:
                 )
                 metadata.status = ChatFileStatus.ANALYZED
                 metadata.analysis_result = result.to_dict()
-                if self.cache_results:
+                if use_cache:
                     self._cache[cache_key] = result
                 return result
 

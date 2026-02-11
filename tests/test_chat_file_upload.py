@@ -4,7 +4,7 @@ Tests for Task 21: Enable File and Image Upload in Chat
 
 Covers:
 - ChatFileHandler (file validation, upload, metadata extraction)
-- VisionService (Claude Vision API integration)
+- VisionService (Kimi K2.5 / Gemini vision analysis)
 - Chat file upload API endpoints
 """
 
