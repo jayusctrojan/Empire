@@ -509,15 +509,15 @@ class ChatFileHandler:
             return base64.b64encode(content).decode('utf-8')
         return None
 
-    def prepare_for_claude_vision(self, file_id: str) -> Optional[Dict[str, Any]]:
+    def prepare_image_for_vision(self, file_id: str) -> Optional[Dict[str, Any]]:
         """
-        Prepare image file for Claude Vision API
+        Prepare image file for vision analysis (provider-neutral).
 
         Args:
             file_id: File ID
 
         Returns:
-            Dict with media_type and base64 data for Claude API, or None
+            ``{"data": bytes, "mime_type": "image/jpeg"}`` or None
         """
         metadata = self.get_file_by_id(file_id)
         if not metadata:
@@ -528,7 +528,7 @@ class ChatFileHandler:
             return None
 
         if metadata.mime_type not in IMAGE_MIME_TYPES:
-            logger.warning("Image type not supported for Claude Vision", mime_type=metadata.mime_type)
+            logger.warning("Unsupported image type for vision", mime_type=metadata.mime_type)
             return None
 
         content = self.get_file_content(file_id)
@@ -536,12 +536,8 @@ class ChatFileHandler:
             return None
 
         return {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": metadata.mime_type,
-                "data": base64.b64encode(content).decode('utf-8')
-            }
+            "data": content,
+            "mime_type": metadata.mime_type,
         }
 
     def delete_file(self, file_id: str) -> bool:

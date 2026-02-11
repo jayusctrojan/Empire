@@ -445,10 +445,10 @@ class TestChatFileHandlerDeletion:
 
 
 class TestChatFileHandlerVision:
-    """Tests for Claude Vision preparation"""
+    """Tests for provider-neutral vision preparation"""
 
     @pytest.mark.asyncio
-    async def test_prepare_for_claude_vision_image(self, file_handler, session_id, sample_jpeg_data):
+    async def test_prepare_image_for_vision(self, file_handler, session_id, sample_jpeg_data):
         # Mock the file handler to detect as image
         with patch.object(file_handler, '_get_mime_type', return_value='image/jpeg'):
             result = await file_handler.process_upload(
@@ -457,22 +457,23 @@ class TestChatFileHandlerVision:
                 session_id=session_id
             )
 
-        vision_data = file_handler.prepare_for_claude_vision(result.file_id)
+        vision_data = file_handler.prepare_image_for_vision(result.file_id)
 
         if vision_data:  # May be None if image detection fails
-            assert vision_data["type"] == "image"
-            assert "source" in vision_data
-            assert vision_data["source"]["type"] == "base64"
+            assert "data" in vision_data
+            assert isinstance(vision_data["data"], bytes)
+            assert "mime_type" in vision_data
+            assert vision_data["mime_type"] == "image/jpeg"
 
     @pytest.mark.asyncio
-    async def test_prepare_for_claude_vision_not_image(self, file_handler, session_id, sample_text_data):
+    async def test_prepare_image_for_vision_not_image(self, file_handler, session_id, sample_text_data):
         result = await file_handler.process_upload(
             file_data=sample_text_data,
             filename="test.txt",
             session_id=session_id
         )
 
-        vision_data = file_handler.prepare_for_claude_vision(result.file_id)
+        vision_data = file_handler.prepare_image_for_vision(result.file_id)
         assert vision_data is None  # Text files not supported for vision
 
 
@@ -561,17 +562,23 @@ class TestVisionService:
 
     @pytest.fixture
     def vision_service(self, file_handler):
-        """Create VisionService with mocked Anthropic client"""
-        with patch('app.services.vision_service.AsyncAnthropic'):
-            service = VisionService(
-                model="claude-sonnet-4-5-20250929",
-                cache_results=True
-            )
+        """Create VisionService with mocked LLM clients"""
+        with patch('app.services.vision_service.get_llm_client') as mock_factory, \
+             patch('app.services.vision_service.get_chat_file_handler') as mock_fh_factory:
+            mock_primary = MagicMock()
+            mock_primary.generate_with_images = AsyncMock(return_value="Test description")
+            mock_primary.is_retryable = MagicMock(return_value=False)
+            mock_fallback = MagicMock()
+            mock_fallback.generate_with_images = AsyncMock(return_value="Fallback description")
+            mock_factory.side_effect = lambda provider: mock_primary if provider == "together" else mock_fallback
+            mock_fh_factory.return_value = file_handler
+            service = VisionService(cache_results=True)
             service.file_handler = file_handler
+            service._mock_primary = mock_primary
             return service
 
     def test_initialization(self, vision_service):
-        assert vision_service.model == "claude-sonnet-4-5-20250929"
+        assert vision_service.primary_model == "moonshotai/Kimi-K2.5-Thinking"
         assert vision_service.cache_results is True
 
     @pytest.mark.asyncio
@@ -611,30 +618,23 @@ class TestVisionService:
         metadata.file_type = ChatFileType.IMAGE
         metadata.mime_type = "image/jpeg"
 
-        # Mock the API response
-        mock_response = Mock()
-        mock_response.content = [Mock(text="This is a test description")]
-
-        vision_service.client = AsyncMock()
-        vision_service.client.messages.create = AsyncMock(return_value=mock_response)
+        # Mock prepare_image_for_vision to return valid data
+        vision_service.file_handler.prepare_image_for_vision = Mock(return_value={
+            "data": b"\xff\xd8test",
+            "mime_type": "image/jpeg",
+        })
 
         # First call
         result1 = await vision_service.analyze_image(upload_result.file_id)
 
-        # Prepare the image data for API call
-        vision_service.file_handler.prepare_for_claude_vision = Mock(return_value={
-            "type": "image",
-            "source": {"type": "base64", "media_type": "image/jpeg", "data": "test"}
-        })
-
         # Second call should use cache
         result2 = await vision_service.analyze_image(upload_result.file_id)
 
-        # Cache should be used, so API only called once
+        # Cache should be used, so primary client only called once
         if result1.success:
-            # Check cache key
             cache_key = f"{upload_result.file_id}_{VisionAnalysisType.GENERAL.value}"
             assert cache_key in vision_service._cache
+            assert vision_service._mock_primary.generate_with_images.await_count == 1
 
     def test_clear_cache_all(self, vision_service):
         # Add some cache entries
