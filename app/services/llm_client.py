@@ -344,9 +344,9 @@ class GeminiLLMClient(LLMClient):
         return response.text or ""
 
     def is_retryable(self, error: Exception) -> bool:
-        error_name = type(error).__name__
-        return error_name in ("ServerError", "TooManyRequests") or isinstance(
-            error, (ConnectionError, TimeoutError)
+        from google.genai import errors
+        return isinstance(
+            error, (errors.ServerError, errors.ClientError, ConnectionError, TimeoutError)
         )
 
 

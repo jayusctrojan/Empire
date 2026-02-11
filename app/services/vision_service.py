@@ -47,7 +47,7 @@ class VisionAnalysisResult:
     processing_time_ms: Optional[float] = None
     model_used: str = "moonshotai/Kimi-K2.5-Thinking"
     error: Optional[str] = None
-    timestamp: datetime = None
+    timestamp: Optional[datetime] = None
 
     def __post_init__(self):
         if self.timestamp is None:

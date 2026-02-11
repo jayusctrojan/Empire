@@ -52,8 +52,9 @@ class WhisperSTTService:
         self, audio_path: str, language: str = "en"
     ) -> Dict[str, Any]:
         """Blocking transcription called from the dedicated executor."""
-        # Wait for model to be ready
-        self._ready.wait()
+        # Wait for model to be ready (5-minute ceiling)
+        if not self._ready.wait(timeout=300):
+            raise RuntimeError("Whisper model loading timed out")
 
         if self._load_error is not None:
             raise RuntimeError(

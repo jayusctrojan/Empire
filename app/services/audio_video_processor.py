@@ -436,8 +436,7 @@ class AudioVideoProcessor:
             result["timeline"] = timeline
 
             result["success"] = (
-                (audio_result["success"] or frame_result["success"])
-                and len(result["errors"]) == 0
+                audio_result["success"] or frame_result["success"]
             )
 
             logger.info(f"Video processing complete: {len(timeline)} timeline events")

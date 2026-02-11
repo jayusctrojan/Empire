@@ -112,7 +112,7 @@ class FileUploadResult:
         }
 
 
-# Image MIME types for Claude Vision API
+# Image MIME types for vision analysis
 IMAGE_MIME_TYPES = {
     "image/jpeg",
     "image/png",

@@ -356,10 +356,8 @@ class TestGeminiLLMClient:
         assert client.is_retryable(TimeoutError("timed out")) is True
 
     def test_is_retryable_server_error(self, client):
-        # Simulate a google ServerError by name
-        class ServerError(Exception):
-            pass
-        assert client.is_retryable(ServerError("500")) is True
+        from google.genai import errors
+        assert client.is_retryable(errors.ServerError(500, {"error": "internal"})) is True
 
     def test_is_retryable_unknown(self, client):
         assert client.is_retryable(ValueError("bad")) is False

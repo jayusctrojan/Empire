@@ -768,6 +768,30 @@ class ServiceOrchestrator:
                 fallback_message=config.fallback if config else None
             )
 
+    async def check_whisper_local(self) -> ServiceHealthCheck:
+        """Check if faster-whisper is available locally."""
+        config = self.inventory.get_service("whisper_local")
+        try:
+            import importlib
+            importlib.import_module("faster_whisper")
+            return ServiceHealthCheck(
+                name="whisper_local",
+                status=ServiceStatus.RUNNING,
+                category=ServiceCategory.OPTIONAL,
+                type=ServiceType.LOCAL,
+                details={"package": "faster-whisper"},
+                fallback_message=config.fallback if config else None,
+            )
+        except ImportError:
+            return ServiceHealthCheck(
+                name="whisper_local",
+                status=ServiceStatus.STOPPED,
+                category=ServiceCategory.OPTIONAL,
+                type=ServiceType.LOCAL,
+                error_message="faster-whisper not installed",
+                fallback_message=config.fallback if config else None,
+            )
+
     # =========================================================================
     # AGGREGATED HEALTH CHECKS
     # =========================================================================
@@ -814,7 +838,7 @@ class ServiceOrchestrator:
             "arcade": lambda: self.check_env_service(
                 "arcade", ServiceCategory.OPTIONAL, ServiceType.API, ["ARCADE_API_KEY"]
             ),
-            "whisper_local": self.check_ffmpeg,  # Uses same local binary check pattern
+            "whisper_local": self.check_whisper_local,
             "gemini": lambda: self.check_env_service(
                 "gemini", ServiceCategory.OPTIONAL, ServiceType.API, ["GOOGLE_API_KEY"]
             ),

@@ -132,7 +132,7 @@ class CostTrackingService:
     Centralized cost tracking for all Empire services
 
     Features:
-    - Track costs from Claude, Soniox, Mistral, LangExtract, Render, Supabase, B2
+    - Track costs from Claude, Together, Google, Whisper Local, Mistral, LangExtract, Render, Supabase, B2
     - Store cost data in Supabase
     - Generate monthly cost reports
     - Budget alerts at 80% threshold
@@ -165,11 +165,12 @@ class CostTrackingService:
         },
         ServiceProvider.TOGETHER: {
             "moonshotai/Kimi-K2.5-Thinking": {
-                "input": 0.0000003,  # $0.30 per 1M tokens
-                "output": 0.00000088,  # $0.88 per 1M tokens
+                "input": 0.0000005,  # $0.50 per 1M tokens
+                "output": 0.0000028,  # $2.80 per 1M tokens
             },
         },
         ServiceProvider.GOOGLE: {
+            # TODO: Update pricing once gemini-3-flash exits preview
             "gemini-3-flash-preview": {
                 "input": 0.0,  # Free during preview
                 "output": 0.0,

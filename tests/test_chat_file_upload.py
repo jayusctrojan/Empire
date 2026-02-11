@@ -628,7 +628,7 @@ class TestVisionService:
         result1 = await vision_service.analyze_image(upload_result.file_id)
 
         # Second call should use cache
-        result2 = await vision_service.analyze_image(upload_result.file_id)
+        await vision_service.analyze_image(upload_result.file_id)
 
         # Cache should be used, so primary client only called once
         if result1.success:
