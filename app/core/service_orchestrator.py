@@ -170,19 +170,19 @@ DEFAULT_SERVICE_INVENTORY = ServiceInventory(
             required_env_vars=["ARCADE_API_KEY"]
         ),
         ServiceConfig(
-            name="soniox",
+            name="whisper_local",
             category=ServiceCategory.OPTIONAL,
-            type=ServiceType.API,
+            type=ServiceType.LOCAL,
             timeout_ms=500,
-            fallback="Audio processing disabled",
-            required_env_vars=["SONIOX_API_KEY"]
+            fallback="Audio transcription disabled"
         ),
         ServiceConfig(
-            name="claude_vision",
+            name="gemini",
             category=ServiceCategory.OPTIONAL,
             type=ServiceType.API,
             timeout_ms=500,
-            fallback="Vision analysis disabled"
+            fallback="Vision analysis disabled",
+            required_env_vars=["GOOGLE_API_KEY"]
         ),
         ServiceConfig(
             name="ffmpeg",
@@ -768,6 +768,30 @@ class ServiceOrchestrator:
                 fallback_message=config.fallback if config else None
             )
 
+    async def check_whisper_local(self) -> ServiceHealthCheck:
+        """Check if faster-whisper is available locally."""
+        config = self.inventory.get_service("whisper_local")
+        try:
+            import importlib
+            importlib.import_module("faster_whisper")
+            return ServiceHealthCheck(
+                name="whisper_local",
+                status=ServiceStatus.RUNNING,
+                category=ServiceCategory.OPTIONAL,
+                type=ServiceType.LOCAL,
+                details={"package": "faster-whisper"},
+                fallback_message=config.fallback if config else None,
+            )
+        except ImportError:
+            return ServiceHealthCheck(
+                name="whisper_local",
+                status=ServiceStatus.STOPPED,
+                category=ServiceCategory.OPTIONAL,
+                type=ServiceType.LOCAL,
+                error_message="faster-whisper not installed",
+                fallback_message=config.fallback if config else None,
+            )
+
     # =========================================================================
     # AGGREGATED HEALTH CHECKS
     # =========================================================================
@@ -814,8 +838,9 @@ class ServiceOrchestrator:
             "arcade": lambda: self.check_env_service(
                 "arcade", ServiceCategory.OPTIONAL, ServiceType.API, ["ARCADE_API_KEY"]
             ),
-            "soniox": lambda: self.check_env_service(
-                "soniox", ServiceCategory.OPTIONAL, ServiceType.API, ["SONIOX_API_KEY"]
+            "whisper_local": self.check_whisper_local,
+            "gemini": lambda: self.check_env_service(
+                "gemini", ServiceCategory.OPTIONAL, ServiceType.API, ["GOOGLE_API_KEY"]
             ),
             "openai": lambda: self.check_env_service(
                 "openai", ServiceCategory.OPTIONAL, ServiceType.API, ["OPENAI_API_KEY"]
@@ -1115,7 +1140,7 @@ class ServiceOrchestrator:
         # Use the category-based defaults from the plan
         required_services = ["supabase", "redis"]
         important_services = ["neo4j", "b2", "celery", "anthropic", "llamaindex", "crewai"]
-        optional_services = ["arcade", "soniox", "claude_vision", "ffmpeg", "openai", "llamacloud", "ollama"]
+        optional_services = ["arcade", "whisper_local", "gemini", "ffmpeg", "openai", "llamacloud", "ollama"]
 
         if service_name in required_services:
             return 2000
@@ -1168,7 +1193,7 @@ class ServiceOrchestrator:
 
         # Cloud services - nothing to do locally
         cloud_services = ["supabase", "redis", "llamaindex", "crewai", "anthropic",
-                         "arcade", "soniox", "openai", "llamacloud"]
+                         "arcade", "gemini", "openai", "llamacloud"]
         if service_name in cloud_services:
             logger.info("Service is cloud-based, skipping local start", service=service_name)
             return True

@@ -1,28 +1,25 @@
 """
-Empire v7.3 - Claude Vision Service
-Integrates Claude Vision API for image analysis in chat
+Empire v7.3 - Vision Service (Multimodal RAG)
+Image analysis via Kimi K2.5 Thinking (primary) with Gemini 3 Flash fallback.
 
-Task 21: Enable File and Image Upload in Chat
-Subtask 21.2: Integrate Claude Vision API for Image Analysis
+Replaces direct Anthropic usage with the LLM client abstraction layer.
 """
 
-import os
-import base64
 import asyncio
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 import structlog
-from anthropic import AsyncAnthropic
 
+from app.services.llm_client import get_llm_client
 from app.services.chat_file_handler import (
     ChatFileHandler,
     ChatFileMetadata,
     ChatFileType,
     ChatFileStatus,
     get_chat_file_handler,
-    IMAGE_MIME_TYPES
+    IMAGE_MIME_TYPES,
 )
 
 logger = structlog.get_logger(__name__)
@@ -30,11 +27,11 @@ logger = structlog.get_logger(__name__)
 
 class VisionAnalysisType(str, Enum):
     """Types of vision analysis"""
-    GENERAL = "general"  # General description
-    DOCUMENT = "document"  # Document/text extraction
-    DIAGRAM = "diagram"  # Diagram/chart analysis
-    CODE = "code"  # Code/screenshot analysis
-    DETAILED = "detailed"  # Highly detailed analysis
+    GENERAL = "general"
+    DOCUMENT = "document"
+    DIAGRAM = "diagram"
+    CODE = "code"
+    DETAILED = "detailed"
 
 
 @dataclass
@@ -48,9 +45,9 @@ class VisionAnalysisResult:
     detected_objects: Optional[List[str]] = None
     confidence_score: Optional[float] = None
     processing_time_ms: Optional[float] = None
-    model_used: str = "claude-sonnet-4-5-20250929"
+    model_used: str = "moonshotai/Kimi-K2.5-Thinking"
     error: Optional[str] = None
-    timestamp: datetime = None
+    timestamp: Optional[datetime] = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -69,7 +66,7 @@ class VisionAnalysisResult:
             "processing_time_ms": self.processing_time_ms,
             "model_used": self.model_used,
             "error": self.error,
-            "timestamp": self.timestamp.isoformat()
+            "timestamp": self.timestamp.isoformat(),
         }
 
 
@@ -122,53 +119,46 @@ Preserve indentation and syntax highlighting if mentioned.""",
 7. Context clues about when/where the image was taken
 8. Any notable or unusual aspects
 
-Be as comprehensive as possible."""
+Be as comprehensive as possible.""",
 }
 
 
 class VisionService:
     """
-    Claude Vision API integration for image analysis in chat
+    Vision analysis using Kimi K2.5 Thinking (primary) with Gemini 3 Flash fallback.
 
     Features:
     - Multiple analysis types (general, document, diagram, code, detailed)
     - Caching of analysis results
-    - Rate limiting and retries
+    - Retry with is_retryable() classification
+    - Primary/fallback model architecture
     - Support for multiple images in single request
     - Integration with chat file handler
     """
 
     def __init__(
         self,
-        model: str = "claude-sonnet-4-5-20250929",
         max_tokens: int = 4096,
         max_retries: int = 3,
-        cache_results: bool = True
+        cache_results: bool = True,
     ):
-        """
-        Initialize Vision Service
-
-        Args:
-            model: Claude model to use for vision
-            max_tokens: Maximum tokens in response
-            max_retries: Maximum retry attempts
-            cache_results: Whether to cache analysis results
-        """
-        self.client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.model = model
+        self.primary_client = get_llm_client("together")
+        self.fallback_client = get_llm_client("gemini")
+        self.primary_model = "moonshotai/Kimi-K2.5-Thinking"
+        self.fallback_model = "gemini-3-flash-preview"
         self.max_tokens = max_tokens
         self.max_retries = max_retries
         self.cache_results = cache_results
         self.file_handler = get_chat_file_handler()
 
-        # Analysis cache (file_id -> result)
+        # Analysis cache (cache_key -> result)
         self._cache: Dict[str, VisionAnalysisResult] = {}
 
         logger.info(
             "VisionService initialized",
-            model=model,
-            max_tokens=max_tokens,
-            max_retries=max_retries
+            primary_model=self.primary_model,
+            fallback_model=self.fallback_model,
+            max_retries=max_retries,
         )
 
     async def analyze_image(
@@ -176,25 +166,15 @@ class VisionService:
         file_id: str,
         analysis_type: VisionAnalysisType = VisionAnalysisType.GENERAL,
         custom_prompt: Optional[str] = None,
-        additional_context: Optional[str] = None
+        additional_context: Optional[str] = None,
     ) -> VisionAnalysisResult:
-        """
-        Analyze an image using Claude Vision API
-
-        Args:
-            file_id: ID of the uploaded file
-            analysis_type: Type of analysis to perform
-            custom_prompt: Custom prompt to use instead of default
-            additional_context: Additional context to include
-
-        Returns:
-            VisionAnalysisResult with analysis details
-        """
+        """Analyze an image using primary (Kimi) with Gemini fallback."""
         start_time = datetime.utcnow()
 
-        # Check cache first
+        # Check cache (skip when custom_prompt is provided)
         cache_key = f"{file_id}_{analysis_type.value}"
-        if self.cache_results and cache_key in self._cache:
+        use_cache = self.cache_results and custom_prompt is None
+        if use_cache and cache_key in self._cache:
             logger.info("Returning cached analysis", file_id=file_id, analysis_type=analysis_type.value)
             return self._cache[cache_key]
 
@@ -202,311 +182,212 @@ class VisionService:
         metadata = self.file_handler.get_file_by_id(file_id)
         if not metadata:
             return VisionAnalysisResult(
-                success=False,
-                file_id=file_id,
-                analysis_type=analysis_type,
-                description="",
-                error="File not found"
+                success=False, file_id=file_id, analysis_type=analysis_type,
+                description="", error="File not found",
             )
 
-        # Validate file type
         if metadata.file_type != ChatFileType.IMAGE:
             return VisionAnalysisResult(
-                success=False,
-                file_id=file_id,
-                analysis_type=analysis_type,
-                description="",
-                error=f"File is not an image: {metadata.file_type.value}"
+                success=False, file_id=file_id, analysis_type=analysis_type,
+                description="", error=f"File is not an image: {metadata.file_type.value}",
             )
 
         if metadata.mime_type not in IMAGE_MIME_TYPES:
             return VisionAnalysisResult(
-                success=False,
-                file_id=file_id,
-                analysis_type=analysis_type,
-                description="",
-                error=f"Unsupported image type: {metadata.mime_type}"
+                success=False, file_id=file_id, analysis_type=analysis_type,
+                description="", error=f"Unsupported image type: {metadata.mime_type}",
             )
 
-        # Prepare image for API
-        image_data = self.file_handler.prepare_for_claude_vision(file_id)
+        # Prepare image (provider-neutral format)
+        image_data = self.file_handler.prepare_image_for_vision(file_id)
         if not image_data:
             return VisionAnalysisResult(
-                success=False,
-                file_id=file_id,
-                analysis_type=analysis_type,
-                description="",
-                error="Failed to prepare image for analysis"
+                success=False, file_id=file_id, analysis_type=analysis_type,
+                description="", error="Failed to prepare image for analysis",
             )
 
         # Build prompt
-        prompt = custom_prompt or ANALYSIS_PROMPTS.get(analysis_type, ANALYSIS_PROMPTS[VisionAnalysisType.GENERAL])
+        prompt = custom_prompt or ANALYSIS_PROMPTS.get(
+            analysis_type, ANALYSIS_PROMPTS[VisionAnalysisType.GENERAL]
+        )
         if additional_context:
             prompt = f"{prompt}\n\nAdditional context: {additional_context}"
 
-        # Make API call with retries
-        last_error = None
+        system = "You are an expert image analyst. Provide accurate, detailed analysis."
+
+        # Try primary client with retries
+        last_primary_error = None
         for attempt in range(1, self.max_retries + 1):
             try:
                 logger.info(
-                    "Analyzing image",
-                    file_id=file_id,
-                    analysis_type=analysis_type.value,
-                    attempt=attempt
+                    "Analyzing image (primary)",
+                    file_id=file_id, analysis_type=analysis_type.value,
+                    attempt=attempt, model=self.primary_model,
                 )
-
-                response = await self.client.messages.create(
-                    model=self.model,
+                description = await self.primary_client.generate_with_images(
+                    system=system,
+                    prompt=prompt,
+                    images=[image_data],
                     max_tokens=self.max_tokens,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                image_data,
-                                {"type": "text", "text": prompt}
-                            ]
-                        }
-                    ]
+                    model=self.primary_model,
                 )
-
-                # Extract response text
-                description = ""
-                for block in response.content:
-                    if hasattr(block, 'text'):
-                        description += block.text
-
-                # Calculate processing time
                 processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-
-                # Create result
                 result = VisionAnalysisResult(
-                    success=True,
-                    file_id=file_id,
-                    analysis_type=analysis_type,
+                    success=True, file_id=file_id, analysis_type=analysis_type,
                     description=description,
                     extracted_text=description if analysis_type in (VisionAnalysisType.DOCUMENT, VisionAnalysisType.CODE) else None,
                     processing_time_ms=processing_time,
-                    model_used=self.model
+                    model_used=self.primary_model,
                 )
-
-                # Update file metadata with analysis
                 metadata.status = ChatFileStatus.ANALYZED
                 metadata.analysis_result = result.to_dict()
-
-                # Cache result
-                if self.cache_results:
+                if use_cache:
                     self._cache[cache_key] = result
-
-                logger.info(
-                    "Image analysis completed",
-                    file_id=file_id,
-                    analysis_type=analysis_type.value,
-                    processing_time_ms=processing_time
-                )
-
                 return result
 
             except Exception as e:
-                last_error = str(e)
+                last_primary_error = str(e)
                 logger.warning(
-                    "Image analysis attempt failed",
-                    file_id=file_id,
-                    attempt=attempt,
-                    error=str(e)
+                    "Primary analysis attempt failed",
+                    file_id=file_id, attempt=attempt, error=str(e),
                 )
+                if self.primary_client.is_retryable(e) and attempt < self.max_retries:
+                    await asyncio.sleep(2 ** attempt)
+                elif not self.primary_client.is_retryable(e):
+                    break  # Non-retryable — go straight to fallback
 
-                if attempt < self.max_retries:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+        # All primary retries exhausted — try fallback once
+        try:
+            logger.info(
+                "Falling back to Gemini",
+                file_id=file_id, model=self.fallback_model,
+            )
+            description = await self.fallback_client.generate_with_images(
+                system=system,
+                prompt=prompt,
+                images=[image_data],
+                max_tokens=self.max_tokens,
+                model=self.fallback_model,
+            )
+            processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+            result = VisionAnalysisResult(
+                success=True, file_id=file_id, analysis_type=analysis_type,
+                description=description,
+                extracted_text=description if analysis_type in (VisionAnalysisType.DOCUMENT, VisionAnalysisType.CODE) else None,
+                processing_time_ms=processing_time,
+                model_used=self.fallback_model,
+            )
+            metadata.status = ChatFileStatus.ANALYZED
+            metadata.analysis_result = result.to_dict()
+            if self.cache_results:
+                self._cache[cache_key] = result
+            return result
 
-        # All retries failed
-        return VisionAnalysisResult(
-            success=False,
-            file_id=file_id,
-            analysis_type=analysis_type,
-            description="",
-            error=f"Analysis failed after {self.max_retries} attempts: {last_error}"
-        )
+        except Exception as fallback_err:
+            processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+            return VisionAnalysisResult(
+                success=False, file_id=file_id, analysis_type=analysis_type,
+                description="", processing_time_ms=processing_time,
+                error=f"Primary failed: {last_primary_error}; Fallback failed: {fallback_err}",
+            )
 
     async def analyze_multiple_images(
         self,
         file_ids: List[str],
         prompt: str,
-        compare: bool = False
+        compare: bool = False,
     ) -> Dict[str, Any]:
-        """
-        Analyze multiple images together
-
-        Args:
-            file_ids: List of file IDs to analyze
-            prompt: Analysis prompt
-            compare: Whether to compare images
-
-        Returns:
-            Combined analysis result
-        """
+        """Analyze multiple images together via primary client."""
         start_time = datetime.utcnow()
 
-        # Prepare all images
-        image_contents = []
+        images = []
         valid_file_ids = []
-
         for file_id in file_ids:
             metadata = self.file_handler.get_file_by_id(file_id)
             if not metadata or metadata.file_type != ChatFileType.IMAGE:
                 continue
-
-            image_data = self.file_handler.prepare_for_claude_vision(file_id)
+            image_data = self.file_handler.prepare_image_for_vision(file_id)
             if image_data:
-                image_contents.append(image_data)
+                images.append(image_data)
                 valid_file_ids.append(file_id)
 
-        if not image_contents:
-            return {
-                "success": False,
-                "error": "No valid images found",
-                "file_ids": file_ids
-            }
+        if not images:
+            return {"success": False, "error": "No valid images found", "file_ids": file_ids}
 
-        # Build prompt for multiple images
         if compare:
-            full_prompt = f"I'm sharing {len(image_contents)} images. Please compare them and: {prompt}"
+            full_prompt = f"I'm sharing {len(images)} images. Please compare them and: {prompt}"
         else:
-            full_prompt = f"I'm sharing {len(image_contents)} images. Please analyze them: {prompt}"
+            full_prompt = f"I'm sharing {len(images)} images. Please analyze them: {prompt}"
 
-        # Build content list
-        content = image_contents + [{"type": "text", "text": full_prompt}]
+        system = "You are an expert image analyst."
 
         try:
-            response = await self.client.messages.create(
-                model=self.model,
+            description = await self.primary_client.generate_with_images(
+                system=system,
+                prompt=full_prompt,
+                images=images,
                 max_tokens=self.max_tokens,
-                messages=[{"role": "user", "content": content}]
+                model=self.primary_model,
             )
-
-            description = ""
-            for block in response.content:
-                if hasattr(block, 'text'):
-                    description += block.text
-
             processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-
             return {
                 "success": True,
                 "file_ids": valid_file_ids,
                 "description": description,
                 "image_count": len(valid_file_ids),
                 "processing_time_ms": processing_time,
-                "model_used": self.model
+                "model_used": self.primary_model,
             }
 
         except Exception as e:
-            logger.error(
-                "Multi-image analysis failed",
-                file_ids=file_ids,
-                error=str(e)
-            )
-            return {
-                "success": False,
-                "file_ids": file_ids,
-                "error": str(e)
-            }
+            logger.error("Multi-image analysis failed", file_ids=file_ids, error=str(e))
+            return {"success": False, "file_ids": file_ids, "error": str(e)}
 
     async def describe_for_chat(
-        self,
-        file_id: str,
-        user_query: Optional[str] = None
+        self, file_id: str, user_query: Optional[str] = None,
     ) -> str:
-        """
-        Get a concise description suitable for chat context
-
-        Args:
-            file_id: ID of the uploaded file
-            user_query: Optional user query about the image
-
-        Returns:
-            Concise description string
-        """
-        prompt = """Provide a concise but informative description of this image suitable for chat context.
-Be brief (2-3 sentences) but capture the essential information."""
-
+        """Get a concise description suitable for chat context."""
+        prompt = (
+            "Provide a concise but informative description of this image suitable for "
+            "chat context. Be brief (2-3 sentences) but capture the essential information."
+        )
         if user_query:
-            prompt = f"User is asking about this image: '{user_query}'\n\n{prompt}\n\nAlso address the user's question if relevant."
+            prompt = (
+                f"User is asking about this image: '{user_query}'\n\n{prompt}\n\n"
+                "Also address the user's question if relevant."
+            )
 
         result = await self.analyze_image(
             file_id=file_id,
             analysis_type=VisionAnalysisType.GENERAL,
-            custom_prompt=prompt
+            custom_prompt=prompt,
         )
-
-        if result.success:
-            return result.description
-        else:
-            return f"[Unable to analyze image: {result.error}]"
+        return result.description if result.success else f"[Unable to analyze image: {result.error}]"
 
     async def extract_text_from_image(self, file_id: str) -> Optional[str]:
-        """
-        Extract text from an image (OCR-style)
+        """Extract text from an image (OCR-style)."""
+        result = await self.analyze_image(file_id=file_id, analysis_type=VisionAnalysisType.DOCUMENT)
+        return result.description if result.success else None
 
-        Args:
-            file_id: ID of the uploaded file
-
-        Returns:
-            Extracted text or None
-        """
-        result = await self.analyze_image(
-            file_id=file_id,
-            analysis_type=VisionAnalysisType.DOCUMENT
+    async def answer_question_about_image(self, file_id: str, question: str) -> str:
+        """Answer a specific question about an image."""
+        custom_prompt = (
+            f"Please answer this question about the image:\n\n"
+            f"Question: {question}\n\n"
+            "Provide a direct, helpful answer based on what you can see in the image. "
+            "If the question cannot be answered from the image, explain why."
         )
-
-        if result.success:
-            return result.description
-        return None
-
-    async def answer_question_about_image(
-        self,
-        file_id: str,
-        question: str
-    ) -> str:
-        """
-        Answer a specific question about an image
-
-        Args:
-            file_id: ID of the uploaded file
-            question: Question to answer
-
-        Returns:
-            Answer string
-        """
-        custom_prompt = f"""Please answer this question about the image:
-
-Question: {question}
-
-Provide a direct, helpful answer based on what you can see in the image.
-If the question cannot be answered from the image, explain why."""
-
         result = await self.analyze_image(
             file_id=file_id,
             analysis_type=VisionAnalysisType.GENERAL,
-            custom_prompt=custom_prompt
+            custom_prompt=custom_prompt,
         )
-
-        if result.success:
-            return result.description
-        else:
-            return f"I couldn't analyze the image: {result.error}"
+        return result.description if result.success else f"I couldn't analyze the image: {result.error}"
 
     def clear_cache(self, file_id: Optional[str] = None) -> int:
-        """
-        Clear analysis cache
-
-        Args:
-            file_id: Specific file to clear, or None for all
-
-        Returns:
-            Number of cached items cleared
-        """
+        """Clear analysis cache."""
         if file_id:
-            keys_to_delete = [k for k in self._cache.keys() if k.startswith(file_id)]
+            keys_to_delete = [k for k in self._cache if k.startswith(file_id)]
             for key in keys_to_delete:
                 del self._cache[key]
             return len(keys_to_delete)
@@ -521,12 +402,7 @@ _vision_service: Optional[VisionService] = None
 
 
 def get_vision_service() -> VisionService:
-    """
-    Get singleton instance of VisionService
-
-    Returns:
-        VisionService instance
-    """
+    """Get singleton instance of VisionService."""
     global _vision_service
     if _vision_service is None:
         _vision_service = VisionService()

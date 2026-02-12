@@ -57,6 +57,10 @@ pycryptodome>=3.19.0  # Zero-knowledge AES encryption for file storage
 pydub>=0.25.1
 mutagen>=1.47.0  # Audio/video metadata extraction
 ffmpeg-python>=0.2.0  # Video/audio extraction and frame extraction
+faster-whisper>=1.0.0  # Local STT with distil-large-v3.5
+
+# Multimodal Vision
+google-genai>=1.0.0  # Gemini 3 Flash for video frame analysis
 
 # Utilities
 python-dotenv>=1.0.0

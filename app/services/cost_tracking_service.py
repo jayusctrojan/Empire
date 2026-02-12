@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 class ServiceProvider(str, Enum):
     """Supported service providers for cost tracking"""
     ANTHROPIC = "anthropic"  # Claude API
-    SONIOX = "soniox"  # Speech-to-text
+    TOGETHER = "together"  # Together AI (Kimi K2.5 Thinking)
+    GOOGLE = "google"  # Google Gemini API
+    WHISPER_LOCAL = "whisper_local"  # Local distil-whisper (free)
     MISTRAL = "mistral"  # Mistral AI API
     LANGEXTRACT = "langextract"  # Document parsing
     RENDER = "render"  # Cloud hosting
@@ -130,7 +132,7 @@ class CostTrackingService:
     Centralized cost tracking for all Empire services
 
     Features:
-    - Track costs from Claude, Soniox, Mistral, LangExtract, Render, Supabase, B2
+    - Track costs from Claude, Together, Google, Whisper Local, Mistral, LangExtract, Render, Supabase, B2
     - Store cost data in Supabase
     - Generate monthly cost reports
     - Budget alerts at 80% threshold
@@ -159,6 +161,25 @@ class CostTrackingService:
             "claude-3-5-haiku-20241022": {
                 "input": 0.000001,  # $1 per 1M tokens
                 "output": 0.000005,  # $5 per 1M tokens
+            },
+        },
+        ServiceProvider.TOGETHER: {
+            "moonshotai/Kimi-K2.5-Thinking": {
+                "input": 0.0000005,  # $0.50 per 1M tokens
+                "output": 0.0000028,  # $2.80 per 1M tokens
+            },
+        },
+        ServiceProvider.GOOGLE: {
+            # TODO: Update pricing once gemini-3-flash exits preview
+            "gemini-3-flash-preview": {
+                "input": 0.0,  # Free during preview
+                "output": 0.0,
+            },
+        },
+        ServiceProvider.WHISPER_LOCAL: {
+            "distil-large-v3.5": {
+                "input": 0.0,  # Local compute — $0
+                "output": 0.0,
             },
         },
         ServiceProvider.OPENAI: {
