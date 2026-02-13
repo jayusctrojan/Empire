@@ -131,6 +131,7 @@ class OpenAICompatibleClient(LLMClient):
         max_tokens: int = 4096,
         temperature: float = 0.3,
         model: Optional[str] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
     ) -> str:
         content: List[Dict[str, Any]] = []
         for img in images:
@@ -141,7 +142,7 @@ class OpenAICompatibleClient(LLMClient):
             })
         content.append({"type": "text", "text": prompt})
 
-        response = await self.client.chat.completions.create(
+        create_kwargs: Dict[str, Any] = dict(
             model=model or self.DEFAULT_MODEL,
             messages=[
                 {"role": "system", "content": system},
@@ -150,6 +151,9 @@ class OpenAICompatibleClient(LLMClient):
             max_tokens=max_tokens,
             temperature=temperature,
         )
+        if extra_body:
+            create_kwargs["extra_body"] = extra_body
+        response = await self.client.chat.completions.create(**create_kwargs)
         return response.choices[0].message.content or ""
 
 
@@ -215,27 +219,16 @@ class OllamaVLMClient(OpenAICompatibleClient):
         max_tokens: int = 4096,
         temperature: float = 0.3,
         model: Optional[str] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
     ) -> str:
-        content: List[Dict[str, Any]] = []
-        for img in images:
-            b64 = base64.b64encode(img["data"]).decode("utf-8")
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{img['mime_type']};base64,{b64}"},
-            })
-        content.append({"type": "text", "text": prompt})
-
-        response = await self.client.chat.completions.create(
-            model=model or self.DEFAULT_MODEL,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": content},
-            ],
-            max_tokens=max_tokens,
-            temperature=temperature,
-            extra_body={"keep_alive": self.KEEP_ALIVE},
+        merged_body = {"keep_alive": self.KEEP_ALIVE}
+        if extra_body:
+            merged_body.update(extra_body)
+        return await super().generate_with_images(
+            system=system, prompt=prompt, images=images,
+            max_tokens=max_tokens, temperature=temperature,
+            model=model, extra_body=merged_body,
         )
-        return response.choices[0].message.content or ""
 
     def is_retryable(self, error: Exception) -> bool:
         """Tuned for local model: retry connection/timeout, fail fast on 404."""

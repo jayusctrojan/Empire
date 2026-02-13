@@ -36,6 +36,9 @@ from app.models.preflight import (
 
 logger = structlog.get_logger(__name__)
 
+# Required Ollama models for local embeddings + vision
+OLLAMA_REQUIRED_MODELS = ["bge-m3", "qwen2.5vl:32b-q8_0"]
+
 
 # =============================================================================
 # PROMETHEUS METRICS
@@ -729,7 +732,7 @@ class ServiceOrchestrator:
         """Check Ollama local service and verify required models."""
         config = self.inventory.get_service("ollama")
         start = time.perf_counter()
-        required_models = ["bge-m3", "qwen2.5vl:32b-q8_0"]
+        required_models = OLLAMA_REQUIRED_MODELS
         try:
             if self._http_client:
                 response = await self._http_client.get(
@@ -743,7 +746,7 @@ class ServiceOrchestrator:
                     ]
                     missing = [
                         m for m in required_models
-                        if not any(m in name for name in model_names)
+                        if not any(name == m or name.startswith(m + ":") for name in model_names)
                     ]
                     details = {"models_loaded": model_names}
                     if missing:

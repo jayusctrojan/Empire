@@ -9,7 +9,7 @@ Fallback: Together AI Kimi K2.5 Thinking (cloud, opt-in via VISION_CLOUD_FALLBAC
 import asyncio
 import os
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -186,10 +186,13 @@ class VisionService:
         prompt: str,
         system: str = "You are an expert image analyst. Provide accurate, detailed analysis.",
         max_tokens: Optional[int] = None,
-    ) -> str:
+    ) -> Tuple[str, str]:
         """Core vision analysis with retry + optional cloud fallback.
 
         Both analyze_image() and analyze_frames() route through here.
+
+        Returns:
+            Tuple of (analysis_text, model_used).
         """
         max_tokens = max_tokens or self.max_tokens
         last_error = None
@@ -197,13 +200,14 @@ class VisionService:
         # Primary: local Qwen-VL via Ollama
         for attempt in range(1, self.max_retries + 1):
             try:
-                return await self.primary_client.generate_with_images(
+                text = await self.primary_client.generate_with_images(
                     system=system,
                     prompt=prompt,
                     images=images,
                     max_tokens=max_tokens,
                     model=self.primary_model,
                 )
+                return text, self.primary_model
             except Exception as e:
                 last_error = str(e)
                 if self.primary_client.is_retryable(e) and attempt < self.max_retries:
@@ -214,17 +218,18 @@ class VisionService:
         # Optional cloud fallback
         if self.cloud_fallback_enabled and self.fallback_client:
             try:
-                return await self.fallback_client.generate_with_images(
+                text = await self.fallback_client.generate_with_images(
                     system=system,
                     prompt=prompt,
                     images=images,
                     max_tokens=max_tokens,
                     model=self.fallback_model,
                 )
+                return text, self.fallback_model or "cloud_fallback"
             except Exception as fallback_err:
                 raise RuntimeError(
                     f"Primary failed: {last_error}; Fallback failed: {fallback_err}"
-                )
+                ) from fallback_err
 
         raise RuntimeError(f"Vision analysis failed: {last_error}")
 
@@ -281,11 +286,8 @@ class VisionService:
             prompt = f"{prompt}\n\nAdditional context: {additional_context}"
 
         try:
-            description = await self._analyze_vision(images=[image_data], prompt=prompt)
+            description, model_used = await self._analyze_vision(images=[image_data], prompt=prompt)
             processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-
-            # Determine which model actually answered
-            model_used = self.primary_model
             result = VisionAnalysisResult(
                 success=True, file_id=file_id, analysis_type=analysis_type,
                 description=description,
@@ -341,10 +343,11 @@ class VisionService:
                 try:
                     with open(frame["path"], "rb") as f:
                         image_bytes = f.read()
+                    import mimetypes
                     ext = Path(frame["path"]).suffix.lower()
-                    mime = "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
+                    mime = mimetypes.types_map.get(ext, "image/jpeg")
 
-                    analysis = await self._analyze_vision(
+                    analysis, _ = await self._analyze_vision(
                         images=[{"data": image_bytes, "mime_type": mime}],
                         prompt=prompt,
                         max_tokens=300,
@@ -404,7 +407,7 @@ class VisionService:
             full_prompt = f"I'm sharing {len(images)} images. Please analyze them: {prompt}"
 
         try:
-            description = await self._analyze_vision(images=images, prompt=full_prompt)
+            description, model_used = await self._analyze_vision(images=images, prompt=full_prompt)
             processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
             return {
                 "success": True,
@@ -412,7 +415,7 @@ class VisionService:
                 "description": description,
                 "image_count": len(valid_file_ids),
                 "processing_time_ms": processing_time,
-                "model_used": self.primary_model,
+                "model_used": model_used,
             }
 
         except Exception as e:
