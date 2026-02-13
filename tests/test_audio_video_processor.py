@@ -1,6 +1,6 @@
 """
-Empire v7.3 - Audio/Video Processor Tests
-Tests for audio/video processing with ffmpeg, local Whisper, and Gemini Vision.
+Empire v7.4 - Audio/Video Processor Tests
+Tests for audio/video processing with ffmpeg, local Whisper, and Qwen-VL (via VisionService).
 
 NOTE: These are INTEGRATION tests - they require ffmpeg to be installed.
 """
@@ -34,17 +34,24 @@ def clear_llm_singletons():
 
 
 @pytest.fixture
-def mock_gemini():
-    client = MagicMock()
-    client.generate_with_images = AsyncMock(return_value="Frame analysis result")
-    client.is_retryable = MagicMock(return_value=False)
-    return client
+def mock_vision_service():
+    svc = MagicMock()
+    svc.analyze_frames = AsyncMock(return_value=[
+        {
+            "success": True,
+            "timestamp_seconds": 0.0,
+            "frame_number": 1,
+            "analysis": "Frame analysis result",
+            "status": "analyzed",
+        }
+    ])
+    return svc
 
 
 @pytest.fixture
-def processor(mock_gemini):
-    with patch("app.services.audio_video_processor.get_llm_client") as mock_factory:
-        mock_factory.return_value = mock_gemini
+def processor(mock_vision_service):
+    with patch("app.services.vision_service.get_vision_service") as mock_get_vs:
+        mock_get_vs.return_value = mock_vision_service
         proc = AudioVideoProcessor()
     return proc
 
@@ -122,6 +129,36 @@ class TestFrameExtraction:
             assert result["video_duration"] == 30.0
             assert len(result["frames"]) == 3
 
+    @pytest.mark.asyncio
+    async def test_extract_frames_with_custom_width(self, processor, tmp_path):
+        """Verify frame_width parameter is passed to ffmpeg scale filter."""
+        video_path = str(tmp_path / "test_video.mp4")
+        frames_dir = tmp_path / "frames"
+        frames_dir.mkdir()
+        (frames_dir / "frame_000001.jpg").touch()
+
+        with patch("app.services.audio_video_processor.FFMPEG_SUPPORT", True), \
+             patch("app.services.audio_video_processor.ffmpeg", create=True) as mock_ffmpeg:
+            mock_ffmpeg.probe.return_value = {"format": {"duration": "10.0"}}
+            mock_ffmpeg.input.return_value = MagicMock()
+            mock_ffmpeg.filter.return_value = MagicMock()
+            mock_ffmpeg.output.return_value = MagicMock()
+            mock_ffmpeg.run = MagicMock()
+
+            await processor.extract_frames_from_video(
+                video_path=video_path,
+                output_dir=str(frames_dir),
+                frame_width=720,
+            )
+
+            # Verify scale filter was called (second filter call after fps)
+            scale_calls = [
+                c for c in mock_ffmpeg.filter.call_args_list
+                if c[0][1] == "scale"
+            ]
+            assert len(scale_calls) == 1
+            assert scale_calls[0][1]["w"] == 720
+
 
 class TestWhisperTranscription:
     """Test local Whisper transcription"""
@@ -176,98 +213,43 @@ class TestWhisperTranscription:
         assert "model failed" in result["errors"][0]
 
 
-class TestGeminiFrameAnalysis:
-    """Test Gemini Vision frame analysis"""
+class TestFrameAnalysis:
+    """Test frame analysis delegation to VisionService"""
 
     @pytest.mark.asyncio
-    async def test_analyze_frame_success(self, processor, mock_gemini, tmp_path):
-        frame_path = tmp_path / "frame_001.jpg"
-        frame_path.write_bytes(b"\xff\xd8fake_jpeg")
-
-        result = await processor.analyze_frame_with_vision(
-            frame_path=str(frame_path), timestamp_seconds=10.5,
-        )
-
-        assert result["success"] is True
-        assert result["timestamp_seconds"] == 10.5
-        assert result["analysis"] == "Frame analysis result"
-        assert len(result["errors"]) == 0
-        mock_gemini.generate_with_images.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_analyze_frame_custom_prompt(self, processor, mock_gemini, tmp_path):
-        frame_path = tmp_path / "frame_001.jpg"
-        frame_path.write_bytes(b"\xff\xd8fake_jpeg")
-
-        await processor.analyze_frame_with_vision(
-            frame_path=str(frame_path),
-            timestamp_seconds=5.0,
-            analysis_prompt="Describe the speaker's gestures.",
-        )
-
-        call_kwargs = mock_gemini.generate_with_images.call_args[1]
-        assert "gestures" in call_kwargs["prompt"]
-
-    @pytest.mark.asyncio
-    async def test_analyze_frame_file_not_found(self, processor):
-        result = await processor.analyze_frame_with_vision(
-            frame_path="/nonexistent/frame.jpg", timestamp_seconds=0.0,
-        )
-        assert result["success"] is False
-        assert len(result["errors"]) > 0
-
-    @pytest.mark.asyncio
-    async def test_analyze_frame_api_error(self, processor, mock_gemini, tmp_path):
-        frame_path = tmp_path / "frame_001.jpg"
-        frame_path.write_bytes(b"\xff\xd8fake_jpeg")
-
-        mock_gemini.generate_with_images.side_effect = RuntimeError("Gemini error")
-
-        result = await processor.analyze_frame_with_vision(
-            frame_path=str(frame_path), timestamp_seconds=1.0,
-        )
-        assert result["success"] is False
-        assert "Gemini Vision error" in result["errors"][0]
-
-
-class TestBatchFrameAnalysis:
-    """Test batch frame analysis with concurrency control"""
-
-    @pytest.mark.asyncio
-    async def test_analyze_all_frames_success(self, processor, mock_gemini, tmp_path):
-        frames = []
-        for i in range(1, 4):
-            path = tmp_path / f"frame_{i:03d}.jpg"
-            path.write_bytes(b"\xff\xd8fake")
-            frames.append({"path": str(path), "timestamp_seconds": float(i)})
-
-        results = await processor.analyze_all_frames(frames=frames, max_concurrent=2)
-
-        assert len(results) == 3
-        for r in results:
-            assert r["success"] is True
-
-    @pytest.mark.asyncio
-    async def test_analyze_all_frames_partial_failure(self, processor, mock_gemini, tmp_path):
-        good_path = tmp_path / "frame_001.jpg"
-        good_path.write_bytes(b"\xff\xd8fake")
-
+    async def test_analyze_video_frames_delegates(self, processor, mock_vision_service, tmp_path):
         frames = [
-            {"path": str(good_path), "timestamp_seconds": 1.0},
-            {"path": "/nonexistent/frame.jpg", "timestamp_seconds": 2.0},
+            {"path": str(tmp_path / "f1.jpg"), "timestamp_seconds": 0.0, "frame_number": 1},
+            {"path": str(tmp_path / "f2.jpg"), "timestamp_seconds": 1.0, "frame_number": 2},
+        ]
+        mock_vision_service.analyze_frames.return_value = [
+            {"success": True, "timestamp_seconds": 0.0, "analysis": "A", "status": "analyzed"},
+            {"success": True, "timestamp_seconds": 1.0, "analysis": "B", "status": "analyzed"},
         ]
 
-        results = await processor.analyze_all_frames(frames=frames)
+        results = await processor.analyze_video_frames(frames)
+
         assert len(results) == 2
-        assert results[0]["success"] is True
-        assert results[1]["success"] is False
+        mock_vision_service.analyze_frames.assert_awaited_once_with(
+            frames=frames, question=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_analyze_video_frames_custom_prompt(self, processor, mock_vision_service):
+        frames = [{"path": "/fake.jpg", "timestamp_seconds": 0.0}]
+
+        await processor.analyze_video_frames(frames, analysis_prompt="Describe the speaker.")
+
+        mock_vision_service.analyze_frames.assert_awaited_once_with(
+            frames=frames, question="Describe the speaker.",
+        )
 
 
 class TestCompleteVideoProcessing:
     """Test integrated video processing workflow"""
 
     @pytest.mark.asyncio
-    async def test_process_video_complete_success(self, processor, mock_gemini, tmp_path):
+    async def test_process_video_complete_success(self, processor, mock_vision_service, tmp_path):
         video_path = str(tmp_path / "test_video.mp4")
         frames_dir = tmp_path / "output" / "frames"
         frames_dir.mkdir(parents=True)
@@ -284,6 +266,11 @@ class TestCompleteVideoProcessing:
             "speakers": ["speaker_0"],
             "duration_seconds": 2.0,
         }
+
+        mock_vision_service.analyze_frames.return_value = [
+            {"success": True, "timestamp_seconds": 0.0, "analysis": "Scene 1", "status": "analyzed"},
+            {"success": True, "timestamp_seconds": 5.0, "analysis": "Scene 2", "status": "analyzed"},
+        ]
 
         with patch("app.services.audio_video_processor.FFMPEG_SUPPORT", True), \
              patch("app.services.audio_video_processor.ffmpeg", create=True) as mock_ffmpeg, \
@@ -312,14 +299,15 @@ class TestCompleteVideoProcessing:
             assert result["frame_extraction"] is not None
             assert result["transcription"] is not None
             assert "timeline" in result
+            mock_vision_service.analyze_frames.assert_awaited_once()
 
 
 class TestSingletonPattern:
     """Test singleton pattern for AudioVideoProcessor"""
 
     def test_get_audio_video_processor_singleton(self):
-        with patch("app.services.audio_video_processor.get_llm_client") as mock_factory:
-            mock_factory.return_value = MagicMock()
+        with patch("app.services.vision_service.get_vision_service") as mock_get_vs:
+            mock_get_vs.return_value = MagicMock()
             # Reset singleton
             import app.services.audio_video_processor as avp
             avp._processor_instance = None

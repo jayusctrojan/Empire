@@ -36,6 +36,9 @@ from app.models.preflight import (
 
 logger = structlog.get_logger(__name__)
 
+# Required Ollama models for local embeddings + vision
+OLLAMA_REQUIRED_MODELS = ["bge-m3", "qwen2.5vl:32b-q8_0"]
+
 
 # =============================================================================
 # PROMETHEUS METRICS
@@ -181,7 +184,7 @@ DEFAULT_SERVICE_INVENTORY = ServiceInventory(
             category=ServiceCategory.OPTIONAL,
             type=ServiceType.API,
             timeout_ms=500,
-            fallback="Vision analysis disabled",
+            fallback="Gemini text generation disabled (vision uses local Ollama)",
             required_env_vars=["GOOGLE_API_KEY"]
         ),
         ServiceConfig(
@@ -213,7 +216,7 @@ DEFAULT_SERVICE_INVENTORY = ServiceInventory(
             type=ServiceType.LOCAL,
             health_url="http://localhost:11434/api/tags",
             timeout_ms=1000,
-            fallback="Using cloud embeddings"
+            fallback="Using cloud embeddings; local vision unavailable"
         ),
     ],
 
@@ -325,10 +328,10 @@ DEGRADATION_RULES: Dict[str, DegradationRule] = {
     ),
     "ollama": DegradationRule(
         service_name="ollama",
-        impact="Local embeddings disabled",
-        fallback_behavior="Use Anthropic embeddings",
-        affected_endpoints=["/api/embeddings/*"],
-        user_message="Using cloud-based embeddings instead of local."
+        impact="Local embeddings and vision disabled",
+        fallback_behavior="Use cloud embeddings; vision falls back to cloud if VISION_CLOUD_FALLBACK=true",
+        affected_endpoints=["/api/embeddings/*", "/api/vision/*"],
+        user_message="Using cloud-based embeddings and vision instead of local."
     ),
 }
 
@@ -726,13 +729,77 @@ class ServiceOrchestrator:
             )
 
     async def check_ollama(self) -> ServiceHealthCheck:
-        """Check Ollama local service"""
-        return await self.check_http_service(
-            name="ollama",
-            health_url="http://localhost:11434/api/tags",
-            category=ServiceCategory.OPTIONAL,
-            timeout=1.0
-        )
+        """Check Ollama local service and verify required models."""
+        config = self.inventory.get_service("ollama")
+        start = time.perf_counter()
+        required_models = OLLAMA_REQUIRED_MODELS
+        try:
+            if self._http_client:
+                response = await self._http_client.get(
+                    "http://localhost:11434/api/tags", timeout=1.0
+                )
+                latency = (time.perf_counter() - start) * 1000
+                if response.status_code == 200:
+                    data = response.json()
+                    model_names = [
+                        m.get("name", "") for m in data.get("models", [])
+                    ]
+                    missing = [
+                        m for m in required_models
+                        if not any(name == m or name.startswith(m + ":") for name in model_names)
+                    ]
+                    details = {"models_loaded": model_names}
+                    if missing:
+                        details["missing_models"] = missing
+                        return ServiceHealthCheck(
+                            name="ollama",
+                            status=ServiceStatus.DEGRADED,
+                            category=ServiceCategory.OPTIONAL,
+                            type=ServiceType.LOCAL,
+                            latency_ms=round(latency, 2),
+                            details=details,
+                            error_message=f"Missing models: {', '.join(missing)}",
+                            fallback_message=config.fallback if config else None,
+                        )
+                    return ServiceHealthCheck(
+                        name="ollama",
+                        status=ServiceStatus.RUNNING,
+                        category=ServiceCategory.OPTIONAL,
+                        type=ServiceType.LOCAL,
+                        latency_ms=round(latency, 2),
+                        details=details,
+                        fallback_message=config.fallback if config else None,
+                    )
+                else:
+                    return ServiceHealthCheck(
+                        name="ollama",
+                        status=ServiceStatus.ERROR,
+                        category=ServiceCategory.OPTIONAL,
+                        type=ServiceType.LOCAL,
+                        latency_ms=round(latency, 2),
+                        error_message=f"HTTP {response.status_code}",
+                        fallback_message=config.fallback if config else None,
+                    )
+            else:
+                return ServiceHealthCheck(
+                    name="ollama",
+                    status=ServiceStatus.UNKNOWN,
+                    category=ServiceCategory.OPTIONAL,
+                    type=ServiceType.LOCAL,
+                    error_message="HTTP client not initialized",
+                    fallback_message=config.fallback if config else None,
+                )
+        except Exception as e:
+            latency = (time.perf_counter() - start) * 1000
+            return ServiceHealthCheck(
+                name="ollama",
+                status=ServiceStatus.ERROR,
+                category=ServiceCategory.OPTIONAL,
+                type=ServiceType.LOCAL,
+                latency_ms=round(latency, 2),
+                error_message=str(e),
+                fallback_message=config.fallback if config else None,
+            )
 
     async def check_ffmpeg(self) -> ServiceHealthCheck:
         """Check if ffmpeg is available locally"""

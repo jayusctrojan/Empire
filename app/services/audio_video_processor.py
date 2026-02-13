@@ -1,11 +1,10 @@
 """
-Empire v7.3 - Audio & Video Processing Service
-Transcribe audio with local Whisper, analyze video frames with Gemini 3 Flash.
+Empire v7.4 - Audio & Video Processing Service
+Transcribe audio with local Whisper, analyze video frames with local Qwen-VL.
 """
 
 import os
 import logging
-import base64
 import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -19,8 +18,6 @@ except ImportError:
     FFMPEG_SUPPORT = False
     logging.warning("ffmpeg-python not available - install with: pip install ffmpeg-python")
 
-from app.services.llm_client import get_llm_client
-
 logger = logging.getLogger(__name__)
 
 
@@ -29,12 +26,13 @@ class AudioVideoProcessor:
     Comprehensive audio/video processor integrating:
     - ffmpeg-python for audio/video extraction and frame extraction
     - Local distil-whisper for transcription (via WhisperSTTService)
-    - Gemini 3 Flash for frame analysis
+    - Local Qwen2.5-VL for frame analysis (via VisionService)
     """
 
     def __init__(self):
-        """Initialize processor with Gemini vision client."""
-        self.vision_client = get_llm_client("gemini")
+        """Initialize processor — delegates vision to VisionService."""
+        from app.services.vision_service import get_vision_service
+        self.vision_service = get_vision_service()
 
         # Default extraction settings
         self.default_audio_sample_rate = 16000  # 16kHz for Whisper
@@ -123,6 +121,7 @@ class AudioVideoProcessor:
         output_dir: Optional[str] = None,
         frame_interval: float = 1.0,
         max_frames: Optional[int] = None,
+        frame_width: int = 1280,
     ) -> Dict[str, Any]:
         """
         Extract frames from video at specified intervals.
@@ -132,6 +131,8 @@ class AudioVideoProcessor:
             output_dir: Directory for output frames (default: temp directory)
             frame_interval: Seconds between extracted frames (default: 1.0)
             max_frames: Maximum number of frames to extract (default: unlimited)
+            frame_width: Target frame width in pixels (default: 1280 for 720p).
+                         Height is scaled proportionally. Reduces file size 3-5x.
 
         Returns:
             Dict with success, frames list, total_frames, video_duration, errors
@@ -165,6 +166,7 @@ class AudioVideoProcessor:
             output_pattern = os.path.join(output_dir, "frame_%06d.jpg")
             stream = ffmpeg.input(video_path)
             stream = ffmpeg.filter(stream, "fps", fps=fps)
+            stream = ffmpeg.filter(stream, "scale", w=frame_width, h=-1)
 
             if max_frames:
                 stream = ffmpeg.filter(stream, "select", f"lt(n,{max_frames})")
@@ -249,96 +251,27 @@ class AudioVideoProcessor:
         return result
 
     # ========================
-    # SUBTASK 11.3: Analyze Frames with Gemini Vision
+    # SUBTASK 11.3: Analyze Frames with Qwen-VL (via VisionService)
     # ========================
 
-    async def analyze_frame_with_vision(
-        self,
-        frame_path: str,
-        timestamp_seconds: float,
-        analysis_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        Analyze a video frame using Gemini 3 Flash.
-
-        Args:
-            frame_path: Path to frame image
-            timestamp_seconds: Timestamp of this frame in the video
-            analysis_prompt: Custom analysis prompt
-
-        Returns:
-            Dict with success, timestamp_seconds, analysis, errors
-        """
-        result = {
-            "success": False,
-            "timestamp_seconds": timestamp_seconds,
-            "analysis": "",
-            "errors": [],
-        }
-
-        try:
-            with open(frame_path, "rb") as f:
-                image_bytes = f.read()
-
-            ext = Path(frame_path).suffix.lower()
-            mime_type = "image/jpeg" if ext in [".jpg", ".jpeg"] else "image/png"
-
-            if analysis_prompt is None:
-                analysis_prompt = (
-                    "Describe what you see in this video frame. Include details about "
-                    "people, objects, actions, text, and the overall scene."
-                )
-
-            logger.info(f"Analyzing frame at {timestamp_seconds:.2f}s with Gemini")
-
-            analysis = await self.vision_client.generate_with_images(
-                system="You are a video frame analyst. Be concise and accurate.",
-                prompt=analysis_prompt,
-                images=[{"data": image_bytes, "mime_type": mime_type}],
-                max_tokens=300,
-            )
-
-            result["analysis"] = analysis
-            result["success"] = True
-
-            logger.info(f"Frame analysis complete for timestamp {timestamp_seconds:.2f}s")
-
-        except Exception as e:
-            logger.error(f"Frame analysis failed: {e}")
-            result["errors"].append(f"Gemini Vision error: {str(e)}")
-
-        return result
-
-    async def analyze_all_frames(
+    async def analyze_video_frames(
         self,
         frames: List[Dict[str, Any]],
         analysis_prompt: Optional[str] = None,
-        max_concurrent: int = 3,
     ) -> List[Dict[str, Any]]:
-        """
-        Analyze multiple video frames with Gemini Vision (with concurrency control).
+        """Delegate frame analysis to VisionService (local Qwen-VL).
 
         Args:
             frames: List of frame dicts from extract_frames_from_video()
-            analysis_prompt: Custom prompt for all frames
-            max_concurrent: Maximum concurrent API calls (default: 3)
+            analysis_prompt: Custom analysis prompt
 
         Returns:
-            List of analysis results with timestamp and description
+            List of per-frame analysis results
         """
-        semaphore = asyncio.Semaphore(max_concurrent)
-
-        async def analyze_with_semaphore(frame):
-            async with semaphore:
-                return await self.analyze_frame_with_vision(
-                    frame["path"],
-                    frame["timestamp_seconds"],
-                    analysis_prompt,
-                )
-
-        tasks = [analyze_with_semaphore(frame) for frame in frames]
-        results = await asyncio.gather(*tasks)
-        return results
+        return await self.vision_service.analyze_frames(
+            frames=frames,
+            question=analysis_prompt,
+        )
 
     # ========================
     # INTEGRATED WORKFLOW
@@ -358,7 +291,7 @@ class AudioVideoProcessor:
         Complete video processing workflow:
         1. Extract audio and frames
         2. Transcribe audio with local Whisper
-        3. Analyze frames with Gemini Vision
+        3. Analyze frames with local Qwen-VL (via VisionService)
         4. Return integrated timeline
         """
         result = {
@@ -403,9 +336,9 @@ class AudioVideoProcessor:
                 if not transcription_result["success"]:
                     result["errors"].extend(transcription_result["errors"])
 
-            # Step 4: Analyze frames with Gemini
+            # Step 4: Analyze frames with Qwen-VL (via VisionService)
             if analyze_frames and frame_result["success"] and frame_result["frames"]:
-                frame_analyses = await self.analyze_all_frames(
+                frame_analyses = await self.analyze_video_frames(
                     frame_result["frames"], frame_analysis_prompt,
                 )
                 result["frame_analyses"] = frame_analyses

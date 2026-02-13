@@ -570,7 +570,7 @@ class TestVisionService:
             mock_primary.is_retryable = MagicMock(return_value=False)
             mock_fallback = MagicMock()
             mock_fallback.generate_with_images = AsyncMock(return_value="Fallback description")
-            mock_factory.side_effect = lambda provider: mock_primary if provider == "together" else mock_fallback
+            mock_factory.side_effect = lambda provider: mock_primary if provider == "ollama_vlm" else mock_fallback
             mock_fh_factory.return_value = file_handler
             service = VisionService(cache_results=True)
             service.file_handler = file_handler
@@ -578,7 +578,7 @@ class TestVisionService:
             return service
 
     def test_initialization(self, vision_service):
-        assert vision_service.primary_model == "moonshotai/Kimi-K2.5-Thinking"
+        assert vision_service.primary_model == "qwen2.5vl:32b-q8_0"
         assert vision_service.cache_results is True
 
     @pytest.mark.asyncio
