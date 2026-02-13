@@ -183,9 +183,9 @@ class OllamaVLMClient(OpenAICompatibleClient):
     KEEP_ALIVE = "30m"
 
     def __init__(self, base_url: Optional[str] = None):
-        self._ollama_base = base_url or os.environ.get(
-            "OLLAMA_BASE_URL", "http://localhost:11434"
-        )
+        self._ollama_base = (
+            base_url or os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        ).rstrip("/")
         client = AsyncOpenAI(
             api_key="ollama",
             base_url=self._ollama_base + "/v1",
@@ -209,7 +209,7 @@ class OllamaVLMClient(OpenAICompatibleClient):
                 timeout=120,
             )
         except Exception as e:
-            logger.warning(f"Ollama VLM preload failed: {e}")
+            logger.warning("Ollama VLM preload failed", model=self.DEFAULT_MODEL, error=str(e))
 
     async def generate_with_images(
         self,

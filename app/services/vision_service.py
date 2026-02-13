@@ -215,6 +215,8 @@ class VisionService:
                 elif not self.primary_client.is_retryable(e):
                     break
 
+        logger.warning("Primary vision analysis exhausted retries", retries=self.max_retries, last_error=last_error)
+
         # Optional cloud fallback
         if self.cloud_fallback_enabled and self.fallback_client:
             try:
@@ -338,11 +340,14 @@ class VisionService:
 
         semaphore = asyncio.Semaphore(max_concurrent)
 
+        def _read_file(path: str) -> bytes:
+            with open(path, "rb") as f:
+                return f.read()
+
         async def analyze_single(frame: Dict[str, Any]) -> Dict[str, Any]:
             async with semaphore:
                 try:
-                    with open(frame["path"], "rb") as f:
-                        image_bytes = f.read()
+                    image_bytes = await asyncio.to_thread(_read_file, frame["path"])
                     import mimetypes
                     ext = Path(frame["path"]).suffix.lower()
                     mime = mimetypes.types_map.get(ext, "image/jpeg")
