@@ -8,7 +8,9 @@ import openai
 
 from app.services.llm_client import (
     LLMClient,
+    OpenAICompatibleClient,
     TogetherLLMClient,
+    OllamaVLMClient,
     AnthropicLLMClient,
     GeminiLLMClient,
     get_llm_client,
@@ -398,6 +400,93 @@ class TestGetLLMClient:
             client2 = get_llm_client("together")
             assert client1 is client2
 
+    def test_returns_ollama_vlm_client(self):
+        with patch.object(OllamaVLMClient, "_preload_model"):
+            client = get_llm_client("ollama_vlm")
+            assert isinstance(client, OllamaVLMClient)
+
     def test_unknown_provider_raises(self):
         with pytest.raises(ValueError, match="Unknown LLM provider"):
             get_llm_client("unknown")
+
+
+# ---------------------------------------------------------------------------
+# OllamaVLMClient
+# ---------------------------------------------------------------------------
+
+
+class TestOllamaVLMClient:
+    """Tests for the Ollama VLM (Qwen2.5-VL) client."""
+
+    @pytest.fixture(autouse=True)
+    def clear_singletons(self):
+        _clients.clear()
+        yield
+        _clients.clear()
+
+    @pytest.fixture
+    def client(self):
+        with patch.object(OllamaVLMClient, "_preload_model"):
+            return OllamaVLMClient()
+
+    def test_default_model(self, client):
+        assert client.DEFAULT_MODEL == "qwen2.5vl:32b-q8_0"
+
+    def test_base_url_default(self, client):
+        assert client._ollama_base == "http://localhost:11434"
+
+    def test_base_url_from_env(self):
+        with patch.dict("os.environ", {"OLLAMA_BASE_URL": "http://myhost:9999"}), \
+             patch.object(OllamaVLMClient, "_preload_model"):
+            c = OllamaVLMClient()
+            assert c._ollama_base == "http://myhost:9999"
+
+    def test_inherits_openai_compatible(self, client):
+        assert isinstance(client, OpenAICompatibleClient)
+        assert isinstance(client, LLMClient)
+
+    def test_is_retryable_connection(self, client):
+        err = openai.APIConnectionError(request=MagicMock())
+        assert client.is_retryable(err) is True
+
+    def test_is_retryable_timeout(self, client):
+        err = openai.APITimeoutError(request=MagicMock())
+        assert client.is_retryable(err) is True
+
+    def test_is_retryable_server_error(self, client):
+        err = openai.APIStatusError(
+            message="internal",
+            response=MagicMock(status_code=500, headers={}),
+            body=None,
+        )
+        assert client.is_retryable(err) is True
+
+    def test_is_retryable_404_not_retryable(self, client):
+        err = openai.APIStatusError(
+            message="not found",
+            response=MagicMock(status_code=404, headers={}),
+            body=None,
+        )
+        assert client.is_retryable(err) is False
+
+    def test_is_retryable_unknown_error(self, client):
+        assert client.is_retryable(ValueError("bad")) is False
+
+    @pytest.mark.asyncio
+    async def test_generate_with_images_sends_keep_alive(self, client):
+        mock_choice = MagicMock()
+        mock_choice.message.content = "I see an image"
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        client.client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+        result = await client.generate_with_images(
+            system="Describe images.",
+            prompt="What is this?",
+            images=[{"data": b"\x89PNG", "mime_type": "image/png"}],
+        )
+
+        assert result == "I see an image"
+        call_kwargs = client.client.chat.completions.create.call_args[1]
+        assert call_kwargs["extra_body"] == {"keep_alive": "30m"}

@@ -1,11 +1,14 @@
 """
-Empire v7.3 - Vision Service (Multimodal RAG)
-Image analysis via Kimi K2.5 Thinking (primary) with Gemini 3 Flash fallback.
+Empire v7.4 - Vision Service (Local Perception Layer)
+Image/frame analysis via local Qwen2.5-VL-32B (Ollama) with opt-in cloud fallback.
 
-Replaces direct Anthropic usage with the LLM client abstraction layer.
+Primary: Ollama Qwen2.5-VL (local, $0)
+Fallback: Together AI Kimi K2.5 Thinking (cloud, opt-in via VISION_CLOUD_FALLBACK=true)
 """
 
 import asyncio
+import os
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
@@ -45,7 +48,7 @@ class VisionAnalysisResult:
     detected_objects: Optional[List[str]] = None
     confidence_score: Optional[float] = None
     processing_time_ms: Optional[float] = None
-    model_used: str = "moonshotai/Kimi-K2.5-Thinking"
+    model_used: str = "qwen2.5vl:32b-q8_0"
     error: Optional[str] = None
     timestamp: Optional[datetime] = None
 
@@ -125,27 +128,43 @@ Be as comprehensive as possible.""",
 
 class VisionService:
     """
-    Vision analysis using Kimi K2.5 Thinking (primary) with Gemini 3 Flash fallback.
+    Vision analysis using local Qwen2.5-VL (Ollama) with opt-in cloud fallback.
+
+    Primary: Ollama Qwen2.5-VL-32B (local, $0)
+    Fallback: Together AI Kimi K2.5 Thinking (cloud, opt-in via VISION_CLOUD_FALLBACK=true)
 
     Features:
     - Multiple analysis types (general, document, diagram, code, detailed)
+    - Video frame analysis via analyze_frames()
     - Caching of analysis results
     - Retry with is_retryable() classification
-    - Primary/fallback model architecture
+    - Opt-in cloud fallback (default: fully local)
     - Support for multiple images in single request
     - Integration with chat file handler
     """
 
+    VISION_MODEL = "qwen2.5vl:32b-q8_0"
+
     def __init__(
         self,
         max_tokens: int = 4096,
-        max_retries: int = 3,
+        max_retries: int = 2,
         cache_results: bool = True,
     ):
-        self.primary_client = get_llm_client("together")
-        self.fallback_client = get_llm_client("gemini")
-        self.primary_model = "moonshotai/Kimi-K2.5-Thinking"
-        self.fallback_model = "gemini-3-flash-preview"
+        self.primary_client = get_llm_client("ollama_vlm")
+        self.primary_model = self.VISION_MODEL
+
+        # Opt-in cloud fallback (default OFF)
+        self.cloud_fallback_enabled = os.environ.get(
+            "VISION_CLOUD_FALLBACK", "false"
+        ).lower() == "true"
+        self.fallback_client = (
+            get_llm_client("together") if self.cloud_fallback_enabled else None
+        )
+        self.fallback_model = (
+            "moonshotai/Kimi-K2.5-Thinking" if self.cloud_fallback_enabled else None
+        )
+
         self.max_tokens = max_tokens
         self.max_retries = max_retries
         self.cache_results = cache_results
@@ -157,9 +176,57 @@ class VisionService:
         logger.info(
             "VisionService initialized",
             primary_model=self.primary_model,
-            fallback_model=self.fallback_model,
+            cloud_fallback=self.cloud_fallback_enabled,
             max_retries=max_retries,
         )
+
+    async def _analyze_vision(
+        self,
+        images: List[Dict[str, Any]],
+        prompt: str,
+        system: str = "You are an expert image analyst. Provide accurate, detailed analysis.",
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Core vision analysis with retry + optional cloud fallback.
+
+        Both analyze_image() and analyze_frames() route through here.
+        """
+        max_tokens = max_tokens or self.max_tokens
+        last_error = None
+
+        # Primary: local Qwen-VL via Ollama
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return await self.primary_client.generate_with_images(
+                    system=system,
+                    prompt=prompt,
+                    images=images,
+                    max_tokens=max_tokens,
+                    model=self.primary_model,
+                )
+            except Exception as e:
+                last_error = str(e)
+                if self.primary_client.is_retryable(e) and attempt < self.max_retries:
+                    await asyncio.sleep(2 ** attempt)
+                elif not self.primary_client.is_retryable(e):
+                    break
+
+        # Optional cloud fallback
+        if self.cloud_fallback_enabled and self.fallback_client:
+            try:
+                return await self.fallback_client.generate_with_images(
+                    system=system,
+                    prompt=prompt,
+                    images=images,
+                    max_tokens=max_tokens,
+                    model=self.fallback_model,
+                )
+            except Exception as fallback_err:
+                raise RuntimeError(
+                    f"Primary failed: {last_error}; Fallback failed: {fallback_err}"
+                )
+
+        raise RuntimeError(f"Vision analysis failed: {last_error}")
 
     async def analyze_image(
         self,
@@ -168,7 +235,7 @@ class VisionService:
         custom_prompt: Optional[str] = None,
         additional_context: Optional[str] = None,
     ) -> VisionAnalysisResult:
-        """Analyze an image using primary (Kimi) with Gemini fallback."""
+        """Analyze an image using local Qwen-VL with opt-in cloud fallback."""
         start_time = datetime.utcnow()
 
         # Check cache (skip when custom_prompt is provided)
@@ -213,83 +280,100 @@ class VisionService:
         if additional_context:
             prompt = f"{prompt}\n\nAdditional context: {additional_context}"
 
-        system = "You are an expert image analyst. Provide accurate, detailed analysis."
-
-        # Try primary client with retries
-        last_primary_error = None
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                logger.info(
-                    "Analyzing image (primary)",
-                    file_id=file_id, analysis_type=analysis_type.value,
-                    attempt=attempt, model=self.primary_model,
-                )
-                description = await self.primary_client.generate_with_images(
-                    system=system,
-                    prompt=prompt,
-                    images=[image_data],
-                    max_tokens=self.max_tokens,
-                    model=self.primary_model,
-                )
-                processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
-                result = VisionAnalysisResult(
-                    success=True, file_id=file_id, analysis_type=analysis_type,
-                    description=description,
-                    extracted_text=description if analysis_type in (VisionAnalysisType.DOCUMENT, VisionAnalysisType.CODE) else None,
-                    processing_time_ms=processing_time,
-                    model_used=self.primary_model,
-                )
-                metadata.status = ChatFileStatus.ANALYZED
-                metadata.analysis_result = result.to_dict()
-                if use_cache:
-                    self._cache[cache_key] = result
-                return result
-
-            except Exception as e:
-                last_primary_error = str(e)
-                logger.warning(
-                    "Primary analysis attempt failed",
-                    file_id=file_id, attempt=attempt, error=str(e),
-                )
-                if self.primary_client.is_retryable(e) and attempt < self.max_retries:
-                    await asyncio.sleep(2 ** attempt)
-                elif not self.primary_client.is_retryable(e):
-                    break  # Non-retryable — go straight to fallback
-
-        # All primary retries exhausted — try fallback once
         try:
-            logger.info(
-                "Falling back to Gemini",
-                file_id=file_id, model=self.fallback_model,
-            )
-            description = await self.fallback_client.generate_with_images(
-                system=system,
-                prompt=prompt,
-                images=[image_data],
-                max_tokens=self.max_tokens,
-                model=self.fallback_model,
-            )
+            description = await self._analyze_vision(images=[image_data], prompt=prompt)
             processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
+
+            # Determine which model actually answered
+            model_used = self.primary_model
             result = VisionAnalysisResult(
                 success=True, file_id=file_id, analysis_type=analysis_type,
                 description=description,
                 extracted_text=description if analysis_type in (VisionAnalysisType.DOCUMENT, VisionAnalysisType.CODE) else None,
                 processing_time_ms=processing_time,
-                model_used=self.fallback_model,
+                model_used=model_used,
             )
             metadata.status = ChatFileStatus.ANALYZED
             metadata.analysis_result = result.to_dict()
-            if self.cache_results:
+            if use_cache:
                 self._cache[cache_key] = result
             return result
 
-        except Exception as fallback_err:
+        except RuntimeError as e:
             processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
             return VisionAnalysisResult(
                 success=False, file_id=file_id, analysis_type=analysis_type,
                 description="", processing_time_ms=processing_time,
-                error=f"Primary failed: {last_primary_error}; Fallback failed: {fallback_err}",
+                error=str(e),
             )
+
+    async def analyze_frames(
+        self,
+        frames: List[Dict[str, Any]],
+        segment_metadata: Optional[Dict[str, Any]] = None,
+        question: Optional[str] = None,
+        max_concurrent: int = 1,
+    ) -> List[Dict[str, Any]]:
+        """Analyze video frames via local Qwen-VL.
+
+        Called by AudioVideoProcessor. Returns per-frame results.
+
+        Args:
+            frames: List of frame dicts with path, timestamp_seconds, frame_number.
+            segment_metadata: Optional video context to include in prompt.
+            question: Custom analysis question.
+            max_concurrent: Concurrent analyses (default 1 for local model).
+        """
+        if not frames:
+            return []
+
+        prompt = question or (
+            "Describe what you see in this video frame. Include details about "
+            "people, objects, actions, text, and the overall scene. Be concise."
+        )
+        if segment_metadata:
+            prompt += f"\n\nVideo context: {segment_metadata}"
+
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def analyze_single(frame: Dict[str, Any]) -> Dict[str, Any]:
+            async with semaphore:
+                try:
+                    with open(frame["path"], "rb") as f:
+                        image_bytes = f.read()
+                    ext = Path(frame["path"]).suffix.lower()
+                    mime = "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
+
+                    analysis = await self._analyze_vision(
+                        images=[{"data": image_bytes, "mime_type": mime}],
+                        prompt=prompt,
+                        max_tokens=300,
+                    )
+                    return {
+                        "success": True,
+                        "timestamp_seconds": frame["timestamp_seconds"],
+                        "frame_number": frame.get("frame_number"),
+                        "analysis": analysis,
+                        "status": "analyzed",
+                    }
+                except Exception as e:
+                    logger.warning(
+                        "Frame analysis failed",
+                        timestamp=frame["timestamp_seconds"],
+                        error=str(e),
+                    )
+                    return {
+                        "success": False,
+                        "timestamp_seconds": frame["timestamp_seconds"],
+                        "frame_number": frame.get("frame_number"),
+                        "analysis": "",
+                        "status": "vision_unavailable",
+                        "error": str(e),
+                    }
+
+        tasks = [analyze_single(frame) for frame in frames]
+        results = await asyncio.gather(*tasks)
+        return list(results)
 
     async def analyze_multiple_images(
         self,
@@ -319,16 +403,8 @@ class VisionService:
         else:
             full_prompt = f"I'm sharing {len(images)} images. Please analyze them: {prompt}"
 
-        system = "You are an expert image analyst."
-
         try:
-            description = await self.primary_client.generate_with_images(
-                system=system,
-                prompt=full_prompt,
-                images=images,
-                max_tokens=self.max_tokens,
-                model=self.primary_model,
-            )
+            description = await self._analyze_vision(images=images, prompt=full_prompt)
             processing_time = (datetime.utcnow() - start_time).total_seconds() * 1000
             return {
                 "success": True,

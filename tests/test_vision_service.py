@@ -1,4 +1,4 @@
-"""Comprehensive tests for VisionService (Kimi K2.5 primary + Gemini fallback)."""
+"""Comprehensive tests for VisionService (local Qwen-VL + opt-in cloud fallback)."""
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -64,19 +64,38 @@ def mock_file_handler():
 
 
 @pytest.fixture
-def service(mock_primary, mock_fallback, mock_file_handler):
+def service(mock_primary, mock_file_handler):
+    """Service with local-only vision (no cloud fallback)."""
     with patch("app.services.vision_service.get_llm_client") as mock_factory, \
-         patch("app.services.vision_service.get_chat_file_handler", return_value=mock_file_handler):
+         patch("app.services.vision_service.get_chat_file_handler", return_value=mock_file_handler), \
+         patch.dict("os.environ", {"VISION_CLOUD_FALLBACK": "false"}):
 
         def factory_side_effect(provider):
-            if provider == "together":
+            if provider == "ollama_vlm":
                 return mock_primary
-            elif provider == "gemini":
-                return mock_fallback
-            raise ValueError(f"Unknown: {provider}")
+            raise ValueError(f"Unexpected provider: {provider}")
 
         mock_factory.side_effect = factory_side_effect
-        svc = VisionService(max_retries=3)
+        svc = VisionService(max_retries=2)
+    return svc
+
+
+@pytest.fixture
+def service_with_fallback(mock_primary, mock_fallback, mock_file_handler):
+    """Service with cloud fallback enabled."""
+    with patch("app.services.vision_service.get_llm_client") as mock_factory, \
+         patch("app.services.vision_service.get_chat_file_handler", return_value=mock_file_handler), \
+         patch.dict("os.environ", {"VISION_CLOUD_FALLBACK": "true"}):
+
+        def factory_side_effect(provider):
+            if provider == "ollama_vlm":
+                return mock_primary
+            elif provider == "together":
+                return mock_fallback
+            raise ValueError(f"Unexpected provider: {provider}")
+
+        mock_factory.side_effect = factory_side_effect
+        svc = VisionService(max_retries=2)
     return svc
 
 
@@ -92,7 +111,7 @@ class TestAnalyzeImageHappyPath:
         result = await service.analyze_image("img-001", analysis_type=analysis_type)
         assert result.success is True
         assert result.description == "Primary analysis result"
-        assert result.model_used == "moonshotai/Kimi-K2.5-Thinking"
+        assert result.model_used == "qwen2.5vl:32b-q8_0"
         assert result.file_id == "img-001"
         assert result.analysis_type == analysis_type
 
@@ -145,7 +164,7 @@ class TestRetryAndFallback:
         async def fail_then_succeed(*args, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count < 3:
+            if call_count < 2:
                 raise ConnectionError("temp failure")
             return "Recovered"
 
@@ -154,45 +173,78 @@ class TestRetryAndFallback:
         result = await service.analyze_image("img-001")
         assert result.success is True
         assert result.description == "Recovered"
-        assert call_count == 3
+        assert call_count == 2
 
     @pytest.mark.asyncio
-    async def test_all_retries_fail_then_fallback_succeeds(self, service, mock_primary, mock_fallback):
+    async def test_all_retries_fail_no_fallback(self, service, mock_primary):
+        """Without cloud fallback, all retries exhausted → failure."""
+        mock_primary.is_retryable.return_value = True
+        mock_primary.generate_with_images.side_effect = ConnectionError("down")
+
+        result = await service.analyze_image("img-001")
+        assert result.success is False
+        assert "Vision analysis failed" in result.error
+
+    @pytest.mark.asyncio
+    async def test_all_retries_fail_then_fallback_succeeds(
+        self, service_with_fallback, mock_primary, mock_fallback
+    ):
         mock_primary.is_retryable.return_value = True
         mock_primary.generate_with_images.side_effect = ConnectionError("down")
         mock_fallback.generate_with_images.return_value = "Fallback analysis result"
 
-        result = await service.analyze_image("img-001")
+        result = await service_with_fallback.analyze_image("img-001")
         assert result.success is True
         assert result.description == "Fallback analysis result"
-        assert result.model_used == "gemini-3-flash-preview"
 
     @pytest.mark.asyncio
-    async def test_both_primary_and_fallback_fail(self, service, mock_primary, mock_fallback):
+    async def test_both_primary_and_fallback_fail(
+        self, service_with_fallback, mock_primary, mock_fallback
+    ):
         mock_primary.is_retryable.return_value = True
         mock_primary.generate_with_images.side_effect = ConnectionError("primary down")
         mock_fallback.generate_with_images.side_effect = RuntimeError("fallback down")
 
-        result = await service.analyze_image("img-001")
+        result = await service_with_fallback.analyze_image("img-001")
         assert result.success is False
         assert "Primary failed" in result.error
         assert "Fallback failed" in result.error
 
     @pytest.mark.asyncio
-    async def test_non_retryable_skips_to_fallback(self, service, mock_primary, mock_fallback):
+    async def test_non_retryable_skips_to_fallback(
+        self, service_with_fallback, mock_primary, mock_fallback
+    ):
         mock_primary.is_retryable.return_value = False
         mock_primary.generate_with_images.side_effect = ValueError("bad input")
 
-        result = await service.analyze_image("img-001")
+        result = await service_with_fallback.analyze_image("img-001")
         assert result.success is True
-        assert result.model_used == "gemini-3-flash-preview"
+        assert result.description == "Fallback analysis result"
         assert mock_primary.generate_with_images.await_count == 1
 
     @pytest.mark.asyncio
-    async def test_fallback_never_called_when_primary_succeeds(self, service, mock_fallback):
-        result = await service.analyze_image("img-001")
+    async def test_fallback_never_called_when_primary_succeeds(
+        self, service_with_fallback, mock_fallback
+    ):
+        result = await service_with_fallback.analyze_image("img-001")
         assert result.success is True
         mock_fallback.generate_with_images.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Cloud fallback configuration
+# ---------------------------------------------------------------------------
+
+class TestCloudFallbackConfig:
+
+    def test_cloud_fallback_disabled_by_default(self, service):
+        assert service.cloud_fallback_enabled is False
+        assert service.fallback_client is None
+
+    def test_cloud_fallback_enabled_via_env(self, service_with_fallback):
+        assert service_with_fallback.cloud_fallback_enabled is True
+        assert service_with_fallback.fallback_client is not None
+        assert service_with_fallback.fallback_model == "moonshotai/Kimi-K2.5-Thinking"
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +288,107 @@ class TestErrorCases:
         result = await service.analyze_image("img-001")
         assert result.success is False
         assert "Failed to prepare" in result.error
+
+
+# ---------------------------------------------------------------------------
+# analyze_frames
+# ---------------------------------------------------------------------------
+
+class TestAnalyzeFrames:
+
+    @pytest.mark.asyncio
+    async def test_happy_path(self, service, mock_primary, tmp_path):
+        frames = []
+        for i in range(5):
+            path = tmp_path / f"frame_{i:03d}.jpg"
+            path.write_bytes(b"\xff\xd8fake_jpeg")
+            frames.append({"path": str(path), "timestamp_seconds": float(i), "frame_number": i})
+
+        results = await service.analyze_frames(frames)
+        assert len(results) == 5
+        for r in results:
+            assert r["success"] is True
+            assert r["analysis"] == "Primary analysis result"
+            assert r["status"] == "analyzed"
+
+    @pytest.mark.asyncio
+    async def test_empty_list(self, service):
+        results = await service.analyze_frames([])
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_single_frame(self, service, tmp_path):
+        path = tmp_path / "single.jpg"
+        path.write_bytes(b"\xff\xd8fake")
+        results = await service.analyze_frames(
+            [{"path": str(path), "timestamp_seconds": 0.0, "frame_number": 1}]
+        )
+        assert len(results) == 1
+        assert results[0]["success"] is True
+
+    @pytest.mark.asyncio
+    async def test_mixed_success_failure(self, service, tmp_path):
+        good_path = tmp_path / "good.jpg"
+        good_path.write_bytes(b"\xff\xd8fake")
+        frames = [
+            {"path": str(good_path), "timestamp_seconds": 0.0, "frame_number": 1},
+            {"path": "/nonexistent/bad.jpg", "timestamp_seconds": 1.0, "frame_number": 2},
+        ]
+        results = await service.analyze_frames(frames)
+        assert len(results) == 2
+        assert results[0]["success"] is True
+        assert results[1]["success"] is False
+        assert results[1]["status"] == "vision_unavailable"
+
+    @pytest.mark.asyncio
+    async def test_with_metadata(self, service, mock_primary, tmp_path):
+        path = tmp_path / "frame.jpg"
+        path.write_bytes(b"\xff\xd8fake")
+        frames = [{"path": str(path), "timestamp_seconds": 5.0, "frame_number": 1}]
+
+        await service.analyze_frames(
+            frames, segment_metadata={"title": "Demo Video", "duration": 60}
+        )
+
+        call_kwargs = mock_primary.generate_with_images.call_args[1]
+        assert "Demo Video" in call_kwargs["prompt"]
+
+    @pytest.mark.asyncio
+    async def test_with_question(self, service, mock_primary, tmp_path):
+        path = tmp_path / "frame.jpg"
+        path.write_bytes(b"\xff\xd8fake")
+        frames = [{"path": str(path), "timestamp_seconds": 1.0}]
+
+        await service.analyze_frames(frames, question="What color is the car?")
+
+        call_kwargs = mock_primary.generate_with_images.call_args[1]
+        assert "What color is the car?" in call_kwargs["prompt"]
+
+    @pytest.mark.asyncio
+    async def test_large_batch(self, service, tmp_path):
+        frames = []
+        for i in range(20):
+            path = tmp_path / f"frame_{i:03d}.jpg"
+            path.write_bytes(b"\xff\xd8fake")
+            frames.append({"path": str(path), "timestamp_seconds": float(i)})
+
+        results = await service.analyze_frames(frames)
+        assert len(results) == 20
+        assert all(r["success"] for r in results)
+
+    @pytest.mark.asyncio
+    async def test_timeout_on_frame(self, service, mock_primary, tmp_path):
+        path = tmp_path / "frame.jpg"
+        path.write_bytes(b"\xff\xd8fake")
+
+        mock_primary.generate_with_images.side_effect = TimeoutError("slow model")
+        mock_primary.is_retryable.return_value = False
+
+        results = await service.analyze_frames(
+            [{"path": str(path), "timestamp_seconds": 0.0}]
+        )
+        assert results[0]["success"] is False
+        assert "vision_unavailable" == results[0]["status"]
 
 
 # ---------------------------------------------------------------------------
@@ -314,3 +467,17 @@ class TestClearCache:
         count = service.clear_cache(file_id="other-file")
         assert count == 0
         assert len(service._cache) == 1
+
+
+# ---------------------------------------------------------------------------
+# VisionAnalysisResult default model
+# ---------------------------------------------------------------------------
+
+class TestVisionAnalysisResultDefault:
+
+    def test_default_model_is_qwen(self):
+        result = VisionAnalysisResult(
+            success=True, file_id="test", analysis_type=VisionAnalysisType.GENERAL,
+            description="test",
+        )
+        assert result.model_used == "qwen2.5vl:32b-q8_0"

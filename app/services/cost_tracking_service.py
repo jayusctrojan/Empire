@@ -31,6 +31,7 @@ class ServiceProvider(str, Enum):
     TOGETHER = "together"  # Together AI (Kimi K2.5 Thinking)
     GOOGLE = "google"  # Google Gemini API
     WHISPER_LOCAL = "whisper_local"  # Local distil-whisper (free)
+    OLLAMA_LOCAL = "ollama_local"  # Local Ollama Qwen-VL (free)
     MISTRAL = "mistral"  # Mistral AI API
     LANGEXTRACT = "langextract"  # Document parsing
     RENDER = "render"  # Cloud hosting
@@ -132,7 +133,7 @@ class CostTrackingService:
     Centralized cost tracking for all Empire services
 
     Features:
-    - Track costs from Claude, Together, Google, Whisper Local, Mistral, LangExtract, Render, Supabase, B2
+    - Track costs from Claude, Together, Google, Whisper Local, Ollama Qwen-VL (local), Mistral, LangExtract, Render, Supabase, B2
     - Store cost data in Supabase
     - Generate monthly cost reports
     - Budget alerts at 80% threshold
@@ -178,6 +179,12 @@ class CostTrackingService:
         },
         ServiceProvider.WHISPER_LOCAL: {
             "distil-large-v3.5": {
+                "input": 0.0,  # Local compute — $0
+                "output": 0.0,
+            },
+        },
+        ServiceProvider.OLLAMA_LOCAL: {
+            "qwen2.5vl:32b-q8_0": {
                 "input": 0.0,  # Local compute — $0
                 "output": 0.0,
             },
