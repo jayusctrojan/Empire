@@ -11,10 +11,8 @@ import sys
 import jwt
 import time
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Env vars injected by Doppler: doppler run --project empire --config prd -- python generate_test_token.py
 
 
 def generate_test_token(
@@ -36,9 +34,9 @@ def generate_test_token(
     secret_key = os.getenv("CLERK_SECRET_KEY")
 
     if not secret_key:
-        print("❌ Error: CLERK_SECRET_KEY not found in .env file")
-        print("\nPlease ensure your .env file contains:")
-        print("CLERK_SECRET_KEY=sk-...")
+        print("❌ Error: CLERK_SECRET_KEY not found in environment")
+        print("\nRun via Doppler:")
+        print("doppler run --project empire --config prd -- python generate_test_token.py")
         sys.exit(1)
 
     # Create JWT payload
@@ -85,8 +83,8 @@ def main():
     secret_key = os.getenv("CLERK_SECRET_KEY")
     if not secret_key:
         print("❌ CLERK_SECRET_KEY not found in environment")
-        print("\nPlease add to your .env file:")
-        print("CLERK_SECRET_KEY=sk-...")
+        print("\nRun via Doppler:")
+        print("doppler run --project empire --config prd -- python generate_test_token.py")
         sys.exit(1)
 
     print(f"✅ Found CLERK_SECRET_KEY: {secret_key[:15]}...")

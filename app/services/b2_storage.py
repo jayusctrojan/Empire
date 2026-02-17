@@ -35,6 +35,9 @@ class B2Folder(str, Enum):
     # Archive folder for long-term storage
     ARCHIVE = "archive/courses"
 
+    # Generated document artifacts (DOCX, XLSX, PPTX, PDF)
+    ARTIFACTS = "artifacts/documents"
+
 
 class ProcessingStatus(str, Enum):
     """File processing status"""

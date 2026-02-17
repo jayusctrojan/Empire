@@ -480,13 +480,14 @@ async def stream_message(
     service: StudioCKOConversationService = Depends(get_service)
 ):
     """
-    Stream a CKO response token by token using Server-Sent Events (SSE).
+    Stream a CKO response using the multi-model pipeline with Server-Sent Events (SSE).
 
     Event types:
     - `start`: Session acknowledged, processing started
+    - `phase`: Pipeline phase indicator (analyzing, searching, reasoning, formatting)
     - `sources`: Retrieved sources (sent early for UI display)
-    - `token`: Response token chunk
-    - `done`: Complete message with metadata
+    - `token`: Response token chunk (streamed from Output Architect or Kimi fallback)
+    - `done`: Complete message with metadata including pipeline_mode
     - `error`: Error occurred
 
     Example SSE stream:
@@ -494,17 +495,26 @@ async def stream_message(
     event: start
     data: {"session_id": "..."}
 
+    event: phase
+    data: {"phase": "analyzing", "label": "Analyzing your question..."}
+
+    event: phase
+    data: {"phase": "searching", "label": "Searching knowledge base..."}
+
     event: sources
     data: {"sources": [...]}
+
+    event: phase
+    data: {"phase": "reasoning", "label": "Thinking deeply..."}
+
+    event: phase
+    data: {"phase": "formatting", "label": "Formatting response..."}
 
     event: token
     data: {"content": "Based on"}
 
-    event: token
-    data: {"content": " the documents"}
-
     event: done
-    data: {"message": {...}, "query_time_ms": 1234}
+    data: {"message": {...}, "query_time_ms": 1234, "pipeline_mode": "full"}
     ```
     """
     async def generate():

@@ -1,3 +1,6 @@
 export { MessageBubble } from './MessageBubble'
 export { CitationPopover } from './CitationPopover'
 export { ChatInput } from './ChatInput'
+export { PhaseIndicator } from './PhaseIndicator'
+export { ArtifactCard } from './ArtifactCard'
+export { ArtifactPanel } from './ArtifactPanel'

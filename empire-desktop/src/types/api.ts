@@ -19,12 +19,28 @@ export interface QueryRequest {
  * Streaming chunk from query response
  */
 export interface StreamChunk {
-  type: 'token' | 'source' | 'workflow' | 'done' | 'error'
+  type: 'token' | 'source' | 'workflow' | 'done' | 'error' | 'phase' | 'artifact'
   content?: string
   source?: SourceCitation
   workflow?: string
   error?: string
+  phase?: 'analyzing' | 'searching' | 'reasoning' | 'formatting'
+  label?: string
+  pipeline_mode?: 'full' | 'no_prompt_engineer' | 'no_output_architect' | 'direct'
+  // Artifact fields (present when type === 'artifact')
+  id?: string
+  title?: string
+  format?: string
+  mimeType?: string
+  sizeBytes?: number
+  previewMarkdown?: string
+  status?: string
 }
+
+/**
+ * Pipeline phase names for CKO streaming
+ */
+export type PipelinePhase = 'analyzing' | 'searching' | 'reasoning' | 'formatting'
 
 /**
  * Source citation from query response

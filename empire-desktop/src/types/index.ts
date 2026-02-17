@@ -20,6 +20,7 @@ export interface Message {
   role: 'user' | 'assistant'
   content: string
   sources?: Source[]
+  artifacts?: Artifact[]
   createdAt: Date
   updatedAt: Date
   status: 'sending' | 'streaming' | 'complete' | 'error'
@@ -32,6 +33,27 @@ export interface Message {
   isKBResponse?: boolean
   // Context window protection (Feature 011)
   isProtected?: boolean
+  // Pipeline metadata
+  pipelineMode?: 'full' | 'no_prompt_engineer' | 'no_output_architect' | 'direct'
+}
+
+// Document Artifacts
+export type ArtifactFormat = 'docx' | 'xlsx' | 'pptx' | 'pdf' | 'md'
+export type ArtifactStatus = 'uploading' | 'ready' | 'error'
+
+export interface Artifact {
+  id: string
+  messageId?: string
+  sessionId: string
+  title: string
+  format: ArtifactFormat
+  mimeType: string
+  sizeBytes: number
+  storageUrl?: string
+  previewMarkdown?: string
+  summary?: string
+  status: ArtifactStatus
+  createdAt?: string
 }
 
 export interface Source {

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { Conversation, Message, Source, SourceCitation, CompactionEvent } from '@/types'
+import type { Conversation, Message, Source, SourceCitation, CompactionEvent, Artifact } from '@/types'
+import type { PipelinePhase } from '@/types/api'
 
 // Response metadata from KB mode
 export interface KBResponseMetadata {
@@ -34,6 +35,14 @@ interface ChatState {
   // Compaction state (Feature 011 - Task 204)
   compactionEvents: CompactionEvent[]
   isCompacting: boolean
+
+  // Pipeline state (Phase 1 - Multi-Model Quality Pipeline)
+  currentPhase: PipelinePhase | null
+  currentPhaseLabel: string
+
+  // Artifact panel state (Phase 4)
+  activeArtifact: Artifact | null
+  isArtifactPanelOpen: boolean
 
   // Actions
   setConversations: (conversations: Conversation[]) => void
@@ -71,6 +80,14 @@ interface ChatState {
   addCompactionEvent: (event: CompactionEvent) => void
   setCompactionEvents: (events: CompactionEvent[]) => void
   clearCompactionEvents: () => void
+
+  // Pipeline actions (Phase 1)
+  setPhase: (phase: PipelinePhase | null, label?: string) => void
+
+  // Artifact actions (Phase 4)
+  setActiveArtifact: (artifact: Artifact | null) => void
+  toggleArtifactPanel: (open?: boolean) => void
+  addArtifactToMessage: (messageId: string, artifact: Artifact) => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -89,6 +106,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   error: null,
   compactionEvents: [],
   isCompacting: false,
+  currentPhase: null,
+  currentPhaseLabel: '',
+  activeArtifact: null,
+  isArtifactPanelOpen: false,
 
   // Conversation actions
   setConversations: (conversations) => set({ conversations }),
@@ -248,4 +269,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setCompactionEvents: (events) => set({ compactionEvents: events }),
 
   clearCompactionEvents: () => set({ compactionEvents: [], isCompacting: false }),
+
+  // Pipeline actions
+  setPhase: (phase, label) => set({ currentPhase: phase, currentPhaseLabel: label || '' }),
+
+  // Artifact actions
+  setActiveArtifact: (artifact) => set({
+    activeArtifact: artifact,
+    isArtifactPanelOpen: artifact !== null,
+  }),
+
+  toggleArtifactPanel: (open) => set((state) => ({
+    isArtifactPanelOpen: open !== undefined ? open : !state.isArtifactPanelOpen,
+    activeArtifact: (open === false || (!open && state.isArtifactPanelOpen)) ? null : state.activeArtifact,
+  })),
+
+  addArtifactToMessage: (messageId, artifact) => set((state) => ({
+    messages: state.messages.map((msg) =>
+      msg.id === messageId
+        ? { ...msg, artifacts: [...(msg.artifacts || []), artifact] }
+        : msg
+    ),
+  })),
 }))

@@ -245,7 +245,7 @@ class OllamaVLMClient(OpenAICompatibleClient):
 class AnthropicLLMClient(LLMClient):
     """Anthropic Claude client (fallback)."""
 
-    DEFAULT_MODEL = "claude-sonnet-4-20250514"
+    DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
 
     def __init__(self, api_key: Optional[str] = None):
         self.client = AsyncAnthropic(
