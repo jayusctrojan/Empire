@@ -382,8 +382,11 @@ class DocumentGeneratorService:
                 content_layout = prs.slide_layouts[1]  # Title and Content
                 current_slide = prs.slides.add_slide(content_layout)
                 current_slide.shapes.title.text = block.content
-                current_body = current_slide.placeholders[1].text_frame
-                current_body.clear()
+                if 1 in current_slide.placeholders:
+                    current_body = current_slide.placeholders[1].text_frame
+                    current_body.clear()
+                else:
+                    current_body = None
 
             elif block.type == "table":
                 # Create a dedicated slide for the table

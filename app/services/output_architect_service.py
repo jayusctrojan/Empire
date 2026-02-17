@@ -10,6 +10,7 @@ Pipeline: PromptEngineer(Sonnet) -> Kimi(reasoning) -> OutputArchitect(Sonnet)
 """
 
 import json
+import re as _re_module
 import structlog
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Optional
@@ -144,7 +145,7 @@ class OutputArchitectService:
             model=self.MODEL,
         )
 
-        return self._parse_output(formatted, structured_prompt)
+        return self.parse_output(formatted, structured_prompt)
 
     async def stream_architect_output(
         self,
@@ -192,7 +193,7 @@ class OutputArchitectService:
 
         return "\n".join(parts)
 
-    def _parse_output(
+    def parse_output(
         self,
         raw_output: str,
         structured_prompt: StructuredPrompt,
@@ -314,8 +315,7 @@ class OutputArchitectService:
                 continue
 
             # List item (unordered: - or *, ordered: 1. 2. etc.)
-            import re as _re
-            ordered_match = _re.match(r'^(\d+)\.\s+(.+)', stripped)
+            ordered_match = _re_module.match(r'^(\d+)\.\s+(.+)', stripped)
             if stripped.startswith("- ") or stripped.startswith("* ") or ordered_match:
                 is_ordered = bool(ordered_match)
                 if current_block and (current_block.type != "list" or current_block.metadata.get("ordered") != is_ordered):

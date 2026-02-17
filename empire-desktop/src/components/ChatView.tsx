@@ -3,7 +3,7 @@ import { useChatStore } from '@/stores/chat'
 import { MessageBubble, ChatInput, PhaseIndicator, ArtifactPanel } from '@/components/chat'
 import { queryStream, uploadDocuments, EmpireAPIError, downloadArtifact } from '@/lib/api'
 import { createConversation, createMessage } from '@/lib/database'
-import type { Message, Artifact } from '@/types'
+import type { Message, Artifact, ArtifactFormat } from '@/types'
 
 export function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -58,9 +58,9 @@ export function ChatView() {
   }, [setActiveArtifact])
 
   // Handle downloading an artifact via Tauri save dialog
-  const handleDownloadArtifact = useCallback(async (artifact: Artifact) => {
+  const handleDownloadArtifact = useCallback(async (artifact: Artifact, format?: ArtifactFormat) => {
     try {
-      await downloadArtifact(artifact)
+      await downloadArtifact(artifact, format)
     } catch (err) {
       console.error('Artifact download failed:', err)
       setError('Failed to download artifact. Please try again.')

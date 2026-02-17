@@ -117,7 +117,7 @@ async def list_artifacts(
         return ArtifactListResponse(artifacts=artifacts, total=total)
 
     except Exception as e:
-        logger.error("Failed to list artifacts", error=str(e))
+        logger.exception("Failed to list artifacts")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list artifacts",
@@ -152,7 +152,7 @@ async def get_artifact(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to get artifact", artifact_id=artifact_id, error=str(e))
+        logger.exception("Failed to get artifact", artifact_id=artifact_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get artifact",
@@ -198,7 +198,7 @@ async def download_artifact(
         )
 
         import re as _re
-        safe_title = _re.sub(r'[^\w\s\-.]', '', row['title'])[:100].strip() or "artifact"
+        safe_title = _re.sub(r'[^\w\-.]', '', row['title'].replace(' ', '_'))[:100].strip() or "artifact"
         filename = f"{safe_title}.{row['format']}"
 
         return StreamingResponse(
@@ -213,7 +213,7 @@ async def download_artifact(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to download artifact", artifact_id=artifact_id, error=str(e))
+        logger.exception("Failed to download artifact", artifact_id=artifact_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to download artifact",
@@ -273,7 +273,7 @@ async def delete_artifact(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Failed to delete artifact", artifact_id=artifact_id, error=str(e))
+        logger.exception("Failed to delete artifact", artifact_id=artifact_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete artifact",

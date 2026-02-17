@@ -50,6 +50,21 @@ export function ArtifactPanel({ artifact, onClose, onDownload }: ArtifactPanelPr
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showDownloadMenu])
 
+  // Close panel or dropdown on Escape
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (showDownloadMenu) {
+          setShowDownloadMenu(false)
+        } else {
+          onClose()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [showDownloadMenu, onClose])
+
   return (
     <div className="w-[40%] min-w-[320px] max-w-[600px] h-full border-l border-empire-border bg-empire-sidebar flex flex-col animate-in slide-in-from-right duration-200">
       {/* Header */}

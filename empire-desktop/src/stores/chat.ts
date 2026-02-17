@@ -283,10 +283,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     isArtifactPanelOpen: artifact !== null,
   }),
 
-  toggleArtifactPanel: (open) => set((state) => ({
-    isArtifactPanelOpen: open !== undefined ? open : !state.isArtifactPanelOpen,
-    activeArtifact: (open === false || (!open && state.isArtifactPanelOpen)) ? null : state.activeArtifact,
-  })),
+  toggleArtifactPanel: (open) => set((state) => {
+    const shouldClose = open === false || (open === undefined && state.isArtifactPanelOpen)
+    return {
+      isArtifactPanelOpen: open !== undefined ? open : !state.isArtifactPanelOpen,
+      activeArtifact: shouldClose ? null : state.activeArtifact,
+    }
+  }),
 
   addArtifactToMessage: (messageId, artifact) => set((state) => ({
     messages: state.messages.map((msg) =>

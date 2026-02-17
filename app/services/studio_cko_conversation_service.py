@@ -673,7 +673,7 @@ class StudioCKOConversationService:
                 and pipeline_mode in (PipelineMode.FULL, PipelineMode.NO_PROMPT_ENGINEER)
             ):
                 try:
-                    architect_result = self.output_architect._parse_output(
+                    architect_result = self.output_architect.parse_output(
                         response_content, structured_prompt
                     )
                     if architect_result.has_artifact:
@@ -895,7 +895,7 @@ class StudioCKOConversationService:
             artifact_event = None
             if use_full_pipeline and response_content:
                 # Parse the full response to get artifact metadata
-                architect_result = self.output_architect._parse_output(
+                architect_result = self.output_architect.parse_output(
                     response_content, structured_prompt
                 )
 
@@ -1529,7 +1529,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 "size_bytes": document.size_bytes,
                 "preview_markdown": document.preview_markdown,
                 "summary": architect_result.summary,
-                "intent": architect_result.artifact_format,
+                "intent": structured_prompt.intent.value if structured_prompt else None,
                 "content_block_count": len(architect_result.content_blocks),
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),

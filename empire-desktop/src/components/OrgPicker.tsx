@@ -13,17 +13,20 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
   const [showCreate, setShowCreate] = useState(false)
   const [newOrgName, setNewOrgName] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
   // Load organizations
   useEffect(() => {
     async function loadOrgs() {
       setLoading(true)
+      setLoadError(null)
       try {
         const orgs = await listOrganizations()
         setUserOrgs(orgs)
       } catch (err) {
         console.error('Failed to load organizations:', err)
+        setLoadError('Failed to load organizations. Please try again.')
       } finally {
         setLoading(false)
       }
@@ -85,6 +88,13 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
             Which company are you working on today?
           </p>
         </div>
+
+        {/* Load error */}
+        {loadError && (
+          <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
+            <p className="text-sm text-red-400">{loadError}</p>
+          </div>
+        )}
 
         {/* Organization List */}
         <div className="space-y-2 mb-6">

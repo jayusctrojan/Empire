@@ -264,6 +264,38 @@ class TestMembership:
             await org_service.add_member("org-123", "user-789", "new-user", "superadmin")
 
     @pytest.mark.asyncio
+    async def test_admin_cannot_assign_owner_role(self, org_service, mock_supabase, sample_membership_row):
+        """Admin trying to assign 'owner' role should raise PermissionError."""
+        admin_membership = {**sample_membership_row, "role": "admin"}
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+            data=[admin_membership]
+        )
+
+        with pytest.raises(PermissionError, match="Only owners can assign the owner role"):
+            await org_service.add_member("org-123", "user-789", "new-user", "owner")
+
+    @pytest.mark.asyncio
+    async def test_admin_cannot_remove_owner(self, org_service, mock_supabase, sample_membership_row):
+        """Admin trying to remove an owner should raise PermissionError."""
+        admin_membership = {**sample_membership_row, "role": "admin", "user_id": "admin-user"}
+        owner_membership = {**sample_membership_row, "role": "owner", "user_id": "owner-user"}
+
+        # First call: requester membership (admin)
+        # Second call: target membership (owner)
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+            data=[admin_membership]
+        )
+        # For the target lookup, mock returns owner
+        # Note: both calls go through the same mock chain; we use side_effect for sequential calls
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.side_effect = [
+            MagicMock(data=[admin_membership]),  # requester
+            MagicMock(data=[owner_membership]),   # target
+        ]
+
+        with pytest.raises(PermissionError, match="Only owners can remove other owners"):
+            await org_service.remove_member("org-123", "admin-user", "owner-user")
+
+    @pytest.mark.asyncio
     async def test_owner_cannot_remove_self(self, org_service, mock_supabase, sample_membership_row):
         # Both requester and target are the same owner
         mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(

@@ -193,6 +193,8 @@ async def remove_member(
             raise HTTPException(status_code=403, detail="Insufficient permissions or member not found")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
 
 
 @router.get("/{org_id}/export")

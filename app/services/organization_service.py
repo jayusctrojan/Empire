@@ -102,7 +102,7 @@ class OrganizationService:
         """Create a new organization and add the creator as owner."""
         slug = slug or self._slugify(name)
 
-        # Insert organization
+        # Insert organization + owner membership atomically via RPC or sequential with cleanup
         org_result = await asyncio.to_thread(
             lambda: self.supabase.supabase.table("organizations")
             .insert({
@@ -120,16 +120,26 @@ class OrganizationService:
         org_row = org_result.data[0]
         org_id = org_row["id"]
 
-        # Add creator as owner
-        await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("org_memberships")
-            .insert({
-                "org_id": org_id,
-                "user_id": owner_user_id,
-                "role": "owner",
-            })
-            .execute()
-        )
+        # Add creator as owner — clean up org on failure
+        try:
+            await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("org_memberships")
+                .insert({
+                    "org_id": org_id,
+                    "user_id": owner_user_id,
+                    "role": "owner",
+                })
+                .execute()
+            )
+        except Exception:
+            # Roll back: delete the orphaned organization
+            await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("organizations")
+                .delete()
+                .eq("id", org_id)
+                .execute()
+            )
+            raise
 
         logger.info("Organization created", org_id=org_id, name=name, owner=owner_user_id)
 
