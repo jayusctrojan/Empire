@@ -899,7 +899,7 @@ class StudioCKOConversationService:
                 session_id=session_id,
                 role=MessageRole.CKO,
                 content=response_content,
-                sources=used_sources if use_full_pipeline else sources[:10]
+                sources=used_sources,
             )
 
             # Artifact generation (if Output Architect detected an artifact)
@@ -1574,7 +1574,14 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 ),
                 name=f"artifact-upload-{artifact_id}",
             )
-            task.add_done_callback(lambda t: t.result() if not t.cancelled() and t.exception() is None else None)
+            def _on_upload_done(t: asyncio.Task) -> None:
+                if t.cancelled():
+                    return
+                exc = t.exception()
+                if exc is not None:
+                    logger.error(f"Background artifact upload task failed: {exc}")
+
+            task.add_done_callback(_on_upload_done)
 
             return {
                 "id": artifact_id,
