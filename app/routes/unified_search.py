@@ -123,6 +123,22 @@ async def unified_search(
 
 
 # ============================================================================
+# Helpers
+# ============================================================================
+
+def _sanitize_for_ilike(value: str) -> str:
+    """Escape special characters for PostgREST ilike filter values."""
+    # Escape SQL LIKE wildcards
+    value = value.replace("\\", "\\\\")
+    value = value.replace("%", "\\%")
+    value = value.replace("_", "\\_")
+    # Strip PostgREST filter delimiters that could inject conditions
+    value = value.replace(",", "")
+    value = value.replace(".", "")
+    return value
+
+
+# ============================================================================
 # Per-type search helpers
 # ============================================================================
 
@@ -130,11 +146,11 @@ async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user
     """Search CKO sessions by title and context_summary using DB-level ilike."""
     items = []
 
-    # Use Supabase or_ for DB-level filtering
+    safe_query = _sanitize_for_ilike(raw_query)
     builder = supabase.table("studio_cko_sessions").select(
         "id, title, context_summary, message_count, last_message_at, created_at"
     ).eq("user_id", user_id).eq("is_deleted", False).or_(
-        f"title.ilike.%{raw_query}%,context_summary.ilike.%{raw_query}%"
+        f"title.ilike.%{safe_query}%,context_summary.ilike.%{safe_query}%"
     ).limit(limit)
 
     if org_id:
@@ -170,10 +186,11 @@ async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, u
     """Search projects by name and description using DB-level ilike."""
     items = []
 
+    safe_query = _sanitize_for_ilike(raw_query)
     builder = supabase.table("projects").select(
         "id, name, description, source_count, created_at, updated_at"
     ).eq("user_id", user_id).or_(
-        f"name.ilike.%{raw_query}%,description.ilike.%{raw_query}%"
+        f"name.ilike.%{safe_query}%,description.ilike.%{safe_query}%"
     ).limit(limit)
 
     if org_id:
@@ -207,10 +224,11 @@ async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_i
     """Search KB documents by filename and metadata using DB-level ilike."""
     items = []
 
+    safe_query = _sanitize_for_ilike(raw_query)
     builder = supabase.table("documents").select(
         "id, filename, file_type, status, department, created_at, updated_at"
     ).eq("status", "processed").or_(
-        f"filename.ilike.%{raw_query}%,department.ilike.%{raw_query}%"
+        f"filename.ilike.%{safe_query}%,department.ilike.%{safe_query}%"
     ).limit(limit)
 
     if org_id:
@@ -245,10 +263,11 @@ async def _search_artifacts(supabase, query_lower: str, raw_query: str, org_id, 
     """Search generated artifacts by title and summary using DB-level ilike."""
     items = []
 
+    safe_query = _sanitize_for_ilike(raw_query)
     builder = supabase.table("studio_cko_artifacts").select(
         "id, title, format, summary, size_bytes, created_at, session_id"
     ).eq("user_id", user_id).or_(
-        f"title.ilike.%{raw_query}%,summary.ilike.%{raw_query}%"
+        f"title.ilike.%{safe_query}%,summary.ilike.%{safe_query}%"
     ).limit(limit)
 
     if org_id:

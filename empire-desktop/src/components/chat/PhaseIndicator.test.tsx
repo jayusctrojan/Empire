@@ -37,9 +37,8 @@ describe('PhaseIndicator', () => {
   })
 
   it('falls back to analyzing style for unknown phase', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { container } = render(
-      <PhaseIndicator phase={'unknown' as any} label="Processing..." />
+      <PhaseIndicator phase={'unknown' as never} label="Processing..." />
     )
     const dot = container.querySelector('.animate-pulse')
     expect(dot).not.toBeNull()

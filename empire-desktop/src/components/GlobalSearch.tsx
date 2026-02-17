@@ -112,10 +112,10 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
         // KB document — go to uploads/projects view
         setActiveView('uploads')
       }
+      onClose()
     } catch (err) {
       console.error('Failed to open result:', err)
     }
-    onClose()
   }, [setActiveConversation, setMessages, setActiveView, onClose])
 
   const handleSelectConversation = useCallback(async (conversation: Conversation) => {
@@ -124,10 +124,10 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
       setMessages(messages)
       setActiveConversation(conversation.id)
       setActiveView('chats')
+      onClose()
     } catch (err) {
       console.error('Failed to open conversation:', err)
     }
-    onClose()
   }, [setActiveConversation, setMessages, setActiveView, onClose])
 
   // Keyboard navigation
@@ -208,7 +208,9 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
                   )}
                 >
                   {tab.label}
-                  {query && <span className="ml-1 opacity-70">{count}</span>}
+                  {query && activeFilter === 'all' && (
+                    <span className="ml-1 opacity-70">{count}</span>
+                  )}
                 </button>
               )
             })}
@@ -328,8 +330,9 @@ function highlightMatch(text: string, query: string): ReactNode {
 
   if (parts.length === 1) return truncated
 
+  // With a single capturing group in split(), odd-indexed parts are always matches
   return parts.map((part, i) =>
-    regex.test(part)
+    i % 2 === 1
       ? <mark key={i} className="bg-empire-primary/30 text-empire-text rounded px-0.5">{part}</mark>
       : part
   )
