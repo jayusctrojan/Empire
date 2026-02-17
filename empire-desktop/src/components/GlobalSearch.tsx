@@ -1,19 +1,28 @@
-import { useState, useEffect, useRef } from 'react'
-import { Search, X, MessageSquare, ArrowRight, Clock } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  Search, X, MessageSquare, ArrowRight, Clock,
+  FolderOpen, BookOpen, FileText,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useChatStore } from '@/stores/chat'
 import { useAppStore } from '@/stores/app'
-import { searchMessages, getConversations, getMessages } from '@/lib/database'
+import { getConversations, getMessages } from '@/lib/database'
+import { unifiedSearch, type SearchContentType, type SearchResultItem } from '@/lib/api/search'
 import type { Conversation } from '@/types'
 
-interface SearchResult {
-  type: 'message' | 'conversation'
-  id: string
-  title: string
-  preview: string
-  conversationId: string
-  messageId?: string
-  highlight?: string
+const FILTER_TABS: { key: SearchContentType | 'all'; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'chat', label: 'Chats' },
+  { key: 'project', label: 'Projects' },
+  { key: 'kb', label: 'Knowledge Base' },
+  { key: 'artifact', label: 'Artifacts' },
+]
+
+const TYPE_ICONS: Record<SearchContentType, typeof MessageSquare> = {
+  chat: MessageSquare,
+  project: FolderOpen,
+  kb: BookOpen,
+  artifact: FileText,
 }
 
 interface GlobalSearchProps {
@@ -23,10 +32,11 @@ interface GlobalSearchProps {
 export function GlobalSearch({ onClose }: GlobalSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResult[]>([])
+  const [results, setResults] = useState<SearchResultItem[]>([])
   const [recentChats, setRecentChats] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [activeFilter, setActiveFilter] = useState<SearchContentType | 'all'>('all')
 
   const { setActiveConversation, setMessages } = useChatStore()
   const { setActiveView } = useAppStore()
@@ -51,7 +61,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
     }
   }, [query])
 
-  // Search with debounce
+  // Search with debounce — uses backend unified search
   useEffect(() => {
     if (!query.trim()) {
       setResults([])
@@ -61,44 +71,74 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
     const timer = setTimeout(async () => {
       setIsLoading(true)
       try {
-        const searchResults = await searchMessages(query)
-        const mapped: SearchResult[] = searchResults.map((r) => ({
-          type: 'message',
-          id: r.message.id,
-          title: r.conversationTitle,
-          preview: r.message.content.slice(0, 100),
-          conversationId: r.message.conversationId,
-          messageId: r.message.id,
-          highlight: highlightMatch(r.message.content, query),
-        }))
-        setResults(mapped)
+        const types = activeFilter === 'all' ? undefined : [activeFilter]
+        const response = await unifiedSearch(query, types, 30)
+        setResults(response.results)
         setSelectedIndex(0)
       } catch (err) {
         console.error('Search failed:', err)
       } finally {
         setIsLoading(false)
       }
-    }, 200) // 200ms debounce
+    }, 250)
 
     return () => clearTimeout(timer)
-  }, [query])
+  }, [query, activeFilter])
+
+  // Filtered results for display
+  const displayResults = activeFilter === 'all'
+    ? results
+    : results.filter((r) => r.type === activeFilter)
+
+  // Handle selecting a search result
+  const handleSelectResult = useCallback(async (result: SearchResultItem) => {
+    if (result.type === 'chat') {
+      const sessionId = (result.metadata?.sessionId as string) || result.id
+      const messages = await getMessages(sessionId)
+      setMessages(messages)
+      setActiveConversation(sessionId)
+      setActiveView('chats')
+    } else if (result.type === 'project') {
+      setActiveView('projects')
+    } else if (result.type === 'artifact') {
+      const sessionId = result.metadata?.sessionId as string | undefined
+      if (sessionId) {
+        const messages = await getMessages(sessionId)
+        setMessages(messages)
+        setActiveConversation(sessionId)
+        setActiveView('chats')
+      }
+    } else {
+      // KB document — go to uploads/projects view
+      setActiveView('uploads')
+    }
+    onClose()
+  }, [setActiveConversation, setMessages, setActiveView, onClose])
+
+  const handleSelectConversation = useCallback(async (conversation: Conversation) => {
+    const messages = await getMessages(conversation.id)
+    setMessages(messages)
+    setActiveConversation(conversation.id)
+    setActiveView('chats')
+    onClose()
+  }, [setActiveConversation, setMessages, setActiveView, onClose])
 
   // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const items = query ? results : recentChats
+      const items = query ? displayResults : recentChats
       const count = items.length
 
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setSelectedIndex((prev) => (prev + 1) % count)
+        setSelectedIndex((prev) => (count > 0 ? (prev + 1) % count : 0))
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setSelectedIndex((prev) => (prev - 1 + count) % count)
+        setSelectedIndex((prev) => (count > 0 ? (prev - 1 + count) % count : 0))
       } else if (e.key === 'Enter') {
         e.preventDefault()
-        if (query && results[selectedIndex]) {
-          handleSelectResult(results[selectedIndex])
+        if (query && displayResults[selectedIndex]) {
+          handleSelectResult(displayResults[selectedIndex])
         } else if (!query && recentChats[selectedIndex]) {
           handleSelectConversation(recentChats[selectedIndex])
         }
@@ -109,24 +149,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [query, results, recentChats, selectedIndex, onClose])
-
-  const handleSelectResult = async (result: SearchResult) => {
-    // Load conversation messages
-    const messages = await getMessages(result.conversationId)
-    setMessages(messages)
-    setActiveConversation(result.conversationId)
-    setActiveView('chats')
-    onClose()
-  }
-
-  const handleSelectConversation = async (conversation: Conversation) => {
-    const messages = await getMessages(conversation.id)
-    setMessages(messages)
-    setActiveConversation(conversation.id)
-    setActiveView('chats')
-    onClose()
-  }
+  }, [query, displayResults, recentChats, selectedIndex, onClose, handleSelectResult, handleSelectConversation])
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/50">
@@ -134,7 +157,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Search Modal */}
-      <div className="relative w-full max-w-xl mx-4 rounded-xl border border-empire-border bg-empire-sidebar shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-2xl mx-4 rounded-xl border border-empire-border bg-empire-sidebar shadow-2xl overflow-hidden">
         {/* Search Input */}
         <div className="flex items-center gap-3 p-4 border-b border-empire-border">
           <Search className="w-5 h-5 text-empire-text-muted flex-shrink-0" />
@@ -143,7 +166,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search messages, conversations..."
+            placeholder="Search chats, projects, knowledge base, artifacts..."
             className="flex-1 bg-transparent text-empire-text placeholder:text-empire-text-muted outline-none"
           />
           {query && (
@@ -159,6 +182,32 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
           </kbd>
         </div>
 
+        {/* Filter Tabs — only show when there's a query */}
+        {query && (
+          <div className="flex items-center gap-1 px-4 py-2 border-b border-empire-border overflow-x-auto">
+            {FILTER_TABS.map((tab) => {
+              const count = tab.key === 'all'
+                ? results.length
+                : results.filter((r) => r.type === tab.key).length
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => { setActiveFilter(tab.key); setSelectedIndex(0) }}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
+                    activeFilter === tab.key
+                      ? 'bg-empire-primary text-white'
+                      : 'bg-empire-border text-empire-text-muted hover:text-empire-text'
+                  )}
+                >
+                  {tab.label}
+                  {query && <span className="ml-1 opacity-70">{count}</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Results */}
         <div className="max-h-[50vh] overflow-y-auto">
           {isLoading ? (
@@ -166,39 +215,47 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
               <div className="animate-spin w-6 h-6 border-2 border-empire-primary border-t-transparent rounded-full" />
             </div>
           ) : query ? (
-            results.length > 0 ? (
+            displayResults.length > 0 ? (
               <ul className="py-2">
-                {results.map((result, index) => (
-                  <li key={result.id}>
-                    <button
-                      onClick={() => handleSelectResult(result)}
-                      className={cn(
-                        'flex items-start gap-3 w-full px-4 py-3 text-left transition-colors',
-                        selectedIndex === index
-                          ? 'bg-empire-primary/20'
-                          : 'hover:bg-empire-border'
-                      )}
-                    >
-                      <MessageSquare className="w-4 h-4 mt-1 text-empire-text-muted flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-empire-text truncate">
-                          {result.title}
-                        </p>
-                        <p
-                          className="text-xs text-empire-text-muted line-clamp-2"
-                          dangerouslySetInnerHTML={{
-                            __html: result.highlight || result.preview,
-                          }}
-                        />
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-empire-text-muted flex-shrink-0" />
-                    </button>
-                  </li>
-                ))}
+                {displayResults.map((result, index) => {
+                  const Icon = TYPE_ICONS[result.type] || MessageSquare
+                  return (
+                    <li key={`${result.type}-${result.id}`}>
+                      <button
+                        onClick={() => handleSelectResult(result)}
+                        className={cn(
+                          'flex items-start gap-3 w-full px-4 py-3 text-left transition-colors',
+                          selectedIndex === index
+                            ? 'bg-empire-primary/20'
+                            : 'hover:bg-empire-border'
+                        )}
+                      >
+                        <Icon className="w-4 h-4 mt-1 text-empire-text-muted flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-empire-text truncate">
+                              {result.title}
+                            </p>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-empire-border text-empire-text-muted capitalize flex-shrink-0">
+                              {result.type}
+                            </span>
+                          </div>
+                          <p
+                            className="text-xs text-empire-text-muted line-clamp-2"
+                            dangerouslySetInnerHTML={{
+                              __html: highlightMatch(result.snippet, query),
+                            }}
+                          />
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-empire-text-muted flex-shrink-0" />
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             ) : (
               <div className="p-8 text-center text-empire-text-muted">
-                <p>No results found for "{query}"</p>
+                <p>No results found for &quot;{query}&quot;</p>
               </div>
             )
           ) : (
@@ -248,7 +305,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
               <kbd className="px-1 py-0.5 rounded bg-empire-border">Enter</kbd> to select
             </span>
           </div>
-          <span>{results.length} results</span>
+          <span>{displayResults.length} results</span>
         </div>
       </div>
     </div>
@@ -259,6 +316,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
  * Highlight matching text in a string
  */
 function highlightMatch(text: string, query: string): string {
+  if (!text || !query) return text || ''
   const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
   const truncated = text.slice(0, 150)

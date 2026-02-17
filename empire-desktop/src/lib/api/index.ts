@@ -237,6 +237,14 @@ export {
   type ArtifactListResponse,
 } from './artifacts'
 
+// Unified Search API
+export {
+  unifiedSearch,
+  type SearchContentType,
+  type SearchResultItem,
+  type UnifiedSearchResponse,
+} from './search'
+
 // Health check
 import { get } from './client'
 import type { HealthResponse } from '@/types'
