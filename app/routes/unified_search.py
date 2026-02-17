@@ -85,28 +85,28 @@ async def unified_search(
             chat_results = await _search_chats(supabase, query_lower, q, org_id, user_id, limit)
             results.extend(chat_results)
         except Exception as e:
-            logger.warning("Chat search failed: %s", e)
+            logger.warning("Chat search failed: %s", e, exc_info=True)
 
     if "project" in search_types:
         try:
             project_results = await _search_projects(supabase, query_lower, q, org_id, user_id, limit)
             results.extend(project_results)
         except Exception as e:
-            logger.warning("Project search failed: %s", e)
+            logger.warning("Project search failed: %s", e, exc_info=True)
 
     if "kb" in search_types:
         try:
             kb_results = await _search_kb_documents(supabase, query_lower, q, org_id, limit)
             results.extend(kb_results)
         except Exception as e:
-            logger.warning("KB search failed: %s", e)
+            logger.warning("KB search failed: %s", e, exc_info=True)
 
     if "artifact" in search_types:
         try:
             artifact_results = await _search_artifacts(supabase, query_lower, q, org_id, user_id, limit)
             results.extend(artifact_results)
         except Exception as e:
-            logger.warning("Artifact search failed: %s", e)
+            logger.warning("Artifact search failed: %s", e, exc_info=True)
 
     # Two stable sorts: first by date desc (tiebreaker), then by relevance desc (primary)
     results.sort(key=lambda r: r.date or "", reverse=True)
@@ -148,6 +148,10 @@ async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user
     items = []
 
     safe_query = _sanitize_for_ilike(raw_query)
+    if not safe_query.strip():
+        return items
+
+    safe_lower = safe_query.lower()
     builder = supabase.table("studio_cko_sessions").select(
         "id, title, context_summary, message_count, last_message_at, created_at"
     ).eq("user_id", user_id).eq("is_deleted", False).or_(
@@ -164,8 +168,8 @@ async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user
         summary = row.get("context_summary") or ""
         title_lower = title.lower()
 
-        # Score: title match > summary match
-        score = 0.9 if query_lower in title_lower else 0.6
+        # Score: title match > summary match (use sanitized query for consistency)
+        score = 0.9 if safe_lower in title_lower else 0.6
         msg_count = row.get("message_count") or 0
         snippet = summary[:150] if summary else f"{msg_count} messages"
 
@@ -188,6 +192,10 @@ async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, u
     items = []
 
     safe_query = _sanitize_for_ilike(raw_query)
+    if not safe_query.strip():
+        return items
+
+    safe_lower = safe_query.lower()
     builder = supabase.table("projects").select(
         "id, name, description, source_count, created_at, updated_at"
     ).eq("user_id", user_id).or_(
@@ -204,7 +212,7 @@ async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, u
         desc = row.get("description") or ""
         name_lower = name.lower()
 
-        score = 0.85 if query_lower in name_lower else 0.55
+        score = 0.85 if safe_lower in name_lower else 0.55
         snippet = desc[:150] if desc else f"{row.get('source_count', 0)} sources"
 
         items.append(SearchResultItem(
@@ -225,15 +233,20 @@ async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_i
     """Search KB documents by filename and metadata using DB-level ilike."""
     items = []
 
+    # KB documents are org-scoped; refuse to search without an org context
+    if not org_id:
+        return items
+
     safe_query = _sanitize_for_ilike(raw_query)
+    if not safe_query.strip():
+        return items
+
+    safe_lower = safe_query.lower()
     builder = supabase.table("documents").select(
         "id, filename, file_type, status, department, created_at, updated_at"
-    ).eq("status", "processed").or_(
+    ).eq("status", "processed").eq("org_id", org_id).or_(
         f"filename.ilike.%{safe_query}%,department.ilike.%{safe_query}%"
     ).limit(limit)
-
-    if org_id:
-        builder = builder.eq("org_id", org_id)
 
     response = builder.execute()
 
@@ -242,7 +255,7 @@ async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_i
         department = row.get("department") or ""
         filename_lower = filename.lower()
 
-        score = 0.8 if query_lower in filename_lower else 0.5
+        score = 0.8 if safe_lower in filename_lower else 0.5
         file_type = row.get("file_type") or "unknown"
         snippet = f"{file_type.upper()} - {department}" if department else file_type.upper()
 
@@ -265,6 +278,10 @@ async def _search_artifacts(supabase, query_lower: str, raw_query: str, org_id, 
     items = []
 
     safe_query = _sanitize_for_ilike(raw_query)
+    if not safe_query.strip():
+        return items
+
+    safe_lower = safe_query.lower()
     builder = supabase.table("studio_cko_artifacts").select(
         "id, title, format, summary, size_bytes, created_at, session_id"
     ).eq("user_id", user_id).or_(
@@ -281,7 +298,7 @@ async def _search_artifacts(supabase, query_lower: str, raw_query: str, org_id, 
         summary = row.get("summary") or ""
         title_lower = title.lower()
 
-        score = 0.75 if query_lower in title_lower else 0.5
+        score = 0.75 if safe_lower in title_lower else 0.5
         fmt = row.get("format") or "unknown"
         snippet = summary[:150] if summary else f"{fmt.upper()} document"
 

@@ -104,6 +104,9 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
           setMessages(messages)
           setActiveConversation(sessionId)
           setActiveView('chats')
+        } else {
+          // No linked session — navigate to uploads view
+          setActiveView('uploads')
         }
       } else {
         // KB document — go to uploads/projects view
