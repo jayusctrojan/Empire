@@ -655,8 +655,12 @@ class StudioCKOConversationService:
                     if pipeline_mode == PipelineMode.FULL:
                         pipeline_mode = PipelineMode.NO_OUTPUT_ARCHITECT
             else:
-                if pipeline_mode == PipelineMode.NO_PROMPT_ENGINEER:
-                    pipeline_mode = PipelineMode.DIRECT if not self.output_architect else pipeline_mode
+                if not self.output_architect:
+                    pipeline_mode = (
+                        PipelineMode.DIRECT
+                        if pipeline_mode == PipelineMode.NO_PROMPT_ENGINEER
+                        else PipelineMode.NO_OUTPUT_ARCHITECT
+                    )
 
             # Step 7: Save CKO response
             cko_msg = await self._save_message(
@@ -831,6 +835,12 @@ class StudioCKOConversationService:
                 and pipeline_mode == PipelineMode.FULL
             )
 
+            if not use_full_pipeline and pipeline_mode == PipelineMode.FULL:
+                if self.output_architect is None:
+                    pipeline_mode = PipelineMode.NO_OUTPUT_ARCHITECT
+                elif structured_prompt is None:
+                    pipeline_mode = PipelineMode.NO_PROMPT_ENGINEER
+
             if use_full_pipeline:
                 # Phase 3: Kimi reasoning (silent collection — not streamed to user)
                 yield {"type": "phase", "phase": "reasoning", "label": "Thinking deeply..."}
@@ -895,22 +905,24 @@ class StudioCKOConversationService:
             # Artifact generation (if Output Architect detected an artifact)
             artifact_event = None
             if use_full_pipeline and response_content:
-                # Parse the full response to get artifact metadata
-                architect_result = self.output_architect.parse_output(
-                    response_content, structured_prompt
-                )
-
-                if architect_result.has_artifact:
-                    artifact_event = await self._generate_and_save_artifact(
-                        architect_result=architect_result,
-                        message_id=cko_msg.id,
-                        session_id=session_id,
-                        user_id=user_id,
-                        structured_prompt=structured_prompt,
+                try:
+                    architect_result = self.output_architect.parse_output(
+                        response_content, structured_prompt
                     )
 
-                    if artifact_event:
-                        yield {"type": "artifact", **artifact_event}
+                    if architect_result.has_artifact:
+                        artifact_event = await self._generate_and_save_artifact(
+                            architect_result=architect_result,
+                            message_id=cko_msg.id,
+                            session_id=session_id,
+                            user_id=user_id,
+                            structured_prompt=structured_prompt,
+                        )
+
+                        if artifact_event:
+                            yield {"type": "artifact", **artifact_event}
+                except Exception as e:
+                    logger.warning(f"Artifact generation failed (streaming): {e}")
 
             # Update session
             await self._update_session_metadata(session_id, message, response_content)
@@ -1610,7 +1622,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 storage_path=document.storage_path,
             )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Background artifact upload failed",
                 artifact_id=artifact_id,
                 error=str(e),

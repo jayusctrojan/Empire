@@ -160,7 +160,7 @@ class TestPromptEngineerGenerate:
 
         # Check that conversation context was included
         call_args = mock_llm.generate.call_args
-        messages = call_args.kwargs.get("messages") or call_args[1].get("messages")
+        messages = call_args.kwargs["messages"]
         assert "Conversation context" in messages[0]["content"]
 
 
