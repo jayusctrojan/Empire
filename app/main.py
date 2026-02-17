@@ -28,6 +28,8 @@ from app.routes import sessions, preferences, costs, rbac, documents, users, mon
 from app.routes import health as health_router  # Task 190: Enhanced Health Checks
 from app.routes import feedback as feedback_router  # Task 188: Agent Feedback System
 from app.routes import kb_submissions  # CKO Telegram Bot: KB Submission Pipeline
+from app.routes import organizations as organizations_router  # Organizations: Multi-Tenant SaaS
+from app.routes import artifacts as artifacts_router  # Phase 3: Document Artifacts
 
 # PENDING FEATURES (to be implemented in future releases):
 # - Task 206: Automatic Checkpoint System (checkpoints_router)
@@ -60,6 +62,7 @@ from app.middleware.rate_limit import configure_rate_limiting, limiter
 from app.middleware.rls_context import configure_rls_context
 from app.middleware.input_validation import configure_input_validation
 from app.middleware.audit import configure_audit_logging
+from app.middleware.org_context import configure_org_context
 
 # Task 136: Request tracing middleware for X-Request-ID propagation
 from app.middleware.request_tracing import RequestTracingMiddleware
@@ -279,6 +282,7 @@ app.add_middleware(
         "X-Request-Context",
         "X-User-ID",
         "X-Session-ID",
+        "X-Org-Id",
         "Accept",
         "Origin",
         "Cache-Control",
@@ -331,6 +335,9 @@ app.add_middleware(
     include_timing=True
 )
 logger.info("request_tracing_middleware_enabled", header="X-Request-ID")
+
+# Organization Context: X-Org-Id header validation and membership caching
+configure_org_context(app)
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"
@@ -640,6 +647,10 @@ app.include_router(feedback_router.router)  # Feedback router has /api/feedback 
 
 # CKO Telegram Bot: KB Submission Pipeline - Agent content submissions for CKO review
 app.include_router(kb_submissions.router)  # KB Submissions router has /api/kb prefix
+
+# Organizations: Multi-Tenant SaaS with acquisition-ready data portability
+app.include_router(organizations_router.router)  # Organizations router has /api/organizations prefix
+app.include_router(artifacts_router.router)  # Artifacts router has /api/studio/artifacts prefix
 
 # =============================================================================
 # PENDING FEATURES (to be implemented in future releases)

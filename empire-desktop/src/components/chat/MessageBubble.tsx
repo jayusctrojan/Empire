@@ -3,8 +3,9 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Copy, Check, RotateCcw, Trash2, ThumbsUp, ThumbsDown, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Message, Source } from '@/types'
+import type { Message, Source, Artifact } from '@/types'
 import { CitationPopover } from './CitationPopover'
+import { ArtifactCard } from './ArtifactCard'
 
 interface MessageBubbleProps {
   message: Message
@@ -13,6 +14,8 @@ interface MessageBubbleProps {
   onRegenerate?: () => void
   onDelete?: () => void
   onRate?: (rating: -1 | 0 | 1, feedback?: string) => void
+  onOpenArtifact?: (artifact: Artifact) => void
+  onDownloadArtifact?: (artifact: Artifact) => void
 }
 
 export function MessageBubble({
@@ -22,6 +25,8 @@ export function MessageBubble({
   onRegenerate,
   onDelete,
   onRate,
+  onOpenArtifact,
+  onDownloadArtifact,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const [showFeedbackInput, setShowFeedbackInput] = useState(false)
@@ -169,6 +174,20 @@ export function MessageBubble({
             <p className="text-xs text-empire-text-muted mb-1">
               {message.sources.length} source{message.sources.length !== 1 ? 's' : ''} cited
             </p>
+          </div>
+        )}
+
+        {/* Artifact cards */}
+        {message.artifacts && message.artifacts.length > 0 && !isStreaming && (
+          <div>
+            {message.artifacts.map((artifact) => (
+              <ArtifactCard
+                key={artifact.id}
+                artifact={artifact}
+                onOpen={onOpenArtifact}
+                onDownload={onDownloadArtifact}
+              />
+            ))}
           </div>
         )}
 

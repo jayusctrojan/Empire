@@ -212,6 +212,31 @@ export {
   type RecoveryProgressResponse,
 } from './compaction'
 
+// Organizations API
+export {
+  listOrganizations,
+  getOrganization,
+  createOrganization,
+  updateOrganization,
+  listMembers,
+  addMember,
+  removeMember,
+  exportOrganization,
+  type CreateOrgRequest,
+  type UpdateOrgRequest,
+  type AddMemberRequest,
+  type OrgMember,
+} from './organizations'
+
+// Artifacts API (Document Generation)
+export {
+  getArtifact,
+  listArtifacts,
+  deleteArtifact,
+  downloadArtifact,
+  type ArtifactListResponse,
+} from './artifacts'
+
 // Health check
 import { get } from './client'
 import type { HealthResponse } from '@/types'

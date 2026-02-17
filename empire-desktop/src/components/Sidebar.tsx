@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/app'
 import { useChatStore } from '@/stores/chat'
 import { UserMenu } from '@/components/auth'
+import { OrgSwitcher } from '@/components/OrgSwitcher'
 import { GlobalSearch } from '@/components/GlobalSearch'
 import { getConversations, deleteConversation } from '@/lib/database'
 import type { Conversation } from '@/types'
@@ -83,10 +84,12 @@ export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
           sidebarOpen ? 'w-64' : 'w-16'
         )}
       >
-        {/* Header with collapse button */}
+        {/* Org Switcher + collapse button */}
         <div className="flex items-center justify-between p-4 border-b border-empire-border">
           {sidebarOpen && (
-            <span className="font-semibold text-empire-text">Empire</span>
+            <div className="flex-1 mr-2">
+              <OrgSwitcher />
+            </div>
           )}
           <button
             onClick={toggleSidebar}

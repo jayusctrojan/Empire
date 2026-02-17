@@ -5,6 +5,7 @@
 
 import { fetch } from '@tauri-apps/plugin-http'
 import { useAuthStore } from '@/stores/auth'
+import { useOrgStore } from '@/stores/org'
 import type { RetryConfig, APIError } from '@/types'
 
 // API Configuration
@@ -76,6 +77,12 @@ function buildHeaders(customHeaders?: Record<string, string>): Record<string, st
   const token = getAuthToken()
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
+  }
+
+  // Inject current org ID for multi-tenant scoping
+  const currentOrg = useOrgStore.getState().currentOrg
+  if (currentOrg) {
+    headers['X-Org-Id'] = currentOrg.id
   }
 
   return headers
@@ -195,6 +202,11 @@ export async function postFormData<T>(endpoint: string, formData: FormData): Pro
   const headers: Record<string, string> = {}
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
+  }
+  // Inject current org ID for multi-tenant scoping
+  const currentOrg = useOrgStore.getState().currentOrg
+  if (currentOrg) {
+    headers['X-Org-Id'] = currentOrg.id
   }
   // Don't set Content-Type for FormData - let browser set it with boundary
 

@@ -5,9 +5,11 @@ import { ProjectsView } from '@/components/ProjectsView'
 import { FileUploadsView } from '@/components/FileUploadsView'
 import { SettingsView } from '@/components/SettingsView'
 import { QuickActions } from '@/components/QuickActions'
+import { OrgPicker } from '@/components/OrgPicker'
 import { AuthProvider, ProtectedRoute } from '@/components/auth'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { useAppStore } from '@/stores/app'
+import { useOrgStore } from '@/stores/org'
 import { useKeyboardShortcuts, useMenuEvents } from '@/hooks'
 import { initializeDatabase } from '@/lib/database'
 
@@ -27,6 +29,7 @@ function MainApp() {
   }, [])
 
   const { activeView } = useAppStore()
+  const { currentOrg } = useOrgStore()
   const [showSearch, setShowSearch] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
 
@@ -85,6 +88,11 @@ function MainApp() {
         </div>
       </div>
     )
+  }
+
+  // Show org picker if no organization selected
+  if (!currentOrg) {
+    return <OrgPicker onOrgSelected={() => {}} />
   }
 
   return (

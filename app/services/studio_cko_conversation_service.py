@@ -32,6 +32,25 @@ from app.services.query_expansion_service import (
     get_query_expansion_service,
     ExpansionStrategy
 )
+from app.services.prompt_engineer_service import (
+    PromptEngineerService,
+    get_prompt_engineer_service,
+    StructuredPrompt,
+    PipelineMode,
+    QueryIntent,
+    OutputFormat,
+)
+from app.services.output_architect_service import (
+    OutputArchitectService,
+    get_output_architect_service,
+    ArchitecturedOutput,
+)
+from app.services.document_generator_service import (
+    DocumentGeneratorService,
+    get_document_generator_service,
+    DocumentFormat,
+    GeneratedDocument,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -217,10 +236,33 @@ class StudioCKOConversationService:
             logger.warning(f"Query expansion unavailable: {e}")
             self.query_expansion_service = None
 
+        # Initialize multi-model pipeline services (Sonnet 4.5 bookends)
+        try:
+            self.prompt_engineer = get_prompt_engineer_service()
+            logger.info("Prompt Engineer service initialized")
+        except Exception as e:
+            logger.warning(f"Prompt Engineer unavailable: {e}")
+            self.prompt_engineer = None
+
+        try:
+            self.output_architect = get_output_architect_service()
+            logger.info("Output Architect service initialized")
+        except Exception as e:
+            logger.warning(f"Output Architect unavailable: {e}")
+            self.output_architect = None
+
+        try:
+            self.document_generator = get_document_generator_service()
+            logger.info("Document Generator service initialized")
+        except Exception as e:
+            logger.warning(f"Document Generator unavailable: {e}")
+            self.document_generator = None
+
         logger.info(
             "StudioCKOConversationService initialized",
             model=self.config.model,
-            kb_limit=self.config.global_kb_limit
+            kb_limit=self.config.global_kb_limit,
+            pipeline_available=self.prompt_engineer is not None and self.output_architect is not None,
         )
 
     # =========================================================================
@@ -488,13 +530,17 @@ class StudioCKOConversationService:
         """
         Send a user message and get CKO response.
 
-        Pipeline:
+        Multi-model pipeline:
         1. Save user message
-        2. Query expansion (if enabled)
-        3. Search global knowledge base
-        4. Generate response with Claude
-        5. Save CKO response with sources
-        6. Update session metadata
+        2. Prompt Engineer (Sonnet 4.5) — intent/format detection + enriched query
+        3. Query expansion (Kimi K2.5 or fallback)
+        4. Search global knowledge base
+        5. Reasoning engine (Kimi K2.5) — generate raw response
+        6. Output Architect (Sonnet 4.5) — format + artifact detection
+        7. Save CKO response with sources
+        8. Update session metadata
+
+        Graceful degradation: if either Sonnet call fails, falls back seamlessly.
 
         Args:
             session_id: Session ID
@@ -507,6 +553,7 @@ class StudioCKOConversationService:
         """
         start_time = time.time()
         config = config or self.config
+        pipeline_mode = PipelineMode.FULL
 
         logger.info(
             "CKO message received",
@@ -520,19 +567,46 @@ class StudioCKOConversationService:
             if not session:
                 raise ValueError(f"Session {session_id} not found or access denied")
 
-            user_msg = await self._save_message(
+            await self._save_message(
                 session_id=session_id,
                 role=MessageRole.USER,
                 content=message
             )
 
-            # Step 2: Query expansion
-            query_variations = [message]
+            # Step 2: Prompt Engineer (Sonnet 4.5 — ~1-2s)
+            structured_prompt: Optional[StructuredPrompt] = None
+            if self.prompt_engineer:
+                try:
+                    structured_prompt = await self.prompt_engineer.engineer_prompt(
+                        query=message,
+                        conversation_context=session.context_summary,
+                    )
+                    logger.info(
+                        "Prompt engineered",
+                        intent=structured_prompt.intent.value,
+                        format=structured_prompt.desired_format.value,
+                    )
+                except Exception as e:
+                    logger.warning(f"Prompt Engineer failed, using raw query: {e}")
+                    pipeline_mode = PipelineMode.NO_PROMPT_ENGINEER
+            else:
+                pipeline_mode = PipelineMode.NO_PROMPT_ENGINEER
+
+            # Determine effective query for expansion/search
+            effective_query = (
+                structured_prompt.enriched_query if structured_prompt else message
+            )
+            output_instructions = (
+                structured_prompt.output_instructions if structured_prompt else ""
+            )
+
+            # Step 3: Query expansion
+            query_variations = [effective_query]
             if config.enable_query_expansion and self.query_expansion_service:
                 try:
                     strategy = ExpansionStrategy(config.expansion_strategy)
                     expansion_result = await self.query_expansion_service.expand_query(
-                        query=message,
+                        query=effective_query,
                         num_variations=config.num_query_variations,
                         strategy=strategy,
                         include_original=True
@@ -542,21 +616,53 @@ class StudioCKOConversationService:
                 except Exception as e:
                     logger.warning(f"Query expansion failed: {e}")
 
-            # Step 3: Search global knowledge base
+            # Step 4: Search global knowledge base
             sources = await self._search_global_kb(
                 query_variations=query_variations,
                 config=config
             )
 
-            # Step 4: Generate response with Claude
-            response_content, used_sources = await self._generate_response(
-                query=message,
+            # Step 5: Reasoning engine (Kimi K2.5 — ~3-8s)
+            raw_response, used_sources = await self._generate_response(
+                query=effective_query,
                 sources=sources,
                 session=session,
-                config=config
+                config=config,
+                output_instructions=output_instructions,
             )
 
-            # Step 5: Save CKO response
+            # Step 6: Output Architect (Sonnet 4.5 — ~2-3s)
+            response_content = raw_response
+            if self.output_architect and structured_prompt and pipeline_mode == PipelineMode.FULL:
+                try:
+                    sources_summary = ", ".join(
+                        s.title for s in used_sources[:5]
+                    ) if used_sources else None
+
+                    architect_result = await self.output_architect.architect_output(
+                        raw_response=raw_response,
+                        structured_prompt=structured_prompt,
+                        sources_summary=sources_summary,
+                    )
+                    response_content = architect_result.formatted_content
+                    logger.info(
+                        "Output architected",
+                        has_artifact=architect_result.has_artifact,
+                        artifact_format=architect_result.artifact_format,
+                    )
+                except Exception as e:
+                    logger.warning(f"Output Architect failed, using raw response: {e}")
+                    if pipeline_mode == PipelineMode.FULL:
+                        pipeline_mode = PipelineMode.NO_OUTPUT_ARCHITECT
+            else:
+                if not self.output_architect:
+                    pipeline_mode = (
+                        PipelineMode.DIRECT
+                        if pipeline_mode == PipelineMode.NO_PROMPT_ENGINEER
+                        else PipelineMode.NO_OUTPUT_ARCHITECT
+                    )
+
+            # Step 7: Save CKO response
             cko_msg = await self._save_message(
                 session_id=session_id,
                 role=MessageRole.CKO,
@@ -564,7 +670,28 @@ class StudioCKOConversationService:
                 sources=used_sources
             )
 
-            # Step 6: Update session metadata
+            # Step 7b: Artifact generation (if detected)
+            if (
+                self.output_architect
+                and structured_prompt
+                and pipeline_mode in (PipelineMode.FULL, PipelineMode.NO_PROMPT_ENGINEER)
+            ):
+                try:
+                    architect_result = self.output_architect.parse_output(
+                        response_content, structured_prompt
+                    )
+                    if architect_result.has_artifact:
+                        await self._generate_and_save_artifact(
+                            architect_result=architect_result,
+                            message_id=cko_msg.id,
+                            session_id=session_id,
+                            user_id=user_id,
+                            structured_prompt=structured_prompt,
+                        )
+                except Exception as e:
+                    logger.warning(f"Artifact generation failed (non-streaming): {e}")
+
+            # Step 8: Update session metadata
             await self._update_session_metadata(session_id, message, response_content)
 
             query_time_ms = (time.time() - start_time) * 1000
@@ -573,7 +700,8 @@ class StudioCKOConversationService:
                 "CKO response generated",
                 session_id=session_id,
                 query_time_ms=query_time_ms,
-                sources_count=len(used_sources)
+                sources_count=len(used_sources),
+                pipeline_mode=pipeline_mode.value,
             )
 
             return CKOResponse(
@@ -599,13 +727,21 @@ class StudioCKOConversationService:
         config: Optional[CKOConfig] = None
     ) -> AsyncIterator[Dict[str, Any]]:
         """
-        Stream a CKO response token by token.
+        Stream a CKO response with multi-model pipeline + phase indicators.
+
+        Pipeline:
+        1. Prompt Engineer (Sonnet 4.5) — silent, emits "analyzing" phase
+        2. Query expansion + KB search — emits "searching" phase
+        3. Kimi reasoning — silent collection, emits "reasoning" phase
+        4. Output Architect (Sonnet 4.5) — streams tokens, emits "formatting" phase
+        Fallback: if either Sonnet fails, streams Kimi directly.
 
         Yields events:
         - {"type": "start", "session_id": ...}
+        - {"type": "phase", "phase": "analyzing|searching|reasoning|formatting", "label": ...}
         - {"type": "sources", "sources": [...]}
         - {"type": "token", "content": ...}
-        - {"type": "done", "message": {...}, "query_time_ms": ...}
+        - {"type": "done", "message": {...}, "query_time_ms": ..., "pipeline_mode": ...}
         - {"type": "error", "error": ...}
 
         Args:
@@ -619,6 +755,7 @@ class StudioCKOConversationService:
         """
         start_time = time.time()
         config = config or self.config
+        pipeline_mode = PipelineMode.FULL
 
         try:
             yield {"type": "start", "session_id": session_id}
@@ -636,13 +773,42 @@ class StudioCKOConversationService:
                 content=message
             )
 
-            # Query expansion
-            query_variations = [message]
+            # Phase 1: Prompt Engineer (Sonnet 4.5)
+            structured_prompt: Optional[StructuredPrompt] = None
+            if self.prompt_engineer:
+                yield {"type": "phase", "phase": "analyzing", "label": "Analyzing your question..."}
+                try:
+                    structured_prompt = await self.prompt_engineer.engineer_prompt(
+                        query=message,
+                        conversation_context=session.context_summary,
+                    )
+                    logger.info(
+                        "Prompt engineered (stream)",
+                        intent=structured_prompt.intent.value,
+                        format=structured_prompt.desired_format.value,
+                    )
+                except Exception as e:
+                    logger.warning(f"Prompt Engineer failed (stream): {e}")
+                    pipeline_mode = PipelineMode.NO_PROMPT_ENGINEER
+            else:
+                pipeline_mode = PipelineMode.NO_PROMPT_ENGINEER
+
+            effective_query = (
+                structured_prompt.enriched_query if structured_prompt else message
+            )
+            output_instructions = (
+                structured_prompt.output_instructions if structured_prompt else ""
+            )
+
+            # Phase 2: Query expansion + KB search
+            yield {"type": "phase", "phase": "searching", "label": "Searching knowledge base..."}
+
+            query_variations = [effective_query]
             if config.enable_query_expansion and self.query_expansion_service:
                 try:
                     strategy = ExpansionStrategy(config.expansion_strategy)
                     expansion_result = await self.query_expansion_service.expand_query(
-                        query=message,
+                        query=effective_query,
                         num_variations=config.num_query_variations,
                         strategy=strategy,
                         include_original=True
@@ -651,7 +817,6 @@ class StudioCKOConversationService:
                 except Exception as e:
                     logger.warning(f"Query expansion failed: {e}")
 
-            # Search global KB
             sources = await self._search_global_kb(
                 query_variations=query_variations,
                 config=config
@@ -663,24 +828,101 @@ class StudioCKOConversationService:
                 "sources": [s.to_dict() for s in sources[:10]]
             }
 
-            # Stream response from Claude
-            response_content = ""
-            async for chunk in self._stream_response(
-                query=message,
-                sources=sources,
-                session=session,
-                config=config
-            ):
-                response_content += chunk
-                yield {"type": "token", "content": chunk}
+            # Determine pipeline path
+            use_full_pipeline = (
+                self.output_architect is not None
+                and structured_prompt is not None
+                and pipeline_mode == PipelineMode.FULL
+            )
+
+            if not use_full_pipeline and pipeline_mode == PipelineMode.FULL:
+                if self.output_architect is None:
+                    pipeline_mode = PipelineMode.NO_OUTPUT_ARCHITECT
+                elif structured_prompt is None:
+                    pipeline_mode = PipelineMode.NO_PROMPT_ENGINEER
+
+            if use_full_pipeline:
+                # Phase 3: Kimi reasoning (silent collection — not streamed to user)
+                yield {"type": "phase", "phase": "reasoning", "label": "Thinking deeply..."}
+
+                raw_response, used_sources = await self._collect_response(
+                    query=effective_query,
+                    sources=sources,
+                    session=session,
+                    config=config,
+                    output_instructions=output_instructions,
+                )
+
+                # Phase 4: Output Architect (Sonnet 4.5 — streamed to user)
+                yield {"type": "phase", "phase": "formatting", "label": "Formatting response..."}
+
+                response_content = ""
+                try:
+                    sources_summary = ", ".join(
+                        s.title for s in used_sources[:5]
+                    ) if used_sources else None
+
+                    async for token in self.output_architect.stream_architect_output(
+                        raw_response=raw_response,
+                        structured_prompt=structured_prompt,
+                        sources_summary=sources_summary,
+                    ):
+                        response_content += token
+                        yield {"type": "token", "content": token}
+
+                except Exception as e:
+                    logger.warning(f"Output Architect streaming failed: {e}")
+                    pipeline_mode = PipelineMode.NO_OUTPUT_ARCHITECT
+                    # Fallback: stream the raw Kimi response that we already collected
+                    response_content = raw_response
+                    yield {"type": "token", "content": raw_response}
+
+            else:
+                # Fallback: stream Kimi directly to user (no Output Architect)
+                yield {"type": "phase", "phase": "reasoning", "label": "Generating response..."}
+
+                response_content = ""
+                async for chunk in self._stream_response(
+                    query=effective_query,
+                    sources=sources,
+                    session=session,
+                    config=config,
+                    output_instructions=output_instructions,
+                ):
+                    response_content += chunk
+                    yield {"type": "token", "content": chunk}
+
+                used_sources = sources[:10]
 
             # Save CKO response
             cko_msg = await self._save_message(
                 session_id=session_id,
                 role=MessageRole.CKO,
                 content=response_content,
-                sources=sources[:10]
+                sources=used_sources,
             )
+
+            # Artifact generation (if Output Architect detected an artifact)
+            artifact_event = None
+            if use_full_pipeline and response_content:
+                try:
+                    architect_result = self.output_architect.parse_output(
+                        response_content, structured_prompt
+                    )
+
+                    if architect_result.has_artifact:
+                        artifact_event = await self._generate_and_save_artifact(
+                            architect_result=architect_result,
+                            message_id=cko_msg.id,
+                            session_id=session_id,
+                            user_id=user_id,
+                            structured_prompt=structured_prompt,
+                        )
+
+                        if artifact_event:
+                            yield {"type": "artifact", **artifact_event}
+                except Exception as e:
+                    logger.warning(f"Artifact generation failed (streaming): {e}")
 
             # Update session
             await self._update_session_metadata(session_id, message, response_content)
@@ -690,7 +932,8 @@ class StudioCKOConversationService:
             yield {
                 "type": "done",
                 "message": cko_msg.to_dict(),
-                "query_time_ms": query_time_ms
+                "query_time_ms": query_time_ms,
+                "pipeline_mode": pipeline_mode.value,
             }
 
         except Exception as e:
@@ -1138,16 +1381,19 @@ class StudioCKOConversationService:
 
         return ranked
 
-    async def _generate_response(
+    def _build_prompt(
         self,
         query: str,
         sources: List[CKOSource],
-        session: CKOSession,
-        config: CKOConfig
-    ) -> Tuple[str, List[CKOSource]]:
-        """Generate CKO response using Claude."""
+        config: CKOConfig,
+        output_instructions: str = "",
+    ) -> Tuple[str, str, Dict[int, CKOSource]]:
+        """
+        Build the system prompt + user prompt + source map for the reasoning engine.
 
-        # Build context from sources
+        Returns:
+            (system_prompt, user_prompt, source_map)
+        """
         context_parts = []
         source_map: Dict[int, CKOSource] = {}
 
@@ -1162,11 +1408,15 @@ class StudioCKOConversationService:
 
         context = "\n\n---\n\n".join(context_parts) if context_parts else "No relevant sources found."
 
+        extra_instructions = ""
+        if output_instructions:
+            extra_instructions = f"\n\nAdditional instructions for this response:\n{output_instructions}"
+
         system_prompt = f"""{config.persona_instruction}
 
 You have access to the following sources from the organization's knowledge base.
 When answering, cite your sources using [1], [2], etc. format.
-If no sources are relevant, acknowledge this honestly."""
+If no sources are relevant, acknowledge this honestly.{extra_instructions}"""
 
         user_prompt = f"""# Sources
 
@@ -1178,6 +1428,21 @@ If no sources are relevant, acknowledge this honestly."""
 
 Please answer based on the sources above. Include citations like [1], [2] when referencing sources."""
 
+        return system_prompt, user_prompt, source_map
+
+    async def _generate_response(
+        self,
+        query: str,
+        sources: List[CKOSource],
+        session: CKOSession,
+        config: CKOConfig,
+        output_instructions: str = "",
+    ) -> Tuple[str, List[CKOSource]]:
+        """Generate CKO response using Kimi K2.5 reasoning engine."""
+        system_prompt, user_prompt, source_map = self._build_prompt(
+            query, sources, config, output_instructions
+        )
+
         answer = await self.llm_client.generate(
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
@@ -1186,42 +1451,38 @@ Please answer based on the sources above. Include citations like [1], [2] when r
             model=config.model,
         )
 
-        # Extract which sources were actually cited
         used_sources = self._extract_cited_sources(answer, source_map)
-
         return answer, used_sources
+
+    async def _collect_response(
+        self,
+        query: str,
+        sources: List[CKOSource],
+        session: CKOSession,
+        config: CKOConfig,
+        output_instructions: str = "",
+    ) -> Tuple[str, List[CKOSource]]:
+        """
+        Non-streaming Kimi call — collects full response for pipeline mode.
+        Same as _generate_response but used explicitly when Output Architect
+        will reformat the output.
+        """
+        return await self._generate_response(
+            query, sources, session, config, output_instructions
+        )
 
     async def _stream_response(
         self,
         query: str,
         sources: List[CKOSource],
         session: CKOSession,
-        config: CKOConfig
+        config: CKOConfig,
+        output_instructions: str = "",
     ) -> AsyncIterator[str]:
-        """Stream CKO response token by token."""
-
-        # Build context
-        context_parts = []
-        for i, source in enumerate(sources[:10], 1):
-            context_parts.append(
-                f"[{i}] {source.title}: {source.snippet}"
-            )
-
-        context = "\n\n".join(context_parts) if context_parts else "No relevant sources found."
-
-        system_prompt = f"""{config.persona_instruction}
-
-Cite sources using [1], [2], etc. format."""
-
-        user_prompt = f"""# Sources
-
-{context}
-
-# Question
-
-{query}
-
-Answer with citations."""
+        """Stream CKO response token by token from Kimi."""
+        system_prompt, user_prompt, _ = self._build_prompt(
+            query, sources, config, output_instructions
+        )
 
         async for text in self.llm_client.stream(
             system=system_prompt,
@@ -1231,6 +1492,148 @@ Answer with citations."""
             model=config.model,
         ):
             yield text
+
+    async def _generate_and_save_artifact(
+        self,
+        architect_result: ArchitecturedOutput,
+        message_id: str,
+        session_id: str,
+        user_id: str,
+        org_id: Optional[str] = None,
+        structured_prompt: Optional[StructuredPrompt] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate a document artifact and save metadata to DB.
+        B2 upload runs in background for optimistic UX.
+
+        Returns:
+            Artifact dict for SSE event, or None if generation fails.
+        """
+        if not self.document_generator or not architect_result.has_artifact:
+            return None
+
+        format_str = architect_result.artifact_format
+        if not format_str:
+            return None
+
+        try:
+            doc_format = DocumentFormat(format_str)
+        except ValueError:
+            logger.warning(f"Unknown artifact format: {format_str}")
+            return None
+
+        title = architect_result.artifact_title or "Document"
+
+        try:
+            # Generate document (runs in thread pool)
+            document = await self.document_generator.generate(
+                content_blocks=architect_result.content_blocks,
+                format=doc_format,
+                title=title,
+                summary=architect_result.summary,
+            )
+
+            # Save artifact metadata to DB immediately (optimistic)
+            artifact_data = {
+                "message_id": message_id,
+                "session_id": session_id,
+                "user_id": user_id,
+                "title": title,
+                "format": doc_format.value,
+                "mime_type": document.mime_type,
+                "size_bytes": document.size_bytes,
+                "preview_markdown": document.preview_markdown,
+                "summary": architect_result.summary,
+                "intent": structured_prompt.intent.value if structured_prompt else None,
+                "content_block_count": len(architect_result.content_blocks),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if org_id:
+                artifact_data["org_id"] = org_id
+
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_artifacts")
+                .insert(artifact_data)
+                .execute()
+            )
+
+            if not result.data:
+                logger.error("Failed to save artifact to DB")
+                return None
+
+            artifact_id = result.data[0]["id"]
+
+            # Start B2 upload in background (non-blocking)
+            task = asyncio.create_task(
+                self._upload_artifact_background(
+                    artifact_id=artifact_id,
+                    document=document,
+                    user_id=user_id,
+                    session_id=session_id,
+                ),
+                name=f"artifact-upload-{artifact_id}",
+            )
+            def _on_upload_done(t: asyncio.Task) -> None:
+                if t.cancelled():
+                    return
+                exc = t.exception()
+                if exc is not None:
+                    logger.error(f"Background artifact upload task failed: {exc}")
+
+            task.add_done_callback(_on_upload_done)
+
+            return {
+                "id": artifact_id,
+                "title": title,
+                "format": doc_format.value,
+                "mimeType": document.mime_type,
+                "sizeBytes": document.size_bytes,
+                "previewMarkdown": document.preview_markdown,
+                "status": "uploading",
+            }
+
+        except Exception as e:
+            logger.error(f"Artifact generation failed: {e}")
+            return None
+
+    async def _upload_artifact_background(
+        self,
+        artifact_id: str,
+        document: GeneratedDocument,
+        user_id: str,
+        session_id: str,
+    ) -> None:
+        """Background task: upload document to B2 and update artifact record."""
+        try:
+            document = await self.document_generator.upload_to_storage(
+                document=document,
+                user_id=user_id,
+                session_id=session_id,
+            )
+
+            # Update artifact with storage URL
+            await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_artifacts")
+                .update({
+                    "storage_url": document.storage_url,
+                    "storage_path": document.storage_path,
+                })
+                .eq("id", artifact_id)
+                .execute()
+            )
+
+            logger.info(
+                "Artifact uploaded to B2",
+                artifact_id=artifact_id,
+                storage_path=document.storage_path,
+            )
+        except Exception as e:
+            logger.exception(
+                "Background artifact upload failed",
+                artifact_id=artifact_id,
+                error=str(e),
+            )
 
     def _extract_cited_sources(
         self,
