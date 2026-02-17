@@ -47,12 +47,12 @@ class OrgContextMiddleware(BaseHTTPMiddleware):
         request.state.org_role = None
 
         # Skip paths that don't need org context
-        path = request.url.path.rstrip("/")
+        path = request.url.path.rstrip("/") or "/"
         if path in SKIP_PATHS or any(path.startswith(p) for p in SKIP_PREFIXES):
             return await call_next(request)
 
         # Check for X-Org-Id header
-        org_id = request.headers.get("X-Org-Id") or request.headers.get("x-org-id")
+        org_id = request.headers.get("x-org-id")
         if not org_id:
             # No org header — proceed without org context
             # Individual endpoints can enforce org requirement if needed
@@ -89,8 +89,11 @@ class OrgContextMiddleware(BaseHTTPMiddleware):
                 request.state.org_role = role
             except Exception as e:
                 logger.warning("Org membership check failed", org_id=org_id, error=str(e))
-                # Proceed without org context — let individual endpoints handle
-                request.state.org_id = org_id
+                # Fail closed — don't set org_id if membership can't be verified
+                return JSONResponse(
+                    status_code=503,
+                    content={"error": "Organization membership verification unavailable"},
+                )
         else:
             # Auth hasn't run yet — store org_id, validation happens at endpoint level
             request.state.org_id = org_id

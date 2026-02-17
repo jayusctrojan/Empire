@@ -52,8 +52,11 @@ export interface Artifact {
   storageUrl?: string
   previewMarkdown?: string
   summary?: string
+  intent?: string
+  contentBlockCount?: number
   status: ArtifactStatus
   createdAt?: string
+  updatedAt?: string
 }
 
 export interface Source {

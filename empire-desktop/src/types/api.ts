@@ -24,7 +24,7 @@ export interface StreamChunk {
   source?: SourceCitation
   workflow?: string
   error?: string
-  phase?: 'analyzing' | 'searching' | 'reasoning' | 'formatting'
+  phase?: PipelinePhase
   label?: string
   pipeline_mode?: 'full' | 'no_prompt_engineer' | 'no_output_architect' | 'direct'
   // Artifact fields (present when type === 'artifact')

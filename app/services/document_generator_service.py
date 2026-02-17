@@ -109,6 +109,8 @@ class DocumentGeneratorService:
         # Sanitize filename
         safe_title = re.sub(r'[^\w\s-]', '', title)[:80].strip()
         safe_title = re.sub(r'\s+', '_', safe_title)
+        if not safe_title:
+            safe_title = "document"
         filename = f"{safe_title}.{format.value}"
 
         # Generate preview markdown (first ~500 chars of formatted content)
@@ -182,7 +184,7 @@ class DocumentGeneratorService:
     ) -> bytes:
         """Generate a DOCX document from content blocks."""
         from docx import Document
-        from docx.shared import Inches, Pt
+        from docx.shared import Pt
         from docx.enum.text import WD_ALIGN_PARAGRAPH
 
         doc = Document()
@@ -239,7 +241,6 @@ class DocumentGeneratorService:
                     doc.add_paragraph("")  # Spacer after table
 
             elif block.type == "code":
-                lang = block.metadata.get("language", "")
                 code_para = doc.add_paragraph()
                 code_run = code_para.add_run(block.content.rstrip())
                 code_run.font.name = 'Courier New'
@@ -368,7 +369,7 @@ class DocumentGeneratorService:
         title_layout = prs.slide_layouts[0]  # Title Slide
         slide = prs.slides.add_slide(title_layout)
         slide.shapes.title.text = title
-        if slide.placeholders[1]:
+        if 1 in slide.placeholders:
             slide.placeholders[1].text = summary or datetime.now(timezone.utc).strftime("%B %d, %Y")
 
         # Group blocks into slides: each heading starts a new slide

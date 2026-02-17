@@ -87,7 +87,7 @@ def main():
         print("doppler run --project empire --config prd -- python generate_test_token.py")
         sys.exit(1)
 
-    print(f"✅ Found CLERK_SECRET_KEY: {secret_key[:15]}...")
+    print(f"✅ Found CLERK_SECRET_KEY: {secret_key[:4]}...")
 
     # Generate token
     print("\nGenerating test token...")

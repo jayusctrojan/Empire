@@ -178,6 +178,30 @@ class TestGetOrg:
 
 class TestUpdateOrg:
     @pytest.mark.asyncio
+    async def test_update_org_success(self, org_service, mock_supabase, sample_org_row, sample_membership_row):
+        """Test owner can update org name."""
+        # Mock membership check — owner role
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+            data=[sample_membership_row]
+        )
+        # Mock update
+        updated_row = {**sample_org_row, "name": "New Name"}
+        mock_supabase.supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[updated_row]
+        )
+        # Mock get_org after update (membership + org fetch + count)
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+            data=[updated_row]
+        )
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            count=1
+        )
+
+        result = await org_service.update_org("org-123", "user-789", name="New Name")
+
+        assert result is not None
+
+    @pytest.mark.asyncio
     async def test_update_requires_admin(self, org_service, mock_supabase, sample_membership_row):
         # Mock membership check — viewer role
         viewer_membership = {**sample_membership_row, "role": "viewer"}
@@ -285,6 +309,34 @@ class TestDataModels:
 # ============================================================================
 
 class TestExport:
+    @pytest.mark.asyncio
+    async def test_export_org_data_success(self, org_service, mock_supabase, sample_org_row, sample_membership_row):
+        """Test owner can export org data."""
+        # Mock membership check — owner
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+            data=[sample_membership_row]
+        )
+        # Mock get_org internals (org fetch + count)
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+            data=[sample_org_row]
+        )
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            count=1, data=[sample_membership_row]
+        )
+        # Mock projects + sources
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[], count=0
+        )
+        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(
+            data=[sample_membership_row]
+        )
+
+        result = await org_service.export_org_data("org-123", "user-789")
+
+        assert "organization" in result
+        assert "memberships" in result
+        assert "version" in result
+
     @pytest.mark.asyncio
     async def test_export_requires_owner(self, org_service, mock_supabase, sample_membership_row):
         # Mock membership as member (not owner)

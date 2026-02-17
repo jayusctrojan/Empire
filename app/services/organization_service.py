@@ -252,6 +252,8 @@ class OrganizationService:
 
         if role not in ("owner", "admin", "member", "viewer"):
             raise ValueError(f"Invalid role: {role}")
+        if role == "owner" and membership.role != "owner":
+            raise PermissionError("Only owners can assign the owner role")
 
         result = await asyncio.to_thread(
             lambda: self.supabase.supabase.table("org_memberships")
@@ -284,6 +286,8 @@ class OrganizationService:
         target_membership = await self._get_membership(org_id, target_user_id)
         if target_membership and target_membership.role == "owner" and requesting_user_id == target_user_id:
             raise ValueError("Owner cannot remove themselves from the organization")
+        if target_membership and target_membership.role == "owner" and membership.role != "owner":
+            raise PermissionError("Only owners can remove other owners")
 
         result = await asyncio.to_thread(
             lambda: self.supabase.supabase.table("org_memberships")
@@ -349,16 +353,17 @@ class OrganizationService:
 
         project_ids = [p["id"] for p in projects_result.data or []]
 
-        # Get project sources for all org projects
-        sources_data = []
-        for pid in project_ids:
-            src_result = await asyncio.to_thread(
-                lambda p=pid: self.supabase.supabase.table("project_sources")
+        # Get project sources for all org projects (single query)
+        if project_ids:
+            sources_result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("project_sources")
                 .select("*")
-                .eq("project_id", p)
+                .in_("project_id", project_ids)
                 .execute()
             )
-            sources_data.extend(src_result.data or [])
+            sources_data = sources_result.data or []
+        else:
+            sources_data = []
 
         return {
             "organization": org.to_dict(),

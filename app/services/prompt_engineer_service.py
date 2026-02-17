@@ -205,7 +205,7 @@ class PromptEngineerService:
             intent = QueryIntent.FACTUAL
 
         # Simple heuristic format detection
-        if any(kw in query_lower for kw in ("spreadsheet", "xlsx", "excel", "table")):
+        if any(kw in query_lower for kw in ("spreadsheet", "xlsx", "excel")):
             fmt = OutputFormat.SPREADSHEET
         elif any(kw in query_lower for kw in ("presentation", "pptx", "slides", "deck")):
             fmt = OutputFormat.PRESENTATION

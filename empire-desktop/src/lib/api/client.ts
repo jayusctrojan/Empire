@@ -203,6 +203,11 @@ export async function postFormData<T>(endpoint: string, formData: FormData): Pro
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
   }
+  // Inject current org ID for multi-tenant scoping
+  const currentOrg = useOrgStore.getState().currentOrg
+  if (currentOrg) {
+    headers['X-Org-Id'] = currentOrg.id
+  }
   // Don't set Content-Type for FormData - let browser set it with boundary
 
   const response = await fetch(url, {

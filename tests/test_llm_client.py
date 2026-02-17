@@ -199,7 +199,7 @@ class TestAnthropicLLMClient:
         assert result == "Hello from Claude"
         client.client.messages.create.assert_awaited_once()
         call_kwargs = client.client.messages.create.call_args[1]
-        assert call_kwargs["model"] == "claude-sonnet-4-20250514"
+        assert call_kwargs["model"] == "claude-sonnet-4-5-20250929"
         assert call_kwargs["system"] == "You are helpful."
 
     @pytest.mark.asyncio

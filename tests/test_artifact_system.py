@@ -148,6 +148,8 @@ class TestArtifactListEndpoint:
             )
 
         assert result.total == 1
+        # Verify session_id filter was applied
+        mock_query.eq.assert_any_call("session_id", "sess-456")
 
 
 class TestArtifactGetEndpoint:

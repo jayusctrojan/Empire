@@ -148,15 +148,17 @@ export function ChatView() {
             setPhase(chunk.phase, chunk.label)
           } else if (chunk.type === 'artifact') {
             // Artifact generated — attach to message
+            const validFormats = new Set(['docx', 'xlsx', 'pptx', 'pdf', 'md'])
+            const validStatuses = new Set(['uploading', 'ready', 'error'])
             const artifact: Artifact = {
               id: chunk.id || crypto.randomUUID(),
               sessionId: conversationId,
               title: chunk.title || 'Document',
-              format: (chunk.format as Artifact['format']) || 'md',
+              format: (validFormats.has(chunk.format || '') ? chunk.format : 'md') as Artifact['format'],
               mimeType: chunk.mimeType || 'text/markdown',
               sizeBytes: chunk.sizeBytes || 0,
               previewMarkdown: chunk.previewMarkdown,
-              status: (chunk.status as Artifact['status']) || 'uploading',
+              status: (validStatuses.has(chunk.status || '') ? chunk.status : 'uploading') as Artifact['status'],
             }
             addArtifactToMessage(assistantMessageId, artifact)
           } else if (chunk.type === 'error') {
@@ -188,6 +190,7 @@ export function ChatView() {
       } catch (err) {
         console.error('Streaming error:', err)
         setPhase(null)
+        const errorContent = useChatStore.getState().streamingContent
         if (err instanceof EmpireAPIError) {
           setError(err.message)
         } else {
@@ -195,7 +198,7 @@ export function ChatView() {
         }
 
         updateStoreMessage(assistantMessageId, {
-          content: streamingContent || 'Error: Failed to get response',
+          content: errorContent || 'Error: Failed to get response',
           status: 'error',
         })
       } finally {
@@ -220,7 +223,6 @@ export function ChatView() {
     setActiveConversation,
     setPhase,
     addArtifactToMessage,
-    streamingContent,
   ])
 
   // Handle stop button

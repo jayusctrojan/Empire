@@ -129,6 +129,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       error: null,
       compactionEvents: [],
       isCompacting: false,
+      currentPhase: null,
+      currentPhaseLabel: '',
+      activeArtifact: null,
+      isArtifactPanelOpen: false,
     }),
 
   setActiveProject: (id) => set({ activeProjectId: id }),

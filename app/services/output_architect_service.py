@@ -258,8 +258,8 @@ class OutputArchitectService:
         for line in lines:
             stripped = line.strip()
 
-            # Heading
-            if stripped.startswith("##"):
+            # Heading (# through ###)
+            if stripped.startswith("#") and len(stripped) > 1 and stripped.lstrip("#").startswith(" "):
                 if current_block:
                     blocks.append(current_block)
                     current_block = None
@@ -313,14 +313,20 @@ class OutputArchitectService:
                 current_block.content += line + "\n"
                 continue
 
-            # List item
-            if stripped.startswith("- ") or stripped.startswith("* "):
-                if current_block and current_block.type != "list":
+            # List item (unordered: - or *, ordered: 1. 2. etc.)
+            import re as _re
+            ordered_match = _re.match(r'^(\d+)\.\s+(.+)', stripped)
+            if stripped.startswith("- ") or stripped.startswith("* ") or ordered_match:
+                is_ordered = bool(ordered_match)
+                if current_block and (current_block.type != "list" or current_block.metadata.get("ordered") != is_ordered):
                     blocks.append(current_block)
                     current_block = None
                 if not current_block:
-                    current_block = ContentBlock(type="list", content="", metadata={"ordered": False})
-                current_block.content += stripped[2:] + "\n"
+                    current_block = ContentBlock(type="list", content="", metadata={"ordered": is_ordered})
+                if ordered_match:
+                    current_block.content += ordered_match.group(2) + "\n"
+                else:
+                    current_block.content += stripped[2:] + "\n"
                 continue
 
             # Regular paragraph

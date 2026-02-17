@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { X, FileDown, FileText, Table, Presentation, ChevronDown } from 'lucide-react'
@@ -35,7 +35,20 @@ function formatFileSize(bytes: number): string {
 
 export function ArtifactPanel({ artifact, onClose, onDownload }: ArtifactPanelProps) {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
+  const downloadMenuRef = useRef<HTMLDivElement>(null)
   const Icon = formatIcons[artifact.format] || FileText
+
+  // Close download menu on outside click
+  useEffect(() => {
+    if (!showDownloadMenu) return
+    function handleClick(e: MouseEvent) {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setShowDownloadMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showDownloadMenu])
 
   return (
     <div className="w-[40%] min-w-[320px] max-w-[600px] h-full border-l border-empire-border bg-empire-sidebar flex flex-col animate-in slide-in-from-right duration-200">
@@ -52,7 +65,7 @@ export function ArtifactPanel({ artifact, onClose, onDownload }: ArtifactPanelPr
         </div>
         <div className="flex items-center gap-1">
           {/* Download button with dropdown */}
-          <div className="relative">
+          <div className="relative" ref={downloadMenuRef}>
             <button
               onClick={() => setShowDownloadMenu(!showDownloadMenu)}
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-empire-primary hover:bg-empire-primary/80 text-white text-sm transition-colors"
@@ -98,7 +111,7 @@ export function ArtifactPanel({ artifact, onClose, onDownload }: ArtifactPanelPr
       {/* Preview content */}
       <div className="flex-1 overflow-y-auto p-4">
         {artifact.previewMarkdown ? (
-          <div className="prose prose-invert prose-sm max-w-none">
+          <div className="prose dark:prose-invert prose-sm max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {artifact.previewMarkdown}
             </ReactMarkdown>

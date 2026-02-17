@@ -91,9 +91,8 @@ async def create_organization(
             settings=request.settings,
         )
         return OrgResponse(**org.to_dict())
-    except Exception as e:
-        logger.error("Failed to create organization", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("", response_model=List[OrgResponse])
@@ -158,7 +157,9 @@ async def add_member(
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return MemberResponse(**membership.to_dict())
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
 
 
 @router.get("/{org_id}/members", response_model=List[MemberResponse])
@@ -191,7 +192,7 @@ async def remove_member(
         if not removed:
             raise HTTPException(status_code=403, detail="Insufficient permissions or member not found")
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/{org_id}/export")
@@ -205,6 +206,6 @@ async def export_organization(
         data = await org_service.export_org_data(org_id, user_id)
         return data
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e

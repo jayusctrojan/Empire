@@ -43,14 +43,14 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
     setCreateError(null)
     try {
       const org = await createOrganization({ name: newOrgName.trim() })
-      setUserOrgs([...userOrgs, org])
+      setUserOrgs([...useOrgStore.getState().userOrgs, org])
       handleSelectOrg(org)
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create organization')
     } finally {
       setIsCreating(false)
     }
-  }, [newOrgName, userOrgs, setUserOrgs, handleSelectOrg])
+  }, [newOrgName, setUserOrgs, handleSelectOrg])
 
   // Auto-select if only one org
   useEffect(() => {

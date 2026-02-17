@@ -120,8 +120,8 @@ async def list_artifacts(
         logger.error("Failed to list artifacts", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list artifacts: {str(e)}",
-        )
+            detail="Failed to list artifacts",
+        ) from e
 
 
 @router.get("/{artifact_id}", response_model=ArtifactResponse)
@@ -155,8 +155,8 @@ async def get_artifact(
         logger.error("Failed to get artifact", artifact_id=artifact_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get artifact: {str(e)}",
-        )
+            detail="Failed to get artifact",
+        ) from e
 
 
 @router.get("/{artifact_id}/download")
@@ -197,7 +197,9 @@ async def download_artifact(
             lambda: b2.download_file(storage_path)
         )
 
-        filename = f"{row['title']}.{row['format']}"
+        import re as _re
+        safe_title = _re.sub(r'[^\w\s\-.]', '', row['title'])[:100].strip() or "artifact"
+        filename = f"{safe_title}.{row['format']}"
 
         return StreamingResponse(
             BytesIO(file_data),
@@ -214,8 +216,8 @@ async def download_artifact(
         logger.error("Failed to download artifact", artifact_id=artifact_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to download artifact: {str(e)}",
-        )
+            detail="Failed to download artifact",
+        ) from e
 
 
 @router.delete("/{artifact_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -274,5 +276,5 @@ async def delete_artifact(
         logger.error("Failed to delete artifact", artifact_id=artifact_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete artifact: {str(e)}",
-        )
+            detail="Failed to delete artifact",
+        ) from e

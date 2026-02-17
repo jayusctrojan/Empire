@@ -1550,14 +1550,16 @@ Please answer based on the sources above. Include citations like [1], [2] when r
             artifact_id = result.data[0]["id"]
 
             # Start B2 upload in background (non-blocking)
-            asyncio.create_task(
+            task = asyncio.create_task(
                 self._upload_artifact_background(
                     artifact_id=artifact_id,
                     document=document,
                     user_id=user_id,
                     session_id=session_id,
-                )
+                ),
+                name=f"artifact-upload-{artifact_id}",
             )
+            task.add_done_callback(lambda t: t.result() if not t.cancelled() and t.exception() is None else None)
 
             return {
                 "id": artifact_id,
