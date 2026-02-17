@@ -52,7 +52,7 @@ async def unified_search(
         None,
         description="Comma-separated content types to search: chat,project,kb,artifact. Default: all"
     ),
-    limit: int = Query(20, ge=1, le=100, description="Max results per type"),
+    limit: int = Query(20, ge=1, le=100, description="Max total results (also used as per-type cap)"),
 ):
     """
     Search across all content types within the user's organization.
@@ -108,8 +108,9 @@ async def unified_search(
         except Exception as e:
             logger.warning("Artifact search failed: %s", e)
 
-    # Sort: highest relevance first, then most recent date as tiebreaker
-    results.sort(key=lambda r: (-r.relevance_score, r.date or ""), reverse=False)
+    # Two stable sorts: first by date desc (tiebreaker), then by relevance desc (primary)
+    results.sort(key=lambda r: r.date or "", reverse=True)
+    results.sort(key=lambda r: r.relevance_score, reverse=True)
 
     # Slice to limit and report accurate total
     sliced = results[:limit]

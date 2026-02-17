@@ -86,9 +86,6 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
     return () => clearTimeout(timer)
   }, [query, activeFilter])
 
-  // Results come pre-filtered from backend — no client-side filter needed
-  const displayResults = results
-
   // Handle selecting a search result
   const handleSelectResult = useCallback(async (result: SearchResultItem) => {
     try {
@@ -133,7 +130,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
   // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const items = query ? displayResults : recentChats
+      const items = query ? results : recentChats
       const count = items.length
 
       if (e.key === 'ArrowDown') {
@@ -144,8 +141,8 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
         setSelectedIndex((prev) => (count > 0 ? (prev - 1 + count) % count : 0))
       } else if (e.key === 'Enter') {
         e.preventDefault()
-        if (query && displayResults[selectedIndex]) {
-          handleSelectResult(displayResults[selectedIndex])
+        if (query && results[selectedIndex]) {
+          handleSelectResult(results[selectedIndex])
         } else if (!query && recentChats[selectedIndex]) {
           handleSelectConversation(recentChats[selectedIndex])
         }
@@ -156,7 +153,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [query, displayResults, recentChats, selectedIndex, onClose, handleSelectResult, handleSelectConversation])
+  }, [query, results, recentChats, selectedIndex, onClose, handleSelectResult, handleSelectConversation])
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/50">
@@ -224,9 +221,9 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
               <div className="animate-spin w-6 h-6 border-2 border-empire-primary border-t-transparent rounded-full" />
             </div>
           ) : query ? (
-            displayResults.length > 0 ? (
+            results.length > 0 ? (
               <ul className="py-2">
-                {displayResults.map((result, index) => {
+                {results.map((result, index) => {
                   const Icon = TYPE_ICONS[result.type] || MessageSquare
                   return (
                     <li key={`${result.type}-${result.id}`}>
@@ -311,7 +308,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
               <kbd className="px-1 py-0.5 rounded bg-empire-border">Enter</kbd> to select
             </span>
           </div>
-          <span>{query ? `${displayResults.length} results` : 'Type to search'}</span>
+          <span>{query ? `${results.length} results` : 'Type to search'}</span>
         </div>
       </div>
     </div>
