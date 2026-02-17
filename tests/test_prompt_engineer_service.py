@@ -223,7 +223,7 @@ Here is a well-formatted response with citations [1].
 {"has_artifact": true, "artifact_format": "docx", "artifact_title": "Revenue Report", "summary": "Q4 revenue analysis"}
 ```"""
 
-        result = self.service._parse_output(raw, self._make_prompt())
+        result = self.service.parse_output(raw, self._make_prompt())
 
         assert result.has_artifact is True
         assert result.artifact_format == "docx"
@@ -234,7 +234,7 @@ Here is a well-formatted response with citations [1].
     def test_parse_without_metadata_block(self):
         raw = "## Answer\n\nSimple response without artifact metadata."
 
-        result = self.service._parse_output(raw, self._make_prompt())
+        result = self.service.parse_output(raw, self._make_prompt())
 
         assert result.has_artifact is False
         assert "Simple response" in result.formatted_content
@@ -243,7 +243,7 @@ Here is a well-formatted response with citations [1].
         """If JSON block absent but prompt says SPREADSHEET → artifact detected."""
         raw = "Here is your data analysis."
 
-        result = self.service._parse_output(
+        result = self.service.parse_output(
             raw, self._make_prompt(fmt=OutputFormat.SPREADSHEET)
         )
 
@@ -252,14 +252,14 @@ Here is a well-formatted response with citations [1].
 
     def test_fallback_artifact_pptx(self):
         raw = "Here are your slides."
-        result = self.service._parse_output(
+        result = self.service.parse_output(
             raw, self._make_prompt(fmt=OutputFormat.PRESENTATION)
         )
         assert result.artifact_format == "pptx"
 
     def test_fallback_artifact_docx(self):
         raw = "Here is your document."
-        result = self.service._parse_output(
+        result = self.service.parse_output(
             raw, self._make_prompt(fmt=OutputFormat.DOCUMENT)
         )
         assert result.artifact_format == "docx"
