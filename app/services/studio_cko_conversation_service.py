@@ -567,7 +567,7 @@ class StudioCKOConversationService:
             if not session:
                 raise ValueError(f"Session {session_id} not found or access denied")
 
-            user_msg = await self._save_message(
+            await self._save_message(
                 session_id=session_id,
                 role=MessageRole.USER,
                 content=message
@@ -682,6 +682,7 @@ class StudioCKOConversationService:
                             message_id=cko_msg.id,
                             session_id=session_id,
                             user_id=user_id,
+                            structured_prompt=structured_prompt,
                         )
                 except Exception as e:
                     logger.warning(f"Artifact generation failed (non-streaming): {e}")
@@ -905,6 +906,7 @@ class StudioCKOConversationService:
                         message_id=cko_msg.id,
                         session_id=session_id,
                         user_id=user_id,
+                        structured_prompt=structured_prompt,
                     )
 
                     if artifact_event:
@@ -1486,6 +1488,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
         session_id: str,
         user_id: str,
         org_id: Optional[str] = None,
+        structured_prompt: Optional[StructuredPrompt] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Generate a document artifact and save metadata to DB.

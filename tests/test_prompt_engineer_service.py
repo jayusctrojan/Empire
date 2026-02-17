@@ -340,7 +340,7 @@ Revenue grew 15% [1].
 
         mock_llm = AsyncMock()
 
-        async def mock_stream(**kwargs):
+        async def mock_stream(**_kwargs):
             for t in tokens:
                 yield t
 

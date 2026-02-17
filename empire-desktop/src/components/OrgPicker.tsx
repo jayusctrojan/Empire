@@ -40,7 +40,7 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
   }, [setCurrentOrg, onOrgSelected])
 
   const handleCreateOrg = useCallback(async () => {
-    if (!newOrgName.trim()) return
+    if (!newOrgName.trim() || isCreating) return
 
     setIsCreating(true)
     setCreateError(null)
@@ -53,7 +53,7 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
     } finally {
       setIsCreating(false)
     }
-  }, [newOrgName, setUserOrgs, handleSelectOrg])
+  }, [newOrgName, isCreating, setUserOrgs, handleSelectOrg])
 
   // Auto-select if only one org
   useEffect(() => {
