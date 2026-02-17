@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import { afterEach } from 'vitest'
 
 // Mock localStorage for zustand persist middleware
 const store: Record<string, string> = {}
@@ -11,4 +12,9 @@ const localStorageMock: Storage = {
   key: (index: number) => Object.keys(store)[index] ?? null,
 }
 
-Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock })
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, configurable: true })
+
+// Clean localStorage between tests to prevent leaks
+afterEach(() => {
+  localStorageMock.clear()
+})

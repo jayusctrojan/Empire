@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import {
   Search, X, MessageSquare, ArrowRight, Clock,
   FolderOpen, BookOpen, FileText,
@@ -62,6 +62,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
   }, [query])
 
   // Search with debounce — uses backend unified search
+  // Backend handles type filtering via the `types` param, so no client-side filter needed
   useEffect(() => {
     if (!query.trim()) {
       setResults([])
@@ -85,41 +86,47 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
     return () => clearTimeout(timer)
   }, [query, activeFilter])
 
-  // Filtered results for display
-  const displayResults = activeFilter === 'all'
-    ? results
-    : results.filter((r) => r.type === activeFilter)
+  // Results come pre-filtered from backend — no client-side filter needed
+  const displayResults = results
 
   // Handle selecting a search result
   const handleSelectResult = useCallback(async (result: SearchResultItem) => {
-    if (result.type === 'chat') {
-      const sessionId = (result.metadata?.sessionId as string) || result.id
-      const messages = await getMessages(sessionId)
-      setMessages(messages)
-      setActiveConversation(sessionId)
-      setActiveView('chats')
-    } else if (result.type === 'project') {
-      setActiveView('projects')
-    } else if (result.type === 'artifact') {
-      const sessionId = result.metadata?.sessionId as string | undefined
-      if (sessionId) {
+    try {
+      if (result.type === 'chat') {
+        const sessionId = (result.metadata?.sessionId as string) || result.id
         const messages = await getMessages(sessionId)
         setMessages(messages)
         setActiveConversation(sessionId)
         setActiveView('chats')
+      } else if (result.type === 'project') {
+        setActiveView('projects')
+      } else if (result.type === 'artifact') {
+        const sessionId = result.metadata?.sessionId as string | undefined
+        if (sessionId) {
+          const messages = await getMessages(sessionId)
+          setMessages(messages)
+          setActiveConversation(sessionId)
+          setActiveView('chats')
+        }
+      } else {
+        // KB document — go to uploads/projects view
+        setActiveView('uploads')
       }
-    } else {
-      // KB document — go to uploads/projects view
-      setActiveView('uploads')
+    } catch (err) {
+      console.error('Failed to open result:', err)
     }
     onClose()
   }, [setActiveConversation, setMessages, setActiveView, onClose])
 
   const handleSelectConversation = useCallback(async (conversation: Conversation) => {
-    const messages = await getMessages(conversation.id)
-    setMessages(messages)
-    setActiveConversation(conversation.id)
-    setActiveView('chats')
+    try {
+      const messages = await getMessages(conversation.id)
+      setMessages(messages)
+      setActiveConversation(conversation.id)
+      setActiveView('chats')
+    } catch (err) {
+      console.error('Failed to open conversation:', err)
+    }
     onClose()
   }, [setActiveConversation, setMessages, setActiveView, onClose])
 
@@ -240,12 +247,9 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
                               {result.type}
                             </span>
                           </div>
-                          <p
-                            className="text-xs text-empire-text-muted line-clamp-2"
-                            dangerouslySetInnerHTML={{
-                              __html: highlightMatch(result.snippet, query),
-                            }}
-                          />
+                          <p className="text-xs text-empire-text-muted line-clamp-2">
+                            {highlightMatch(result.snippet, query)}
+                          </p>
                         </div>
                         <ArrowRight className="w-4 h-4 text-empire-text-muted flex-shrink-0" />
                       </button>
@@ -294,18 +298,18 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
           )}
         </div>
 
-        {/* Footer */}
+        {/* Footer — show result count only when searching, otherwise show hint */}
         <div className="flex items-center justify-between px-4 py-2 border-t border-empire-border bg-empire-bg/50 text-xs text-empire-text-muted">
           <div className="flex items-center gap-4">
             <span>
-              <kbd className="px-1 py-0.5 rounded bg-empire-border">↑</kbd>{' '}
-              <kbd className="px-1 py-0.5 rounded bg-empire-border">↓</kbd> to navigate
+              <kbd className="px-1 py-0.5 rounded bg-empire-border">&uarr;</kbd>{' '}
+              <kbd className="px-1 py-0.5 rounded bg-empire-border">&darr;</kbd> to navigate
             </span>
             <span>
               <kbd className="px-1 py-0.5 rounded bg-empire-border">Enter</kbd> to select
             </span>
           </div>
-          <span>{displayResults.length} results</span>
+          <span>{query ? `${displayResults.length} results` : 'Type to search'}</span>
         </div>
       </div>
     </div>
@@ -313,14 +317,22 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
 }
 
 /**
- * Highlight matching text in a string
+ * Highlight matching text in a string using React elements (safe, no XSS).
  */
-function highlightMatch(text: string, query: string): string {
+function highlightMatch(text: string, query: string): ReactNode {
   if (!text || !query) return text || ''
+  const truncated = text.slice(0, 150)
   const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
-  const truncated = text.slice(0, 150)
-  return truncated.replace(regex, '<mark class="bg-empire-primary/30 text-empire-text rounded px-0.5">$1</mark>')
+  const parts = truncated.split(regex)
+
+  if (parts.length === 1) return truncated
+
+  return parts.map((part, i) =>
+    regex.test(part)
+      ? <mark key={i} className="bg-empire-primary/30 text-empire-text rounded px-0.5">{part}</mark>
+      : part
+  )
 }
 
 export default GlobalSearch

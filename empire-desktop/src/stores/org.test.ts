@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { act } from '@testing-library/react'
 import { useOrgStore } from './org'
 import type { Organization } from './org'
 
@@ -16,14 +15,12 @@ function makeOrg(overrides: Partial<Organization> = {}): Organization {
 
 describe('useOrgStore', () => {
   beforeEach(() => {
-    // Reset store between tests
-    act(() => {
-      useOrgStore.setState({
-        currentOrg: null,
-        userOrgs: [],
-        isLoading: false,
-        error: null,
-      })
+    // Reset store between tests — direct setState, no act() needed for non-rendered hooks
+    useOrgStore.setState({
+      currentOrg: null,
+      userOrgs: [],
+      isLoading: false,
+      error: null,
     })
   })
 

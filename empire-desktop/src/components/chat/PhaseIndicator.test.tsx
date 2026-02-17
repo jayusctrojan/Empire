@@ -11,33 +11,38 @@ describe('PhaseIndicator', () => {
   it('renders with analyzing phase styles', () => {
     const { container } = render(<PhaseIndicator phase="analyzing" label="Analyzing..." />)
     const dot = container.querySelector('.animate-pulse')
-    expect(dot).toBeInTheDocument()
+    expect(dot).not.toBeNull()
     expect(dot).toHaveClass('bg-blue-400')
   })
 
   it('renders with searching phase styles', () => {
     const { container } = render(<PhaseIndicator phase="searching" label="Searching..." />)
     const dot = container.querySelector('.animate-pulse')
+    expect(dot).not.toBeNull()
     expect(dot).toHaveClass('bg-yellow-400')
   })
 
   it('renders with reasoning phase styles', () => {
     const { container } = render(<PhaseIndicator phase="reasoning" label="Reasoning..." />)
     const dot = container.querySelector('.animate-pulse')
+    expect(dot).not.toBeNull()
     expect(dot).toHaveClass('bg-purple-400')
   })
 
   it('renders with formatting phase styles', () => {
     const { container } = render(<PhaseIndicator phase="formatting" label="Formatting..." />)
     const dot = container.querySelector('.animate-pulse')
+    expect(dot).not.toBeNull()
     expect(dot).toHaveClass('bg-green-400')
   })
 
   it('falls back to analyzing style for unknown phase', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { container } = render(
-      <PhaseIndicator phase={'unknown' as never} label="Processing..." />
+      <PhaseIndicator phase={'unknown' as any} label="Processing..." />
     )
     const dot = container.querySelector('.animate-pulse')
+    expect(dot).not.toBeNull()
     expect(dot).toHaveClass('bg-blue-400')
   })
 })

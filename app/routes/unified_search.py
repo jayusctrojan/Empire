@@ -61,9 +61,9 @@ async def unified_search(
     """
     from app.core.database import get_supabase
 
-    # Parse org context from middleware
+    # Parse org context from middleware — no header fallback (security)
     org_id = getattr(request.state, "org_id", None)
-    user_id = getattr(request.state, "user_id", None) or request.headers.get("X-User-ID")
+    user_id = getattr(request.state, "user_id", None)
 
     if not user_id:
         raise HTTPException(status_code=401, detail="User ID required")
@@ -79,7 +79,7 @@ async def unified_search(
     results: List[SearchResultItem] = []
     query_lower = q.lower()
 
-    # Search in parallel-ish (sequential but fast since each is a single DB call)
+    # Search each type (sequential but fast since each is a single DB call)
     if "chat" in search_types:
         try:
             chat_results = await _search_chats(supabase, query_lower, q, org_id, user_id, limit)
@@ -108,15 +108,16 @@ async def unified_search(
         except Exception as e:
             logger.warning("Artifact search failed: %s", e)
 
-    # Sort: relevance desc, then date desc
-    results.sort(key=lambda r: (-r.relevance_score, r.date), reverse=False)
-    # Re-sort properly: highest relevance first, then most recent
-    results.sort(key=lambda r: (-r.relevance_score, ""), reverse=False)
+    # Sort: highest relevance first, then most recent date as tiebreaker
+    results.sort(key=lambda r: (-r.relevance_score, r.date or ""), reverse=False)
+
+    # Slice to limit and report accurate total
+    sliced = results[:limit]
 
     return UnifiedSearchResponse(
         query=q,
-        results=results[:limit],
-        total=len(results),
+        results=sliced,
+        total=len(sliced),
         types_searched=search_types,
     )
 
@@ -126,12 +127,15 @@ async def unified_search(
 # ============================================================================
 
 async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
-    """Search CKO sessions by title and context_summary."""
+    """Search CKO sessions by title and context_summary using DB-level ilike."""
     items = []
 
+    # Use Supabase or_ for DB-level filtering
     builder = supabase.table("studio_cko_sessions").select(
         "id, title, context_summary, message_count, last_message_at, created_at"
-    ).eq("user_id", user_id).eq("is_deleted", False).limit(100)
+    ).eq("user_id", user_id).eq("is_deleted", False).or_(
+        f"title.ilike.%{raw_query}%,context_summary.ilike.%{raw_query}%"
+    ).limit(limit)
 
     if org_id:
         builder = builder.eq("org_id", org_id)
@@ -142,35 +146,35 @@ async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user
         title = row.get("title") or "Untitled"
         summary = row.get("context_summary") or ""
         title_lower = title.lower()
-        summary_lower = summary.lower()
 
-        if query_lower in title_lower or query_lower in summary_lower:
-            # Score: title match > summary match
-            score = 0.9 if query_lower in title_lower else 0.6
-            msg_count = row.get("message_count") or 0
-            snippet = summary[:150] if summary else f"{msg_count} messages"
+        # Score: title match > summary match
+        score = 0.9 if query_lower in title_lower else 0.6
+        msg_count = row.get("message_count") or 0
+        snippet = summary[:150] if summary else f"{msg_count} messages"
 
-            items.append(SearchResultItem(
-                id=row["id"],
-                type="chat",
-                title=title,
-                snippet=snippet,
-                date=row.get("last_message_at") or row.get("created_at") or "",
-                relevance_score=score,
-                metadata={"messageCount": msg_count, "sessionId": row["id"]},
-            ))
+        items.append(SearchResultItem(
+            id=row["id"],
+            type="chat",
+            title=title,
+            snippet=snippet,
+            date=row.get("last_message_at") or row.get("created_at") or "",
+            relevance_score=score,
+            metadata={"messageCount": msg_count, "sessionId": row["id"]},
+        ))
 
     items.sort(key=lambda x: -x.relevance_score)
     return items[:limit]
 
 
 async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
-    """Search projects by name and description."""
+    """Search projects by name and description using DB-level ilike."""
     items = []
 
     builder = supabase.table("projects").select(
         "id, name, description, source_count, created_at, updated_at"
-    ).eq("user_id", user_id).limit(100)
+    ).eq("user_id", user_id).or_(
+        f"name.ilike.%{raw_query}%,description.ilike.%{raw_query}%"
+    ).limit(limit)
 
     if org_id:
         builder = builder.eq("org_id", org_id)
@@ -181,33 +185,33 @@ async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, u
         name = row.get("name") or "Untitled"
         desc = row.get("description") or ""
         name_lower = name.lower()
-        desc_lower = desc.lower()
 
-        if query_lower in name_lower or query_lower in desc_lower:
-            score = 0.85 if query_lower in name_lower else 0.55
-            snippet = desc[:150] if desc else f"{row.get('source_count', 0)} sources"
+        score = 0.85 if query_lower in name_lower else 0.55
+        snippet = desc[:150] if desc else f"{row.get('source_count', 0)} sources"
 
-            items.append(SearchResultItem(
-                id=row["id"],
-                type="project",
-                title=name,
-                snippet=snippet,
-                date=row.get("updated_at") or row.get("created_at") or "",
-                relevance_score=score,
-                metadata={"sourceCount": row.get("source_count", 0)},
-            ))
+        items.append(SearchResultItem(
+            id=row["id"],
+            type="project",
+            title=name,
+            snippet=snippet,
+            date=row.get("updated_at") or row.get("created_at") or "",
+            relevance_score=score,
+            metadata={"sourceCount": row.get("source_count", 0)},
+        ))
 
     items.sort(key=lambda x: -x.relevance_score)
     return items[:limit]
 
 
 async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_id, limit: int) -> List[SearchResultItem]:
-    """Search KB documents by filename and metadata."""
+    """Search KB documents by filename and metadata using DB-level ilike."""
     items = []
 
     builder = supabase.table("documents").select(
         "id, filename, file_type, status, department, created_at, updated_at"
-    ).eq("status", "processed").limit(100)
+    ).eq("status", "processed").or_(
+        f"filename.ilike.%{raw_query}%,department.ilike.%{raw_query}%"
+    ).limit(limit)
 
     if org_id:
         builder = builder.eq("org_id", org_id)
@@ -218,34 +222,37 @@ async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_i
         filename = row.get("filename") or "Unknown"
         department = row.get("department") or ""
         filename_lower = filename.lower()
-        dept_lower = department.lower()
 
-        if query_lower in filename_lower or query_lower in dept_lower:
-            score = 0.8 if query_lower in filename_lower else 0.5
-            file_type = row.get("file_type") or "unknown"
-            snippet = f"{file_type.upper()} - {department}" if department else file_type.upper()
+        score = 0.8 if query_lower in filename_lower else 0.5
+        file_type = row.get("file_type") or "unknown"
+        snippet = f"{file_type.upper()} - {department}" if department else file_type.upper()
 
-            items.append(SearchResultItem(
-                id=row["id"],
-                type="kb",
-                title=filename,
-                snippet=snippet,
-                date=row.get("updated_at") or row.get("created_at") or "",
-                relevance_score=score,
-                metadata={"fileType": file_type, "department": department},
-            ))
+        items.append(SearchResultItem(
+            id=row["id"],
+            type="kb",
+            title=filename,
+            snippet=snippet,
+            date=row.get("updated_at") or row.get("created_at") or "",
+            relevance_score=score,
+            metadata={"fileType": file_type, "department": department},
+        ))
 
     items.sort(key=lambda x: -x.relevance_score)
     return items[:limit]
 
 
 async def _search_artifacts(supabase, query_lower: str, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
-    """Search generated artifacts by title and summary."""
+    """Search generated artifacts by title and summary using DB-level ilike."""
     items = []
 
     builder = supabase.table("studio_cko_artifacts").select(
         "id, title, format, summary, size_bytes, created_at, session_id"
-    ).eq("user_id", user_id).limit(100)
+    ).eq("user_id", user_id).or_(
+        f"title.ilike.%{raw_query}%,summary.ilike.%{raw_query}%"
+    ).limit(limit)
+
+    if org_id:
+        builder = builder.eq("org_id", org_id)
 
     response = builder.execute()
 
@@ -253,26 +260,24 @@ async def _search_artifacts(supabase, query_lower: str, raw_query: str, org_id, 
         title = row.get("title") or "Untitled"
         summary = row.get("summary") or ""
         title_lower = title.lower()
-        summary_lower = summary.lower()
 
-        if query_lower in title_lower or query_lower in summary_lower:
-            score = 0.75 if query_lower in title_lower else 0.5
-            fmt = row.get("format") or "unknown"
-            snippet = summary[:150] if summary else f"{fmt.upper()} document"
+        score = 0.75 if query_lower in title_lower else 0.5
+        fmt = row.get("format") or "unknown"
+        snippet = summary[:150] if summary else f"{fmt.upper()} document"
 
-            items.append(SearchResultItem(
-                id=row["id"],
-                type="artifact",
-                title=title,
-                snippet=snippet,
-                date=row.get("created_at") or "",
-                relevance_score=score,
-                metadata={
-                    "format": fmt,
-                    "sizeBytes": row.get("size_bytes", 0),
-                    "sessionId": row.get("session_id"),
-                },
-            ))
+        items.append(SearchResultItem(
+            id=row["id"],
+            type="artifact",
+            title=title,
+            snippet=snippet,
+            date=row.get("created_at") or "",
+            relevance_score=score,
+            metadata={
+                "format": fmt,
+                "sizeBytes": row.get("size_bytes", 0),
+                "sessionId": row.get("session_id"),
+            },
+        ))
 
     items.sort(key=lambda x: -x.relevance_score)
     return items[:limit]

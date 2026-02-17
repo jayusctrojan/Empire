@@ -13,7 +13,7 @@ export interface SearchResultItem {
   title: string
   snippet: string
   date: string
-  relevanceScore: number
+  relevance_score: number
   metadata: Record<string, unknown>
 }
 

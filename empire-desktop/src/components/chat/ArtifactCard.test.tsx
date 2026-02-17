@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ArtifactCard } from './ArtifactCard'
 import type { Artifact } from '@/types'
 
@@ -39,24 +40,25 @@ describe('ArtifactCard', () => {
     expect(screen.getByText('Uploading...')).toBeInTheDocument()
   })
 
-  it('calls onOpen when card is clicked', () => {
+  it('calls onOpen when card is clicked', async () => {
+    const user = userEvent.setup()
     const onOpen = vi.fn()
     const artifact = makeArtifact()
     render(<ArtifactCard artifact={artifact} onOpen={onOpen} />)
 
-    // Click the card area (the outer div)
-    fireEvent.click(screen.getByText('Q4 Revenue Report'))
+    await user.click(screen.getByText('Q4 Revenue Report'))
     expect(onOpen).toHaveBeenCalledWith(artifact)
   })
 
-  it('calls onDownload when download button is clicked', () => {
+  it('calls onDownload when download button is clicked', async () => {
+    const user = userEvent.setup()
     const onDownload = vi.fn()
     const onOpen = vi.fn()
     const artifact = makeArtifact()
     render(<ArtifactCard artifact={artifact} onOpen={onOpen} onDownload={onDownload} />)
 
     const downloadBtn = screen.getByTitle('Download')
-    fireEvent.click(downloadBtn)
+    await user.click(downloadBtn)
     expect(onDownload).toHaveBeenCalledWith(artifact)
     // onOpen should NOT be called (stopPropagation)
     expect(onOpen).not.toHaveBeenCalled()
