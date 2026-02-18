@@ -75,40 +75,37 @@ async def unified_search(
     all_types = ["chat", "project", "kb", "artifact"]
     if types:
         search_types = [t.strip().lower() for t in types.split(",") if t.strip().lower() in all_types]
+        if not search_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"No valid types provided. Accepted values: {', '.join(all_types)}",
+            )
     else:
         search_types = all_types
 
     supabase = get_supabase()
     results: List[SearchResultItem] = []
 
-    # Search each type (sequential but fast since each is a single DB call)
+    # Build search coroutines for requested types and run concurrently
+    async def _safe(coro, label: str) -> List[SearchResultItem]:
+        try:
+            return await coro
+        except (APIError, httpx.HTTPError) as e:
+            logger.warning("%s search failed: %s", label, e, exc_info=True)
+            return []
+
+    tasks = []
     if "chat" in search_types:
-        try:
-            chat_results = await _search_chats(supabase, q, org_id, user_id, limit)
-            results.extend(chat_results)
-        except (APIError, httpx.HTTPError) as e:
-            logger.warning("Chat search failed: %s", e, exc_info=True)
-
+        tasks.append(_safe(_search_chats(supabase, q, org_id, user_id, limit), "Chat"))
     if "project" in search_types:
-        try:
-            project_results = await _search_projects(supabase, q, org_id, user_id, limit)
-            results.extend(project_results)
-        except (APIError, httpx.HTTPError) as e:
-            logger.warning("Project search failed: %s", e, exc_info=True)
-
+        tasks.append(_safe(_search_projects(supabase, q, org_id, user_id, limit), "Project"))
     if "kb" in search_types:
-        try:
-            kb_results = await _search_kb_documents(supabase, q, org_id, limit)
-            results.extend(kb_results)
-        except (APIError, httpx.HTTPError) as e:
-            logger.warning("KB search failed: %s", e, exc_info=True)
-
+        tasks.append(_safe(_search_kb_documents(supabase, q, org_id, limit), "KB"))
     if "artifact" in search_types:
-        try:
-            artifact_results = await _search_artifacts(supabase, q, org_id, user_id, limit)
-            results.extend(artifact_results)
-        except (APIError, httpx.HTTPError) as e:
-            logger.warning("Artifact search failed: %s", e, exc_info=True)
+        tasks.append(_safe(_search_artifacts(supabase, q, org_id, user_id, limit), "Artifact"))
+
+    for type_results in await asyncio.gather(*tasks):
+        results.extend(type_results)
 
     # Two stable sorts: first by date desc (tiebreaker), then by relevance desc (primary)
     results.sort(key=lambda r: r.date or "", reverse=True)

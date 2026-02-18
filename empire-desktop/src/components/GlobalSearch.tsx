@@ -78,24 +78,30 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
       return
     }
 
+    let ignore = false
     const timer = setTimeout(async () => {
       setIsLoading(true)
       try {
         const types = activeFilter === 'all' ? undefined : [activeFilter]
         const response = await unifiedSearch(query, types, 30)
+        if (ignore) return
         setResults(response.results)
         setSearchError(null)
         setSelectedIndex(0)
       } catch (err) {
+        if (ignore) return
         console.error('Search failed:', err)
         setResults([])
         setSearchError('Search is temporarily unavailable. Please try again.')
       } finally {
-        setIsLoading(false)
+        if (!ignore) setIsLoading(false)
       }
     }, 250)
 
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      ignore = true
+    }
   }, [query, activeFilter])
 
   // Handle selecting a search result
