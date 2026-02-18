@@ -77,33 +77,32 @@ async def unified_search(
 
     supabase = get_supabase()
     results: List[SearchResultItem] = []
-    query_lower = q.lower()
 
     # Search each type (sequential but fast since each is a single DB call)
     if "chat" in search_types:
         try:
-            chat_results = await _search_chats(supabase, query_lower, q, org_id, user_id, limit)
+            chat_results = await _search_chats(supabase, q, org_id, user_id, limit)
             results.extend(chat_results)
         except Exception as e:
             logger.warning("Chat search failed: %s", e, exc_info=True)
 
     if "project" in search_types:
         try:
-            project_results = await _search_projects(supabase, query_lower, q, org_id, user_id, limit)
+            project_results = await _search_projects(supabase, q, org_id, user_id, limit)
             results.extend(project_results)
         except Exception as e:
             logger.warning("Project search failed: %s", e, exc_info=True)
 
     if "kb" in search_types:
         try:
-            kb_results = await _search_kb_documents(supabase, query_lower, q, org_id, limit)
+            kb_results = await _search_kb_documents(supabase, q, org_id, limit)
             results.extend(kb_results)
         except Exception as e:
             logger.warning("KB search failed: %s", e, exc_info=True)
 
     if "artifact" in search_types:
         try:
-            artifact_results = await _search_artifacts(supabase, query_lower, q, org_id, user_id, limit)
+            artifact_results = await _search_artifacts(supabase, q, org_id, user_id, limit)
             results.extend(artifact_results)
         except Exception as e:
             logger.warning("Artifact search failed: %s", e, exc_info=True)
@@ -128,22 +127,31 @@ async def unified_search(
 # ============================================================================
 
 def _sanitize_for_ilike(value: str) -> str:
-    """Escape special characters for PostgREST ilike filter values."""
-    # Escape SQL LIKE wildcards
+    """Escape special characters for PostgREST ilike filter values.
+
+    - Escapes SQL LIKE wildcards (%, _)
+    - Strips commas (PostgREST OR-condition separator)
+    - Preserves dots by quoting the value in the filter string
+    """
     value = value.replace("\\", "\\\\")
     value = value.replace("%", "\\%")
     value = value.replace("_", "\\_")
-    # Strip PostgREST filter delimiters that could inject conditions
+    # Strip commas — they separate OR conditions in PostgREST filters
     value = value.replace(",", "")
-    value = value.replace(".", "")
     return value
+
+
+def _build_ilike_or(field1: str, field2: str, safe_query: str) -> str:
+    """Build a PostgREST or_ filter string with quoted values to handle dots."""
+    # Quoting values with double quotes allows dots in values
+    return f'{field1}.ilike."%{safe_query}%",{field2}.ilike."%{safe_query}%"'
 
 
 # ============================================================================
 # Per-type search helpers
 # ============================================================================
 
-async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
+async def _search_chats(supabase, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
     """Search CKO sessions by title and context_summary using DB-level ilike."""
     items = []
 
@@ -155,7 +163,7 @@ async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user
     builder = supabase.table("studio_cko_sessions").select(
         "id, title, context_summary, message_count, last_message_at, created_at"
     ).eq("user_id", user_id).eq("is_deleted", False).or_(
-        f"title.ilike.%{safe_query}%,context_summary.ilike.%{safe_query}%"
+        _build_ilike_or("title", "context_summary", safe_query)
     ).limit(limit)
 
     if org_id:
@@ -168,7 +176,7 @@ async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user
         summary = row.get("context_summary") or ""
         title_lower = title.lower()
 
-        # Score: title match > summary match (use sanitized query for consistency)
+        # Score: title match > summary match
         score = 0.9 if safe_lower in title_lower else 0.6
         msg_count = row.get("message_count") or 0
         snippet = summary[:150] if summary else f"{msg_count} messages"
@@ -187,7 +195,7 @@ async def _search_chats(supabase, query_lower: str, raw_query: str, org_id, user
     return items[:limit]
 
 
-async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
+async def _search_projects(supabase, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
     """Search projects by name and description using DB-level ilike."""
     items = []
 
@@ -199,7 +207,7 @@ async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, u
     builder = supabase.table("projects").select(
         "id, name, description, source_count, created_at, updated_at"
     ).eq("user_id", user_id).or_(
-        f"name.ilike.%{safe_query}%,description.ilike.%{safe_query}%"
+        _build_ilike_or("name", "description", safe_query)
     ).limit(limit)
 
     if org_id:
@@ -229,7 +237,7 @@ async def _search_projects(supabase, query_lower: str, raw_query: str, org_id, u
     return items[:limit]
 
 
-async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_id, limit: int) -> List[SearchResultItem]:
+async def _search_kb_documents(supabase, raw_query: str, org_id, limit: int) -> List[SearchResultItem]:
     """Search KB documents by filename and metadata using DB-level ilike."""
     items = []
 
@@ -245,7 +253,7 @@ async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_i
     builder = supabase.table("documents").select(
         "id, filename, file_type, status, department, created_at, updated_at"
     ).eq("status", "processed").eq("org_id", org_id).or_(
-        f"filename.ilike.%{safe_query}%,department.ilike.%{safe_query}%"
+        _build_ilike_or("filename", "department", safe_query)
     ).limit(limit)
 
     response = builder.execute()
@@ -273,7 +281,7 @@ async def _search_kb_documents(supabase, query_lower: str, raw_query: str, org_i
     return items[:limit]
 
 
-async def _search_artifacts(supabase, query_lower: str, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
+async def _search_artifacts(supabase, raw_query: str, org_id, user_id, limit: int) -> List[SearchResultItem]:
     """Search generated artifacts by title and summary using DB-level ilike."""
     items = []
 
@@ -285,7 +293,7 @@ async def _search_artifacts(supabase, query_lower: str, raw_query: str, org_id, 
     builder = supabase.table("studio_cko_artifacts").select(
         "id, title, format, summary, size_bytes, created_at, session_id"
     ).eq("user_id", user_id).or_(
-        f"title.ilike.%{safe_query}%,summary.ilike.%{safe_query}%"
+        _build_ilike_or("title", "summary", safe_query)
     ).limit(limit)
 
     if org_id:

@@ -37,6 +37,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [activeFilter, setActiveFilter] = useState<SearchContentType | 'all'>('all')
+  const [searchError, setSearchError] = useState<string | null>(null)
 
   const { setActiveConversation, setMessages } = useChatStore()
   const { setActiveView } = useAppStore()
@@ -75,9 +76,12 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
         const types = activeFilter === 'all' ? undefined : [activeFilter]
         const response = await unifiedSearch(query, types, 30)
         setResults(response.results)
+        setSearchError(null)
         setSelectedIndex(0)
       } catch (err) {
         console.error('Search failed:', err)
+        setResults([])
+        setSearchError('Search is temporarily unavailable. Please try again.')
       } finally {
         setIsLoading(false)
       }
@@ -259,6 +263,10 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
                   )
                 })}
               </ul>
+            ) : searchError ? (
+              <div className="p-8 text-center text-red-400">
+                <p>{searchError}</p>
+              </div>
             ) : (
               <div className="p-8 text-center text-empire-text-muted">
                 <p>No results found for &quot;{query}&quot;</p>
