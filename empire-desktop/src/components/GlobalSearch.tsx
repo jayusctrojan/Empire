@@ -25,6 +25,13 @@ const TYPE_ICONS: Record<SearchContentType, typeof MessageSquare> = {
   artifact: FileText,
 }
 
+const TYPE_LABELS: Record<SearchContentType, string> = {
+  chat: 'Chat',
+  project: 'Project',
+  kb: 'KB',
+  artifact: 'Artifact',
+}
+
 interface GlobalSearchProps {
   onClose: () => void
 }
@@ -67,6 +74,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
   useEffect(() => {
     if (!query.trim()) {
       setResults([])
+      setSearchError(null)
       return
     }
 
@@ -212,7 +220,7 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
                   )}
                 >
                   {tab.label}
-                  {query && activeFilter === 'all' && (
+                  {activeFilter === 'all' && (
                     <span className="ml-1 opacity-70">{count}</span>
                   )}
                 </button>
@@ -249,8 +257,8 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
                             <p className="text-sm font-medium text-empire-text truncate">
                               {result.title}
                             </p>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-empire-border text-empire-text-muted capitalize flex-shrink-0">
-                              {result.type}
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-empire-border text-empire-text-muted flex-shrink-0">
+                              {TYPE_LABELS[result.type] || result.type}
                             </span>
                           </div>
                           <p className="text-xs text-empire-text-muted line-clamp-2">
@@ -319,7 +327,13 @@ export function GlobalSearch({ onClose }: GlobalSearchProps) {
               <kbd className="px-1 py-0.5 rounded bg-empire-border">Enter</kbd> to select
             </span>
           </div>
-          <span>{query ? `${results.length} results` : 'Type to search'}</span>
+          <span>
+            {query
+              ? searchError
+                ? 'Search unavailable'
+                : `${results.length} results`
+              : 'Type to search'}
+          </span>
         </div>
       </div>
     </div>

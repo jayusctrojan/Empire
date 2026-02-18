@@ -9,10 +9,13 @@ Searches across all content types within an organization:
 All results are scoped to the user's current organization.
 """
 
+import asyncio
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, Query, Request, HTTPException
 from pydantic import BaseModel, Field
+from postgrest.exceptions import APIError
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -83,28 +86,28 @@ async def unified_search(
         try:
             chat_results = await _search_chats(supabase, q, org_id, user_id, limit)
             results.extend(chat_results)
-        except Exception as e:
+        except (APIError, httpx.HTTPError) as e:
             logger.warning("Chat search failed: %s", e, exc_info=True)
 
     if "project" in search_types:
         try:
             project_results = await _search_projects(supabase, q, org_id, user_id, limit)
             results.extend(project_results)
-        except Exception as e:
+        except (APIError, httpx.HTTPError) as e:
             logger.warning("Project search failed: %s", e, exc_info=True)
 
     if "kb" in search_types:
         try:
             kb_results = await _search_kb_documents(supabase, q, org_id, limit)
             results.extend(kb_results)
-        except Exception as e:
+        except (APIError, httpx.HTTPError) as e:
             logger.warning("KB search failed: %s", e, exc_info=True)
 
     if "artifact" in search_types:
         try:
             artifact_results = await _search_artifacts(supabase, q, org_id, user_id, limit)
             results.extend(artifact_results)
-        except Exception as e:
+        except (APIError, httpx.HTTPError) as e:
             logger.warning("Artifact search failed: %s", e, exc_info=True)
 
     # Two stable sorts: first by date desc (tiebreaker), then by relevance desc (primary)
@@ -138,6 +141,8 @@ def _sanitize_for_ilike(value: str) -> str:
     value = value.replace("_", "\\_")
     # Strip commas — they separate OR conditions in PostgREST filters
     value = value.replace(",", "")
+    # Strip double quotes — _build_ilike_or wraps values in quotes
+    value = value.replace('"', "")
     return value
 
 
@@ -169,7 +174,8 @@ async def _search_chats(supabase, raw_query: str, org_id, user_id, limit: int) -
     if org_id:
         builder = builder.eq("org_id", org_id)
 
-    response = builder.execute()
+    loop = asyncio.get_running_loop()
+    response = await loop.run_in_executor(None, builder.execute)
 
     for row in response.data or []:
         title = row.get("title") or "Untitled"
@@ -213,7 +219,8 @@ async def _search_projects(supabase, raw_query: str, org_id, user_id, limit: int
     if org_id:
         builder = builder.eq("org_id", org_id)
 
-    response = builder.execute()
+    loop = asyncio.get_running_loop()
+    response = await loop.run_in_executor(None, builder.execute)
 
     for row in response.data or []:
         name = row.get("name") or "Untitled"
@@ -256,7 +263,8 @@ async def _search_kb_documents(supabase, raw_query: str, org_id, limit: int) -> 
         _build_ilike_or("filename", "department", safe_query)
     ).limit(limit)
 
-    response = builder.execute()
+    loop = asyncio.get_running_loop()
+    response = await loop.run_in_executor(None, builder.execute)
 
     for row in response.data or []:
         filename = row.get("filename") or "Unknown"
@@ -299,7 +307,8 @@ async def _search_artifacts(supabase, raw_query: str, org_id, user_id, limit: in
     if org_id:
         builder = builder.eq("org_id", org_id)
 
-    response = builder.execute()
+    loop = asyncio.get_running_loop()
+    response = await loop.run_in_executor(None, builder.execute)
 
     for row in response.data or []:
         title = row.get("title") or "Untitled"
