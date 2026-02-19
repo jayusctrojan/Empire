@@ -30,6 +30,7 @@ from app.routes import feedback as feedback_router  # Task 188: Agent Feedback S
 from app.routes import kb_submissions  # CKO Telegram Bot: KB Submission Pipeline
 from app.routes import organizations as organizations_router  # Organizations: Multi-Tenant SaaS
 from app.routes import artifacts as artifacts_router  # Phase 3: Document Artifacts
+from app.routes import unified_search as unified_search_router  # Phase 4: Unified Search
 
 # PENDING FEATURES (to be implemented in future releases):
 # - Task 206: Automatic Checkpoint System (checkpoints_router)
@@ -651,6 +652,7 @@ app.include_router(kb_submissions.router)  # KB Submissions router has /api/kb p
 # Organizations: Multi-Tenant SaaS with acquisition-ready data portability
 app.include_router(organizations_router.router)  # Organizations router has /api/organizations prefix
 app.include_router(artifacts_router.router)  # Artifacts router has /api/studio/artifacts prefix
+app.include_router(unified_search_router.router)  # Unified Search router has /api/search prefix
 
 # =============================================================================
 # PENDING FEATURES (to be implemented in future releases)
