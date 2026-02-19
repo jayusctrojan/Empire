@@ -93,6 +93,9 @@ async def unified_search(
         except (APIError, httpx.HTTPError) as e:
             logger.warning("%s search failed: %s", label, e, exc_info=True)
             return []
+        except Exception as e:
+            logger.error("Unexpected %s search error: %s", label, e, exc_info=True)
+            return []
 
     tasks = []
     if "chat" in search_types:
