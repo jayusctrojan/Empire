@@ -68,9 +68,9 @@ export interface AssetStatsResponse {
 
 export interface AssetUpdateRequest {
   title?: string
+  name?: string
   content?: string
-  format?: AssetFormat
-  department?: string
+  status?: AssetStatus
 }
 
 export interface AssetReclassifyRequest {
@@ -211,55 +211,62 @@ export async function* testAssetStream(
   const reader = response.body?.getReader()
   if (!reader) throw new Error('No response body')
 
+  const onAbort = () => reader.cancel()
+  signal?.addEventListener('abort', onAbort)
+
   const decoder = new TextDecoder()
   let buffer = ''
 
   let eventData = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done || signal?.aborted) break
 
-    buffer += decoder.decode(value, { stream: true })
+      buffer += decoder.decode(value, { stream: true })
 
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
 
-    for (const line of lines) {
-      if (line.startsWith('event: ')) {
-        // event type line — next data line will follow
-      } else if (line.startsWith('data: ')) {
-        eventData += (eventData ? '\n' : '') + line.slice(6)
-      } else if (line === '' && eventData) {
-        try {
-          const chunk = JSON.parse(eventData) as AssetTestStreamChunk
-          yield chunk
-        } catch {
-          // Ignore malformed JSON
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          // event type line — next data line will follow
+        } else if (line.startsWith('data: ')) {
+          eventData += (eventData ? '\n' : '') + line.slice(6)
+        } else if (line === '' && eventData) {
+          try {
+            const chunk = JSON.parse(eventData) as AssetTestStreamChunk
+            yield chunk
+          } catch {
+            // Ignore malformed JSON
+          }
+          eventData = ''
         }
-        eventData = ''
       }
     }
-  }
 
-  // Flush any remaining buffered event
-  if (buffer.trim()) {
-    const remaining = buffer.split('\n')
-    let eventData = ''
-    for (const line of remaining) {
-      if (line.startsWith('data: ')) {
-        eventData += (eventData ? '\n' : '') + line.slice(6)
-      } else if (line === '' && eventData) {
+    // Flush any remaining buffered event
+    if (buffer.trim()) {
+      const remaining = buffer.split('\n')
+      let flushData = ''
+      for (const line of remaining) {
+        if (line.startsWith('data: ')) {
+          flushData += (flushData ? '\n' : '') + line.slice(6)
+        } else if (line === '' && flushData) {
+          try {
+            yield JSON.parse(flushData) as AssetTestStreamChunk
+          } catch { /* ignore */ }
+          flushData = ''
+        }
+      }
+      if (flushData) {
         try {
-          yield JSON.parse(eventData) as AssetTestStreamChunk
+          yield JSON.parse(flushData) as AssetTestStreamChunk
         } catch { /* ignore */ }
-        eventData = ''
       }
     }
-    if (eventData) {
-      try {
-        yield JSON.parse(eventData) as AssetTestStreamChunk
-      } catch { /* ignore */ }
-    }
+  } finally {
+    signal?.removeEventListener('abort', onAbort)
   }
 }

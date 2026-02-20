@@ -253,6 +253,14 @@ export function AssetsView() {
     testMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [testMessages, testStreamingContent])
 
+  // Abort in-flight test stream on unmount
+  useEffect(() => {
+    return () => {
+      testAbortRef.current?.abort()
+      testAbortRef.current = null
+    }
+  }, [])
+
   // ============================================================================
   // Handlers
   // ============================================================================
@@ -541,6 +549,7 @@ export function AssetsView() {
             </div>
             <button
               onClick={handleCloseDetail}
+              aria-label="Close detail panel"
               className="p-1.5 rounded-lg hover:bg-empire-border text-empire-text-muted hover:text-empire-text transition-colors"
             >
               <X className="w-5 h-5" />

@@ -36,7 +36,7 @@ Empire is an AI-powered knowledge management platform with:
 - Run CI/CD checks before merging
 - Follow CodeRabbit review feedback
 - Backend tests: `pytest` (170+ test files)
-- Frontend tests: `npx vitest run` in `empire-desktop/` (43 tests)
+- Frontend tests: `npx vitest run` in `empire-desktop/` (44 tests)
 - Type checking: `npx tsc --noEmit` in `empire-desktop/`
 
 ## Key Directories
