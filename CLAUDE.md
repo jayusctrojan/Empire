@@ -11,11 +11,11 @@
 Empire is an AI-powered knowledge management platform with:
 - **Multi-Model Quality Pipeline**: Sonnet 4.6 (prompt engineer + output architect) → Kimi K2.5 Thinking (reasoning engine)
 - **Multi-Tenant Organizations**: Role-based membership (owner/admin/member/viewer), RLS data isolation
-- **Tauri Desktop App**: React 18 + TypeScript + Zustand, 31 components
+- **Tauri Desktop App**: React 18 + TypeScript + Zustand, 32 components
 - **Document Generation**: DOCX, XLSX, PPTX, PDF artifacts from AI responses
 - **Multimodal RAG**: Local vision (Qwen2.5-VL-32B), audio STT (Whisper), video frames (Gemini 3 Flash)
 - **Hybrid Database**: PostgreSQL (Supabase) + Neo4j + Redis
-- **57 API Route Modules** (300+ endpoints), **139 service files**
+- **58 API Route Modules** (300+ endpoints), **139 service files**
 
 ## AI Models
 
@@ -42,12 +42,12 @@ Empire is an AI-powered knowledge management platform with:
 ## Key Directories
 
 - `app/` - FastAPI backend (Python 3.11+)
-- `app/routes/` - 57 API route modules (300+ endpoints)
+- `app/routes/` - 58 API route modules (300+ endpoints)
 - `app/services/` - 139 service files (business logic, LLM clients, pipeline)
 - `app/core/` - Database clients, config
 - `app/middleware/` - Auth, rate limiting, org context
 - `empire-desktop/` - Tauri 2.x desktop app (React + TypeScript)
-- `empire-desktop/src/components/` - 31 React components
+- `empire-desktop/src/components/` - 32 React components
 - `empire-desktop/src/stores/` - Zustand state management
 - `empire-desktop/src/lib/api/` - Backend API client (with X-Org-Id header)
 - `migrations/` - SQL migration files
@@ -73,6 +73,7 @@ Empire is an AI-powered knowledge management platform with:
 - `app/routes/organizations.py` - Org CRUD + membership management
 - `app/routes/unified_search.py` - Cross-type search (chats, projects, KB, artifacts)
 - `app/routes/artifacts.py` - Artifact download/metadata
+- `app/routes/studio_assets.py` - Asset CRUD, publish/archive lifecycle, test sandbox SSE
 
 ## Infrastructure
 

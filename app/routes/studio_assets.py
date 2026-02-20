@@ -206,7 +206,7 @@ def get_service() -> AssetManagementService:
 async def list_assets(
     asset_type: Optional[str] = Query(None, description="Filter by asset type"),
     department: Optional[str] = Query(None, description="Filter by department"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    asset_status: Optional[str] = Query(None, alias="status", description="Filter by status"),
     search: Optional[str] = Query(None, description="Search in title and content"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(50, ge=1, le=100, description="Maximum records to return"),
@@ -225,14 +225,14 @@ async def list_assets(
             user_id=user_id,
             asset_type=asset_type,
             department=department,
-            status=status,
+            status=asset_status,
             search=search
         )
 
         filters = AssetFilters(
             asset_type=asset_type,
             department=department,
-            status=status,
+            status=asset_status,
             search_query=search
         )
 
@@ -611,7 +611,7 @@ async def test_asset(
                 event_type = event.get("type", "unknown")
                 yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
 
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Asset test streaming error",
                 asset_id=asset_id,

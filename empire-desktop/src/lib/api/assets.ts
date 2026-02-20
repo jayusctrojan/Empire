@@ -214,6 +214,8 @@ export async function* testAssetStream(
   const decoder = new TextDecoder()
   let buffer = ''
 
+  let eventData = ''
+
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
@@ -222,8 +224,6 @@ export async function* testAssetStream(
 
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
-
-    let eventData = ''
 
     for (const line of lines) {
       if (line.startsWith('event: ')) {
