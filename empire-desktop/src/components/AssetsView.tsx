@@ -197,12 +197,15 @@ export function AssetsView() {
   const testMessagesEndRef = useRef<HTMLDivElement>(null)
   const testAbortRef = useRef<AbortController | null>(null)
   const isSearchInitialized = useRef(false)
+  const fetchIdRef = useRef(0)
+  const pendingHistoryRef = useRef<string | null>(null)
 
   // ============================================================================
   // Data Fetching
   // ============================================================================
 
   const fetchAssets = useCallback(async () => {
+    const id = ++fetchIdRef.current
     setIsLoading(true)
     setError(null)
     try {
@@ -210,12 +213,14 @@ export function AssetsView() {
         listAssets(filters, 0, 50),
         getAssetStats(),
       ])
+      if (fetchIdRef.current !== id) return // stale response
       setAssets(listResult.assets)
       setStats(statsResult)
     } catch (err) {
+      if (fetchIdRef.current !== id) return
       setError(err instanceof Error ? err.message : 'Failed to load assets')
     } finally {
-      setIsLoading(false)
+      if (fetchIdRef.current === id) setIsLoading(false)
     }
   }, [filters])
 
@@ -269,6 +274,7 @@ export function AssetsView() {
     // Cancel any in-flight test stream
     testAbortRef.current?.abort()
     testAbortRef.current = null
+    pendingHistoryRef.current = asset.id
     setSelectedAsset(asset)
     setIsDetailOpen(true)
     setActiveTab('content')
@@ -283,7 +289,9 @@ export function AssetsView() {
 
     try {
       const historyResult = await getAssetHistory(asset.id)
-      setAssetHistory(historyResult.history)
+      if (pendingHistoryRef.current === asset.id) {
+        setAssetHistory(historyResult.history)
+      }
     } catch {
       // Non-critical — history just won't show
     }
