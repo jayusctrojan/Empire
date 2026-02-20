@@ -246,6 +246,9 @@ export async function* testAssetStream(
       }
     }
 
+    // Don't flush stale data from an intentionally cancelled stream
+    if (signal?.aborted) return
+
     // Flush any remaining buffered event
     if (buffer.trim()) {
       const remaining = buffer.split('\n')
