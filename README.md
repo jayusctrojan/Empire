@@ -1,294 +1,209 @@
-# AI Empire Software Requirements Specification v5.0
-## Mac Studio Edition - Local-First AI Architecture
+# Empire v7.5 - AI-Powered Knowledge Management Platform
 
-This directory contains the complete Software Requirements Specification (SRS) for the AI Empire File Processing System v5.0, featuring the revolutionary Mac Studio M3 Ultra local-first architecture with 98% on-device AI inference.
+**Version:** v7.5.0
+**Last Updated:** 2026-02-19
+**Status:** Production Deployed
 
-## 🚀 v5.0 Highlights - Mac Studio Revolution
+---
 
-- **Mac Studio M3 Ultra (96GB):** Complete AI powerhouse for local processing
-- **Llama 3.3 70B:** GPT-4 quality running locally at 32 tokens/second
-- **98% Local Inference:** Near-complete independence from cloud APIs
-- **$100-195/month:** 40% reduction in operating costs
-- **Complete Privacy:** Sensitive data never leaves your hardware
-- **Delivery Date:** October 14, 2025
+## Overview
 
-## 📁 Directory Structure
+Empire is a production-ready AI-powered knowledge management platform featuring a **multi-model quality pipeline**, **multi-tenant organization layer**, **Tauri desktop application**, **document generation**, and **multimodal RAG processing**.
+
+### Key Capabilities
+
+- **Multi-Model AI Pipeline**: Sonnet 4.5 bookend processing + Kimi K2.5 Thinking reasoning engine
+- **Document Generation**: DOCX, XLSX, PPTX, PDF artifacts from AI responses
+- **Multimodal RAG**: Local vision (Qwen2.5-VL-32B), audio STT (Whisper), video frame analysis
+- **Multi-Tenant Organizations**: Role-based membership and data isolation
+- **Tauri Desktop App**: TypeScript/React with artifact preview, org picker, unified search
+- **Unified Search**: Cmd+K search across chats, projects, KB, and artifacts
+- **15+ Specialized AI Agents**: Document processing, analysis, and orchestration
+- **57 API Route Modules**: 300+ endpoints
+- **Hybrid Database**: PostgreSQL (Supabase) + Neo4j + Redis
+
+---
+
+## Architecture
+
+### Multi-Model Quality Pipeline
+
+Every query flows through a 3-stage pipeline:
+
+```
+User Query
+     |
+     v
+[PROMPT ENGINEER - Sonnet 4.5]     ~1-2s
+  Intent detection, format detection, enriched query
+     |
+     v
+[Query Expansion - Kimi K2.5] -> [RAG Search] -> [BGE-Reranker-v2]
+     |
+     v
+[REASONING ENGINE - Kimi K2.5 Thinking]   ~3-8s
+  Deep reasoning with citations [1], [2]
+     |
+     v
+[OUTPUT ARCHITECT - Sonnet 4.5]    ~2-3s
+  Formatting, artifact detection, streaming
+     |
+     v (if artifact detected)
+[Document Generator -> B2 Storage -> Artifact card in chat]
+```
+
+### AI Models
+
+| Purpose | Model | Provider |
+|---------|-------|----------|
+| Prompt Engineering | Claude Sonnet 4.5 | Anthropic |
+| Output Formatting | Claude Sonnet 4.5 | Anthropic |
+| Reasoning Engine | Kimi K2.5 Thinking | Together AI |
+| Query Expansion | Kimi K2.5 | Together AI |
+| Image Analysis | Kimi K2.5 / Gemini 3 Flash | Together AI / Google |
+| Local Vision | Qwen2.5-VL-32B | Ollama (Mac Studio) |
+| Audio STT | distil-whisper/distil-large-v3.5 | faster-whisper (local) |
+| Video Frames | Gemini 3 Flash | Google AI |
+| Embeddings | BGE-M3 | Local (1024-dim) |
+| Reranking | BGE-Reranker-v2 | Local |
+
+### Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| AI Reasoning | Kimi K2.5 Thinking (Together AI) |
+| AI Prompt/Output | Claude Sonnet 4.5 (Anthropic) |
+| Backend | FastAPI (Python 3.11+) |
+| Desktop App | Tauri 2.x + React + TypeScript |
+| State Management | Zustand |
+| Task Queue | Celery |
+| Vector DB | PostgreSQL + pgvector (Supabase) |
+| Graph DB | Neo4j (Mac Studio Docker) |
+| Cache/Broker | Redis (Upstash) |
+| Storage | Backblaze B2 |
+| Monitoring | Prometheus + Grafana + Alertmanager |
+| Testing | pytest (backend) + vitest (frontend) |
+| Deployment | Render.com |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+
+- Rust (for Tauri desktop app)
+- Docker (for Neo4j)
+
+### Backend
+
+```bash
+git clone https://github.com/jayusctrojan/Empire.git
+cd Empire
+cp .env.example .env  # Configure API keys
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+docker-compose up -d neo4j
+uvicorn app.main:app --reload --port 8000
+```
+
+### Desktop App
+
+```bash
+cd empire-desktop
+npm install
+npm run tauri dev
+```
+
+### Verify
+
+```bash
+curl http://localhost:8000/health
+# {"status": "healthy", "version": "7.5.0"}
+```
+
+---
+
+## Project Structure
 
 ```
 Empire/
-├── Core Sections (IEEE 830-1998 Structure)
-│   ├── 01_introduction.md ✅
-│   ├── 02_overall_description.md ✅ (UPDATED v5.0)
-│   ├── 03_specific_requirements.md ✅
-│   
-├── Version Enhancements
-│   ├── 04_v3_enhancements.md ✅
-│   ├── 05_v3_1_optimizations.md ✅
-│   ├── 06_v4_unified_architecture.md ✅ (Includes Appendices A-R)
-│   ├── 07_performance_scaling.md ✅
-│   ├── 08_video_processing.md ✅
-│   └── 09_orchestrator_requirements.md ✅
-│
-└── Supporting Files
-    ├── README.md (this file)
-    ├── empire-arch.txt (v5.0 Architecture)
-    └── claude.md
-
-Note: All appendices are integrated into Section 6
+├── app/                          # FastAPI backend
+│   ├── routes/                   # 57 API route modules
+│   ├── services/                 # 139 service files
+│   ├── core/                     # Database, config
+│   ├── middleware/                # Auth, rate limiting, org context
+│   └── main.py                   # FastAPI entry point
+├── empire-desktop/               # Tauri desktop application
+│   ├── src/components/           # 31 React components
+│   ├── src/stores/               # Zustand state management
+│   ├── src/lib/api/              # Backend API client
+│   └── src-tauri/                # Rust backend
+├── tests/                        # 170+ backend test files
+├── migrations/                   # SQL migrations
+├── docs/                         # Documentation
+├── notebooklm/                   # NotebookLM source docs
+└── config/monitoring/            # Prometheus/Grafana
 ```
-
-## 📚 Documentation Status
-- ✅ All sections complete and reviewed (October 12, 2025)
-- ✅ No placeholders or incomplete sections
-- ✅ Ready for October 14, 2025 deployment
-- ✅ Quarterly review schedule established
-
-## 📋 Section Overview
-
-### Core Sections
-
-#### [1. Introduction](01_introduction.md)
-- Purpose and scope of the SRS
-- v5.0 Mac Studio Edition overview
-- Definitions, acronyms, and abbreviations
-- References and document organization
-- October 14, 2025 delivery date confirmed
-
-#### [2. Overall Description](02_overall_description.md) ⭐ **UPDATED v5.0**
-- **NEW:** Mac Studio M3 Ultra architecture
-- **NEW:** 98% local AI inference model
-- **NEW:** Llama 3.3 70B local deployment
-- Product perspective and system context
-- User characteristics for high-privacy users
-- Constraints and assumptions
-- **NEW:** Performance targets (32 tok/s, 500+ docs/day)
-
-#### [3. Specific Requirements](03_specific_requirements.md)
-- Functional requirements (FR-XXX)
-- Non-functional requirements (NFR-XXX)
-- External interface requirements
-- System features and performance requirements
-- Design constraints and software attributes
-- 150+ detailed requirements
-
-### Version Enhancement Sections
-
-#### [4. Version 3.0 Enhancements](04_v3_enhancements.md)
-- Parallel processing engine (10 concurrent workflows)
-- Semantic chunking system
-- Quality monitoring framework
-- Three-tier caching architecture
-- GPU utilization monitoring
-
-#### [5. Version 3.1 Optimizations](05_v3_1_optimizations.md)
-- Fast track processing (70% faster)
-- Cost management system
-- Intelligent error recovery
-- Circuit breaker implementation
-- Personal productivity analytics
-
-#### [6. Version 4.0 Architecture & Appendices](06_v4_unified_architecture.md)
-This section now contains all appendices:
-- **Appendix A:** Business Rules (BR-001 to BR-030)
-- **Appendix B:** Technical Stack Summary
-- **Appendix C:** Document Routing Logic
-- **Appendix D:** Operational Procedures
-- **Appendix E:** Key Management & Security
-- **Appendix F:** Migration Plans
-- **Appendix G:** Monitoring and Observability
-- **Appendix H:** Configuration Template
-- **Appendix I:** Disaster Recovery Plan
-- **Appendix J:** Performance Benchmarks
-- **Through Appendix R:** Version History
-
-#### [7. Performance & Scaling](07_performance_scaling.md)
-- Mac Studio resource optimization
-- Advanced batch processing
-- Predictive caching
-- Performance monitoring
-- Future scaling options
-
-#### [8. Video Processing](08_video_processing.md)
-- Multi-modal video analysis
-- Real-time stream processing
-- Frame extraction and analysis
-- Qwen2.5-VL-7B vision model integration
-- GPU-accelerated processing
-
-#### [9. Orchestrator Requirements](09_orchestrator_requirements.md)
-- n8n workflow orchestration
-- Task scheduling and automation
-- CrewAI multi-agent coordination
-- Mac Studio resource scheduling
-- Cost-aware orchestration
-
-## 🏗️ v5.0 Mac Studio Architecture
-
-### Core Infrastructure
-```
-Mac Studio M3 Ultra (96GB) - October 14, 2025 Delivery
-├── 28-core CPU, 60-core GPU, 32-core Neural Engine
-├── 800 GB/s memory bandwidth
-├── Llama 3.3 70B (35GB) - Primary LLM
-├── Qwen2.5-VL-7B (5GB) - Vision model
-├── mem-agent MCP (3GB) - Memory management
-├── nomic-embed-text (2GB) - Embeddings
-├── 31GB free for caching
-└── 98% of all inference runs locally
-```
-
-### Local Models Running
-- **Llama 3.3 70B:** GPT-4 quality, 32 tokens/second
-- **Qwen2.5-VL-7B:** Vision and image analysis
-- **mem-agent:** Persistent memory, <500ms retrieval
-- **nomic-embed:** Local embedding generation
-- **BGE-reranker:** Local search optimization
-
-### Minimal Cloud Services
-- **n8n & CrewAI (Render):** $30-50 - Orchestration only
-- **Supabase:** $25 - Private PostgreSQL
-- **Pinecone:** $0-70 - Vector storage
-- **Backblaze B2:** $10-20 - Zero-knowledge backups
-- **Hyperbolic.ai:** $5-10 - Edge cases ONLY
-- **Others:** ~$20 - OCR, transcription as needed
-
-### Total Costs
-- **One-time:** $3,999 (Mac Studio) + $200 (UPS/accessories)
-- **Monthly:** $100-195 (40% reduction from v4.0)
-- **ROI:** 14-20 month payback period
-
-## 🚀 Key Features & Capabilities
-
-### Privacy & Security
-- ✅ 98% local inference - data sovereignty
-- ✅ Zero-knowledge encrypted backups
-- ✅ FileVault + client-side encryption
-- ✅ Sensitive docs never leave Mac Studio
-- ✅ Tailscale VPN for secure remote access
-- ✅ Complete offline capability
-
-### Performance Metrics
-- ✅ 32 tokens/second inference speed
-- ✅ 500+ documents/day capacity
-- ✅ 10+ concurrent workflows
-- ✅ <500ms memory retrieval (typically <100ms)
-- ✅ 1-3 seconds end-to-end latency
-- ✅ 80%+ cache hit rate
-
-### Document Processing
-- ✅ 40+ format support via MarkItDown MCP
-- ✅ Fast track for simple documents (70% faster)
-- ✅ Parallel processing (10 concurrent)
-- ✅ Semantic chunking with quality scoring
-- ✅ Hash-based change detection
-
-### Intelligence Features
-- ✅ Hybrid RAG (vector + graph + SQL)
-- ✅ CrewAI multi-agent analysis
-- ✅ mem-agent persistent context
-- ✅ Local embeddings and reranking
-- ✅ Vision processing with Qwen2.5-VL
-
-### Backup & Recovery
-- ✅ Everything backed up to B2
-- ✅ 4-hour Recovery Time Objective
-- ✅ 1-hour Recovery Point Objective
-- ✅ Automated integrity checks
-- ✅ Quarterly disaster recovery drills
-
-## 📊 Requirement Categories
-
-| Prefix | Category | Version | Count |
-|--------|----------|---------|-------|
-| FR | Functional Requirements | Base | 120+ |
-| NFR | Non-Functional Requirements | Base | 30+ |
-| SR | Security Requirements | Base | 15+ |
-| PFR | Performance Functional | v3.0 | 20+ |
-| CMR | Cost Management | v3.1 | 10+ |
-| MSR | Mac Studio Requirements | v5.0 | 15+ |
-| LLR | Local LLM Requirements | v5.0 | 15+ |
-| MEM | Memory Management | v5.0 | 10+ |
-| VIS | Vision Processing | v5.0 | 7+ |
-| PRV | Privacy Requirements | v5.0 | 7+ |
-
-## 🗓️ Implementation Timeline
-
-### October 14, 2025: Mac Studio Delivery
-**Day 1 Setup:**
-- Unbox and connect Mac Studio
-- Install Ollama and pull Llama 3.3 70B
-- Setup Open WebUI and LiteLLM
-- Configure mem-agent MCP
-- Initial testing
-
-**Week 1: Core Services**
-- Pull vision model (Qwen-VL)
-- Configure B2 backups
-- Setup Claude Desktop MCP
-- Install embeddings/reranker
-- Configure Tailscale VPN
-
-**Week 2: Integration**
-- Update n8n workflows
-- Smart routing logic
-- Cloud service connections
-- Monitoring setup
-- Cost tracking
-
-**Week 3-4: Optimization**
-- Performance tuning
-- Cache optimization
-- Documentation
-- Final testing
-- Production ready
-
-## ⚡ Performance Comparison
-
-| Metric | v4.0 (Cloud-Heavy) | v5.0 (Mac Studio) | Improvement |
-|--------|-------------------|-------------------|-------------|
-| LLM API Costs | $50-100/month | $5-10/month | 90% reduction |
-| Inference Speed | Variable | 32 tok/s | Consistent |
-| Privacy | Partial | Complete | 100% local |
-| Latency | 2-5 seconds | 1-3 seconds | 50% faster |
-| Document Capacity | 200/day | 500+/day | 2.5x increase |
-| Uptime Dependency | Cloud services | Local hardware | Independent |
-
-## ✅ Next Steps
-
-1. **Review Architecture:** Study `empire-arch.txt` for complete v5.0 details
-2. **Prepare for Delivery:** Ensure readiness for October 14, 2025
-3. **Plan Migration:** Document current data for migration
-4. **Test Procedures:** Validate disaster recovery plans
-5. **Budget Planning:** Allocate $4,200 initial + $100-195/month
-
-## 🔒 Security & Compliance
-
-- **GDPR Compliant:** Full data protection
-- **SOC 2 Ready:** Security controls in place
-- **HIPAA Capable:** With proper configuration
-- **Zero-Knowledge:** Complete encryption
-- **Data Sovereignty:** 98% local processing
-
-## 📝 Notes
-
-- **Version 5.0** represents a paradigm shift to local-first AI
-- Mac Studio delivery confirmed for **October 14, 2025**
-- Render workspace ID: `tea-d1vtdtre5dus73a4rb4g`
-- All sensitive data processing happens locally
-- Cloud services used only for orchestration and non-sensitive tasks
-- Complete system can operate offline for core functions
-- All appendices integrated into Section 6 for easier reference
-
-## 🤝 Support
-
-For questions or clarifications about the v5.0 architecture:
-- Review `empire-arch.txt` for detailed specifications
-- Check individual section files for specific requirements
-- Section 6 contains all appendices (A through R)
-- Consult disaster recovery procedures in Section 6
 
 ---
-*Last Updated: October 12, 2025*  
-*Version: 5.0 - Mac Studio Edition*  
-*IEEE 830-1998 Compliant*  
-*Classification: Confidential - Internal Use*
+
+## Cloud Services (Production)
+
+| Service | Platform | Cost |
+|---------|----------|------|
+| FastAPI Backend | Render | $7/month |
+| Celery Workers | Render | $7/month |
+| Gradio Chat UI | Render | $7/month |
+| CrewAI Service | Render | $7/month |
+| PostgreSQL | Supabase | $25/month |
+| Redis | Upstash | Free |
+| File Storage | Backblaze B2 | ~$5/month |
+| **Infrastructure Total** | | **~$60/month** |
+| Anthropic API | Anthropic | Usage-based |
+| Together AI | Together | Usage-based |
+| Google AI | Google | Usage-based |
+
+---
+
+## Documentation
+
+| Document | Location |
+|----------|----------|
+| Architecture | `notebooklm/ARCHITECTURE.md` |
+| Features | `notebooklm/FEATURES.md` |
+| AI Models & Agents | `notebooklm/AI_AGENTS.md` |
+| Developer Guide | `docs/onboarding/DEVELOPER_GUIDE.md` |
+| End User Guide | `docs/onboarding/END_USER_GUIDE.md` |
+| API Reference | `docs/API_REFERENCE.md` |
+
+---
+
+## Testing
+
+```bash
+# Backend
+pytest                           # All tests
+pytest tests/test_unified_search.py -v  # Specific file
+
+# Frontend
+cd empire-desktop
+npx vitest run                   # All frontend tests
+npx tsc --noEmit                 # Type checking
+```
+
+---
+
+## Contributing
+
+1. Create a feature branch: `git checkout -b feature/your-feature`
+2. Make changes and add tests
+3. Run tests: `pytest` and `npx vitest run`
+4. Push and create PR: `gh pr create`
+5. Address CodeRabbit review feedback
+6. Get approval from Jay before merging to main
+
+---
+
+*Empire v7.5 - Multi-model AI pipeline with organization tenancy, desktop app, artifact generation, and unified search.*

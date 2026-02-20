@@ -1,32 +1,70 @@
-# Empire v7.3 - Production Architecture
+# Empire v7.5 - Production Architecture
 
-**Version:** v7.3.0
-**Last Updated:** 2025-12-30
-**Status:** ✅ Production Ready
+**Version:** v7.5.0
+**Last Updated:** 2026-02-19
+**Status:** Production Ready
 
 ---
 
 ## AI Processing Architecture
 
-### Primary AI: Claude Sonnet 4.5 (Anthropic Cloud API)
+### Multi-Model Quality Pipeline
 
-**All AI reasoning, summarization, classification, and chat responses use Claude Sonnet 4.5 via Anthropic's cloud API.**
+Empire v7.5 uses a **3-stage multi-model pipeline** for every query. Two different AI providers work together:
 
 ```
-User Query → FastAPI → Claude Sonnet 4.5 API → Response with Citations
+User Query
+     |
+     v
+[Sonnet 4.5 - Prompt Engineer]     ~1-2s
+  Intent detection, format detection, enriched query
+     |
+     v
+[Kimi K2.5 - Query Expansion] -> [RAG Search] -> [BGE-Reranker-v2]
+     |
+     v
+[Kimi K2.5 Thinking - Reasoning]   ~3-8s
+  Deep reasoning with citations
+     |
+     v
+[Sonnet 4.5 - Output Architect]    ~2-3s
+  Formatting, structuring, artifact detection, streaming
+     |
+     v (if artifact detected)
+[Document Generator] -> [B2 Storage] -> [Artifact card in chat]
 ```
 
 ### AI Models Used
 
-| Purpose | Model | Provider | Type |
-|---------|-------|----------|------|
-| **All AI Processing** | Claude Sonnet 4.5 | Anthropic | Cloud API |
-| Query Expansion | Claude Haiku | Anthropic | Cloud API |
-| Image Analysis | Claude Vision | Anthropic | Cloud API |
-| Embeddings | BGE-M3 | Local/Render | 1024-dim vectors |
-| Reranking | BGE-Reranker-v2 | Local | Search optimization |
+| Purpose | Model | Provider | Type | Cost |
+|---------|-------|----------|------|------|
+| **Prompt Engineering** | Claude Sonnet 4.5 | Anthropic | Cloud API | ~$0.002/query |
+| **Output Formatting** | Claude Sonnet 4.5 | Anthropic | Cloud API | ~$0.002/query |
+| **Reasoning Engine** | Kimi K2.5 Thinking | Together AI | Cloud API | Usage-based |
+| **Query Expansion** | Kimi K2.5 | Together AI | Cloud API | Usage-based |
+| **Image Analysis (primary)** | Kimi K2.5 Thinking | Together AI | Cloud API | Usage-based |
+| **Image Fallback** | Gemini 3 Flash | Google AI | Cloud API | Usage-based |
+| **Local Vision** | Qwen2.5-VL-32B | Ollama | Local (Mac Studio) | $0 |
+| **Audio STT** | distil-whisper/distil-large-v3.5 | faster-whisper | Local (Mac Studio) | $0 |
+| **Video Frames** | Gemini 3 Flash | Google AI | Cloud API | Usage-based |
+| **Embeddings** | BGE-M3 | Local/Render | 1024-dim vectors | $0 |
+| **Reranking** | BGE-Reranker-v2 | Local | Search optimization | $0 |
 
-### 15 AI Agents (All Claude Sonnet 4.5)
+### LLM Client Abstraction Layer
+
+All AI providers implement a unified interface (`app/services/llm_client.py`):
+
+```
+LLMClient (abstract base)
+  |-- TogetherAILLMClient    (Kimi K2.5 Thinking)
+  |-- AnthropicLLMClient     (Claude Sonnet 4.5)
+  |-- GeminiLLMClient        (Gemini 3 Flash)
+  |-- OpenAICompatibleClient (Ollama/Qwen2.5-VL, any OpenAI-compatible API)
+```
+
+Features: `generate()`, `generate_with_images()`, `is_retryable()`, automatic retry with backoff.
+
+### 15+ AI Agents (Legacy + Pipeline)
 
 | Agent | Purpose |
 |-------|---------|
@@ -39,6 +77,72 @@ User Query → FastAPI → Claude Sonnet 4.5 API → Response with Citations
 | AGENT-013 | Analysis Agent - Pattern detection |
 | AGENT-014 | Writing Agent - Report generation |
 | AGENT-015 | Review Agent - Quality assurance |
+| Prompt Engineer | Query enrichment and intent detection (Sonnet 4.5) |
+| Output Architect | Response formatting and artifact detection (Sonnet 4.5) |
+
+---
+
+## Application Architecture
+
+### Two Frontend Interfaces
+
+| Interface | Technology | Purpose |
+|-----------|------------|---------|
+| **Empire Desktop** | Tauri 2.x + React + TypeScript | Primary desktop app with full features |
+| **Gradio Chat** | Gradio (Python) | Web-based chat interface |
+
+### Desktop App Architecture
+
+```
+empire-desktop/
+  src/
+    components/         # React components (31 files)
+      auth/             # Authentication (Clerk)
+      chat/             # Chat UI, artifacts, phase indicators
+      projects/         # Project management
+    stores/             # Zustand state management
+      chat.ts           # Conversations, messages, artifacts, phases
+      app.ts            # View state, sidebar
+      org.ts            # Organization selection, switching
+      projects.ts       # Project list
+    lib/
+      api/              # Backend API client
+        client.ts       # Fetch wrapper with X-Org-Id header
+        search.ts       # Unified search API
+        artifacts.ts    # Artifact download/metadata
+        index.ts        # Core API functions
+      database.ts       # Local IndexedDB for offline data
+    test/
+      setup.ts          # vitest + jsdom + localStorage mock
+```
+
+### Backend Architecture
+
+```
+app/
+  routes/              # 57 API route modules (300+ endpoints)
+    unified_search.py  # Cross-type search with asyncio.gather
+    organizations.py   # Multi-tenant org management
+    artifacts.py       # Artifact CRUD + download
+    studio_cko.py      # CKO chat with multi-model pipeline
+    kb_submissions.py  # Knowledge base submissions
+    ...
+  services/            # 139 service files
+    llm_client.py      # Unified LLM provider abstraction
+    prompt_engineer_service.py    # Sonnet 4.5 prompt enrichment
+    output_architect_service.py   # Sonnet 4.5 output formatting
+    document_generator_service.py # DOCX/XLSX/PPTX/PDF generation
+    organization_service.py       # Org CRUD + membership
+    vision_service.py             # Multi-provider image analysis
+    whisper_stt_service.py        # Local audio transcription
+    audio_video_processor.py      # Video frame extraction + analysis
+    studio_cko_conversation_service.py  # CKO chat orchestration
+    ...
+  core/
+    database.py        # Supabase client initialization
+    config.py          # Environment configuration
+  middleware/          # Auth, rate limiting, org context
+```
 
 ---
 
@@ -46,65 +150,32 @@ User Query → FastAPI → Claude Sonnet 4.5 API → Response with Citations
 
 ### Hybrid Database System
 
-Empire uses a hybrid database approach with PostgreSQL for vectors/data and Neo4j for graphs:
-
 | Database | Provider | Purpose | Cost |
 |----------|----------|---------|------|
-| **PostgreSQL** | Supabase | Vectors, user data, sessions, audit logs | $25/month |
+| **PostgreSQL** | Supabase | Vectors, user data, sessions, orgs, artifacts, audit logs | $25/month |
 | **Neo4j** | Mac Studio Docker | Knowledge graphs, entity relationships | $0 |
 | **Redis** | Upstash | Caching, Celery broker, rate limiting | Free tier |
 
-### Why Both Databases?
+### Key PostgreSQL Tables
 
-- **PostgreSQL (pgvector)**: Fast vector similarity search, ACID transactions, row-level security
-- **Neo4j**: Graph traversal, relationship queries, entity connections, graph algorithms
+**Core Tables:**
+- `documents_v2` - Document metadata and content
+- `record_manager_v2` - Vector embeddings (pgvector)
+- `knowledge_entities` - Extracted entities
+- `chat_sessions` - Chat history
+- `audit_logs` - Security audit trail
 
-### Data Flow
+**v7.5 Additions:**
+- `organizations` - Company/org entities (slug, logo, settings)
+- `org_memberships` - User-org relationships (owner/admin/member/viewer roles)
+- `studio_cko_sessions` - CKO chat sessions (with org_id)
+- `studio_cko_messages` - CKO chat messages
+- `studio_cko_artifacts` - Generated document artifacts (DOCX/XLSX/PPTX/PDF)
+- `projects` - Projects (with org_id)
 
-```
-Document Upload
-     ↓
-[PostgreSQL] Store content, metadata, embeddings
-     ↓
-[Neo4j] Store entities, relationships, graph connections
-     ↓
-Query Time: Hybrid search combines both
-```
+### Row-Level Security
 
----
-
-## Cloud Services (Render.com)
-
-| Service | Purpose | Cost |
-|---------|---------|------|
-| **jb-empire-api** | FastAPI backend, 29 route modules (293+ endpoints) | $7/month |
-| **empire-celery-worker** | Background task processing | $7/month |
-| **jb-empire-chat** | Gradio chat interface | $7/month |
-| **jb-crewai** | Multi-agent orchestration | $7/month |
-
-### API Endpoints (29 Route Modules, 293+ Endpoints)
-
-**Document Processing:**
-- `POST /api/v1/upload` - Document upload with validation
-- `GET /api/status/*` - Processing status
-
-**Chat & Query:**
-- `POST /api/query/auto` - Intelligent query routing
-- `POST /api/query/adaptive` - LangGraph adaptive workflow
-- `POST /api/chat/*` - Chat with file upload
-- `WS /ws/*` - WebSocket real-time updates
-
-**AI Agents:**
-- `POST /api/summarizer/summarize` - Content summarization
-- `POST /api/classifier/classify` - Department classification
-- `POST /api/document-analysis/analyze` - Full document analysis
-- `POST /api/orchestration/workflow` - Multi-agent orchestration
-
-**Management:**
-- `/api/documents/*` - Document management
-- `/api/users/*` - User management
-- `/api/rbac/*` - Role-based access control
-- `/api/monitoring/*` - Analytics dashboard
+All org-scoped tables enforce RLS policies. Users can only access data within organizations they belong to.
 
 ---
 
@@ -114,25 +185,31 @@ Query Time: Hybrid search combines both
 
 ```
 b2://empire-documents/
-├── {department}/          # 12 departments
-│   ├── {document_id}/
-│   │   ├── original.pdf
-│   │   ├── processed.txt
-│   │   └── metadata.json
-├── crewai/assets/         # CrewAI outputs
-│   ├── reports/
-│   ├── analysis/
-│   └── visualizations/
+  {department}/           # 12 departments
+    {document_id}/
+      original.pdf
+      processed.txt
+      metadata.json
+  artifacts/documents/    # NEW: Generated artifacts (v7.5)
+    {artifact_id}.docx
+    {artifact_id}.xlsx
+    {artifact_id}.pptx
+  crewai/assets/          # CrewAI outputs
+    reports/
+    analysis/
+    visualizations/
 ```
 
-### Supabase (Data Storage)
+---
 
-Key tables:
-- `documents_v2` - Document metadata and content
-- `record_manager_v2` - Vector embeddings (pgvector)
-- `knowledge_entities` - Extracted entities
-- `chat_sessions` - Chat history
-- `audit_logs` - Security audit trail
+## Cloud Services (Render.com)
+
+| Service | Purpose | Cost |
+|---------|---------|------|
+| **jb-empire-api** | FastAPI backend, 57 route modules | $7/month |
+| **empire-celery-worker** | Background task processing | $7/month |
+| **jb-empire-chat** | Gradio chat interface | $7/month |
+| **jb-crewai** | Multi-agent orchestration | $7/month |
 
 ---
 
@@ -144,10 +221,13 @@ Key tables:
 |-------|---------------|
 | **Transport** | TLS 1.2+ on all services |
 | **Authentication** | Clerk auth + JWT tokens |
-| **Authorization** | Row-Level Security (RLS) on 14 tables |
+| **Authorization** | Row-Level Security (RLS) on org-scoped tables |
+| **Multi-Tenancy** | Organization-level data isolation |
+| **API Auth** | X-API-Key for Telegram bots and integrations |
 | **Rate Limiting** | Redis-backed, tiered by endpoint |
 | **Encryption** | AES-256 at rest (Supabase, B2) |
 | **Audit** | Comprehensive event logging |
+| **Input Sanitization** | PostgREST ilike injection protection |
 
 ### HTTP Security Headers
 
@@ -184,7 +264,9 @@ Key tables:
 | Upstash Redis | Free |
 | Neo4j (self-hosted) | $0 |
 | **Infrastructure Total** | **~$60** |
-| Anthropic API | Usage-based |
+| Anthropic API (Sonnet 4.5) | Usage-based (~$0.004/query) |
+| Together AI (Kimi K2.5) | Usage-based |
+| Google AI (Gemini 3 Flash) | Usage-based |
 
 ---
 
@@ -192,17 +274,24 @@ Key tables:
 
 | Layer | Technology |
 |-------|------------|
-| AI | Claude Sonnet 4.5 (Anthropic API) |
+| AI Reasoning | Kimi K2.5 Thinking (Together AI) |
+| AI Prompt/Output | Claude Sonnet 4.5 (Anthropic API) |
+| Local Vision | Qwen2.5-VL-32B (Ollama) |
+| Local Audio | distil-whisper (faster-whisper) |
+| Video Analysis | Gemini 3 Flash (Google AI) |
 | Backend | FastAPI (Python 3.11+) |
+| Desktop App | Tauri 2.x + React + TypeScript |
+| State Management | Zustand |
 | Task Queue | Celery |
 | Vector DB | PostgreSQL + pgvector |
 | Graph DB | Neo4j |
 | Cache | Redis (Upstash) |
 | Storage | Backblaze B2 |
-| Frontend | Gradio |
+| Frontend (Web) | Gradio |
 | Monitoring | Prometheus + Grafana |
+| Testing | pytest + vitest |
 | Deployment | Render.com |
 
 ---
 
-**Empire v7.3** - Cloud-first architecture with Claude Sonnet 4.5 powering all AI capabilities.
+**Empire v7.5** - Cloud-first architecture with multi-model AI pipeline, desktop app, and multi-tenant data isolation.

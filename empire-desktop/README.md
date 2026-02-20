@@ -1,73 +1,101 @@
-# React + TypeScript + Vite
+# Empire Desktop
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Tauri 2.x desktop application for Empire v7.5 — the primary interface for the AI-powered knowledge management platform.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+| Layer | Technology |
+|-------|------------|
+| Framework | Tauri 2.x (Rust backend) |
+| UI | React 18 + TypeScript |
+| State | Zustand (with persist middleware) |
+| Styling | Tailwind CSS (Empire dark theme) |
+| Testing | Vitest + @testing-library/react |
+| Build | Vite |
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **CKO Chat**: Multi-model AI pipeline with phase indicators and streaming
+- **Organization Picker/Switcher**: Multi-tenant organization support
+- **Unified Search**: Cmd+K search across chats, projects, KB, artifacts
+- **Artifact System**: Inline preview cards, side panel viewer, file download
+- **Document Generation**: DOCX, XLSX, PPTX, PDF from AI responses
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```bash
+# Install dependencies
+npm install
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# Start in development mode (hot-reload)
+npm run tauri dev
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# Run tests
+npx vitest run
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Type checking
+npx tsc --noEmit
+
+# Build for production
+npm run tauri build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Project Structure
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```
+empire-desktop/
+├── src/
+│   ├── components/           # 31 React components
+│   │   ├── auth/             # Authentication (Clerk)
+│   │   ├── chat/             # ChatView, MessageBubble, ArtifactCard, etc.
+│   │   ├── projects/         # Project management
+│   │   ├── GlobalSearch.tsx   # Cmd+K unified search modal
+│   │   ├── OrgPicker.tsx      # Organization selection on launch
+│   │   ├── OrgSwitcher.tsx    # Org switching dropdown
+│   │   └── Sidebar.tsx        # Navigation sidebar
+│   ├── stores/               # Zustand state management
+│   │   ├── chat.ts           # Conversations, messages, artifacts, phases
+│   │   ├── app.ts            # View state, sidebar
+│   │   ├── org.ts            # Organization selection, switching
+│   │   └── projects.ts       # Project list
+│   ├── lib/
+│   │   ├── api/              # Backend API client
+│   │   │   ├── client.ts     # Fetch wrapper with X-Org-Id header
+│   │   │   ├── search.ts     # Unified search API
+│   │   │   ├── artifacts.ts  # Artifact download/metadata
+│   │   │   └── index.ts      # Core API functions
+│   │   ├── database.ts       # Local IndexedDB for offline data
+│   │   └── utils.ts          # Utility functions (cn, etc.)
+│   ├── test/                 # Test setup and test files
+│   ├── types/                # TypeScript type definitions
+│   └── App.tsx               # Root component
+├── src-tauri/                # Rust backend for Tauri
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── tailwind.config.ts
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Key Components
+
+| Component | Purpose |
+|-----------|---------|
+| `ChatView` | Main chat interface with streaming + artifact panel |
+| `GlobalSearch` | Cmd+K unified search modal with filter tabs |
+| `OrgPicker` | Organization selection on launch |
+| `OrgSwitcher` | Org switching dropdown in sidebar |
+| `Sidebar` | Conversation list, navigation |
+| `MessageBubble` | Chat messages with citation popovers |
+| `ArtifactCard` | Inline artifact preview in chat |
+| `ArtifactPanel` | Side panel artifact viewer |
+| `PhaseIndicator` | Pipeline phase indicator (Analyzing/Searching/Thinking/Formatting) |
+
+## Testing
+
+22 tests across 3 test files:
+
+```bash
+npx vitest run                              # All tests
+npx vitest run src/test/stores/chat.test.ts  # Specific file
+npx vitest                                   # Watch mode
 ```

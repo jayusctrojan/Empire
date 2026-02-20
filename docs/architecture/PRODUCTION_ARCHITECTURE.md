@@ -1,19 +1,64 @@
-# Empire v7.2 Production Architecture - Hybrid Database System
+# Empire v7.5 Production Architecture - Hybrid Database + Multi-Model Pipeline
 
 ## Overview
 
-Empire v7.2 uses a **hybrid database production architecture** where PostgreSQL and Neo4j work together as complementary systems, NOT as development vs production databases.
+Empire v7.5 uses a **hybrid database production architecture** where PostgreSQL, Neo4j, and Redis work together as complementary systems, combined with a **multi-model AI pipeline** for every query.
+
+---
+
+## The Multi-Model Quality Pipeline
+
+Every CKO query flows through a 3-stage pipeline using multiple AI providers:
+
+```
+User Query
+     |
+     v
+[Sonnet 4.5 - Prompt Engineer]     ~1-2s
+  Intent detection, format detection, enriched query
+     |
+     v
+[Kimi K2.5 - Query Expansion] -> [RAG Search] -> [BGE-Reranker-v2]
+     |
+     v
+[Kimi K2.5 Thinking - Reasoning]   ~3-8s
+  Deep reasoning with citations
+     |
+     v
+[Sonnet 4.5 - Output Architect]    ~2-3s
+  Formatting, structuring, artifact detection, streaming
+     |
+     v (if artifact detected)
+[Document Generator] -> [B2 Storage] -> [Artifact card in chat]
+```
+
+### LLM Client Abstraction
+
+All providers implement a unified interface (`app/services/llm_client.py`):
+
+```
+LLMClient (abstract base)
+  |-- TogetherAILLMClient    (Kimi K2.5 Thinking)
+  |-- AnthropicLLMClient     (Claude Sonnet 4.5)
+  |-- GeminiLLMClient        (Gemini 3 Flash)
+  |-- OpenAICompatibleClient (Ollama/Qwen2.5-VL)
+```
+
+---
 
 ## The Hybrid Database Strategy
 
 ### 1. PostgreSQL (Supabase) - $25/month
-**Purpose**: Traditional data and vector storage
+**Purpose**: Traditional data, vectors, and multi-tenant storage
 - User accounts and authentication
 - Document content and metadata
-- Vector embeddings (pgvector)
-- Chat history and sessions
-- Tabular/structured data
+- Vector embeddings (pgvector, 1024-dim BGE-M3)
+- CKO chat sessions and messages
+- Organizations and org memberships
+- Generated artifacts (studio_cko_artifacts)
+- Projects (org-scoped)
 - Audit logs and system data
+- Row-Level Security on org-scoped tables
 
 ### 2. Neo4j (Mac Studio Docker) - FREE
 **Purpose**: Knowledge graphs and relationships
@@ -24,7 +69,13 @@ Empire v7.2 uses a **hybrid database production architecture** where PostgreSQL 
 - Centrality analysis
 - Path finding between entities
 
-### Both Work Together in Production
+### 3. Redis (Upstash) - Free
+**Purpose**: Caching and message brokering
+- Response caching
+- Celery task broker
+- Rate limiting counters
+
+### Both PostgreSQL and Neo4j Work Together in Production
 
 ```python
 # Example: Processing a new document
@@ -32,17 +83,18 @@ async def process_document(document):
     # 1. Store in PostgreSQL
     doc_id = await supabase.table('documents').insert({
         'content': document.text,
-        'metadata': document.metadata
+        'metadata': document.metadata,
+        'org_id': current_org_id  # v7.5: org-scoped
     })
 
-    # 2. Generate embeddings → PostgreSQL
-    embeddings = await generate_embeddings(document.text)
-    await supabase.table('document_vectors').insert({
+    # 2. Generate embeddings -> PostgreSQL
+    embeddings = await generate_embeddings(document.text)  # BGE-M3, 1024-dim
+    await supabase.table('record_manager_v2').insert({
         'document_id': doc_id,
         'embedding': embeddings
     })
 
-    # 3. Extract entities → Neo4j
+    # 3. Extract entities -> Neo4j
     entities = await extract_entities(document.text)
     for entity in entities:
         await neo4j.run("""
@@ -50,247 +102,197 @@ async def process_document(document):
             MERGE (d:Document {id: $doc_id})
             MERGE (d)-[:MENTIONS]->(e)
         """, name=entity.name, type=entity.type, doc_id=doc_id)
-
-    # 4. Maintain bi-directional sync
-    await sync_metadata_between_databases()
 ```
 
-## Multi-Modal Access Patterns
+---
 
-### 1. REST/WebSocket API (FastAPI)
-For application developers and end users:
-```python
-# Query both databases
-@app.post("/search")
-async def search(query: str):
-    # Vector search in PostgreSQL
-    vector_results = await search_vectors_postgresql(query)
+## Multi-Tenant Organization Layer (v7.5)
 
-    # Graph traversal in Neo4j
-    graph_results = await search_relationships_neo4j(query)
+All data is scoped to organizations:
 
-    # Combine and rank results
-    return combine_results(vector_results, graph_results)
+```
+Organization (company)
+  |-- org_memberships (user <-> org, roles: owner/admin/member/viewer)
+  |-- projects (org-scoped)
+  |-- studio_cko_sessions (chats, org-scoped)
+  |-- documents (KB, org-scoped)
+  |-- studio_cko_artifacts (org-scoped)
 ```
 
-### 2. Neo4j MCP (Claude Desktop/Code)
-For developers and power users:
-```
-User: "Show me all documents that mention both Acme Corp and California regulations"
+- **X-Org-Id header**: Sent with every API request from the desktop app
+- **Middleware**: Extracts org_id, sets request.state.org_id
+- **RLS**: PostgreSQL Row-Level Security enforces tenant isolation
 
-Claude translates to Cypher:
-MATCH (d:Document)-[:MENTIONS]->(e1:Entity {name: 'Acme Corp'})
-WHERE EXISTS((d)-[:MENTIONS]->(:Entity {name: 'California', type: 'regulation'}))
-RETURN d.title, d.id
+---
 
-[Results shown directly in Claude Desktop]
-```
+## Key PostgreSQL Tables (v7.5)
 
-## Production Query Examples
+### Core Tables
+- `documents_v2` - Document metadata and content
+- `record_manager_v2` - Vector embeddings (pgvector)
+- `knowledge_entities` - Extracted entities
+- `chat_sessions` - Legacy chat history
+- `audit_logs` - Security audit trail
 
-### Hybrid Query (Uses Both Databases)
-```python
-async def find_related_documents(entity_name: str):
-    # 1. Find entity in Neo4j and get related entities
-    graph_query = """
-    MATCH (e:Entity {name: $name})-[:RELATED_TO]-(related:Entity)
-    RETURN related.name AS entity, related.type AS type
-    """
-    related_entities = await neo4j.run(graph_query, name=entity_name)
+### v7.5 Additions
+- `organizations` - Company/org entities (slug, logo, settings)
+- `org_memberships` - User-org relationships (owner/admin/member/viewer roles)
+- `studio_cko_sessions` - CKO chat sessions (with org_id)
+- `studio_cko_messages` - CKO chat messages
+- `studio_cko_artifacts` - Generated document artifacts (DOCX/XLSX/PPTX/PDF)
+- `projects` - Projects (with org_id)
 
-    # 2. Get document IDs from Neo4j
-    doc_query = """
-    MATCH (d:Document)-[:MENTIONS]->(e:Entity {name: $name})
-    RETURN DISTINCT d.id AS doc_id
-    """
-    doc_ids = await neo4j.run(doc_query, name=entity_name)
+---
 
-    # 3. Fetch full documents from PostgreSQL
-    documents = await supabase.table('documents').select('*').in_('id', doc_ids)
+## Unified Search Architecture
 
-    # 4. Perform vector similarity search in PostgreSQL
-    vector_similar = await supabase.rpc('vector_similarity_search', {
-        'query_text': entity_name,
-        'match_threshold': 0.7
-    })
-
-    return {
-        'direct_mentions': documents,
-        'related_entities': related_entities,
-        'similar_documents': vector_similar
-    }
-```
-
-## Why This is NOT "Development Only"
-
-### Neo4j is Essential for Production Because:
-
-1. **Relationship Queries Are Core Features**
-   - "Show all contracts affected by policy X"
-   - "Find all entities connected to company Y"
-   - "Trace the impact chain of regulation Z"
-
-2. **Graph Algorithms Provide Unique Value**
-   - PageRank for entity importance
-   - Community detection for topic clustering
-   - Shortest path for relationship discovery
-
-3. **Natural Language Graph Access**
-   - Neo4j MCP allows non-technical users to query graphs
-   - Claude translates questions to Cypher automatically
-
-4. **Performance Requirements**
-   - Graph queries are 10-100x faster than SQL joins
-   - Critical for real-time relationship traversal
-
-## Infrastructure Setup
-
-### Mac Studio (Always On)
-```yaml
-# docker-compose.yml
-services:
-  neo4j:
-    image: neo4j:5.13.0
-    ports:
-      - "7474:7474"  # Web interface
-      - "7687:7687"  # Bolt protocol
-    environment:
-      - NEO4J_AUTH=neo4j/<your-password>  # Set from .env file
-    volumes:
-      - ./neo4j/data:/data
-      - ./neo4j/logs:/logs
-```
-
-### Access from Cloud Services
-```python
-# FastAPI on Render connects via Tailscale
-NEO4J_URI = "bolt://100.119.86.6:7687"  # Tailscale IP of Mac Studio
-```
-
-### Backup Strategy
-- PostgreSQL: Automated Supabase backups
-- Neo4j: Daily exports to Backblaze B2
-- Sync verification: Hourly consistency checks
-
-## Cost Breakdown
-
-### Production Databases
-- **PostgreSQL (Supabase)**: $25/month
-- **Neo4j (Mac Studio)**: $0 (FREE Docker)
-- **Total Database Cost**: $25/month
-
-### Why Not Cloud Neo4j?
-- Neo4j Aura (cloud): $65-140/month minimum
-- GrapheneDB: $90+/month
-- Amazon Neptune: $100+/month
-- **Savings**: $65-140/month by self-hosting
-
-## File Upload Security Architecture
-
-Empire v7.3 implements enterprise-grade file upload security with multi-layer validation:
-
-### Security Layers
-
-**Layer 1: Basic Validation**
-- File extension whitelist (40+ supported types)
-- File size limits (10 bytes min, 100MB max)
-- Upload count limits (10 files per request)
-
-**Layer 2: Advanced Validation (python-magic)**
-- MIME type detection via file magic numbers
-- Cross-check MIME type against extension
-- Detect mismatched/spoofed file extensions
-- Header validation for PDFs, images, documents
-
-**Layer 3: Malware Scanning (VirusTotal)**
-- **Smart Hash-First Approach**:
-  1. Calculate SHA256 hash (instant, free)
-  2. Check VirusTotal database (FREE, unlimited lookups)
-  3. Only upload unknown files (saves 95% of quota)
-- **70+ antivirus engines** when upload needed
-- Effectively **unlimited scans** (known files = free)
-- Production-ready on free tier (500 uploads/day → 10,000+ scans/day effective)
-
-### File Upload Flow
+`GET /api/search/unified` searches across all content types within the user's organization:
 
 ```python
-# Multi-layer security validation
-async def upload_file(file):
-    # Layer 1: Basic checks
-    validate_extension(file.filename)  # Whitelist check
-    validate_size(file.size)           # Size limits
+# Parallel search with asyncio.gather
+tasks = []
+if "chat" in search_types:
+    tasks.append(_safe(_search_chats(supabase, q, org_id, user_id, limit), "Chat"))
+if "project" in search_types:
+    tasks.append(_safe(_search_projects(supabase, q, org_id, user_id, limit), "Project"))
+if "kb" in search_types:
+    tasks.append(_safe(_search_kb_documents(supabase, q, org_id, limit), "KB"))
+if "artifact" in search_types:
+    tasks.append(_safe(_search_artifacts(supabase, q, org_id, user_id, limit), "Artifact"))
 
-    # Layer 2: Advanced validation
-    mime_type = detect_mime_type(file.content)  # python-magic
-    validate_header(file.content, file.extension)  # Magic numbers
-
-    # Layer 3: Malware scanning (optional)
-    if scan_for_malware:
-        file_hash = calculate_sha256(file)
-
-        # Check hash in VT database (FREE, unlimited)
-        scan_result = await virustotal.check_hash(file_hash)
-
-        if scan_result.found:
-            # Use cached results (FREE!)
-            return scan_result.is_clean
-        else:
-            # Upload for scan (uses quota)
-            return await virustotal.scan_file(file)
-
-    # Upload to B2
-    await b2.upload(file)
+for type_results in await asyncio.gather(*tasks):
+    results.extend(type_results)
 ```
 
-### Production Benefits
+- PostgREST ilike injection protection
+- Relevance scoring (title matches > description matches)
+- Results sorted by relevance then date
 
-✅ **Cost Effective**: 95% of scans are FREE (hash lookups)
-✅ **Fast**: Known files = instant approval (no upload)
-✅ **Scalable**: Handles 10,000+ files/day on free tier
-✅ **Secure**: 70+ engines for unknown files
-✅ **User-Friendly**: Detailed error messages for rejected files
+---
 
-### API Endpoints
+## Storage Architecture
 
-```bash
-# Upload without scanning
-POST /api/v1/upload/upload
-{
-  "files": [...],
-  "scan_for_malware": false
-}
+### Backblaze B2 (File Storage)
 
-# Upload with malware scanning
-POST /api/v1/upload/upload?scan_for_malware=true
-{
-  "files": [...]
-}
+```
+b2://empire-documents/
+  {department}/           # 12 business departments
+    {document_id}/
+      original.pdf
+      processed.txt
+      metadata.json
+  artifacts/documents/    # Generated artifacts (v7.5)
+    {artifact_id}.docx
+    {artifact_id}.xlsx
+    {artifact_id}.pptx
+  crewai/assets/          # CrewAI outputs
 ```
 
-### Error Handling
+---
 
-Validation failures return detailed error messages:
-- "File header does not match expected format for .pdf"
-- "Malware detected by 15/70 engines"
-- "File is too small (5 bytes) and may be corrupted"
+## Document Generation & Artifacts (v7.5)
 
-## Common Misconceptions Clarified
+| Format | Library | Use Case |
+|--------|---------|----------|
+| DOCX | python-docx | Reports, memos, analysis |
+| XLSX | openpyxl | Spreadsheets, data tables |
+| PPTX | python-pptx | Presentations, slide decks |
+| PDF | PDFReportGenerator | Formal reports |
 
-❌ **WRONG**: "Neo4j is for development, PostgreSQL is for production"
-✅ **RIGHT**: Both Neo4j and PostgreSQL are production databases with different strengths
+Artifact lifecycle:
+1. Output Architect detects artifact-worthy content
+2. Document Generator creates file from content blocks
+3. File uploaded to B2 (`artifacts/documents/`)
+4. Metadata saved to `studio_cko_artifacts` table
+5. SSE event sent to desktop app
+6. Desktop shows inline ArtifactCard with preview/download
 
-❌ **WRONG**: "We'll migrate from Neo4j to PostgreSQL later"
-✅ **RIGHT**: They work together permanently - Neo4j for graphs, PostgreSQL for vectors/data
+---
 
-❌ **WRONG**: "Neo4j MCP is just for testing"
-✅ **RIGHT**: Neo4j MCP is a production feature enabling natural language graph queries
+## Multimodal Processing
 
-## Summary
+### Image Analysis (3-tier fallback)
+```
+Image -> Qwen2.5-VL-32B (local, Ollama)
+           |  (fallback)
+         Kimi K2.5 Thinking (Together AI)
+           |  (fallback)
+         Gemini 3 Flash (Google AI)
+```
 
-Empire v7.2's hybrid database architecture is a **production design decision** that leverages:
-- PostgreSQL's strength in vector search and traditional data
-- Neo4j's superiority in graph operations and relationships
-- Multi-modal access via REST APIs and Neo4j MCP
-- Cost efficiency by self-hosting Neo4j on Mac Studio
+### Audio Processing
+```
+Audio -> distil-whisper/distil-large-v3.5 (local, faster-whisper, 2x realtime)
+           -> Transcript -> RAG pipeline
+```
 
-This is NOT a temporary development setup - it's the production architecture that provides unique capabilities impossible with a single database.
+### Video Processing
+```
+Video -> ffmpeg frame extraction -> Gemini 3 Flash analysis -> Summary
+```
+
+---
+
+## Security Architecture
+
+| Layer | Implementation |
+|-------|---------------|
+| Transport | TLS 1.2+ on all services |
+| Authentication | Clerk auth + JWT tokens |
+| Authorization | Row-Level Security on org-scoped tables |
+| Multi-Tenancy | Organization-level data isolation |
+| API Auth | X-API-Key for Telegram bots |
+| Rate Limiting | Redis-backed, tiered by endpoint |
+| Encryption | AES-256 at rest (Supabase, B2) |
+| Audit | Comprehensive event logging |
+| Input Sanitization | PostgREST ilike injection protection |
+| HTTP Headers | HSTS, CSP, X-Frame-Options, X-Content-Type-Options |
+
+---
+
+## Infrastructure & Monitoring
+
+### Cloud Services (Render.com)
+
+| Service | Purpose | Cost |
+|---------|---------|------|
+| jb-empire-api | FastAPI backend | $7/month |
+| empire-celery-worker | Background tasks | $7/month |
+| jb-empire-chat | Gradio chat UI | $7/month |
+| jb-crewai | Multi-agent workflows | $7/month |
+
+### Monitoring Stack
+
+| Component | Purpose | Port |
+|-----------|---------|------|
+| Prometheus | Metrics collection | 9090 |
+| Grafana | Visualization | 3001 |
+| Alertmanager | Email notifications | 9093 |
+
+39 alert rules: Critical (service down), Warning (performance), Info (health summaries)
+
+---
+
+## Cost Summary
+
+| Category | Monthly Cost |
+|----------|-------------|
+| Render Services (4) | $28 |
+| Supabase PostgreSQL | $25 |
+| Backblaze B2 | ~$5 |
+| Upstash Redis | Free |
+| Neo4j (self-hosted) | $0 |
+| **Infrastructure Total** | **~$60** |
+| Anthropic API | ~$0.004/query |
+| Together AI | Usage-based |
+| Google AI | Usage-based |
+
+---
+
+## Why This Architecture
+
+- **PostgreSQL + Neo4j**: Each excels at different queries - vectors/relational vs. graphs/relationships
+- **Multi-model pipeline**: Sonnet 4.5 for formatting quality, Kimi K2.5 for deep reasoning
+- **Local models**: Zero-cost vision and audio processing on Mac Studio
+- **Multi-tenant**: Organization isolation with RLS for SaaS readiness
+- **Cost efficient**: ~$60/month infrastructure + usage-based AI costs

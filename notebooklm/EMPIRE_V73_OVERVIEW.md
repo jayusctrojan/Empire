@@ -1,126 +1,240 @@
-# Empire v7.3 - AI-Powered Knowledge Management System
+# Empire v7.5 - AI-Powered Knowledge Management Platform
 
-**Version:** v7.3.0
-**Last Updated:** 2025-12-30
-**Status:** ✅ ALL 47 TASKS COMPLETE - Production Deployed & Verified
+**Version:** v7.5.0
+**Last Updated:** 2026-02-19
+**Status:** Production Deployed & Verified
 
 ---
 
 ## Executive Summary
 
-Empire v7.3 is a production-ready AI-powered knowledge management platform featuring:
+Empire v7.5 is a production-ready AI-powered knowledge management platform featuring:
 
-- **15 Specialized AI Agents** powered by Claude Sonnet 4.5
+- **Multi-Model Quality Pipeline** with Sonnet 4.5 bookend processing + Kimi K2.5 Thinking reasoning engine
+- **Multi-Tenant Organization Layer** with role-based membership and data isolation
+- **Tauri Desktop Application** (TypeScript/React) with artifact preview, org picker, and unified search
+- **Document Generation** producing DOCX, XLSX, PPTX, and PDF artifacts from AI responses
+- **Multimodal RAG** with local vision (Qwen2.5-VL-32B), audio STT (Whisper), and video frame analysis
+- **Unified Search** across chats, projects, knowledge base, and artifacts with filter tabs
+- **15+ Specialized AI Agents** for document processing, analysis, and orchestration
 - **Hybrid Database Architecture** (PostgreSQL + Neo4j)
-- **29 API Route Modules (293+ Endpoints)** for document processing, chat, and analysis
-- **Real-time Processing** with WebSocket status updates
-- **Multi-Agent Orchestration** for complex document analysis
+- **57 API Route Modules** with 300+ endpoints
+
+---
+
+## What Changed: v7.3 to v7.5
+
+| Feature | v7.3 | v7.5 |
+|---------|------|------|
+| **Primary AI** | Claude Sonnet 4.5 only | Multi-model pipeline: Sonnet 4.5 (prompt/output) + Kimi K2.5 Thinking (reasoning) |
+| **Frontend** | Gradio chat UI | Tauri Desktop App (React/TypeScript) + Gradio |
+| **Vision** | Claude Vision (cloud) | Qwen2.5-VL-32B (local via Ollama) + Kimi K2.5 + Gemini 3 Flash fallback |
+| **Audio** | None | Local distil-whisper/distil-large-v3.5 via faster-whisper |
+| **Tenancy** | Single-user | Multi-tenant with organizations, memberships, roles |
+| **Document Gen** | None | DOCX, XLSX, PPTX, PDF generation from AI responses |
+| **Artifacts** | None | Inline preview cards, side panel, download in desktop app |
+| **Search** | Per-type only | Unified search across chats, projects, KB, artifacts |
+| **Testing** | Backend only | Backend (170+ tests) + Frontend vitest (22 tests) |
+| **Route Modules** | 29 | 57 |
 
 ---
 
 ## Core AI Architecture
 
-### Primary AI Model: Claude Sonnet 4.5 (Anthropic API)
+### Multi-Model Quality Pipeline
 
-**ALL AI processing in Empire v7.3 uses Claude Sonnet 4.5 via Anthropic's cloud API.**
+Every query flows through a 3-stage pipeline:
 
-| Component | Model | Purpose |
-|-----------|-------|---------|
-| Content Summarization | Claude Sonnet 4.5 | PDF summary generation |
-| Department Classification | Claude Sonnet 4.5 | 12-department content routing |
-| Document Analysis | Claude Sonnet 4.5 | Topic/entity/fact extraction |
-| Query Processing | Claude Sonnet 4.5 | Natural language understanding |
-| Multi-Agent Orchestration | Claude Sonnet 4.5 | Complex workflow coordination |
-| Chat Responses | Claude Sonnet 4.5 | Conversational AI with citations |
-
-### 15-Agent AI System
-
-Empire v7.3 includes a comprehensive multi-agent system:
-
-| Agent ID | Name | Purpose |
-|----------|------|---------|
-| AGENT-002 | Content Summarizer | PDF summary generation with key points |
-| AGENT-008 | Department Classifier | 12-department content classification |
-| AGENT-009 | Senior Research Analyst | Topic, entity, and fact extraction |
-| AGENT-010 | Content Strategist | Executive summaries and recommendations |
-| AGENT-011 | Fact Checker | Claim verification with citations |
-| AGENT-012 | Research Agent | Web/academic search, query expansion |
-| AGENT-013 | Analysis Agent | Pattern detection and correlations |
-| AGENT-014 | Writing Agent | Report generation, multi-format output |
-| AGENT-015 | Review Agent | Quality assurance and revision loops |
-
-### Multi-Agent Workflows
-
-**Document Analysis Pipeline (Tasks 42-45):**
 ```
-Document → AGENT-009 (Research) → AGENT-010 (Strategy) → AGENT-011 (Fact-Check) → Result
+User Query
+  |
+  v
+[PROMPT ENGINEER - Sonnet 4.5]  ~1-2s
+  Intent detection, output format detection, enriched query
+  |
+  v
+[Query Expansion - Kimi K2.5] -> RAG Search -> Reranking
+  |
+  v
+[REASONING ENGINE - Kimi K2.5 Thinking]  ~3-8s
+  Deep reasoning with citations [1], [2]
+  |
+  v
+[OUTPUT ARCHITECT - Sonnet 4.5]  ~2-3s
+  Formats, structures, detects artifacts, streams to user
+  |
+  v (if artifact detected)
+Document Generator -> B2 Storage -> Artifact card in chat
 ```
 
-**Orchestration Pipeline (Task 46):**
+**Streaming UX**: User sees phase indicators ("Analyzing...", "Searching...", "Thinking...", "Formatting..."), then the Output Architect's formatted response streams token-by-token.
+
+**Graceful degradation**: If either Sonnet call fails, falls back to raw query -> Kimi -> raw response.
+
+### AI Models Used
+
+| Purpose | Model | Provider | Type |
+|---------|-------|----------|------|
+| **Prompt Engineering** | Claude Sonnet 4.5 | Anthropic | Cloud API |
+| **Output Formatting** | Claude Sonnet 4.5 | Anthropic | Cloud API |
+| **Reasoning Engine** | Kimi K2.5 Thinking | Together AI | Cloud API |
+| **Query Expansion** | Kimi K2.5 | Together AI | Cloud API |
+| **Image Analysis** | Kimi K2.5 Thinking (primary) | Together AI | Cloud API |
+| **Image Fallback** | Gemini 3 Flash | Google AI | Cloud API |
+| **Local Vision** | Qwen2.5-VL-32B | Ollama (local) | Local inference |
+| **Audio STT** | distil-whisper/distil-large-v3.5 | faster-whisper (local) | Local inference |
+| **Video Frames** | Gemini 3 Flash | Google AI | Cloud API |
+| **Embeddings** | BGE-M3 | Local/Render | 1024-dim vectors |
+| **Reranking** | BGE-Reranker-v2 | Local | Search optimization |
+
+### LLM Client Abstraction
+
+All model providers use a unified `LLMClient` interface (`app/services/llm_client.py`):
+
+```python
+class LLMClient(ABC):
+    async def generate(prompt, system_prompt, ...) -> str
+    async def generate_with_images(prompt, images, ...) -> str
+    def is_retryable(error) -> bool
+
+# Implementations:
+class TogetherAILLMClient(LLMClient)     # Kimi K2.5 Thinking
+class AnthropicLLMClient(LLMClient)       # Claude Sonnet 4.5
+class GeminiLLMClient(LLMClient)          # Gemini 3 Flash
+class OpenAICompatibleClient(LLMClient)   # Ollama/Qwen2.5-VL
 ```
-Task → AGENT-012 (Research) → AGENT-013 (Analysis) → AGENT-014 (Writing) → AGENT-015 (Review)
-                                                                              ↓
-                                                                     [Revision Loop]
+
+---
+
+## Organization Layer (Multi-Tenant)
+
+### Data Model
+
+```
+Organization (company)
+  |-- org_memberships (user <-> org, with roles: owner/admin/member/viewer)
+  |-- projects (scoped to org)
+  |-- studio_cko_sessions (chats, scoped to org)
+  |-- documents (KB, scoped to org)
+  |-- studio_cko_artifacts (scoped to org)
+```
+
+### Features
+
+- **Org Picker**: First screen after login for multi-org users
+- **Org Switcher**: Dropdown in sidebar header to switch between orgs
+- **Row-Level Security**: All data scoped to user's current organization
+- **Role-Based Membership**: Owner, Admin, Member, Viewer roles
+
+---
+
+## Unified Search
+
+### `GET /api/search/unified`
+
+Searches across all content types within the user's organization:
+
+| Type | Table | Fields Searched |
+|------|-------|----------------|
+| **chat** | studio_cko_sessions | title, context_summary |
+| **project** | projects | name, description |
+| **kb** | documents | filename, department |
+| **artifact** | studio_cko_artifacts | title, summary |
+
+- **Parallel search**: `asyncio.gather()` across all types simultaneously
+- **Relevance scoring**: Title matches score higher than description/summary matches
+- **Filter tabs**: All, Chats, Projects, Knowledge Base, Artifacts
+- **Cmd+K** keyboard shortcut in desktop app
+
+---
+
+## Document Generation & Artifact System
+
+### Supported Formats
+
+| Format | Library | Use Case |
+|--------|---------|----------|
+| **DOCX** | python-docx | Reports, memos, analysis documents |
+| **XLSX** | openpyxl | Spreadsheets, data tables, budgets |
+| **PPTX** | python-pptx | Presentations, slide decks |
+| **PDF** | PDFReportGenerator (custom) | Formal reports with formatting |
+
+### Desktop UI
+
+- **ArtifactCard**: Inline card in chat with file type icon, title, format badge, size
+- **ArtifactPanel**: Slide-out right panel with rendered markdown preview
+- **PhaseIndicator**: Animated pulsing dot showing pipeline phase during processing
+- **Download**: Save to disk via Tauri save dialog
+
+---
+
+## Tauri Desktop Application
+
+### Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Framework** | Tauri 2.x (Rust backend) |
+| **UI** | React 18 + TypeScript |
+| **State** | Zustand (with persist middleware) |
+| **Styling** | Tailwind CSS (Empire dark theme) |
+| **Testing** | Vitest + @testing-library/react (22 tests) |
+| **Build** | Vite |
+
+### Key Components
+
+| Component | Purpose |
+|-----------|---------|
+| `ChatView.tsx` | Main chat interface with streaming + artifact panel |
+| `GlobalSearch.tsx` | Cmd+K unified search modal with filter tabs |
+| `OrgPicker.tsx` | Organization selection on launch |
+| `OrgSwitcher.tsx` | Org switching dropdown in sidebar |
+| `Sidebar.tsx` | Conversation list, navigation |
+| `MessageBubble.tsx` | Chat messages with citation popovers |
+| `ArtifactCard.tsx` | Inline artifact preview in chat |
+| `ArtifactPanel.tsx` | Side panel artifact viewer |
+| `PhaseIndicator.tsx` | Pipeline phase indicator |
+
+---
+
+## Multimodal Capabilities
+
+### Image Analysis
+
+```
+Image -> Qwen2.5-VL-32B (local, via Ollama)
+           |  (fallback if Ollama unavailable)
+         Kimi K2.5 Thinking (Together AI)
+           |  (fallback)
+         Gemini 3 Flash (Google AI)
+```
+
+### Audio/Video Processing
+
+```
+Audio file -> distil-whisper (local, faster-whisper) -> Transcript -> RAG pipeline
+Video file -> ffmpeg frame extraction -> Gemini 3 Flash analysis -> Summary
 ```
 
 ---
 
 ## Database Architecture
 
-### Hybrid Database System (Production)
+### Hybrid Database System
 
 | Database | Provider | Purpose | Cost |
 |----------|----------|---------|------|
-| PostgreSQL | Supabase | Vector search, user data, sessions | $25/month |
-| Neo4j | Mac Studio Docker | Knowledge graphs, entity relationships | $0 (self-hosted) |
-| Redis | Upstash | Caching, Celery broker | Free tier |
+| **PostgreSQL** | Supabase | Vectors, user data, sessions, orgs, artifacts | $25/month |
+| **Neo4j** | Mac Studio Docker | Knowledge graphs, entity relationships | $0 |
+| **Redis** | Upstash | Caching, Celery broker, rate limiting | Free tier |
 
-### Why Hybrid?
+### Key Tables (v7.5 additions)
 
-- **PostgreSQL**: Excellent for vector similarity search (pgvector), structured data
-- **Neo4j**: Superior for relationship traversal, graph algorithms, entity connections
-- **Together**: Comprehensive knowledge management with both semantic search AND relationship discovery
-
----
-
-## 12 Business Departments
-
-Content is automatically classified into one of 12 departments:
-
-1. **IT & Engineering** - Technical, software, infrastructure, DevOps
-2. **Sales & Marketing** - Revenue, campaigns, customer acquisition
-3. **Customer Support** - Service, tickets, satisfaction, help desk
-4. **Operations & HR & Supply Chain** - Logistics, workforce, processes
-5. **Finance & Accounting** - Budget, reporting, compliance, auditing
-6. **Project Management** - Planning, tracking, delivery, Agile/Scrum
-7. **Real Estate** - Property, leases, facilities, tenant relations
-8. **Private Equity & M&A** - Investments, acquisitions, due diligence
-9. **Consulting** - Advisory, strategy, transformation, frameworks
-10. **Personal & Continuing Education** - Training, development, learning
-11. **Research & Development (R&D)** - Innovation, prototyping, experiments, patents
-12. **Global** - Cross-department content applicable to multiple areas
-
----
-
-## API Endpoints (29 Route Modules, 293+ Endpoints)
-
-### Core APIs
-- `/api/v1/upload` - Document upload with validation
-- `/api/query/*` - Query processing (auto, adaptive, batch)
-- `/api/chat/*` - Chat interface with file upload
-- `/ws/*` - WebSocket real-time updates
-
-### AI Agent APIs
-- `/api/summarizer/*` - Content summarization (AGENT-002)
-- `/api/classifier/*` - Department classification (AGENT-008)
-- `/api/document-analysis/*` - Full document analysis (AGENT-009/010/011)
-- `/api/orchestration/*` - Multi-agent workflows (AGENT-012/013/014/015)
-
-### Management APIs
-- `/api/documents/*` - Bulk document management
-- `/api/users/*` - User management & GDPR compliance
-- `/api/rbac/*` - Role-based access control
-- `/api/monitoring/*` - Analytics dashboard
+| Table | Purpose |
+|-------|---------|
+| `organizations` | Company/org entities with slug, logo, settings |
+| `org_memberships` | User-org relationships with roles |
+| `studio_cko_artifacts` | Generated document artifacts |
 
 ---
 
@@ -130,80 +244,27 @@ Content is automatically classified into one of 12 departments:
 |---------|----------|---------|------|
 | FastAPI Backend | Render | Main API service | $7/month |
 | Celery Workers | Render | Background task processing | $7/month |
-| Chat UI | Render | Gradio-based user interface | $7/month |
+| Chat UI | Render | Gradio-based interface | $7/month |
 | CrewAI Service | Render | Multi-agent workflows | $7/month |
 | PostgreSQL | Supabase | Primary database | $25/month |
 | Redis | Upstash | Caching & message broker | Free |
-| File Storage | Backblaze B2 | Document storage | ~$5/month |
-| AI API | Anthropic | Claude Sonnet 4.5 | Usage-based |
+| File Storage | Backblaze B2 | Document + artifact storage | ~$5/month |
+| Anthropic API | Anthropic | Sonnet 4.5 (prompt/output) | Usage-based |
+| Together AI | Together | Kimi K2.5 Thinking (reasoning) | Usage-based |
+| Google AI | Google | Gemini 3 Flash (vision fallback) | Usage-based |
 
-**Total Infrastructure: ~$60-80/month** (excluding AI API usage)
-
----
-
-## Key Features
-
-### 1. Source Attribution
-- Every AI response includes inline citations
-- Page numbers and source metadata
-- Click-to-expand source context
-
-### 2. Real-Time Processing Status
-- WebSocket-based status updates
-- Progress bars for document processing
-- Stage-by-stage visibility
-
-### 3. Intelligent Query Routing
-- Automatic workflow selection (LangGraph/CrewAI/Simple RAG)
-- >90% routing accuracy
-- <100ms routing decisions
-
-### 4. Book Processing
-- Automatic chapter detection (>90% accuracy)
-- Per-chapter knowledge base entries
-- Book-wide or chapter-specific queries
-
-### 5. URL/Link Support
-- YouTube video transcription
-- Web article extraction
-- Automatic content type detection
+**Infrastructure: ~$60/month** (excluding AI API usage)
+**Per-query pipeline cost: ~$0.0045** (both Sonnet calls combined)
 
 ---
 
-## Security Features
+## Testing
 
-- **HTTP Security Headers**: HSTS, CSP, X-Frame-Options
-- **Rate Limiting**: Redis-backed, tiered by endpoint
-- **Row-Level Security**: Database-level data isolation
-- **Encryption**: AES-256 at rest, TLS 1.2+ in transit
-- **Audit Logging**: Comprehensive event tracking
-
----
-
-## Monitoring Stack
-
-- **Prometheus**: Metrics collection (port 9090)
-- **Grafana**: Visualization dashboards (port 3001)
-- **Alertmanager**: Email notifications for critical issues
-- **39 Alert Rules**: Across critical, warning, and info levels
-
----
-
-## Implementation Status
-
-### Phase 0: Foundation (8 tasks) ✅
-- OpenAPI contracts, database migrations, feature flags, monitoring setup
-
-### Phase 1: Sprint 1 (19 tasks) ✅
-- R&D department, real-time status, source attribution, agent router
-
-### Phase 2: Sprint 2 (14 tasks) ✅
-- URL support, chat file upload, book processing, security hardening
-
-### Phase 3: Sprint 3 (5 tasks) ✅
-- AI Agent System (Tasks 42-46): All 15 agents implemented
-
-**Total: 47/47 tasks completed**
+| Layer | Framework | Count |
+|-------|-----------|-------|
+| Backend | pytest | 170+ test files |
+| Frontend | vitest + testing-library | 22 tests across 3 files |
+| Code Review | CodeRabbit | Automated on every PR |
 
 ---
 
@@ -211,17 +272,23 @@ Content is automatically classified into one of 12 departments:
 
 | Layer | Technology |
 |-------|------------|
-| **AI Processing** | Claude Sonnet 4.5 (Anthropic API) |
-| **Backend** | FastAPI (Python) |
-| **Task Processing** | Celery |
-| **Vector Database** | PostgreSQL + pgvector (Supabase) |
-| **Graph Database** | Neo4j |
+| **AI Reasoning** | Kimi K2.5 Thinking (Together AI) |
+| **AI Prompt/Output** | Claude Sonnet 4.5 (Anthropic API) |
+| **Local Vision** | Qwen2.5-VL-32B (Ollama) |
+| **Local Audio** | distil-whisper (faster-whisper) |
+| **Video Analysis** | Gemini 3 Flash (Google AI) |
+| **Backend** | FastAPI (Python 3.11+) |
+| **Desktop App** | Tauri 2.x + React + TypeScript |
+| **State Management** | Zustand |
+| **Task Queue** | Celery |
+| **Vector DB** | PostgreSQL + pgvector (Supabase) |
+| **Graph DB** | Neo4j |
 | **Cache/Broker** | Redis (Upstash) |
-| **File Storage** | Backblaze B2 |
-| **Frontend** | Gradio |
+| **Storage** | Backblaze B2 |
 | **Monitoring** | Prometheus + Grafana + Alertmanager |
+| **Testing** | pytest (backend) + vitest (frontend) |
 | **Deployment** | Render.com |
 
 ---
 
-**Empire v7.3** - Production-ready AI knowledge management with 15 specialized agents, hybrid database architecture, and comprehensive security.
+**Empire v7.5** - Multi-model AI pipeline with organization tenancy, desktop app, artifact generation, and unified search.

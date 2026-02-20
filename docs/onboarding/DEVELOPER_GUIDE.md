@@ -1,4 +1,4 @@
-# Empire v7.3 - Developer Onboarding Guide
+# Empire v7.5 - Developer Onboarding Guide
 
 **From Zero to First Contribution in 30 Minutes**
 
@@ -29,8 +29,9 @@ Before you begin, ensure you have:
 
 | Software | Version | Purpose |
 |----------|---------|---------|
-| **Python** | 3.9+ | Backend runtime |
+| **Python** | 3.11+ | Backend runtime |
 | **Node.js** | 18+ | Frontend tooling |
+| **Rust** | Latest stable | Tauri desktop app |
 | **Docker** | 24+ | Neo4j database |
 | **Git** | Latest | Version control |
 | **VS Code** | Latest | Recommended IDE |
@@ -40,15 +41,15 @@ Before you begin, ensure you have:
 | Software | Purpose |
 |----------|---------|
 | **GitHub CLI** (`gh`) | PR management |
-| **Ollama** | Local embedding models (BGE-M3) |
+| **Ollama** | Local vision model (Qwen2.5-VL-32B) |
 | **Tailscale** | Remote access to Mac Studio services |
 | **Postman** / **Insomnia** | API testing |
 
 ### System Requirements
 
 - **OS**: macOS, Linux, or Windows (WSL2)
-- **RAM**: 8GB minimum, 16GB recommended
-- **Disk Space**: 10GB free
+- **RAM**: 8GB minimum, 16GB recommended (32GB+ for local Ollama models)
+- **Disk Space**: 10GB free (20GB+ if running Ollama models locally)
 
 ---
 
@@ -58,8 +59,8 @@ Before you begin, ensure you have:
 
 ```bash
 # Clone from GitHub
-git clone https://github.com/your-org/empire.git
-cd empire
+git clone https://github.com/jayusctrojan/Empire.git
+cd Empire
 
 # Create a feature branch
 git checkout -b feature/your-feature-name
@@ -78,14 +79,18 @@ cp .env.example .env
 **Essential Variables**:
 ```bash
 # Required for basic functionality
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=sk-ant-...           # Sonnet 4.5 (prompt/output pipeline)
+TOGETHER_API_KEY=...                    # Kimi K2.5 Thinking (reasoning engine)
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your-service-key
 NEO4J_PASSWORD=your-secure-password
 
 # Optional for full functionality
+GOOGLE_API_KEY=...                      # Gemini 3 Flash (vision/video fallback)
 REDIS_URL=redis://localhost:6379
-OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_BASE_URL=http://localhost:11434  # Local Qwen2.5-VL-32B
+B2_APPLICATION_KEY_ID=...               # Backblaze B2 storage
+B2_APPLICATION_KEY=...
 ```
 
 ### 3. Install Dependencies
@@ -132,10 +137,19 @@ celery -A app.celery_app worker --loglevel=info
 curl http://localhost:8000/health
 
 # Expected response:
-# {"status": "healthy", "version": "7.3.0"}
+# {"status": "healthy", "version": "7.5.0"}
 ```
 
-**🎉 Congratulations!** You're ready to start developing.
+### 6. Run the Desktop App (Optional)
+
+```bash
+# Install frontend dependencies
+cd empire-desktop
+npm install
+
+# Start in development mode
+npm run tauri dev
+```
 
 ---
 
@@ -152,6 +166,7 @@ code --install-extension ms-python.vscode-pylance
 code --install-extension ms-python.black-formatter
 code --install-extension charliermarsh.ruff
 code --install-extension dbaeumer.vscode-eslint
+code --install-extension bradlc.vscode-tailwindcss
 ```
 
 #### 2. Configure VS Code Settings
@@ -170,6 +185,12 @@ Create `.vscode/settings.json`:
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.rulers": [88]
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
   }
 }
 ```
@@ -271,49 +292,98 @@ redis-cli ping
 ## Project Structure
 
 ```
-empire/
-├── app/                          # Main application code
-│   ├── api/                      # API endpoints
-│   │   └── routes/               # Route handlers
-│   │       ├── query.py          # Query endpoints (Task 46)
-│   │       ├── documents.py      # Document management
-│   │       └── crewai.py         # CrewAI orchestration
-│   ├── services/                 # Business logic
-│   │   ├── query_cache.py        # Semantic caching (Task 43.3)
-│   │   ├── embedding_service.py  # BGE-M3 embeddings
-│   │   ├── langgraph_service.py  # LangGraph workflows
-│   │   └── arcade_service.py     # Arcade.dev integration
-│   ├── models/                   # Pydantic models
-│   │   ├── query.py              # Query request/response models
-│   │   └── document.py           # Document models
-│   ├── middleware/               # FastAPI middleware
-│   │   ├── security.py           # Security headers (Task 41.1)
-│   │   ├── rate_limit.py         # Rate limiting
-│   │   └── rls_context.py        # RLS context setting
-│   ├── utils/                    # Utility functions
+Empire/
+├── app/                          # FastAPI backend
+│   ├── routes/                   # 57 API route modules (300+ endpoints)
+│   │   ├── unified_search.py     # Cross-type search with asyncio.gather
+│   │   ├── organizations.py      # Multi-tenant org management
+│   │   ├── artifacts.py          # Artifact CRUD + download
+│   │   ├── studio_cko.py         # CKO chat with multi-model pipeline
+│   │   ├── kb_submissions.py     # Knowledge base submissions
+│   │   └── ...
+│   ├── services/                 # 139 service files
+│   │   ├── llm_client.py         # Unified LLM provider abstraction (4 impls)
+│   │   ├── prompt_engineer_service.py    # Sonnet 4.5 prompt enrichment
+│   │   ├── output_architect_service.py   # Sonnet 4.5 output formatting
+│   │   ├── document_generator_service.py # DOCX/XLSX/PPTX/PDF generation
+│   │   ├── organization_service.py       # Org CRUD + membership
+│   │   ├── vision_service.py             # Multi-provider image analysis
+│   │   ├── whisper_stt_service.py        # Local audio transcription
+│   │   ├── audio_video_processor.py      # Video frame extraction + analysis
+│   │   ├── studio_cko_conversation_service.py  # CKO chat orchestration
+│   │   ├── cost_tracking_service.py      # Per-query cost tracking
+│   │   └── ...
+│   ├── core/
+│   │   ├── database.py           # Supabase client initialization
+│   │   └── config.py             # Environment configuration
+│   ├── middleware/                # Auth, rate limiting, org context
 │   ├── main.py                   # FastAPI application entry
 │   └── celery_app.py             # Celery configuration
-├── tests/                        # Test suite
-│   ├── unit/                     # Unit tests
-│   ├── integration/              # Integration tests
-│   └── load_testing/             # Load tests (Task 43.3)
+├── empire-desktop/               # Tauri desktop application
+│   ├── src/
+│   │   ├── components/           # React components (31 files)
+│   │   │   ├── auth/             # Authentication (Clerk)
+│   │   │   ├── chat/             # Chat UI, artifacts, phase indicators
+│   │   │   └── projects/         # Project management
+│   │   ├── stores/               # Zustand state management
+│   │   │   ├── chat.ts           # Conversations, messages, artifacts, phases
+│   │   │   ├── app.ts            # View state, sidebar
+│   │   │   ├── org.ts            # Organization selection, switching
+│   │   │   └── projects.ts       # Project list
+│   │   ├── lib/
+│   │   │   ├── api/              # Backend API client
+│   │   │   │   ├── client.ts     # Fetch wrapper with X-Org-Id header
+│   │   │   │   ├── search.ts     # Unified search API
+│   │   │   │   ├── artifacts.ts  # Artifact download/metadata
+│   │   │   │   └── index.ts      # Core API functions
+│   │   │   └── database.ts       # Local IndexedDB for offline data
+│   │   └── test/
+│   │       └── setup.ts          # vitest + jsdom + localStorage mock
+│   ├── src-tauri/                # Rust backend for Tauri
+│   └── package.json
+├── tests/                        # Backend test suite (170+ test files)
 ├── migrations/                   # Database migrations
-│   ├── supabase/                 # Supabase migrations
-│   └── neo4j/                    # Neo4j schema updates
 ├── docs/                         # Documentation
-│   ├── API_REFERENCE.md          # Complete API docs
-│   ├── WORKFLOW_DIAGRAMS.md      # System diagrams
-│   └── onboarding/               # Onboarding guides
-├── scripts/                      # Utility scripts
-│   ├── init_neo4j_schema.py      # Neo4j setup
-│   └── seed_test_data.py         # Test data generation
-├── .env                          # Environment variables (DO NOT COMMIT)
-├── .env.example                  # Environment template
+│   ├── onboarding/               # Onboarding guides
+│   └── API_REFERENCE.md
+├── notebooklm/                   # NotebookLM source documents
 ├── requirements.txt              # Python dependencies
 ├── requirements-dev.txt          # Development dependencies
 ├── docker-compose.yml            # Docker services
 └── README.md                     # Project overview
 ```
+
+---
+
+## Key Architecture Concepts
+
+### Multi-Model Pipeline
+
+Every CKO query flows through 3 stages:
+1. **Prompt Engineer** (Sonnet 4.5): Detects intent, output format, enriches query
+2. **Reasoning Engine** (Kimi K2.5 Thinking): Deep reasoning with citations
+3. **Output Architect** (Sonnet 4.5): Formats response, detects artifacts, streams to user
+
+### LLM Client Abstraction
+
+All AI providers implement a unified `LLMClient` interface (`app/services/llm_client.py`):
+
+```python
+class LLMClient(ABC):
+    async def generate(prompt, system_prompt, ...) -> str
+    async def generate_with_images(prompt, images, ...) -> str
+    def is_retryable(error) -> bool
+
+# Implementations:
+# TogetherAILLMClient  → Kimi K2.5 Thinking
+# AnthropicLLMClient   → Claude Sonnet 4.5
+# GeminiLLMClient      → Gemini 3 Flash
+# OpenAICompatibleClient → Ollama/Qwen2.5-VL (any OpenAI-compatible API)
+```
+
+### Organization Layer
+
+All data is scoped to organizations. The `X-Org-Id` header is sent with every API request from the desktop app. Middleware extracts it and sets `request.state.org_id` for route handlers.
 
 ---
 
@@ -329,21 +399,15 @@ git checkout -b feature/enhanced-health-check
 
 ### Step 2: Write the Code
 
-Edit `app/api/routes/monitoring.py`:
+Edit `app/routes/monitoring.py`:
 
 ```python
-# Add this import at the top
-from app.services.database import check_database_connection
-
-# Add this new endpoint
 @router.get("/health/detailed")
 async def detailed_health_check():
-    """
-    Detailed health check including database status
-    """
+    """Detailed health check including database status"""
     health_status = {
         "status": "healthy",
-        "version": "7.3.0",
+        "version": "7.5.0",
         "services": {}
     }
 
@@ -351,7 +415,7 @@ async def detailed_health_check():
     try:
         neo4j_status = await check_database_connection("neo4j")
         health_status["services"]["neo4j"] = "healthy"
-    except Exception as e:
+    except Exception:
         health_status["services"]["neo4j"] = "unhealthy"
         health_status["status"] = "degraded"
 
@@ -359,16 +423,8 @@ async def detailed_health_check():
     try:
         supabase_status = await check_database_connection("supabase")
         health_status["services"]["supabase"] = "healthy"
-    except Exception as e:
+    except Exception:
         health_status["services"]["supabase"] = "unhealthy"
-        health_status["status"] = "degraded"
-
-    # Check Redis
-    try:
-        redis_status = await check_database_connection("redis")
-        health_status["services"]["redis"] = "healthy"
-    except Exception as e:
-        health_status["services"]["redis"] = "unhealthy"
         health_status["status"] = "degraded"
 
     return health_status
@@ -376,10 +432,11 @@ async def detailed_health_check():
 
 ### Step 3: Write Tests
 
-Create `tests/unit/test_health_check.py`:
+Create `tests/test_health_check.py`:
 
 ```python
 import pytest
+from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -388,35 +445,11 @@ client = TestClient(app)
 def test_detailed_health_check():
     """Test detailed health check endpoint"""
     response = client.get("/api/monitoring/health/detailed")
-
     assert response.status_code == 200
-
     data = response.json()
     assert "status" in data
     assert "version" in data
     assert "services" in data
-
-    # Check required services
-    assert "neo4j" in data["services"]
-    assert "supabase" in data["services"]
-    assert "redis" in data["services"]
-
-def test_health_check_with_db_failure(monkeypatch):
-    """Test health check when database is down"""
-    # Mock database connection failure
-    def mock_check_db(*args, **kwargs):
-        raise ConnectionError("Database unavailable")
-
-    monkeypatch.setattr(
-        "app.services.database.check_database_connection",
-        mock_check_db
-    )
-
-    response = client.get("/api/monitoring/health/detailed")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "degraded"
 ```
 
 ### Step 4: Run Tests
@@ -426,49 +459,17 @@ def test_health_check_with_db_failure(monkeypatch):
 pytest
 
 # Run specific test file
-pytest tests/unit/test_health_check.py -v
+pytest tests/test_health_check.py -v
 
 # Run with coverage
 pytest --cov=app --cov-report=html
 ```
 
-### Step 5: Manual Testing
+### Step 5: Commit and Push
 
 ```bash
-# Start the server
-uvicorn app.main:app --reload
-
-# Test the endpoint
-curl http://localhost:8000/api/monitoring/health/detailed
-
-# Expected response:
-{
-  "status": "healthy",
-  "version": "7.3.0",
-  "services": {
-    "neo4j": "healthy",
-    "supabase": "healthy",
-    "redis": "healthy"
-  }
-}
-```
-
-### Step 6: Commit Your Changes
-
-```bash
-# Stage changes
-git add app/api/routes/monitoring.py tests/unit/test_health_check.py
-
-# Commit with descriptive message
-git commit -m "feat: add detailed health check endpoint
-
-- Added /api/monitoring/health/detailed endpoint
-- Includes status for Neo4j, Supabase, and Redis
-- Returns 'degraded' status if any service is unhealthy
-- Added unit tests with mocking for failure scenarios
-- Closes #123"
-
-# Push to your fork
+git add app/routes/monitoring.py tests/test_health_check.py
+git commit -m "feat: add detailed health check endpoint"
 git push origin feature/enhanced-health-check
 ```
 
@@ -476,7 +477,7 @@ git push origin feature/enhanced-health-check
 
 ## Testing
 
-### Running Tests
+### Backend Tests (pytest)
 
 ```bash
 # Run all tests
@@ -491,89 +492,68 @@ pytest --cov=app --cov-report=html
 open htmlcov/index.html
 
 # Run specific test file
-pytest tests/unit/test_query_cache.py -v
-
-# Run specific test function
-pytest tests/unit/test_query_cache.py::test_semantic_similarity -v
-
-# Run with verbose output
-pytest -vv
+pytest tests/test_unified_search.py -v
 
 # Run in parallel (faster)
 pytest -n auto
 ```
 
-### Writing Tests
+### Frontend Tests (vitest)
 
-#### Unit Test Example
+```bash
+cd empire-desktop
 
-```python
-# tests/unit/test_embedding_service.py
-import pytest
-from app.services.embedding_service import EmbeddingService
+# Run all frontend tests
+npx vitest run
 
-@pytest.fixture
-def embedding_service():
-    """Fixture to create embedding service instance"""
-    return EmbeddingService()
+# Run in watch mode
+npx vitest
 
-def test_generate_embedding(embedding_service):
-    """Test embedding generation"""
-    text = "What are California insurance requirements?"
+# Run specific test file
+npx vitest run src/test/stores/chat.test.ts
 
-    result = embedding_service.generate_embedding(text)
-
-    assert result is not None
-    assert len(result.embedding) == 1024  # BGE-M3 dimension
-    assert all(isinstance(x, float) for x in result.embedding)
-
-def test_embedding_caching(embedding_service):
-    """Test that identical queries use cached embeddings"""
-    text = "Test query"
-
-    # First call
-    result1 = embedding_service.generate_embedding(text)
-
-    # Second call (should hit cache)
-    result2 = embedding_service.generate_embedding(text)
-
-    assert result1.embedding == result2.embedding
-    assert result2.from_cache is True
+# Type checking
+npx tsc --noEmit
 ```
 
-#### Integration Test Example
+### Writing Tests
+
+#### Backend Unit Test Example
 
 ```python
-# tests/integration/test_query_endpoint.py
 import pytest
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
+from unittest.mock import MagicMock, patch
+from app.services.prompt_engineer_service import PromptEngineerService
 
 @pytest.fixture
-def auth_token():
-    """Fixture to get authentication token"""
-    # In real tests, use actual authentication
-    return "test-jwt-token"
+def service():
+    return PromptEngineerService()
 
-def test_adaptive_query_endpoint(auth_token):
-    """Test adaptive query endpoint"""
-    response = client.post(
-        "/api/query/adaptive",
-        headers={"Authorization": f"Bearer {auth_token}"},
-        json={
-            "query": "What are California insurance requirements?",
-            "max_iterations": 3
-        }
-    )
+@pytest.mark.asyncio
+async def test_intent_detection(service):
+    """Test that prompt engineer detects query intent"""
+    with patch.object(service, '_call_sonnet') as mock_call:
+        mock_call.return_value = '{"intent": "analytical", "format": "text"}'
+        result = await service.engineer_prompt("Compare our sales across regions")
+        assert result.intent == "analytical"
+```
 
-    assert response.status_code == 200
+#### Frontend Test Example
 
-    data = response.json()
-    assert "answer" in data
-    assert "sources" in data
-    assert "processing_time_ms" in data
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest'
+import { useChatStore } from '@/stores/chat'
+
+describe('Chat Store', () => {
+  beforeEach(() => {
+    useChatStore.getState().reset()
+  })
+
+  it('sets active conversation', () => {
+    useChatStore.getState().setActiveConversation('session-123')
+    expect(useChatStore.getState().activeConversationId).toBe('session-123')
+  })
+})
 ```
 
 ---
@@ -584,60 +564,37 @@ def test_adaptive_query_endpoint(auth_token):
 
 Before submitting, ensure:
 
-- [ ] All tests pass (`pytest`)
+- [ ] All backend tests pass (`pytest`)
+- [ ] All frontend tests pass (`npx vitest run` in empire-desktop/)
+- [ ] TypeScript compiles (`npx tsc --noEmit` in empire-desktop/)
 - [ ] Code is formatted (`black app/` and `ruff check app/`)
-- [ ] Type hints are added (check with `mypy app/`)
 - [ ] Documentation is updated (if adding new features)
 - [ ] Commit messages follow conventional commits format
-- [ ] PR description explains the change
 
 ### Create the PR
 
 ```bash
-# Using GitHub CLI (recommended)
 gh pr create --title "feat: add detailed health check endpoint" \
   --body "## Summary
-This PR adds a new detailed health check endpoint that includes database status.
-
-## Changes
-- Added `/api/monitoring/health/detailed` endpoint
+- Added /api/monitoring/health/detailed endpoint
 - Returns status for Neo4j, Supabase, and Redis
-- Added unit tests with failure scenario mocking
 
-## Testing
-- [x] Unit tests pass
-- [x] Manual testing completed
-- [x] Integration tests pass
-
-## Closes
-Closes #123" \
+## Test plan
+- [ ] Unit tests pass
+- [ ] Manual testing completed" \
   --base main
-
-# Or manually via GitHub web interface
-# 1. Push your branch
-# 2. Visit https://github.com/your-org/empire
-# 3. Click "Compare & pull request"
 ```
 
 ### PR Review Process
 
-1. **Automated Checks**: CI/CD runs tests and linters
-2. **Code Review**: Team members review your code
-3. **Revisions**: Address feedback and push updates
-4. **Approval**: Get required approvals (usually 1-2 reviewers)
-5. **Merge**: Maintainer merges to main branch
+1. **CodeRabbit**: Automated AI code review runs on every PR
+2. **CI/CD**: Automated tests and linters
+3. **Code Review**: Team members review your code
+4. **Revisions**: Address CodeRabbit + reviewer feedback and push updates
+5. **Approval**: Get required approvals
+6. **Merge**: Maintainer merges to main branch (squash merge preferred)
 
-### After Merge
-
-```bash
-# Update your local main branch
-git checkout main
-git pull origin main
-
-# Delete your feature branch
-git branch -d feature/enhanced-health-check
-git push origin --delete feature/enhanced-health-check
-```
+**Important**: Never merge to main without explicit approval from Jay.
 
 ---
 
@@ -660,202 +617,76 @@ uvicorn app.main:app --reload  # API server
 celery -A app.celery_app worker --loglevel=info  # Worker
 
 # 4. Make changes, test, commit
-# ... coding ...
 pytest
 git commit -m "feat: description"
 
-# 5. End of day
+# 5. Push and create PR
 git push origin feature/my-new-feature
-# Open draft PR for visibility
+gh pr create
 ```
 
----
-
-### Working with Multiple Services
+### Working with the Desktop App
 
 ```bash
 # Terminal 1: API Server
 uvicorn app.main:app --reload --port 8000
 
-# Terminal 2: Celery Worker
-celery -A app.celery_app worker --loglevel=info
+# Terminal 2: Desktop App (hot-reloads)
+cd empire-desktop && npm run tauri dev
 
-# Terminal 3: Celery Beat (scheduled tasks)
-celery -A app.celery_app beat --loglevel=info
-
-# Terminal 4: Monitoring (Flower)
-celery -A app.celery_app flower --port=5555
-
-# Terminal 5: Your development work
-# Run tests, make changes, etc.
-```
-
-**Pro Tip**: Use `tmux` or VS Code's integrated terminal to manage multiple terminals.
-
----
-
-### Debugging
-
-#### FastAPI Debugging (VS Code)
-
-1. Set breakpoints in VS Code
-2. Press `F5` to start debugging
-3. Send requests to `http://localhost:8000`
-4. Execution pauses at breakpoints
-
-#### Celery Task Debugging
-
-```python
-# Add breakpoint in task
-@celery_app.task
-def process_document(document_id: str):
-    import pdb; pdb.set_trace()  # Breakpoint
-    # ... task code ...
-```
-
-Run Celery with single worker:
-```bash
-celery -A app.celery_app worker --loglevel=debug --pool=solo
-```
-
-#### Database Query Debugging
-
-**Neo4j**:
-```python
-# Enable query logging
-import logging
-logging.getLogger("neo4j").setLevel(logging.DEBUG)
-```
-
-**Supabase**:
-```python
-# Log SQL queries
-from supabase import create_client
-
-supabase = create_client(url, key)
-supabase.postgrest.schema("public").from_("table").select("*").execute()
-# Check logs in Supabase dashboard
+# Terminal 3: Run frontend tests in watch mode
+cd empire-desktop && npx vitest
 ```
 
 ---
 
 ## Common Tasks
 
-### Adding a New API Endpoint
+### Adding a New API Route Module
 
-1. **Define Pydantic models** (`app/models/your_feature.py`):
+1. **Create route file** (`app/routes/your_feature.py`):
 ```python
-from pydantic import BaseModel
+from fastapi import APIRouter, Request, HTTPException
 
-class YourRequest(BaseModel):
-    field1: str
-    field2: int
+router = APIRouter(prefix="/api/your-feature", tags=["Your Feature"])
 
-class YourResponse(BaseModel):
-    result: str
-    status: str
+@router.get("/")
+async def list_items(request: Request):
+    org_id = getattr(request.state, "org_id", None)
+    user_id = getattr(request.state, "user_id", None)
+    # Implementation scoped to org
+    return {"items": []}
 ```
 
-2. **Create route handler** (`app/api/routes/your_feature.py`):
+2. **Register router** (`app/main.py`):
 ```python
-from fastapi import APIRouter, Depends
-from app.middleware.auth import verify_clerk_token
-
-router = APIRouter()
-
-@router.post("/your-endpoint", response_model=YourResponse)
-async def your_endpoint(
-    request: YourRequest,
-    user: dict = Depends(verify_clerk_token)
-):
-    # Implementation
-    return YourResponse(result="success", status="ok")
+from app.routes import your_feature
+app.include_router(your_feature.router)
 ```
 
-3. **Register router** (`app/main.py`):
-```python
-from app.api.routes import your_feature
+3. **Write tests** (`tests/test_your_feature.py`)
 
-app.include_router(
-    your_feature.router,
-    prefix="/api/your-feature",
-    tags=["Your Feature"]
-)
-```
+### Adding a New LLM Provider
 
-4. **Write tests** (`tests/unit/test_your_feature.py`)
-5. **Update documentation** (`docs/API_REFERENCE.md`)
+1. Create a new class extending `LLMClient` in `app/services/llm_client.py`
+2. Implement `generate()`, `generate_with_images()`, and `is_retryable()`
+3. Add to `get_llm_client()` factory function
+4. Add cost tracking in `cost_tracking_service.py`
 
----
+### Adding a Desktop Component
 
-### Adding a New Celery Task
-
-1. **Define task** (`app/tasks/your_task.py`):
-```python
-from app.celery_app import celery_app
-
-@celery_app.task
-def your_background_task(param1: str, param2: int):
-    # Long-running operation
-    result = process_something(param1, param2)
-    return result
-```
-
-2. **Call task from endpoint**:
-```python
-from app.tasks.your_task import your_background_task
-
-@router.post("/submit")
-async def submit_task(request: TaskRequest):
-    task = your_background_task.apply_async(
-        args=[request.param1, request.param2]
-    )
-    return {"task_id": task.id, "status": "queued"}
-```
-
-3. **Check task status**:
-```python
-from celery.result import AsyncResult
-
-@router.get("/status/{task_id}")
-async def check_status(task_id: str):
-    result = AsyncResult(task_id)
-    return {
-        "status": result.status,
-        "result": result.result if result.ready() else None
-    }
-```
-
----
+1. Create component in `empire-desktop/src/components/`
+2. Use Zustand stores for state management
+3. Follow the Empire dark theme (Tailwind classes: `bg-empire-*`, `text-empire-*`)
+4. Add tests in `empire-desktop/src/test/`
 
 ### Adding Database Migrations
 
 **Supabase**:
 ```bash
-# Create migration
 supabase migration new add_your_table
-
-# Edit migration file in migrations/supabase/
-# Add SQL commands
-
-# Apply migration locally
-supabase db reset
-
-# Apply to production
+# Edit migration file, then:
 supabase db push
-```
-
-**Neo4j**:
-```python
-# Create migration script in migrations/neo4j/
-# Add to scripts/init_neo4j_schema.py
-def create_new_index():
-    with driver.session() as session:
-        session.run("""
-            CREATE INDEX your_index_name IF NOT EXISTS
-            FOR (n:YourLabel)
-            ON (n.property)
-        """)
 ```
 
 ---
@@ -886,15 +717,27 @@ docker-compose down
 docker-compose up -d
 ```
 
-#### Import Errors
+#### Frontend Build Errors
 
 ```bash
-# Ensure PYTHONPATH includes project root
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+cd empire-desktop
 
-# Or run from project root
-cd /path/to/empire
-python -m app.main
+# Clear node_modules and reinstall
+rm -rf node_modules
+npm install
+
+# Check TypeScript errors
+npx tsc --noEmit
+```
+
+#### Tauri Build Issues
+
+```bash
+# Ensure Rust is installed and up to date
+rustup update
+
+# Check Tauri prerequisites
+cargo install tauri-cli
 ```
 
 #### Test Failures
@@ -904,7 +747,7 @@ python -m app.main
 pytest -vv
 
 # Run specific failing test
-pytest tests/unit/test_file.py::test_function -vv
+pytest tests/test_file.py::test_function -vv
 
 # Check test logs
 pytest --log-cli-level=DEBUG
@@ -916,35 +759,27 @@ pytest --log-cli-level=DEBUG
 
 ### Python (PEP 8 + Black)
 
-```python
+```bash
 # Use Black formatter (88 character line length)
 black app/
 
 # Check with Ruff
 ruff check app/
-
-# Type hints required
-def process_query(query: str, max_iterations: int = 3) -> dict:
-    """
-    Process query with adaptive workflow
-
-    Args:
-        query: User query string
-        max_iterations: Max refinement iterations
-
-    Returns:
-        Query result dictionary
-    """
-    pass
 ```
+
+### TypeScript/React
+
+- Use functional components with hooks
+- Zustand for state management (not Redux)
+- Tailwind CSS for styling (Empire dark theme)
+- `vitest` + `@testing-library/react` for tests
 
 ### Naming Conventions
 
-- **Files**: `snake_case.py`
+- **Files**: `snake_case.py` (backend), `PascalCase.tsx` (components), `camelCase.ts` (utils)
 - **Classes**: `PascalCase`
-- **Functions/Methods**: `snake_case`
+- **Functions/Methods**: `snake_case` (Python), `camelCase` (TypeScript)
 - **Constants**: `UPPER_SNAKE_CASE`
-- **Private**: `_leading_underscore`
 
 ### Commit Messages
 
@@ -956,8 +791,6 @@ fix: resolve cache key collision in Redis
 docs: update API reference for query endpoints
 test: add unit tests for semantic similarity
 refactor: extract caching logic into service
-perf: optimize vector search query
-chore: update dependencies to latest versions
 ```
 
 ---
@@ -966,36 +799,17 @@ chore: update dependencies to latest versions
 
 ### Documentation
 - [API Reference](../API_REFERENCE.md)
-- [Workflow Diagrams](../WORKFLOW_DIAGRAMS.md)
-- [Security Guide](../SECURITY.md)
+- [NotebookLM Docs](../../notebooklm/) (Architecture, Features, AI Agents)
 
 ### External Resources
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Supabase Docs](https://supabase.com/docs)
+- [Tauri Documentation](https://tauri.app/v2/)
+- [Zustand Documentation](https://zustand-demo.pmnd.rs/)
 - [Neo4j Developer Guide](https://neo4j.com/developer/)
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
-
-### Getting Help
-- **Slack**: #empire-dev-support
-- **Email**: dev-support@empire.ai
-- **Office Hours**: Wednesdays 2-3 PM PST
 
 ---
 
-## Next Steps
-
-Now that you're set up, try:
-
-1. **Explore the codebase**: Read through existing endpoints and services
-2. **Pick a good first issue**: Look for issues tagged "good-first-issue"
-3. **Join the community**: Introduce yourself in #empire-dev
-4. **Review PRs**: Learn from others by reviewing open pull requests
-5. **Ask questions**: Don't hesitate to ask in Slack or office hours
-
-**Welcome to the Empire development team!** 🚀
-
----
-
-**Last Updated**: 2025-01-17
-**Version**: 7.3
+**Last Updated**: 2026-02-19
+**Version**: 7.5
 **Maintainer**: Empire Development Team

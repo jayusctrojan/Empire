@@ -1,51 +1,151 @@
-# Empire v7.3 - Features & Capabilities
+# Empire v7.5 - Features & Capabilities
 
-**Version:** v7.3.0
-**Last Updated:** 2025-12-30
-**Status:** ✅ All 47 Tasks Complete - Production Deployed & Verified
+**Version:** v7.5.0
+**Last Updated:** 2026-02-19
+**Status:** Production Deployed & Verified
 
 ---
 
 ## Core Features
 
-### 1. AI-Powered Document Processing
+### 1. Multi-Model Quality Pipeline
 
-**Primary AI:** Claude Sonnet 4.5 (Anthropic Cloud API)
+Every query flows through a **3-stage AI pipeline** that bookends reasoning with formatting:
 
-- Automatic content summarization
-- Department classification (10 categories)
-- Entity and topic extraction
-- Fact verification with citations
-- Multi-document analysis
+```
+User Query
+     |
+     v
+[PROMPT ENGINEER - Sonnet 4.5]     ~1-2s
+  Intent detection, format detection, enriched query
+     |
+     v
+[Query Expansion - Kimi K2.5] -> [RAG Search] -> [BGE-Reranker-v2]
+     |
+     v
+[REASONING ENGINE - Kimi K2.5 Thinking]   ~3-8s
+  Deep reasoning with citations [1], [2]
+     |
+     v
+[OUTPUT ARCHITECT - Sonnet 4.5]    ~2-3s
+  Formatting, artifact detection, streaming
+     |
+     v (if artifact detected)
+[Document Generator -> B2 Storage -> Artifact card in chat]
+```
 
-### 2. Intelligent Chat Interface
+**Streaming UX**: Users see phase indicators ("Analyzing...", "Searching...", "Thinking...", "Formatting..."), then the formatted response streams token-by-token.
 
-- Natural language queries
-- Real-time streaming responses
-- Source attribution with page numbers
-- File/image upload in chat
+**Graceful degradation**: If either Sonnet 4.5 call fails, falls back to raw query -> Kimi -> raw response.
+
+**Per-query pipeline cost**: ~$0.0045 for both Sonnet 4.5 calls combined.
+
+### 2. Multi-Tenant Organization Layer
+
+- **Organization model**: Multi-tenant SaaS with proper tenant isolation
+- **Org Picker**: First screen after login for multi-org users
+- **Org Switcher**: Dropdown in sidebar header for quick org changes
+- **Role-based membership**: Owner, Admin, Member, Viewer
+- **Row-Level Security**: All data scoped to user's current organization
+- **Org-scoped data**: Projects, chats, KB documents, artifacts all isolated per org
+
+### 3. Intelligent Chat Interface (CKO)
+
+- Natural language queries with multi-model pipeline
+- Real-time streaming with phase indicators
+- Source attribution with inline citations [1], [2]
+- File/image/audio/video upload in chat
 - Conversation memory and context
+- Quality weight presets (Speed / Balanced / Quality)
 
-### 3. Multi-Agent Orchestration
+### 4. Document Generation & Artifacts
 
-15 specialized AI agents coordinate for complex tasks:
-- Research → Analysis → Writing → Review pipeline
-- Automatic revision loops for quality
-- Parallel processing for efficiency
+AI-generated documents from chat responses:
 
-### 4. Source Attribution
+| Format | Library | Use Case |
+|--------|---------|----------|
+| **DOCX** | python-docx | Reports, memos, analysis documents |
+| **XLSX** | openpyxl | Spreadsheets, data tables, budgets |
+| **PPTX** | python-pptx | Presentations, slide decks |
+| **PDF** | PDFReportGenerator | Formal reports with formatting |
+
+- **ArtifactCard**: Inline card in chat with file type icon, title, format badge, size
+- **ArtifactPanel**: Slide-out side panel with rendered markdown preview
+- **Download**: Save to disk via Tauri save dialog
+- **Storage**: Uploaded to Backblaze B2 (`artifacts/documents/` folder)
+
+### 5. Unified Search
+
+Search across all content types within the user's organization:
+
+| Type | Table | Fields Searched |
+|------|-------|----------------|
+| **Chats** | studio_cko_sessions | title, context_summary |
+| **Projects** | projects | name, description |
+| **Knowledge Base** | documents | filename, department |
+| **Artifacts** | studio_cko_artifacts | title, summary |
+
+- **Cmd+K** keyboard shortcut opens search modal
+- **Parallel search**: `asyncio.gather()` across all types simultaneously
+- **Filter tabs**: All, Chats, Projects, Knowledge Base, Artifacts
+- **Relevance scoring**: Title matches score higher than description/summary matches
+- **Endpoint**: `GET /api/search/unified?q=...&types=chat,project,kb,artifact`
+
+### 6. Multimodal Processing
+
+**Image Analysis** (3-tier fallback):
+```
+Image -> Qwen2.5-VL-32B (local, Ollama, zero cost)
+           |  (fallback)
+         Kimi K2.5 Thinking (Together AI)
+           |  (fallback)
+         Gemini 3 Flash (Google AI)
+```
+
+**Audio Processing**:
+```
+Audio file (mp3/wav/m4a/etc.)
+     |
+     v
+distil-whisper/distil-large-v3.5 (local, faster-whisper, 2x realtime)
+     |
+     v
+Transcript text -> RAG pipeline
+```
+
+**Video Processing**:
+```
+Video file -> ffmpeg frame extraction -> Gemini 3 Flash analysis -> Summary
+```
+
+### 7. Source Attribution
 
 Every AI response includes:
 - Inline citations [1], [2], [3]
 - Source document and page numbers
-- Click-to-expand full context
+- Citation popovers in desktop app
 - Confidence scores
 
-### 5. Real-Time Processing Status
+### 8. Multi-Agent Orchestration
 
-- WebSocket-based live updates
-- Progress bars for each processing stage
-- Stage visibility: uploading → parsing → embedding → indexing → complete
+15+ specialized AI agents coordinate for complex tasks:
+- Research -> Analysis -> Writing -> Review pipeline
+- Automatic revision loops for quality
+- Parallel processing for efficiency
+- Document analysis pipeline (AGENT-009 -> 010 -> 011)
+
+### 9. Tauri Desktop Application
+
+| Layer | Technology |
+|-------|------------|
+| **Framework** | Tauri 2.x (Rust backend) |
+| **UI** | React 18 + TypeScript |
+| **State** | Zustand (with persist middleware) |
+| **Styling** | Tailwind CSS (Empire dark theme) |
+| **Testing** | Vitest + @testing-library/react (22 tests) |
+| **Build** | Vite |
+
+Key components: ChatView, GlobalSearch, OrgPicker, OrgSwitcher, Sidebar, MessageBubble, ArtifactCard, ArtifactPanel, PhaseIndicator
 
 ---
 
@@ -59,6 +159,8 @@ Every AI response includes:
 | Spreadsheets | XLSX, XLS, CSV |
 | Presentations | PPTX, PPT |
 | Images | PNG, JPG, JPEG, GIF, WEBP |
+| Audio | MP3, WAV, M4A, OGG, FLAC |
+| Video | MP4, MOV, AVI, MKV |
 | Web | HTML, XML, JSON |
 | Code | PY, JS, TS, JAVA, CPP, etc. |
 
@@ -84,24 +186,27 @@ Every AI response includes:
 
 Combines multiple search methods:
 
-1. **Vector Similarity** - Semantic understanding via embeddings
+1. **Vector Similarity** - Semantic understanding via BGE-M3 embeddings (1024-dim)
 2. **Full-Text Search** - Keyword matching with ranking
-3. **Graph Traversal** - Entity relationship discovery
+3. **Graph Traversal** - Entity relationship discovery (Neo4j)
 4. **Reranking** - BGE-Reranker-v2 for precision
 
 ### Query Expansion
 
-Claude Haiku generates query variations:
+Kimi K2.5 generates query variations:
 - Original: "insurance requirements"
 - Expanded: "insurance policy requirements", "coverage mandates", "regulatory compliance insurance"
 - Result: 15-30% better recall
 
-### Intelligent Query Routing
+### CKO Weights System
 
-Automatically selects the best workflow:
-- **LangGraph**: Complex queries needing iteration
-- **CrewAI**: Multi-document analysis
-- **Simple RAG**: Direct knowledge lookups
+Three quality presets for the reasoning engine:
+
+| Preset | Thinking Tokens | Use Case |
+|--------|----------------|----------|
+| **Speed** | 1,024 | Quick answers, simple lookups |
+| **Balanced** | 4,096 | General queries (default) |
+| **Quality** | 16,384 | Deep analysis, complex reasoning |
 
 ---
 
@@ -112,7 +217,8 @@ Automatically selects the best workflow:
 - Clerk authentication integration
 - JWT token validation
 - Role-Based Access Control (RBAC)
-- Row-Level Security on 14 tables
+- Multi-tenant organization isolation
+- Row-Level Security on org-scoped tables
 
 ### Rate Limiting
 
@@ -128,12 +234,18 @@ Tiered limits by endpoint:
 - AES-256 at rest (Supabase, B2)
 - Application-level encryption for sensitive fields
 
-### Compliance
+### Input Sanitization
 
-- HIPAA-ready architecture
-- GDPR data handling
-- SOC 2 aligned practices
-- Comprehensive audit logging
+- PostgREST ilike injection protection
+- SQL wildcard escaping (`%`, `_`)
+- Comma and quote stripping for OR-condition safety
+
+### HTTP Security Headers
+
+- HSTS (Strict-Transport-Security)
+- CSP (Content-Security-Policy)
+- X-Frame-Options: DENY
+- X-Content-Type-Options: nosniff
 
 ---
 
@@ -143,7 +255,7 @@ Tiered limits by endpoint:
 
 - Prometheus metrics on all services
 - Custom business metrics
-- Performance tracking
+- Per-query cost tracking across models
 
 ### Visualization
 
@@ -183,18 +295,22 @@ Content is automatically classified into one of 12 departments:
 
 ## API Capabilities
 
-### 29 Route Modules (293+ Endpoints)
+### 57 Route Modules (300+ Endpoints)
+
+**Core Pipeline:**
+- CKO chat with multi-model pipeline
+- Unified search across all content types
+- Artifact CRUD and download
 
 **Document Management:**
 - Upload, retrieve, update, delete documents
 - Bulk operations
 - Status tracking
 
-**Query Processing:**
-- Auto-routed queries
-- Adaptive LangGraph workflows
-- Batch processing
-- Async operations
+**Organizations:**
+- Create, list, update organizations
+- Add/remove members with roles
+- Org-scoped data isolation
 
 **AI Agents:**
 - Summarization
@@ -208,11 +324,12 @@ Content is automatically classified into one of 12 departments:
 - Audit logs
 - Feature flags
 
-### WebSocket Support
+### Streaming (SSE)
 
-- Real-time status updates
-- Chat streaming
-- Processing notifications
+- Server-Sent Events for real-time chat streaming
+- Phase indicators during pipeline processing
+- Artifact events when documents are generated
+- Token-by-token Output Architect streaming
 
 ---
 
@@ -220,31 +337,31 @@ Content is automatically classified into one of 12 departments:
 
 | Metric | Target | Achieved |
 |--------|--------|----------|
-| Query Response | <3 seconds | ✅ |
-| Status Update Latency | <500ms | ✅ |
-| Source Attribution Accuracy | >95% | ✅ |
-| Agent Routing Accuracy | >90% | ✅ |
-| Chapter Detection Accuracy | >90% | ✅ |
-| Uptime | >99.5% | ✅ |
+| Pipeline Response (end-to-end) | <15 seconds | ~6-13s |
+| Prompt Engineer Stage | <2 seconds | ~1-2s |
+| Reasoning Stage | <8 seconds | ~3-8s |
+| Output Architect Stage | <3 seconds | ~2-3s |
+| Source Attribution Accuracy | >95% | Yes |
+| Agent Routing Accuracy | >90% | Yes |
+| Uptime | >99.5% | Yes |
 
 ---
 
-## Implementation Status
+## What Changed: v7.3 to v7.5
 
-### Phase 0: Foundation (8 tasks) ✅
-OpenAPI contracts, migrations, feature flags, monitoring
-
-### Phase 1: Sprint 1 (19 tasks) ✅
-R&D department, real-time status, source attribution, agent router
-
-### Phase 2: Sprint 2 (14 tasks) ✅
-URL support, chat files, book processing, security hardening
-
-### Phase 3: Sprint 3 (5 tasks) ✅
-AI Agent System: AGENT-002, 008, 009-015
-
-**Total: 47/47 tasks completed**
+| Feature | v7.3 | v7.5 |
+|---------|------|------|
+| **Primary AI** | Claude Sonnet 4.5 only | Multi-model pipeline: Sonnet 4.5 (prompt/output) + Kimi K2.5 Thinking (reasoning) |
+| **Frontend** | Gradio chat UI | Tauri Desktop App (React/TypeScript) + Gradio |
+| **Vision** | Claude Vision (cloud) | Qwen2.5-VL-32B (local) + Kimi K2.5 + Gemini 3 Flash fallback |
+| **Audio** | None | Local distil-whisper via faster-whisper |
+| **Tenancy** | Single-user | Multi-tenant with organizations, memberships, roles |
+| **Document Gen** | None | DOCX, XLSX, PPTX, PDF generation from AI responses |
+| **Artifacts** | None | Inline preview cards, side panel, download in desktop app |
+| **Search** | Per-type only | Unified search across chats, projects, KB, artifacts |
+| **Testing** | Backend only | Backend (170+ tests) + Frontend vitest (22 tests) |
+| **Route Modules** | 29 | 57 |
 
 ---
 
-**Empire v7.3** - Production Deployed & Verified - AI-powered knowledge management with document processing.
+**Empire v7.5** - Multi-model AI pipeline with organization tenancy, desktop app, artifact generation, multimodal processing, and unified search.
