@@ -557,8 +557,11 @@ export function AssetsView() {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-empire-border">
+          <div role="tablist" className="flex border-b border-empire-border">
             <button
+              role="tab"
+              aria-selected={activeTab === 'content'}
+              aria-controls="tab-panel-content"
               onClick={() => setActiveTab('content')}
               className={cn(
                 'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
@@ -570,6 +573,9 @@ export function AssetsView() {
               Content
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === 'test'}
+              aria-controls="tab-panel-test"
               onClick={() => setActiveTab('test')}
               className={cn(
                 'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
@@ -595,7 +601,7 @@ export function AssetsView() {
 
           {/* Tab Content */}
           {activeTab === 'content' ? (
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div id="tab-panel-content" role="tabpanel" className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Asset Content */}
               <div>
                 <h3 className="text-xs uppercase tracking-wider text-empire-text-muted mb-2">Content</h3>
@@ -711,7 +717,7 @@ export function AssetsView() {
             </div>
           ) : (
             /* Test Tab */
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div id="tab-panel-test" role="tabpanel" className="flex-1 flex flex-col overflow-hidden">
               {/* Test Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {testMessages.length === 0 && !isTestStreaming && (
@@ -808,6 +814,7 @@ export function AssetsView() {
                   <button
                     onClick={() => handleSendTest(testInput)}
                     disabled={isTestStreaming || !testInput.trim()}
+                    aria-label={isTestStreaming ? 'Sending test query' : 'Send test query'}
                     className="p-2 rounded-lg bg-empire-primary hover:bg-empire-primary/80 text-white disabled:opacity-50 transition-colors"
                   >
                     {isTestStreaming ? (

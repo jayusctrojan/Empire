@@ -266,6 +266,13 @@ export async function* testAssetStream(
         } catch { /* ignore */ }
       }
     }
+
+    // Flush any accumulated eventData not terminated with a blank line
+    if (eventData) {
+      try {
+        yield JSON.parse(eventData) as AssetTestStreamChunk
+      } catch { /* ignore */ }
+    }
   } finally {
     signal?.removeEventListener('abort', onAbort)
   }
