@@ -118,7 +118,7 @@ class PromptEngineerService:
     Uses Sonnet 4.5 (~200-400 output tokens, ~1-2s latency).
     """
 
-    MODEL = "claude-sonnet-4-5-20250929"
+    MODEL = "claude-sonnet-4-6"
     MAX_TOKENS = 500
     TEMPERATURE = 0.2
 

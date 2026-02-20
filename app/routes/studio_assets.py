@@ -16,8 +16,10 @@ Endpoints:
 
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import structlog
+import json
 
 from app.middleware.auth import get_current_user
 from app.services.asset_management_service import (
@@ -532,6 +534,99 @@ async def reclassify_asset(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reclassify asset: {str(e)}"
         )
+
+
+# ============================================================================
+# Asset Test Endpoint
+# ============================================================================
+
+class AssetTestRequest(BaseModel):
+    """Request to test an asset through the CKO pipeline"""
+    query: str = Field(..., min_length=1, max_length=5000)
+
+
+@router.post("/{asset_id}/test")
+async def test_asset(
+    asset_id: str,
+    request: AssetTestRequest,
+    user_id: str = Depends(get_current_user),
+    service: AssetManagementService = Depends(get_service)
+):
+    """
+    Test an asset by running a query through the CKO pipeline with
+    the asset content injected as system context.
+
+    Returns SSE stream with events: start, phase, token, sources, artifact, done, error.
+    """
+    # Validate asset exists and belongs to user
+    try:
+        asset = await service.get_asset(asset_id, user_id)
+    except AssetNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found"
+        )
+
+    async def generate():
+        try:
+            from app.services.studio_cko_conversation_service import (
+                StudioCKOConversationService,
+                CKOConfig,
+                get_cko_conversation_service,
+            )
+
+            cko_service = get_cko_conversation_service()
+
+            # Create a temporary test session
+            session = await cko_service.create_session(
+                user_id=user_id,
+                title=f"Asset Test: {asset.title}"
+            )
+
+            yield f"event: start\ndata: {json.dumps({'session_id': session.id, 'asset_id': asset_id})}\n\n"
+
+            # Build context-enriched message with asset content
+            asset_context = (
+                f"You are testing the following {asset.asset_type} asset.\n"
+                f"Asset Name: {asset.name}\n"
+                f"Asset Title: {asset.title}\n"
+                f"Department: {asset.department}\n"
+                f"Format: {asset.format}\n"
+                f"---\n"
+                f"Asset Content:\n{asset.content}\n"
+                f"---\n\n"
+                f"User's test query: {request.query}"
+            )
+
+            config = CKOConfig()
+
+            async for event in cko_service.stream_message(
+                session_id=session.id,
+                user_id=user_id,
+                message=asset_context,
+                config=config
+            ):
+                event_type = event.get("type", "unknown")
+                yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
+
+        except Exception as e:
+            logger.error(
+                "Asset test streaming error",
+                asset_id=asset_id,
+                user_id=user_id,
+                error=str(e)
+            )
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # ============================================================================

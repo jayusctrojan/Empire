@@ -4,6 +4,7 @@ import { ChatView } from '@/components/ChatView'
 import { ProjectsView } from '@/components/ProjectsView'
 import { FileUploadsView } from '@/components/FileUploadsView'
 import { SettingsView } from '@/components/SettingsView'
+import { AssetsView } from '@/components/AssetsView'
 import { QuickActions } from '@/components/QuickActions'
 import { OrgPicker } from '@/components/OrgPicker'
 import { AuthProvider, ProtectedRoute } from '@/components/auth'
@@ -102,6 +103,7 @@ function MainApp() {
         {activeView === 'chats' && <ChatView />}
         {activeView === 'projects' && <ProjectsView />}
         {activeView === 'uploads' && <FileUploadsView />}
+        {activeView === 'assets' && <AssetsView />}
         {activeView === 'settings' && <SettingsView />}
       </main>
 

@@ -21,8 +21,8 @@ Empire is an AI-powered knowledge management platform with:
 
 | Purpose | Model | Provider |
 |---------|-------|----------|
-| Prompt Engineering | Claude Sonnet 4.5 | Anthropic |
-| Output Formatting | Claude Sonnet 4.5 | Anthropic |
+| Prompt Engineering | Claude Sonnet 4.6 | Anthropic |
+| Output Formatting | Claude Sonnet 4.6 | Anthropic |
 | Reasoning Engine | Kimi K2.5 Thinking | Together AI |
 | Image Analysis | Kimi K2.5 / Gemini 3 Flash | Together AI / Google |
 | Audio STT | distil-whisper/distil-large-v3.5 | Local (faster-whisper) |

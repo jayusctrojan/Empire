@@ -40,7 +40,7 @@ logger = structlog.get_logger(__name__)
 class SynthesisConfig:
     """Configuration for synthesis operations"""
     # Model settings
-    model: str = "claude-sonnet-4-5-20250929"
+    model: str = "claude-sonnet-4-6"
     max_tokens: int = 4096
     temperature: float = 0.2
 

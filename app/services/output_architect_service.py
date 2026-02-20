@@ -111,7 +111,7 @@ class OutputArchitectService:
     Uses Sonnet 4.5 (~2-3s latency).
     """
 
-    MODEL = "claude-sonnet-4-5-20250929"
+    MODEL = "claude-sonnet-4-6"
     MAX_TOKENS = 4096
     TEMPERATURE = 0.2
 

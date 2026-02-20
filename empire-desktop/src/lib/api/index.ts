@@ -4,7 +4,7 @@
  */
 
 // Core client
-export { apiRequest, get, post, postFormData, del, getApiBaseUrl, EmpireAPIError } from './client'
+export { apiRequest, get, post, patch, postFormData, del, getApiBaseUrl, EmpireAPIError } from './client'
 
 // Projects API (cloud-persisted)
 export {
@@ -116,7 +116,9 @@ export {
   reclassifyAsset,
   getAssetStats,
   getAssetHealth,
+  testAssetStream,
   ASSET_TYPE_CONFIG,
+  ASSET_STATUS_CONFIG,
   DEPARTMENTS,
   type Asset,
   type AssetType,
@@ -129,6 +131,7 @@ export {
   type AssetStatsResponse,
   type AssetUpdateRequest,
   type AssetReclassifyRequest,
+  type AssetTestStreamChunk,
 } from './assets'
 
 // Classifications API (AI Studio)

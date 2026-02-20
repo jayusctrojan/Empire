@@ -143,8 +143,15 @@ class CostTrackingService:
     # Pricing configurations (USD)
     PRICING = {
         ServiceProvider.ANTHROPIC: {
-            "claude-sonnet-4-5-20250929": {
+            "claude-sonnet-4-6": {
                 "input": 0.000003,  # $3 per 1M tokens (≤200K)
+                "input_above_200k": 0.000006,  # $6 per 1M tokens (>200K)
+                "output": 0.000015,  # $15 per 1M tokens (≤200K)
+                "output_above_200k": 0.0000225,  # $22.50 per 1M tokens (>200K)
+                "tier_threshold": 200_000,  # Token threshold for tiered pricing
+            },
+            "claude-sonnet-4-5-20250929": {
+                "input": 0.000003,  # $3 per 1M tokens (≤200K) — legacy
                 "input_above_200k": 0.000006,  # $6 per 1M tokens (>200K)
                 "output": 0.000015,  # $15 per 1M tokens (≤200K)
                 "output_above_200k": 0.0000225,  # $22.50 per 1M tokens (>200K)
