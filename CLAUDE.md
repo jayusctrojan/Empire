@@ -9,7 +9,7 @@
 ## Overview
 
 Empire is an AI-powered knowledge management platform with:
-- **Multi-Model Quality Pipeline**: Sonnet 4.5 (prompt engineer + output architect) → Kimi K2.5 Thinking (reasoning engine)
+- **Multi-Model Quality Pipeline**: Sonnet 4.6 (prompt engineer + output architect) → Kimi K2.5 Thinking (reasoning engine)
 - **Multi-Tenant Organizations**: Role-based membership (owner/admin/member/viewer), RLS data isolation
 - **Tauri Desktop App**: React 18 + TypeScript + Zustand, 31 components
 - **Document Generation**: DOCX, XLSX, PPTX, PDF artifacts from AI responses
@@ -36,7 +36,7 @@ Empire is an AI-powered knowledge management platform with:
 - Run CI/CD checks before merging
 - Follow CodeRabbit review feedback
 - Backend tests: `pytest` (170+ test files)
-- Frontend tests: `npx vitest run` in `empire-desktop/` (22 tests)
+- Frontend tests: `npx vitest run` in `empire-desktop/` (43 tests)
 - Type checking: `npx tsc --noEmit` in `empire-desktop/`
 
 ## Key Directories
@@ -58,8 +58,8 @@ Empire is an AI-powered knowledge management platform with:
 ## Key Services
 
 - `app/services/llm_client.py` - Unified LLM provider abstraction (TogetherAI, Anthropic, Gemini, OpenAI-compatible)
-- `app/services/prompt_engineer_service.py` - Sonnet 4.5 prompt enrichment (Stage 1)
-- `app/services/output_architect_service.py` - Sonnet 4.5 output formatting (Stage 3)
+- `app/services/prompt_engineer_service.py` - Sonnet 4.6 prompt enrichment (Stage 1)
+- `app/services/output_architect_service.py` - Sonnet 4.6 output formatting (Stage 3)
 - `app/services/studio_cko_conversation_service.py` - CKO pipeline orchestration
 - `app/services/document_generator_service.py` - DOCX/XLSX/PPTX/PDF generation
 - `app/services/vision_service.py` - Multi-provider image analysis

@@ -22,11 +22,14 @@ vi.mock('@tauri-apps/plugin-http', () => ({
 }))
 
 import { get, post, patch } from './client'
-import { listAssets, getAsset, updateAsset, publishAsset, archiveAsset } from './assets'
+import { fetch } from '@tauri-apps/plugin-http'
+import { listAssets, getAsset, updateAsset, publishAsset, archiveAsset, testAssetStream } from './assets'
+import type { AssetTestStreamChunk } from './assets'
 
 const mockGet = vi.mocked(get)
 const mockPost = vi.mocked(post)
 const mockPatch = vi.mocked(patch)
+const mockFetch = vi.mocked(fetch)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -86,5 +89,30 @@ describe('Assets API', () => {
 
     expect(mockPost).toHaveBeenCalledWith('/api/studio/assets/asset-1/archive', {})
     expect(result).toEqual(mockAsset)
+  })
+
+  it('testAssetStream() opens SSE stream to /api/studio/assets/{id}/test', async () => {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('event: start\ndata: {"type":"start","session_id":"s1"}\n\n'))
+        controller.enqueue(encoder.encode('event: done\ndata: {"type":"done"}\n\n'))
+        controller.close()
+      },
+    })
+    mockFetch.mockResolvedValue({ body: stream, ok: true, status: 200, statusText: 'OK' } as unknown as Response)
+
+    const chunks: AssetTestStreamChunk[] = []
+    for await (const chunk of testAssetStream('asset-1', 'test query')) {
+      chunks.push(chunk)
+    }
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/studio/assets/asset-1/test'),
+      expect.objectContaining({ method: 'POST' })
+    )
+    expect(chunks.length).toBe(2)
+    expect(chunks[0].type).toBe('start')
+    expect(chunks[1].type).toBe('done')
   })
 })

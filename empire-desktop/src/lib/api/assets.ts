@@ -182,7 +182,8 @@ export async function getAssetHealth(): Promise<{ status: string; issues: string
  */
 export async function* testAssetStream(
   assetId: string,
-  query: string
+  query: string,
+  signal?: AbortSignal
 ): AsyncGenerator<AssetTestStreamChunk> {
   const baseUrl = getApiBaseUrl()
   const url = `${baseUrl}/api/studio/assets/${assetId}/test`
@@ -200,6 +201,7 @@ export async function* testAssetStream(
     method: 'POST',
     headers,
     body: JSON.stringify({ query }),
+    signal,
   })
 
   if (!response.ok) {
@@ -227,7 +229,7 @@ export async function* testAssetStream(
       if (line.startsWith('event: ')) {
         // event type line — next data line will follow
       } else if (line.startsWith('data: ')) {
-        eventData = line.slice(6)
+        eventData += (eventData ? '\n' : '') + line.slice(6)
       } else if (line === '' && eventData) {
         try {
           const chunk = JSON.parse(eventData) as AssetTestStreamChunk
@@ -237,6 +239,27 @@ export async function* testAssetStream(
         }
         eventData = ''
       }
+    }
+  }
+
+  // Flush any remaining buffered event
+  if (buffer.trim()) {
+    const remaining = buffer.split('\n')
+    let eventData = ''
+    for (const line of remaining) {
+      if (line.startsWith('data: ')) {
+        eventData += (eventData ? '\n' : '') + line.slice(6)
+      } else if (line === '' && eventData) {
+        try {
+          yield JSON.parse(eventData) as AssetTestStreamChunk
+        } catch { /* ignore */ }
+        eventData = ''
+      }
+    }
+    if (eventData) {
+      try {
+        yield JSON.parse(eventData) as AssetTestStreamChunk
+      } catch { /* ignore */ }
     }
   }
 }

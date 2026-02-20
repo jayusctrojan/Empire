@@ -2,7 +2,7 @@
 Empire v7.3 - Prompt Engineer Service
 Phase 1: Multi-Model Quality Pipeline
 
-First stage of the Sonnet 4.5 bookend pipeline. Analyzes user queries
+First stage of the Sonnet 4.6 bookend pipeline. Analyzes user queries
 to detect intent, desired output format, and produces enriched prompts
 with explicit instructions for the reasoning engine (Kimi K2.5).
 
@@ -115,7 +115,7 @@ Rules:
 class PromptEngineerService:
     """
     Analyzes user queries and produces enriched, structured prompts.
-    Uses Sonnet 4.5 (~200-400 output tokens, ~1-2s latency).
+    Uses Sonnet 4.6 (~200-400 output tokens, ~1-2s latency).
     """
 
     MODEL = "claude-sonnet-4-6"

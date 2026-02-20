@@ -108,7 +108,7 @@ describe('AssetsView', () => {
     render(<AssetsView />)
     await waitFor(() => expect(screen.getByText('Code Review Skill')).toBeInTheDocument())
 
-    const typeSelect = screen.getAllByRole('combobox')[0]
+    const typeSelect = screen.getByLabelText('Filter by type')
     await user.selectOptions(typeSelect, 'skill')
 
     await waitFor(() => {
@@ -123,7 +123,7 @@ describe('AssetsView', () => {
     render(<AssetsView />)
     await waitFor(() => expect(screen.getByText('Code Review Skill')).toBeInTheDocument())
 
-    const statusSelect = screen.getAllByRole('combobox')[1]
+    const statusSelect = screen.getByLabelText('Filter by status')
     await user.selectOptions(statusSelect, 'published')
 
     await waitFor(() => {
@@ -138,7 +138,7 @@ describe('AssetsView', () => {
     render(<AssetsView />)
     await waitFor(() => expect(screen.getByText('Code Review Skill')).toBeInTheDocument())
 
-    const deptSelect = screen.getAllByRole('combobox')[2]
+    const deptSelect = screen.getByLabelText('Filter by department')
     await user.selectOptions(deptSelect, 'it-engineering')
 
     await waitFor(() => {

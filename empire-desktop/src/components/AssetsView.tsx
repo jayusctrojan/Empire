@@ -23,7 +23,6 @@ import {
 import { cn } from '@/lib/utils'
 import {
   listAssets,
-  getAsset,
   getAssetStats,
   getAssetHistory,
   publishAsset,
@@ -56,7 +55,7 @@ function StatusBadge({ status }: { status: AssetStatus }) {
     gray: 'bg-gray-500/20 text-gray-400',
   }
   return (
-    <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', colorClasses[config.color])}>
+    <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', colorClasses[config.color] || colorClasses.gray)}>
       {config.label}
     </span>
   )
@@ -145,6 +144,22 @@ const SUGGESTION_CHIPS: Record<AssetType, string[]> = {
 }
 
 // ============================================================================
+// Utilities
+// ============================================================================
+
+function relativeTime(dateStr?: string): string {
+  if (!dateStr) return ''
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -179,6 +194,8 @@ export function AssetsView() {
   const [testInput, setTestInput] = useState('')
   const [testArtifacts, setTestArtifacts] = useState<AssetTestStreamChunk[]>([])
   const testMessagesEndRef = useRef<HTMLDivElement>(null)
+  const testAbortRef = useRef<AbortController | null>(null)
+  const isSearchInitialized = useRef(false)
 
   // ============================================================================
   // Data Fetching
@@ -205,8 +222,12 @@ export function AssetsView() {
     fetchAssets()
   }, [fetchAssets])
 
-  // Debounced search
+  // Debounced search (skip initial mount to avoid redundant fetch)
   useEffect(() => {
+    if (!isSearchInitialized.current) {
+      isSearchInitialized.current = true
+      return
+    }
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => {
       setFilters(prev => ({
@@ -236,6 +257,9 @@ export function AssetsView() {
   // ============================================================================
 
   const handleSelectAsset = async (asset: Asset) => {
+    // Cancel any in-flight test stream
+    testAbortRef.current?.abort()
+    testAbortRef.current = null
     setSelectedAsset(asset)
     setIsDetailOpen(true)
     setActiveTab('content')
@@ -246,6 +270,7 @@ export function AssetsView() {
     setTestStreamingContent('')
     setTestPhase(null)
     setTestArtifacts([])
+    setIsTestStreaming(false)
 
     try {
       const historyResult = await getAssetHistory(asset.id)
@@ -293,6 +318,9 @@ export function AssetsView() {
   const handleSendTest = async (query: string) => {
     if (!selectedAsset || !query.trim() || isTestStreaming) return
 
+    const controller = new AbortController()
+    testAbortRef.current = controller
+
     const userMsg: TestMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -309,7 +337,7 @@ export function AssetsView() {
       let fullContent = ''
       const artifacts: AssetTestStreamChunk[] = []
 
-      for await (const chunk of testAssetStream(selectedAsset.id, query.trim())) {
+      for await (const chunk of testAssetStream(selectedAsset.id, query.trim(), controller.signal)) {
         switch (chunk.type) {
           case 'phase':
             if (chunk.phase && chunk.label) {
@@ -343,6 +371,7 @@ export function AssetsView() {
       }
       setTestMessages(prev => [...prev, assistantMsg])
     } catch (err) {
+      if (controller.signal.aborted) return // Silently ignore aborted streams
       const errorMsg: TestMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant',
@@ -362,22 +391,6 @@ export function AssetsView() {
     setTestStreamingContent('')
     setTestPhase(null)
     setTestArtifacts([])
-  }
-
-  // ============================================================================
-  // Relative Time
-  // ============================================================================
-
-  function relativeTime(dateStr?: string): string {
-    if (!dateStr) return ''
-    const diff = Date.now() - new Date(dateStr).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    return `${days}d ago`
   }
 
   // ============================================================================
@@ -409,6 +422,7 @@ export function AssetsView() {
         {/* Filter Bar */}
         <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-empire-border">
           <select
+            aria-label="Filter by type"
             value={filters.assetType || ''}
             onChange={(e) => setFilters(prev => ({ ...prev, assetType: (e.target.value || undefined) as AssetType | undefined }))}
             className="px-2 py-1 rounded bg-empire-card border border-empire-border text-sm text-empire-text"
@@ -420,6 +434,7 @@ export function AssetsView() {
           </select>
 
           <select
+            aria-label="Filter by status"
             value={filters.status || ''}
             onChange={(e) => setFilters(prev => ({ ...prev, status: (e.target.value || undefined) as AssetStatus | undefined }))}
             className="px-2 py-1 rounded bg-empire-card border border-empire-border text-sm text-empire-text"
@@ -431,6 +446,7 @@ export function AssetsView() {
           </select>
 
           <select
+            aria-label="Filter by department"
             value={filters.department || ''}
             onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value || undefined }))}
             className="px-2 py-1 rounded bg-empire-card border border-empire-border text-sm text-empire-text"
@@ -763,6 +779,7 @@ export function AssetsView() {
                 )}
                 <div className="flex items-center gap-2">
                   <input
+                    aria-label="Test query input"
                     type="text"
                     placeholder="Type a test query..."
                     value={testInput}

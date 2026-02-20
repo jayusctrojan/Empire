@@ -2,7 +2,7 @@
 Empire v7.3 - Output Architect Service
 Phase 1: Multi-Model Quality Pipeline
 
-Final stage of the Sonnet 4.5 bookend pipeline. Takes raw Kimi reasoning
+Final stage of the Sonnet 4.6 bookend pipeline. Takes raw Kimi reasoning
 output and reformats it into polished, structured content. Detects when
 an artifact (DOCX/XLSX/PPTX) should be generated.
 
@@ -108,7 +108,7 @@ Formatting rules:
 class OutputArchitectService:
     """
     Formats raw Kimi reasoning into polished output with artifact detection.
-    Uses Sonnet 4.5 (~2-3s latency).
+    Uses Sonnet 4.6 (~2-3s latency).
     """
 
     MODEL = "claude-sonnet-4-6"

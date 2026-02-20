@@ -108,7 +108,7 @@ class TestAssetTestEndpoint:
         assert response.status_code == 404
         assert "Asset not found" in response.json()["detail"]
 
-    def test_returns_403_for_different_user_asset(self, client, mock_service):
+    def test_returns_404_for_other_users_asset(self, client, mock_service):
         """Test endpoint returns 404 (not 403) when user doesn't own the asset.
         The service layer raises AssetNotFoundError for unauthorized access."""
         from app.services.asset_management_service import AssetNotFoundError
@@ -159,8 +159,7 @@ class TestAssetTestEndpoint:
 
         async def capture_stream(*args, **kwargs):
             nonlocal captured_message
-            # The message is passed as a keyword arg or positional
-            captured_message = kwargs.get("message") or (args[2] if len(args) > 2 else None)
+            captured_message = kwargs.get("message")
             yield {"type": "done", "message": {"content": "done"}}
 
         mock_cko_service.stream_message = capture_stream
@@ -217,7 +216,7 @@ class TestAssetTestEndpoint:
 
         async def mock_stream_error(*args, **kwargs):
             raise RuntimeError("Pipeline failed: model overloaded")
-            yield  # Make it an async generator
+            yield  # noqa: unreachable — required to make this an async generator
 
         mock_cko_service.stream_message = mock_stream_error
 
@@ -234,4 +233,4 @@ class TestAssetTestEndpoint:
         assert response.status_code == 200
         body = response.text
         assert "event: error" in body
-        assert "Pipeline failed" in body
+        assert "An internal error occurred" in body

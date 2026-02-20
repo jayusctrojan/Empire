@@ -565,9 +565,11 @@ async def test_asset(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Asset not found"
-        )
+        ) from None
 
     async def generate():
+        session = None
+        cko_service = None
         try:
             from app.services.studio_cko_conversation_service import (
                 StudioCKOConversationService,
@@ -610,13 +612,18 @@ async def test_asset(
                 yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
 
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Asset test streaming error",
                 asset_id=asset_id,
                 user_id=user_id,
-                error=str(e)
             )
-            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            yield f"event: error\ndata: {json.dumps({'error': 'An internal error occurred during asset test'})}\n\n"
+        finally:
+            if session is not None and cko_service is not None:
+                try:
+                    await cko_service.delete_session(session.id, user_id)
+                except Exception:
+                    logger.warning("Failed to clean up test session", session_id=session.id)
 
     return StreamingResponse(
         generate(),
