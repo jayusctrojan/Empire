@@ -117,6 +117,10 @@ export {
   getAssetStats,
   getAssetHealth,
   testAssetStream,
+  checkDuplicates,
+  findAssetDuplicates,
+  getTestMessages,
+  clearTestSession,
   ASSET_TYPE_CONFIG,
   ASSET_STATUS_CONFIG,
   DEPARTMENTS,
@@ -132,6 +136,10 @@ export {
   type AssetUpdateRequest,
   type AssetReclassifyRequest,
   type AssetTestStreamChunk,
+  type DedupMatch,
+  type DedupCheckResponse,
+  type TestSessionMessage,
+  type TestMessagesResponse,
 } from './assets'
 
 // Classifications API (AI Studio)

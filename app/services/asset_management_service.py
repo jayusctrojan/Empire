@@ -26,6 +26,7 @@ from enum import Enum
 import structlog
 
 from app.services.supabase_storage import get_supabase_storage
+from app.services.asset_dedup_service import AssetDedupService
 
 logger = structlog.get_logger(__name__)
 
@@ -432,6 +433,7 @@ class AssetManagementService:
                 "storage_path": asset.storage_path,
                 "version": new_version,
                 "parent_version_id": asset.id,
+                "content_hash": AssetDedupService.compute_content_hash(updates["content"]),
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
