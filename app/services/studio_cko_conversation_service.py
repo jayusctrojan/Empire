@@ -556,8 +556,8 @@ class StudioCKOConversationService:
                 return self._row_to_session(insert_result.data[0])
         except Exception as insert_err:
             # Race condition: unique constraint violation — re-query
-            err_msg = str(insert_err).lower()
-            if "duplicate" in err_msg or "unique" in err_msg or "23505" in err_msg:
+            err_msg = str(insert_err)
+            if "23505" in err_msg or "duplicate key" in err_msg.lower():
                 retry_result = await asyncio.to_thread(
                     lambda: self.supabase.supabase.table("studio_cko_sessions")
                         .select("*")

@@ -339,8 +339,8 @@ async def check_duplicates(
             asset_type=request.assetType,
         )
         return _build_dedup_response(result)
-    except Exception as e:
-        logger.error("Dedup check failed", error=str(e), user_id=user_id)
+    except Exception:
+        logger.exception("Dedup check failed", user_id=user_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check duplicates",
@@ -382,8 +382,8 @@ async def find_asset_duplicates(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Asset not found",
         ) from None
-    except Exception as e:
-        logger.error("Dedup check failed", error=str(e), asset_id=asset_id)
+    except Exception:
+        logger.exception("Dedup check failed", asset_id=asset_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to find duplicates",
@@ -764,8 +764,8 @@ async def get_test_messages(
             "messages": [m.to_dict() for m in messages],
         }
 
-    except Exception as e:
-        logger.error("Failed to get test messages", asset_id=asset_id, error=str(e))
+    except Exception:
+        logger.exception("Failed to get test messages", asset_id=asset_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get test messages",
@@ -783,8 +783,8 @@ async def clear_test_session(
 
         cko_service = get_cko_conversation_service()
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
-    except Exception as e:
-        logger.error("Failed to clear test session", asset_id=asset_id, error=str(e))
+    except Exception:
+        logger.exception("Failed to clear test session", asset_id=asset_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to clear test session",
