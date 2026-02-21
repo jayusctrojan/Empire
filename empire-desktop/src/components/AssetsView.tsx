@@ -409,10 +409,13 @@ export function AssetsView() {
   }
 
   const handleClearTest = () => {
+    testAbortRef.current?.abort()
+    testAbortRef.current = null
     setTestMessages([])
     setTestStreamingContent('')
     setTestPhase(null)
     setTestArtifacts([])
+    setIsTestStreaming(false)
   }
 
   // ============================================================================
