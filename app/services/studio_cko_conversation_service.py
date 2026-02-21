@@ -571,7 +571,7 @@ class StudioCKOConversationService:
                     return self._row_to_session(retry_result.data[0])
             raise
 
-        raise Exception("Failed to create asset test session - no data returned")
+        raise RuntimeError("Failed to create asset test session: no data returned")
 
     async def get_asset_test_messages(
         self, user_id: str, asset_id: str
@@ -593,7 +593,7 @@ class StudioCKOConversationService:
             messages = await self.get_messages(session_id, user_id)
             return session_id, messages
         except Exception as e:
-            logger.error("Failed to get asset test messages", asset_id=asset_id, error=str(e))
+            logger.exception("Failed to get asset test messages", asset_id=asset_id, error=str(e))
             raise
 
     async def delete_asset_test_session(self, user_id: str, asset_id: str) -> bool:
@@ -616,7 +616,7 @@ class StudioCKOConversationService:
             return await self.delete_session(session_id, user_id)
 
         except Exception as e:
-            logger.error("Failed to delete asset test session", asset_id=asset_id, error=str(e))
+            logger.exception("Failed to delete asset test session", asset_id=asset_id, error=str(e))
             return False
 
     # =========================================================================

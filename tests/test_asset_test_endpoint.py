@@ -179,6 +179,35 @@ class TestAssetTestEndpoint:
         assert "Reviews code for best practices" in captured_message
         assert "test this skill" in captured_message
 
+    def test_subsequent_message_sends_raw_query(self, client, mock_service, mock_asset, mock_cko_service):
+        """Test that subsequent messages (message_count > 0) send only the raw query, not asset context."""
+        mock_service.get_asset.return_value = mock_asset
+        mock_cko_service.get_or_create_asset_test_session.return_value.message_count = 1
+
+        captured_message = None
+
+        async def capture_stream(*args, **kwargs):
+            nonlocal captured_message
+            captured_message = kwargs.get("message")
+            yield {"type": "done", "message": {"content": "done"}}
+
+        mock_cko_service.stream_message = capture_stream
+
+        with patch(
+            "app.services.studio_cko_conversation_service.get_cko_conversation_service",
+            return_value=mock_cko_service
+        ):
+            client.post(
+                "/api/studio/assets/asset-123/test",
+                json={"query": "test this skill"}
+            )
+
+        assert captured_message is not None
+        # Should be ONLY the raw query, not the full asset context
+        assert captured_message == "test this skill"
+        assert "code-reviewer" not in captured_message
+        assert "Reviews code for best practices" not in captured_message
+
     def test_streams_artifact_events(self, client, mock_service, mock_asset, mock_cko_service):
         """Test endpoint returns proper artifact events when doc generation triggered"""
         mock_service.get_asset.return_value = mock_asset

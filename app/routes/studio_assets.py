@@ -343,8 +343,8 @@ async def check_duplicates(
         logger.error("Dedup check failed", error=str(e), user_id=user_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to check duplicates: {str(e)}",
-        )
+            detail="Failed to check duplicates",
+        ) from None
 
 
 def _build_dedup_response(result: Dict[str, Any]) -> DedupCheckResponse:
@@ -386,7 +386,7 @@ async def find_asset_duplicates(
         logger.error("Dedup check failed", error=str(e), asset_id=asset_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to find duplicates: {str(e)}",
+            detail="Failed to find duplicates",
         ) from None
 
 
@@ -768,8 +768,8 @@ async def get_test_messages(
         logger.error("Failed to get test messages", asset_id=asset_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get test messages: {str(e)}",
-        )
+            detail="Failed to get test messages",
+        ) from None
 
 
 @router.delete("/{asset_id}/test")
@@ -783,15 +783,14 @@ async def clear_test_session(
 
         cko_service = get_cko_conversation_service()
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
-
-        return {"deleted": deleted}
-
     except Exception as e:
         logger.error("Failed to clear test session", asset_id=asset_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to clear test session: {str(e)}",
-        )
+            detail="Failed to clear test session",
+        ) from None
+    else:
+        return {"deleted": deleted}
 
 
 # ============================================================================
