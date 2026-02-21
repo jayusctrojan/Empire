@@ -38,7 +38,7 @@ class AssetDedupService:
     def compute_content_hash(content: str) -> str:
         """MD5 of normalized (lowercase, collapsed whitespace) content, first 16 hex chars."""
         normalized = re.sub(r"\s+", " ", content.lower()).strip()
-        return hashlib.md5(normalized.encode("utf-8")).hexdigest()[:16]
+        return hashlib.md5(normalized.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
 
     @staticmethod
     def jaccard_similarity(a: str, b: str) -> float:

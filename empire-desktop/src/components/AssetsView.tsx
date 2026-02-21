@@ -211,6 +211,7 @@ export function AssetsView() {
   const [dedupResult, setDedupResult] = useState<DedupCheckResponse | null>(null)
   const [isDedupLoading, setIsDedupLoading] = useState(false)
   const dedupIdRef = useRef(0)
+  const testMsgIdRef = useRef(0)
 
   // ============================================================================
   // Data Fetching
@@ -268,8 +269,10 @@ export function AssetsView() {
   useEffect(() => {
     if (activeTab !== 'test' || !selectedAsset) return
     if (testMessages.length > 0 || isTestStreaming) return // Already have messages
+    const requestId = ++testMsgIdRef.current
     getTestMessages(selectedAsset.id)
       .then(result => {
+        if (testMsgIdRef.current !== requestId) return // Stale response
         if (result.messages.length > 0) {
           setTestMessages(result.messages.map(m => ({
             id: m.id,
@@ -330,6 +333,7 @@ export function AssetsView() {
     // Cancel any in-flight test stream
     testAbortRef.current?.abort()
     testAbortRef.current = null
+    testMsgIdRef.current += 1 // Invalidate stale getTestMessages responses
     pendingHistoryRef.current = asset.id
     setSelectedAsset(asset)
     setIsDetailOpen(true)

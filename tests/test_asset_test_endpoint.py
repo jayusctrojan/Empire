@@ -126,7 +126,7 @@ class TestAssetTestEndpoint:
         """Test endpoint streams SSE events (phase, token, done)"""
         mock_service.get_asset.return_value = mock_asset
 
-        async def mock_stream(*_, **kwargs):
+        async def mock_stream(*_, **__):
             yield {"type": "phase", "phase": "analyzing", "label": "Analyzing..."}
             yield {"type": "token", "content": "Here is "}
             yield {"type": "token", "content": "the response."}
@@ -212,7 +212,7 @@ class TestAssetTestEndpoint:
         """Test endpoint returns proper artifact events when doc generation triggered"""
         mock_service.get_asset.return_value = mock_asset
 
-        async def mock_stream_with_artifact(*_, **kwargs):
+        async def mock_stream_with_artifact(*_, **__):
             yield {"type": "token", "content": "Generated document."}
             yield {
                 "type": "artifact",
@@ -244,7 +244,7 @@ class TestAssetTestEndpoint:
         """Test endpoint handles CKO pipeline errors gracefully"""
         mock_service.get_asset.return_value = mock_asset
 
-        async def mock_stream_error(*_, **kwargs):
+        async def mock_stream_error(*_, **__):
             raise RuntimeError("Pipeline failed: model overloaded")
             yield  # noqa: unreachable — required to make this an async generator
 
