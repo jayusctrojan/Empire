@@ -63,7 +63,8 @@ def mock_cko_service():
     cko = AsyncMock()
     session = MagicMock()
     session.id = "test-session-123"
-    cko.create_session.return_value = session
+    session.message_count = 0
+    cko.get_or_create_asset_test_session.return_value = session
     return cko
 
 
