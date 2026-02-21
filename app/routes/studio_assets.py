@@ -692,6 +692,9 @@ async def test_asset(
 
             # First message: inject full asset context
             # Subsequent messages: send only the user query
+            # Note: message_count could be stale if a prior stream_message failed
+            # after saving the user msg but before _update_session_metadata.
+            # Re-injecting context in that case is harmless (slightly noisy but safe).
             if session.message_count == 0:
                 message = (
                     f"You are testing the following {asset.asset_type} asset.\n"
