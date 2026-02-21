@@ -381,13 +381,13 @@ async def find_asset_duplicates(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Asset not found",
-        )
+        ) from None
     except Exception as e:
         logger.error("Dedup check failed", error=str(e), asset_id=asset_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to find duplicates: {str(e)}",
-        )
+        ) from None
 
 
 # ============================================================================

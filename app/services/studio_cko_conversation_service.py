@@ -523,79 +523,78 @@ class StudioCKOConversationService:
         asset_title: str,
     ) -> CKOSession:
         """Find existing test session for an asset or create one."""
-        try:
-            # Try to find existing
-            result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
-                    .select("*")
-                    .eq("user_id", user_id)
-                    .eq("asset_id", asset_id)
-                    .eq("session_type", "asset_test")
-                    .limit(1)
-                    .execute()
-            )
-            if result.data and len(result.data) > 0:
-                return self._row_to_session(result.data[0])
-
-            # Create new test session
-            now = datetime.now(timezone.utc)
-            try:
-                insert_result = await asyncio.to_thread(
-                    lambda: self.supabase.supabase.table("studio_cko_sessions").insert({
-                        "user_id": user_id,
-                        "asset_id": asset_id,
-                        "session_type": "asset_test",
-                        "title": f"Asset Test: {asset_title}",
-                        "message_count": 0,
-                        "pending_clarifications": 0,
-                        "created_at": now.isoformat(),
-                        "updated_at": now.isoformat(),
-                    }).execute()
-                )
-                if insert_result.data and len(insert_result.data) > 0:
-                    logger.info("Asset test session created", asset_id=asset_id, user_id=user_id)
-                    return self._row_to_session(insert_result.data[0])
-            except Exception as insert_err:
-                # Race condition: unique constraint violation — re-query
-                err_msg = str(insert_err).lower()
-                if "duplicate" in err_msg or "unique" in err_msg or "23505" in err_msg:
-                    retry_result = await asyncio.to_thread(
-                        lambda: self.supabase.supabase.table("studio_cko_sessions")
-                            .select("*")
-                            .eq("user_id", user_id)
-                            .eq("asset_id", asset_id)
-                            .eq("session_type", "asset_test")
-                            .limit(1)
-                            .execute()
-                    )
-                    if retry_result.data and len(retry_result.data) > 0:
-                        return self._row_to_session(retry_result.data[0])
-                raise
-
-            raise Exception("Failed to create asset test session - no data returned")
-
-        except Exception as e:
-            logger.error("Failed to get/create asset test session", asset_id=asset_id, error=str(e))
-            raise
-
-    async def get_asset_test_messages(
-        self, user_id: str, asset_id: str
-    ) -> Tuple[Optional[str], List[CKOMessage]]:
-        """Get messages for an asset's test session. Returns (session_id, messages)."""
+        # Try to find existing
         result = await asyncio.to_thread(
             lambda: self.supabase.supabase.table("studio_cko_sessions")
-                .select("id")
+                .select("*")
                 .eq("user_id", user_id)
                 .eq("asset_id", asset_id)
                 .eq("session_type", "asset_test")
                 .limit(1)
                 .execute()
         )
-        if not result.data:
-            return None, []
-        session_id = result.data[0]["id"]
-        messages = await self.get_messages(session_id, user_id)
-        return session_id, messages
+        if result.data and len(result.data) > 0:
+            return self._row_to_session(result.data[0])
+
+        # Create new test session
+        now = datetime.now(timezone.utc)
+        try:
+            insert_result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions").insert({
+                    "user_id": user_id,
+                    "asset_id": asset_id,
+                    "session_type": "asset_test",
+                    "title": f"Asset Test: {asset_title}",
+                    "message_count": 0,
+                    "pending_clarifications": 0,
+                    "created_at": now.isoformat(),
+                    "updated_at": now.isoformat(),
+                }).execute()
+            )
+            if insert_result.data and len(insert_result.data) > 0:
+                logger.info("Asset test session created", asset_id=asset_id, user_id=user_id)
+                return self._row_to_session(insert_result.data[0])
+        except Exception as insert_err:
+            # Race condition: unique constraint violation — re-query
+            err_msg = str(insert_err).lower()
+            if "duplicate" in err_msg or "unique" in err_msg or "23505" in err_msg:
+                retry_result = await asyncio.to_thread(
+                    lambda: self.supabase.supabase.table("studio_cko_sessions")
+                        .select("*")
+                        .eq("user_id", user_id)
+                        .eq("asset_id", asset_id)
+                        .eq("session_type", "asset_test")
+                        .limit(1)
+                        .execute()
+                )
+                if retry_result.data and len(retry_result.data) > 0:
+                    return self._row_to_session(retry_result.data[0])
+            raise
+
+        raise Exception("Failed to create asset test session - no data returned")
+
+    async def get_asset_test_messages(
+        self, user_id: str, asset_id: str
+    ) -> Tuple[Optional[str], List[CKOMessage]]:
+        """Get messages for an asset's test session. Returns (session_id, messages)."""
+        try:
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .eq("asset_id", asset_id)
+                    .eq("session_type", "asset_test")
+                    .limit(1)
+                    .execute()
+            )
+            if not result.data:
+                return None, []
+            session_id = result.data[0]["id"]
+            messages = await self.get_messages(session_id, user_id)
+            return session_id, messages
+        except Exception as e:
+            logger.error("Failed to get asset test messages", asset_id=asset_id, error=str(e))
+            raise
 
     async def delete_asset_test_session(self, user_id: str, asset_id: str) -> bool:
         """Delete test session + messages for an asset."""
