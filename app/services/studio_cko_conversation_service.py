@@ -578,6 +578,25 @@ class StudioCKOConversationService:
             logger.error("Failed to get/create asset test session", asset_id=asset_id, error=str(e))
             raise
 
+    async def get_asset_test_messages(
+        self, user_id: str, asset_id: str
+    ) -> Tuple[Optional[str], List[CKOMessage]]:
+        """Get messages for an asset's test session. Returns (session_id, messages)."""
+        result = await asyncio.to_thread(
+            lambda: self.supabase.supabase.table("studio_cko_sessions")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("asset_id", asset_id)
+                .eq("session_type", "asset_test")
+                .limit(1)
+                .execute()
+        )
+        if not result.data:
+            return None, []
+        session_id = result.data[0]["id"]
+        messages = await self.get_messages(session_id, user_id)
+        return session_id, messages
+
     async def delete_asset_test_session(self, user_id: str, asset_id: str) -> bool:
         """Delete test session + messages for an asset."""
         try:

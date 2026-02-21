@@ -751,24 +751,10 @@ async def get_test_messages(
         from app.services.studio_cko_conversation_service import get_cko_conversation_service
 
         cko_service = get_cko_conversation_service()
+        session_id, messages = await cko_service.get_asset_test_messages(user_id, asset_id)
 
-        # Find existing test session
-        import asyncio
-        result = await asyncio.to_thread(
-            lambda: cko_service.supabase.supabase.table("studio_cko_sessions")
-                .select("id")
-                .eq("user_id", user_id)
-                .eq("asset_id", asset_id)
-                .eq("session_type", "asset_test")
-                .limit(1)
-                .execute()
-        )
-
-        if not result.data:
+        if session_id is None:
             return {"sessionId": None, "messages": []}
-
-        session_id = result.data[0]["id"]
-        messages = await cko_service.get_messages(session_id, user_id)
 
         return {
             "sessionId": session_id,
