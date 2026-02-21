@@ -87,6 +87,7 @@ def mock_supabase_client():
     mock.select.return_value = mock
     mock.eq.return_value = mock
     mock.neq.return_value = mock
+    mock.order.return_value = mock
     mock.limit.return_value = mock
     mock.execute.return_value = Mock(data=[])
     return mock

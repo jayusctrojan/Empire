@@ -167,8 +167,6 @@ class TestGetOrCreateAssetTestSession:
             Exception("duplicate key value violates unique constraint"),
         ]
         # The insert raises, so we mock it differently
-        original_execute = table.execute
-
         call_count = 0
 
         def side_effect():

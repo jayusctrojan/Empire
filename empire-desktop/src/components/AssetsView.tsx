@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils'
 import {
   listAssets,
+  getAsset,
   getAssetStats,
   getAssetHistory,
   publishAsset,
@@ -260,6 +261,7 @@ export function AssetsView() {
       .finally(() => {
         if (dedupIdRef.current === id) setIsDedupLoading(false)
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAsset?.id])
 
   // Load test messages when Test tab is activated
@@ -279,6 +281,7 @@ export function AssetsView() {
       .catch(() => {
         // Fail silently
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedAsset?.id])
 
   // Debounced search (skip initial mount to avoid redundant fetch)
@@ -625,12 +628,15 @@ export function AssetsView() {
                 {selectedAsset.title}
               </h2>
               <StatusBadge status={selectedAsset.status} />
-              {dedupResult?.hasDuplicates && (
-                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
-                  <AlertTriangle className="w-3 h-3" />
-                  {(dedupResult.exactMatches.length + dedupResult.nearMatches.length)} duplicate{(dedupResult.exactMatches.length + dedupResult.nearMatches.length) !== 1 ? 's' : ''}
-                </span>
-              )}
+              {dedupResult?.hasDuplicates && (() => {
+                const dupCount = dedupResult.exactMatches.length + dedupResult.nearMatches.length
+                return (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                    <AlertTriangle className="w-3 h-3" />
+                    {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
+                  </span>
+                )
+              })()}
             </div>
             <button
               onClick={handleCloseDetail}
@@ -765,9 +771,18 @@ export function AssetsView() {
                       {dedupResult.exactMatches.map(m => (
                         <button
                           key={m.id}
-                          onClick={() => {
+                          onClick={async () => {
                             const match = assets.find(a => a.id === m.id)
-                            if (match) handleSelectAsset(match)
+                            if (match) {
+                              handleSelectAsset(match)
+                            } else {
+                              try {
+                                const fetched = await getAsset(m.id)
+                                handleSelectAsset(fetched)
+                              } catch {
+                                // Non-critical
+                              }
+                            }
                           }}
                           className="w-full text-left p-2 rounded bg-red-500/10 border border-red-500/20 text-sm hover:bg-red-500/20 transition-colors"
                         >
@@ -779,9 +794,18 @@ export function AssetsView() {
                       {dedupResult.nearMatches.map(m => (
                         <button
                           key={m.id}
-                          onClick={() => {
+                          onClick={async () => {
                             const match = assets.find(a => a.id === m.id)
-                            if (match) handleSelectAsset(match)
+                            if (match) {
+                              handleSelectAsset(match)
+                            } else {
+                              try {
+                                const fetched = await getAsset(m.id)
+                                handleSelectAsset(fetched)
+                              } catch {
+                                // Non-critical
+                              }
+                            }
                           }}
                           className="w-full text-left p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-sm hover:bg-yellow-500/20 transition-colors"
                         >

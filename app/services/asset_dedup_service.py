@@ -8,6 +8,7 @@ Uses content hashing (MD5, first 16 hex chars) for exact matches
 and Jaccard similarity (word-level) for near matches.
 """
 
+import asyncio
 import hashlib
 import re
 from typing import Optional, List, Dict, Any
@@ -82,14 +83,14 @@ class AssetDedupService:
             )
             if exclude_id:
                 query = query.neq("id", exclude_id)
-            result = query.execute()
+            result = await asyncio.to_thread(query.execute)
 
             for row in result.data or []:
                 exact_matches.append({
                     "id": row["id"],
                     "title": row["title"],
                     "name": row["name"],
-                    "assetType": row["asset_type"],
+                    "asset_type": row["asset_type"],
                     "department": row["department"],
                     "similarity": 1.0,
                 })
@@ -100,6 +101,7 @@ class AssetDedupService:
                 .select("id, title, name, asset_type, department, content")
                 .eq("user_id", user_id)
                 .neq("content_hash", content_hash)
+                .order("updated_at", desc=True)
                 .limit(50)
             )
             if asset_type:
@@ -108,7 +110,7 @@ class AssetDedupService:
                 candidate_query = candidate_query.neq("id", exclude_id)
             # Exclude already-matched exact IDs
             exact_ids = {m["id"] for m in exact_matches}
-            candidate_result = candidate_query.execute()
+            candidate_result = await asyncio.to_thread(candidate_query.execute)
 
             for row in candidate_result.data or []:
                 if row["id"] in exact_ids:
@@ -119,7 +121,7 @@ class AssetDedupService:
                         "id": row["id"],
                         "title": row["title"],
                         "name": row["name"],
-                        "assetType": row["asset_type"],
+                        "asset_type": row["asset_type"],
                         "department": row["department"],
                         "similarity": round(sim, 2),
                     })
@@ -144,8 +146,8 @@ class AssetDedupService:
         user_id: str,
     ) -> Dict[str, Any]:
         """Find duplicates of an existing asset."""
-        result = (
-            self.supabase.client.table("studio_assets")
+        result = await asyncio.to_thread(
+            lambda: self.supabase.client.table("studio_assets")
             .select("id, content, asset_type")
             .eq("id", asset_id)
             .eq("user_id", user_id)

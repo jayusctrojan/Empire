@@ -556,8 +556,9 @@ class StudioCKOConversationService:
                     logger.info("Asset test session created", asset_id=asset_id, user_id=user_id)
                     return self._row_to_session(insert_result.data[0])
             except Exception as insert_err:
-                # Race condition: another request created it — re-query
-                if "duplicate" in str(insert_err).lower() or "unique" in str(insert_err).lower():
+                # Race condition: unique constraint violation — re-query
+                err_msg = str(insert_err).lower()
+                if "duplicate" in err_msg or "unique" in err_msg or "23505" in err_msg:
                     retry_result = await asyncio.to_thread(
                         lambda: self.supabase.supabase.table("studio_cko_sessions")
                             .select("*")
@@ -1073,7 +1074,7 @@ class StudioCKOConversationService:
                     clarification_answer=row.get("clarification_answer"),
                     rating=row.get("rating"),
                     rating_feedback=row.get("rating_feedback"),
-                    created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
+                    created_at=self._parse_dt(row.get("created_at")),
                 ))
 
             return messages

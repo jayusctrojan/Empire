@@ -188,7 +188,7 @@ class AssetStatsResponse(BaseModel):
 class DedupCheckRequest(BaseModel):
     """Request to check for duplicate assets"""
     content: str = Field(..., min_length=1)
-    assetType: Optional[str] = None
+    assetType: Optional[str] = Field(None, pattern="^(skill|command|agent|prompt|workflow)$")
 
 
 class DedupMatchResponse(BaseModel):
@@ -338,18 +338,33 @@ async def check_duplicates(
             user_id=user_id,
             asset_type=request.assetType,
         )
-        return DedupCheckResponse(
-            contentHash=result["content_hash"],
-            exactMatches=[DedupMatchResponse(**m) for m in result["exact_matches"]],
-            nearMatches=[DedupMatchResponse(**m) for m in result["near_matches"]],
-            hasDuplicates=result["has_duplicates"],
-        )
+        return _build_dedup_response(result)
     except Exception as e:
         logger.error("Dedup check failed", error=str(e), user_id=user_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check duplicates: {str(e)}",
         )
+
+
+def _build_dedup_response(result: Dict[str, Any]) -> DedupCheckResponse:
+    """Convert service-layer dedup result (snake_case) to API response (camelCase)."""
+    def _to_match(m: Dict[str, Any]) -> DedupMatchResponse:
+        return DedupMatchResponse(
+            id=m["id"],
+            title=m["title"],
+            name=m["name"],
+            assetType=m["asset_type"],
+            department=m["department"],
+            similarity=m.get("similarity"),
+        )
+
+    return DedupCheckResponse(
+        contentHash=result["content_hash"],
+        exactMatches=[_to_match(m) for m in result["exact_matches"]],
+        nearMatches=[_to_match(m) for m in result["near_matches"]],
+        hasDuplicates=result["has_duplicates"],
+    )
 
 
 @router.get("/{asset_id}/duplicates", response_model=DedupCheckResponse)
@@ -361,12 +376,7 @@ async def find_asset_duplicates(
     """Find duplicates of an existing asset."""
     try:
         result = await dedup.find_duplicates_for_asset(asset_id, user_id)
-        return DedupCheckResponse(
-            contentHash=result["content_hash"],
-            exactMatches=[DedupMatchResponse(**m) for m in result["exact_matches"]],
-            nearMatches=[DedupMatchResponse(**m) for m in result["near_matches"]],
-            hasDuplicates=result["has_duplicates"],
-        )
+        return _build_dedup_response(result)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
