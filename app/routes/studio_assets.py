@@ -16,8 +16,10 @@ Endpoints:
 
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import structlog
+import json
 
 from app.middleware.auth import get_current_user
 from app.services.asset_management_service import (
@@ -204,7 +206,7 @@ def get_service() -> AssetManagementService:
 async def list_assets(
     asset_type: Optional[str] = Query(None, description="Filter by asset type"),
     department: Optional[str] = Query(None, description="Filter by department"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    asset_status: Optional[str] = Query(None, alias="status", description="Filter by status"),
     search: Optional[str] = Query(None, description="Search in title and content"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(50, ge=1, le=100, description="Maximum records to return"),
@@ -223,14 +225,14 @@ async def list_assets(
             user_id=user_id,
             asset_type=asset_type,
             department=department,
-            status=status,
+            status=asset_status,
             search=search
         )
 
         filters = AssetFilters(
             asset_type=asset_type,
             department=department,
-            status=status,
+            status=asset_status,
             search_query=search
         )
 
@@ -532,6 +534,106 @@ async def reclassify_asset(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reclassify asset: {str(e)}"
         )
+
+
+# ============================================================================
+# Asset Test Endpoint
+# ============================================================================
+
+class AssetTestRequest(BaseModel):
+    """Request to test an asset through the CKO pipeline"""
+    query: str = Field(..., min_length=1, max_length=5000)
+
+
+@router.post("/{asset_id}/test")
+async def test_asset(
+    asset_id: str,
+    request: AssetTestRequest,
+    user_id: str = Depends(get_current_user),
+    service: AssetManagementService = Depends(get_service)
+):
+    """
+    Test an asset by running a query through the CKO pipeline with
+    the asset content injected as system context.
+
+    Returns SSE stream with events: start, phase, token, sources, artifact, done, error.
+    """
+    # Validate asset exists and belongs to user
+    try:
+        asset = await service.get_asset(asset_id, user_id)
+    except AssetNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found"
+        ) from None
+
+    async def generate():
+        session = None
+        cko_service = None
+        try:
+            from app.services.studio_cko_conversation_service import (
+                StudioCKOConversationService,
+                CKOConfig,
+                get_cko_conversation_service,
+            )
+
+            cko_service = get_cko_conversation_service()
+
+            # Create a temporary test session
+            session = await cko_service.create_session(
+                user_id=user_id,
+                title=f"Asset Test: {asset.title}"
+            )
+
+            yield f"event: start\ndata: {json.dumps({'session_id': session.id, 'asset_id': asset_id})}\n\n"
+
+            # Build context-enriched message with asset content
+            asset_context = (
+                f"You are testing the following {asset.asset_type} asset.\n"
+                f"Asset Name: {asset.name}\n"
+                f"Asset Title: {asset.title}\n"
+                f"Department: {asset.department}\n"
+                f"Format: {asset.format}\n"
+                f"---\n"
+                f"Asset Content:\n{asset.content}\n"
+                f"---\n\n"
+                f"User's test query: {request.query}"
+            )
+
+            config = CKOConfig()
+
+            async for event in cko_service.stream_message(
+                session_id=session.id,
+                user_id=user_id,
+                message=asset_context,
+                config=config
+            ):
+                event_type = event.get("type", "unknown")
+                yield f"event: {event_type}\ndata: {json.dumps(event)}\n\n"
+
+        except Exception:
+            logger.exception(
+                "Asset test streaming error",
+                asset_id=asset_id,
+                user_id=user_id,
+            )
+            yield f"event: error\ndata: {json.dumps({'error': 'An internal error occurred during asset test'})}\n\n"
+        finally:
+            if session is not None and cko_service is not None:
+                try:
+                    await cko_service.delete_session(session.id, user_id)
+                except Exception:
+                    logger.warning("Failed to clean up test session", session_id=session.id)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # ============================================================================

@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Settings, User } from '@/types'
 
+export type ActiveView = 'chats' | 'projects' | 'uploads' | 'assets' | 'settings'
+
 interface AppState {
   // User state
   user: User | null
@@ -9,7 +11,7 @@ interface AppState {
 
   // UI state
   sidebarOpen: boolean
-  activeView: 'chats' | 'projects' | 'uploads' | 'settings'
+  activeView: ActiveView
 
   // Settings
   settings: Settings
@@ -17,7 +19,7 @@ interface AppState {
   // Actions
   setUser: (user: User | null) => void
   toggleSidebar: () => void
-  setActiveView: (view: 'chats' | 'projects' | 'uploads' | 'settings') => void
+  setActiveView: (view: ActiveView) => void
   updateSettings: (settings: Partial<Settings>) => void
   logout: () => void
 }

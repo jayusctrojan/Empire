@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Trash2,
   Upload,
+  Boxes,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/app'
@@ -73,6 +74,7 @@ export function Sidebar({ showSearch, setShowSearch }: SidebarProps) {
     { id: 'chats' as const, icon: MessageSquare, label: 'Chats' },
     { id: 'projects' as const, icon: FolderOpen, label: 'Projects' },
     { id: 'uploads' as const, icon: Upload, label: 'File Uploads' },
+    { id: 'assets' as const, icon: Boxes, label: 'Assets' },
     { id: 'settings' as const, icon: Settings, label: 'Settings' },
   ]
 

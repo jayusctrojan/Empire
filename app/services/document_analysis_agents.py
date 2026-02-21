@@ -9,7 +9,7 @@ Three specialized agents for comprehensive document analysis workflows:
 - AGENT-010: Generate executive summaries, findings, and recommendations
 - AGENT-011: Verify claims, assign confidence scores, provide citations
 
-All agents use Claude Sonnet 4.5 with varying temperatures.
+All agents use Claude Sonnet 4.6 with varying temperatures.
 
 Author: Claude Code
 Date: 2025-01-26
@@ -88,7 +88,7 @@ AGENT_CONFIGS = {
         "agent_id": "AGENT-009",
         "name": "Senior Research Analyst",
         "description": "Extracts topics, entities, facts, and assesses document quality",
-        "model": "claude-sonnet-4-5-20250929",
+        "model": "claude-sonnet-4-6",
         "temperature": 0.1,  # Low temperature for factual extraction
         "max_tokens": 4000
     },
@@ -96,7 +96,7 @@ AGENT_CONFIGS = {
         "agent_id": "AGENT-010",
         "name": "Content Strategist",
         "description": "Generates executive summaries, findings, and recommendations",
-        "model": "claude-sonnet-4-5-20250929",
+        "model": "claude-sonnet-4-6",
         "temperature": 0.3,  # Slightly higher for creative synthesis
         "max_tokens": 3000
     },
@@ -104,7 +104,7 @@ AGENT_CONFIGS = {
         "agent_id": "AGENT-011",
         "name": "Fact Checker",
         "description": "Verifies claims, assigns confidence scores, provides citations",
-        "model": "claude-sonnet-4-5-20250929",
+        "model": "claude-sonnet-4-6",
         "temperature": 0.0,  # Zero temperature for strict verification
         "max_tokens": 3000
     }
@@ -267,7 +267,7 @@ class ResearchAnalystAgent:
     AGENT-009: Senior Research Analyst
 
     Extracts topics, entities, facts, and performs quality assessment
-    from documents using Claude Sonnet 4.5 with low temperature.
+    from documents using Claude Sonnet 4.6 with low temperature.
     """
 
     AGENT_ID = "AGENT-009"
@@ -522,7 +522,7 @@ class ContentStrategistAgent:
     AGENT-010: Content Strategist
 
     Generates executive summaries, findings, and recommendations
-    from documents using Claude Sonnet 4.5.
+    from documents using Claude Sonnet 4.6.
     """
 
     AGENT_ID = "AGENT-010"
@@ -777,7 +777,7 @@ class FactCheckerAgent:
     AGENT-011: Fact Checker
 
     Verifies claims, assigns confidence scores, and provides citations
-    using Claude Sonnet 4.5 with zero temperature for strict verification.
+    using Claude Sonnet 4.6 with zero temperature for strict verification.
     """
 
     AGENT_ID = "AGENT-011"

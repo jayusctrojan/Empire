@@ -193,6 +193,16 @@ export async function post<T>(endpoint: string, body?: unknown): Promise<T> {
 }
 
 /**
+ * PATCH request helper
+ */
+export async function patch<T>(endpoint: string, body?: unknown): Promise<T> {
+  return apiRequest<T>(endpoint, {
+    method: 'PATCH',
+    body: body ? JSON.stringify(body) : undefined,
+  })
+}
+
+/**
  * POST multipart form data (for file uploads)
  */
 export async function postFormData<T>(endpoint: string, formData: FormData): Promise<T> {

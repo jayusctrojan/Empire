@@ -320,7 +320,7 @@ class AgentMetricsContext:
     ):
         self.agent_id = agent_id
         self.operation = operation
-        self.model = model or "claude-sonnet-4-5-20250929"
+        self.model = model or "claude-sonnet-4-6"
         self.start_time: Optional[float] = None
         self.status = "failure"  # Default to failure, must explicitly set success
         self._input_tokens = 0
