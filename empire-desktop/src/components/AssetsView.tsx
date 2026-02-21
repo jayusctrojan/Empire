@@ -385,6 +385,9 @@ export function AssetsView() {
       // Don't update state if stream was aborted (e.g., user switched assets)
       if (controller.signal.aborted) return
 
+      // Skip empty responses (no content or artifacts)
+      if (!fullContent && artifacts.length === 0) return
+
       const assistantMsg: TestMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -486,6 +489,7 @@ export function AssetsView() {
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-empire-text-muted" />
             <input
               type="text"
+              aria-label="Search assets"
               placeholder="Search assets..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
