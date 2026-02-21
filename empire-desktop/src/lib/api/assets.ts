@@ -3,7 +3,7 @@
  * AI Studio asset management (prompts, agents, workflows, etc.)
  */
 
-import { get, post, patch, getApiBaseUrl } from './client'
+import { get, post, patch, del, getApiBaseUrl } from './client'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 import { fetch } from '@tauri-apps/plugin-http'
@@ -174,6 +174,54 @@ export async function getAssetStats(): Promise<AssetStatsResponse> {
 
 export async function getAssetHealth(): Promise<{ status: string; issues: string[] }> {
   return get('/api/studio/assets/health')
+}
+
+// Dedup types
+export interface DedupMatch {
+  id: string
+  title: string
+  name: string
+  assetType: string
+  department: string
+  similarity?: number
+}
+
+export interface DedupCheckResponse {
+  contentHash: string
+  exactMatches: DedupMatch[]
+  nearMatches: DedupMatch[]
+  hasDuplicates: boolean
+}
+
+export async function checkDuplicates(content: string, assetType?: string): Promise<DedupCheckResponse> {
+  return post<DedupCheckResponse>('/api/studio/assets/duplicates/check', { content, assetType })
+}
+
+export async function findAssetDuplicates(assetId: string): Promise<DedupCheckResponse> {
+  return get<DedupCheckResponse>(`/api/studio/assets/${assetId}/duplicates`)
+}
+
+// Test session types
+export interface TestSessionMessage {
+  id: string
+  sessionId: string
+  role: string
+  content: string
+  sources?: Array<Record<string, unknown>>
+  createdAt?: string
+}
+
+export interface TestMessagesResponse {
+  sessionId: string | null
+  messages: TestSessionMessage[]
+}
+
+export async function getTestMessages(assetId: string): Promise<TestMessagesResponse> {
+  return get<TestMessagesResponse>(`/api/studio/assets/${assetId}/test/messages`)
+}
+
+export async function clearTestSession(assetId: string): Promise<{ deleted: boolean }> {
+  return del<{ deleted: boolean }>(`/api/studio/assets/${assetId}/test`)
 }
 
 /**
