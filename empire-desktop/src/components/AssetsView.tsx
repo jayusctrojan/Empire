@@ -493,6 +493,8 @@ export function AssetsView() {
   // Render
   // ============================================================================
 
+  const dupCount = (dedupResult?.exactMatches.length ?? 0) + (dedupResult?.nearMatches.length ?? 0)
+
   return (
     <div className="flex h-full">
       {/* Left Panel — Asset List */}
@@ -632,15 +634,12 @@ export function AssetsView() {
                 {selectedAsset.title}
               </h2>
               <StatusBadge status={selectedAsset.status} />
-              {dedupResult?.hasDuplicates && (() => {
-                const dupCount = dedupResult.exactMatches.length + dedupResult.nearMatches.length
-                return (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
-                    <AlertTriangle className="w-3 h-3" />
-                    {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
-                  </span>
-                )
-              })()}
+              {dedupResult?.hasDuplicates && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                  <AlertTriangle className="w-3 h-3" />
+                  {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
             <button
               onClick={handleCloseDetail}

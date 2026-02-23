@@ -108,13 +108,9 @@ class AssetDedupService:
                 candidate_query = candidate_query.eq("asset_type", asset_type)
             if exclude_id:
                 candidate_query = candidate_query.neq("id", exclude_id)
-            # Exclude already-matched exact IDs
-            exact_ids = {m["id"] for m in exact_matches}
             candidate_result = await asyncio.to_thread(candidate_query.execute)
 
             for row in candidate_result.data or []:
-                if row["id"] in exact_ids:
-                    continue
                 sim = self.jaccard_similarity(content, row["content"])
                 if sim >= self.JACCARD_THRESHOLD:
                     near_matches.append({
@@ -129,8 +125,8 @@ class AssetDedupService:
             # Sort near matches by similarity descending
             near_matches.sort(key=lambda m: m["similarity"], reverse=True)
 
-        except Exception as e:
-            logger.warning("Dedup check failed", error=str(e), user_id=user_id)
+        except Exception:
+            logger.exception("Dedup check failed (advisory)", user_id=user_id)
             # Advisory — don't raise, just return empty results
 
         return {
