@@ -106,6 +106,8 @@ class CKOSession:
     message_count: int = 0
     pending_clarifications: int = 0
     context_summary: Optional[str] = None
+    asset_id: Optional[str] = None
+    session_type: str = "cko"
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_message_at: Optional[datetime] = None
@@ -118,6 +120,8 @@ class CKOSession:
             "messageCount": self.message_count,
             "pendingClarifications": self.pending_clarifications,
             "contextSummary": self.context_summary,
+            "assetId": self.asset_id,
+            "sessionType": self.session_type,
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "lastMessageAt": self.last_message_at.isoformat() if self.last_message_at else None,
@@ -334,6 +338,29 @@ class StudioCKOConversationService:
     # Session Management
     # =========================================================================
 
+    @staticmethod
+    def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+        """Parse ISO datetime from Supabase (handles Z suffix)."""
+        if not value:
+            return None
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+    def _row_to_session(self, row: Dict[str, Any]) -> CKOSession:
+        """Convert DB row to CKOSession. Single source of truth."""
+        return CKOSession(
+            id=row["id"],
+            user_id=row["user_id"],
+            title=row.get("title"),
+            message_count=row.get("message_count", 0),
+            pending_clarifications=row.get("pending_clarifications", 0),
+            context_summary=row.get("context_summary"),
+            asset_id=row.get("asset_id"),
+            session_type=row.get("session_type") or "cko",
+            created_at=self._parse_dt(row.get("created_at")),
+            updated_at=self._parse_dt(row.get("updated_at")),
+            last_message_at=self._parse_dt(row.get("last_message_at")),
+        )
+
     async def create_session(self, user_id: str, title: Optional[str] = None) -> CKOSession:
         """
         Create a new CKO conversation session.
@@ -360,18 +387,7 @@ class StudioCKOConversationService:
             )
 
             if result.data and len(result.data) > 0:
-                row = result.data[0]
-                session = CKOSession(
-                    id=row["id"],
-                    user_id=row["user_id"],
-                    title=row.get("title"),
-                    message_count=row.get("message_count", 0),
-                    pending_clarifications=row.get("pending_clarifications", 0),
-                    context_summary=row.get("context_summary"),
-                    created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
-                    updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")) if row.get("updated_at") else None,
-                )
-
+                session = self._row_to_session(result.data[0])
                 logger.info("CKO session created", session_id=session.id, user_id=user_id)
                 return session
 
@@ -403,18 +419,7 @@ class StudioCKOConversationService:
             )
 
             if result.data and len(result.data) > 0:
-                row = result.data[0]
-                return CKOSession(
-                    id=row["id"],
-                    user_id=row["user_id"],
-                    title=row.get("title"),
-                    message_count=row.get("message_count", 0),
-                    pending_clarifications=row.get("pending_clarifications", 0),
-                    context_summary=row.get("context_summary"),
-                    created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
-                    updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")) if row.get("updated_at") else None,
-                    last_message_at=datetime.fromisoformat(row["last_message_at"].replace("Z", "+00:00")) if row.get("last_message_at") else None,
-                )
+                return self._row_to_session(result.data[0])
 
             return None
 
@@ -444,6 +449,7 @@ class StudioCKOConversationService:
                 lambda: self.supabase.supabase.table("studio_cko_sessions")
                     .select("*")
                     .eq("user_id", user_id)
+                    .or_("session_type.eq.cko,session_type.is.null")
                     .order("updated_at", desc=True)
                     .range(offset, offset + limit - 1)
                     .execute()
@@ -451,17 +457,7 @@ class StudioCKOConversationService:
 
             sessions = []
             for row in result.data or []:
-                sessions.append(CKOSession(
-                    id=row["id"],
-                    user_id=row["user_id"],
-                    title=row.get("title"),
-                    message_count=row.get("message_count", 0),
-                    pending_clarifications=row.get("pending_clarifications", 0),
-                    context_summary=row.get("context_summary"),
-                    created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
-                    updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")) if row.get("updated_at") else None,
-                    last_message_at=datetime.fromisoformat(row["last_message_at"].replace("Z", "+00:00")) if row.get("last_message_at") else None,
-                ))
+                sessions.append(self._row_to_session(row))
 
             return sessions
 
@@ -514,6 +510,113 @@ class StudioCKOConversationService:
 
         except Exception as e:
             logger.error("Failed to delete CKO session", session_id=session_id, error=str(e))
+            return False
+
+    # =========================================================================
+    # Asset Test Session Management
+    # =========================================================================
+
+    async def get_or_create_asset_test_session(
+        self,
+        user_id: str,
+        asset_id: str,
+        asset_title: str,
+    ) -> CKOSession:
+        """Find existing test session for an asset or create one."""
+        # Try to find existing
+        result = await asyncio.to_thread(
+            lambda: self.supabase.supabase.table("studio_cko_sessions")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("asset_id", asset_id)
+                .eq("session_type", "asset_test")
+                .limit(1)
+                .execute()
+        )
+        if result.data and len(result.data) > 0:
+            return self._row_to_session(result.data[0])
+
+        # Create new test session
+        now = datetime.now(timezone.utc)
+        try:
+            insert_result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions").insert({
+                    "user_id": user_id,
+                    "asset_id": asset_id,
+                    "session_type": "asset_test",
+                    "title": f"Asset Test: {asset_title}",
+                    "message_count": 0,
+                    "pending_clarifications": 0,
+                    "created_at": now.isoformat(),
+                    "updated_at": now.isoformat(),
+                }).execute()
+            )
+            if insert_result.data and len(insert_result.data) > 0:
+                logger.info("Asset test session created", asset_id=asset_id, user_id=user_id)
+                return self._row_to_session(insert_result.data[0])
+        except Exception as insert_err:
+            # Race condition: unique constraint violation — re-query
+            err_msg = str(insert_err)
+            if "23505" in err_msg or "duplicate key" in err_msg.lower():
+                retry_result = await asyncio.to_thread(
+                    lambda: self.supabase.supabase.table("studio_cko_sessions")
+                        .select("*")
+                        .eq("user_id", user_id)
+                        .eq("asset_id", asset_id)
+                        .eq("session_type", "asset_test")
+                        .limit(1)
+                        .execute()
+                )
+                if retry_result.data and len(retry_result.data) > 0:
+                    return self._row_to_session(retry_result.data[0])
+            raise
+
+        raise RuntimeError("Failed to create asset test session: no data returned")
+
+    async def get_asset_test_messages(
+        self, user_id: str, asset_id: str
+    ) -> Tuple[Optional[str], List[CKOMessage]]:
+        """Get messages for an asset's test session. Returns (session_id, messages)."""
+        try:
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .eq("asset_id", asset_id)
+                    .eq("session_type", "asset_test")
+                    .limit(1)
+                    .execute()
+            )
+            if not result.data:
+                return None, []
+            session_id = result.data[0]["id"]
+            messages = await self.get_messages(session_id, user_id)
+            return session_id, messages
+        except Exception as e:
+            logger.exception("Failed to get asset test messages", asset_id=asset_id, error=str(e))
+            raise
+
+    async def delete_asset_test_session(self, user_id: str, asset_id: str) -> bool:
+        """Delete test session + messages for an asset."""
+        try:
+            # Find the session
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .eq("asset_id", asset_id)
+                    .eq("session_type", "asset_test")
+                    .limit(1)
+                    .execute()
+            )
+            if not result.data:
+                return False
+
+            session_id = result.data[0]["id"]
+            return await self.delete_session(session_id, user_id)
+
+        except Exception as e:
+            logger.exception("Failed to delete asset test session", asset_id=asset_id, error=str(e))
             return False
 
     # =========================================================================
@@ -989,7 +1092,7 @@ class StudioCKOConversationService:
                     clarification_answer=row.get("clarification_answer"),
                     rating=row.get("rating"),
                     rating_feedback=row.get("rating_feedback"),
-                    created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
+                    created_at=self._parse_dt(row.get("created_at")),
                 ))
 
             return messages

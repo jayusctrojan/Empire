@@ -19,15 +19,21 @@ import {
   FileText,
   Table,
   Presentation,
+  TriangleAlert,
+  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   listAssets,
+  getAsset,
   getAssetStats,
   getAssetHistory,
   publishAsset,
   archiveAsset,
   testAssetStream,
+  findAssetDuplicates,
+  getTestMessages,
+  clearTestSession,
   ASSET_TYPE_CONFIG,
   ASSET_STATUS_CONFIG,
   DEPARTMENTS,
@@ -40,6 +46,7 @@ import type {
   AssetStatsResponse,
   AssetVersion,
   AssetTestStreamChunk,
+  DedupCheckResponse,
 } from '@/lib/api/assets'
 import type { PipelinePhase } from '@/types/api'
 
@@ -200,6 +207,12 @@ export function AssetsView() {
   const fetchIdRef = useRef(0)
   const pendingHistoryRef = useRef<string | null>(null)
 
+  // Dedup state
+  const [dedupResult, setDedupResult] = useState<DedupCheckResponse | null>(null)
+  const [isDedupLoading, setIsDedupLoading] = useState(false)
+  const dedupIdRef = useRef(0)
+  const testMsgIdRef = useRef(0)
+
   // ============================================================================
   // Data Fetching
   // ============================================================================
@@ -227,6 +240,52 @@ export function AssetsView() {
   useEffect(() => {
     fetchAssets()
   }, [fetchAssets])
+
+  // Auto-check dedup when asset is selected
+  useEffect(() => {
+    if (!selectedAsset) {
+      setDedupResult(null)
+      return
+    }
+    const id = ++dedupIdRef.current
+    setIsDedupLoading(true)
+    setDedupResult(null)
+    findAssetDuplicates(selectedAsset.id)
+      .then(result => {
+        if (dedupIdRef.current === id) {
+          setDedupResult(result)
+        }
+      })
+      .catch(() => {
+        // Fail silently — dedup is advisory
+      })
+      .finally(() => {
+        if (dedupIdRef.current === id) setIsDedupLoading(false)
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAsset?.id])
+
+  // Load test messages when Test tab is activated
+  useEffect(() => {
+    if (activeTab !== 'test' || !selectedAsset) return
+    if (testMessages.length > 0 || isTestStreaming) return // Already have messages
+    const requestId = ++testMsgIdRef.current
+    getTestMessages(selectedAsset.id)
+      .then(result => {
+        if (testMsgIdRef.current !== requestId) return // Stale response
+        if (result.messages.length > 0) {
+          setTestMessages(result.messages.map(m => ({
+            id: m.id,
+            role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+            content: m.content,
+          })))
+        }
+      })
+      .catch(() => {
+        // Fail silently
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedAsset?.id])
 
   // Debounced search (skip initial mount to avoid redundant fetch)
   useEffect(() => {
@@ -274,18 +333,20 @@ export function AssetsView() {
     // Cancel any in-flight test stream
     testAbortRef.current?.abort()
     testAbortRef.current = null
+    testMsgIdRef.current += 1 // Invalidate stale getTestMessages responses
     pendingHistoryRef.current = asset.id
     setSelectedAsset(asset)
     setIsDetailOpen(true)
     setActiveTab('content')
     setAssetHistory([])
     setIsHistoryExpanded(false)
-    // Reset test chat when switching assets
+    // Reset test chat and dedup when switching assets
     setTestMessages([])
     setTestStreamingContent('')
     setTestPhase(null)
     setTestArtifacts([])
     setIsTestStreaming(false)
+    setDedupResult(null)
 
     try {
       const historyResult = await getAssetHistory(asset.id)
@@ -411,7 +472,7 @@ export function AssetsView() {
     }
   }
 
-  const handleClearTest = () => {
+  const handleClearTest = async () => {
     testAbortRef.current?.abort()
     testAbortRef.current = null
     setTestMessages([])
@@ -419,11 +480,45 @@ export function AssetsView() {
     setTestPhase(null)
     setTestArtifacts([])
     setIsTestStreaming(false)
+    if (selectedAsset) {
+      try {
+        await clearTestSession(selectedAsset.id)
+      } catch {
+        // Non-critical
+      }
+    }
+  }
+
+  const handleNavigateToDuplicate = async (assetId: string) => {
+    const match = assets.find(a => a.id === assetId)
+    if (match) {
+      handleSelectAsset(match)
+    } else {
+      try {
+        const fetched = await getAsset(assetId)
+        handleSelectAsset(fetched)
+      } catch {
+        // Non-critical
+      }
+    }
+  }
+
+  const handleRecheckDuplicates = () => {
+    if (!selectedAsset) return
+    const id = ++dedupIdRef.current
+    setIsDedupLoading(true)
+    setDedupResult(null)
+    findAssetDuplicates(selectedAsset.id)
+      .then(result => { if (dedupIdRef.current === id) setDedupResult(result) })
+      .catch(() => {})
+      .finally(() => { if (dedupIdRef.current === id) setIsDedupLoading(false) })
   }
 
   // ============================================================================
   // Render
   // ============================================================================
+
+  const dupCount = (dedupResult?.exactMatches.length ?? 0) + (dedupResult?.nearMatches.length ?? 0)
 
   return (
     <div className="flex h-full">
@@ -564,6 +659,12 @@ export function AssetsView() {
                 {selectedAsset.title}
               </h2>
               <StatusBadge status={selectedAsset.status} />
+              {dedupResult?.hasDuplicates && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                  <TriangleAlert className="w-3 h-3" />
+                  {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
             <button
               onClick={handleCloseDetail}
@@ -669,6 +770,54 @@ export function AssetsView() {
                     </>
                   )}
                 </div>
+              </div>
+
+              {/* Duplicates */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs uppercase tracking-wider text-empire-text-muted">Duplicates</h3>
+                  <button
+                    onClick={handleRecheckDuplicates}
+                    className="flex items-center gap-1 text-xs text-empire-text-muted hover:text-empire-text"
+                  >
+                    <RefreshCw className={cn('w-3 h-3', isDedupLoading && 'animate-spin')} /> Re-check
+                  </button>
+                </div>
+                {isDedupLoading ? (
+                  <p className="text-xs text-empire-text-muted">Checking for duplicates...</p>
+                ) : dedupResult ? (
+                  dedupResult.hasDuplicates ? (
+                    <div className="space-y-2">
+                      {dedupResult.exactMatches.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => handleNavigateToDuplicate(m.id)}
+                          className="w-full text-left p-2 rounded bg-red-500/10 border border-red-500/20 text-sm hover:bg-red-500/20 transition-colors"
+                        >
+                          <span className="text-red-400 font-medium">Exact duplicate:</span>{' '}
+                          <span className="text-empire-text">{m.title}</span>{' '}
+                          <span className="text-empire-text-muted">in {DEPARTMENTS.find(d => d.value === m.department)?.label || m.department}</span>
+                        </button>
+                      ))}
+                      {dedupResult.nearMatches.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => handleNavigateToDuplicate(m.id)}
+                          className="w-full text-left p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-sm hover:bg-yellow-500/20 transition-colors"
+                        >
+                          <span className="text-yellow-400 font-medium">Similar to:</span>{' '}
+                          <span className="text-empire-text">{m.title}</span>{' '}
+                          <span className="text-empire-text-muted">in {DEPARTMENTS.find(d => d.value === m.department)?.label || m.department}</span>{' '}
+                          <span className="text-yellow-400">&mdash; {Math.round((m.similarity ?? 0) * 100)}% match</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-400 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> No duplicates found
+                    </p>
+                  )
+                ) : null}
               </div>
 
               {/* Version History */}

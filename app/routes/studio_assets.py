@@ -34,6 +34,10 @@ from app.services.asset_management_service import (
     AssetReclassifyError,
     get_asset_management_service,
 )
+from app.services.asset_dedup_service import (
+    AssetDedupService,
+    get_asset_dedup_service,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -181,6 +185,30 @@ class AssetStatsResponse(BaseModel):
     byDepartment: Dict[str, int]
 
 
+class DedupCheckRequest(BaseModel):
+    """Request to check for duplicate assets"""
+    content: str = Field(..., min_length=1)
+    assetType: Optional[str] = Field(None, pattern="^(skill|command|agent|prompt|workflow)$")
+
+
+class DedupMatchResponse(BaseModel):
+    """A duplicate match"""
+    id: str
+    title: str
+    name: str
+    assetType: str
+    department: str
+    similarity: Optional[float] = None
+
+
+class DedupCheckResponse(BaseModel):
+    """Response from duplicate check"""
+    contentHash: str
+    exactMatches: List[DedupMatchResponse]
+    nearMatches: List[DedupMatchResponse]
+    hasDuplicates: bool
+
+
 class HealthResponse(BaseModel):
     """Health check response"""
     status: str
@@ -196,6 +224,11 @@ class HealthResponse(BaseModel):
 def get_service() -> AssetManagementService:
     """Dependency for asset management service"""
     return get_asset_management_service()
+
+
+def get_dedup_service() -> AssetDedupService:
+    """Dependency for dedup service"""
+    return get_asset_dedup_service()
 
 
 # ============================================================================
@@ -286,6 +319,75 @@ async def get_asset_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get asset stats: {str(e)}"
         )
+
+
+# ============================================================================
+# Dedup Endpoints
+# ============================================================================
+
+@router.post("/duplicates/check", response_model=DedupCheckResponse)
+async def check_duplicates(
+    request: DedupCheckRequest,
+    user_id: str = Depends(get_current_user),
+    dedup: AssetDedupService = Depends(get_dedup_service),
+) -> DedupCheckResponse:
+    """Check content for duplicate assets across all departments."""
+    try:
+        result = await dedup.check_duplicates(
+            content=request.content,
+            user_id=user_id,
+            asset_type=request.assetType,
+        )
+        return _build_dedup_response(result)
+    except Exception:
+        logger.exception("Dedup check failed", user_id=user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to check duplicates",
+        ) from None
+
+
+def _build_dedup_response(result: Dict[str, Any]) -> DedupCheckResponse:
+    """Convert service-layer dedup result (snake_case) to API response (camelCase)."""
+    def _to_match(m: Dict[str, Any]) -> DedupMatchResponse:
+        return DedupMatchResponse(
+            id=m["id"],
+            title=m["title"],
+            name=m["name"],
+            assetType=m["asset_type"],
+            department=m["department"],
+            similarity=m.get("similarity"),
+        )
+
+    return DedupCheckResponse(
+        contentHash=result["content_hash"],
+        exactMatches=[_to_match(m) for m in result["exact_matches"]],
+        nearMatches=[_to_match(m) for m in result["near_matches"]],
+        hasDuplicates=result["has_duplicates"],
+    )
+
+
+@router.get("/{asset_id}/duplicates", response_model=DedupCheckResponse)
+async def find_asset_duplicates(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+    dedup: AssetDedupService = Depends(get_dedup_service),
+) -> DedupCheckResponse:
+    """Find duplicates of an existing asset."""
+    try:
+        result = await dedup.find_duplicates_for_asset(asset_id, user_id)
+        return _build_dedup_response(result)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found",
+        ) from None
+    except Exception:
+        logger.exception("Dedup check failed", asset_id=asset_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to find duplicates",
+        ) from None
 
 
 # ============================================================================
@@ -556,6 +658,9 @@ async def test_asset(
     Test an asset by running a query through the CKO pipeline with
     the asset content injected as system context.
 
+    Session persists across requests for multi-turn testing.
+    First message injects asset content; subsequent messages send only the user query.
+
     Returns SSE stream with events: start, phase, token, sources, artifact, done, error.
     """
     # Validate asset exists and belongs to user
@@ -568,44 +673,49 @@ async def test_asset(
         ) from None
 
     async def generate():
-        session = None
-        cko_service = None
         try:
             from app.services.studio_cko_conversation_service import (
-                StudioCKOConversationService,
                 CKOConfig,
                 get_cko_conversation_service,
             )
 
             cko_service = get_cko_conversation_service()
 
-            # Create a temporary test session
-            session = await cko_service.create_session(
+            # Get or create persistent test session
+            session = await cko_service.get_or_create_asset_test_session(
                 user_id=user_id,
-                title=f"Asset Test: {asset.title}"
+                asset_id=asset_id,
+                asset_title=asset.title,
             )
 
             yield f"event: start\ndata: {json.dumps({'session_id': session.id, 'asset_id': asset_id})}\n\n"
 
-            # Build context-enriched message with asset content
-            asset_context = (
-                f"You are testing the following {asset.asset_type} asset.\n"
-                f"Asset Name: {asset.name}\n"
-                f"Asset Title: {asset.title}\n"
-                f"Department: {asset.department}\n"
-                f"Format: {asset.format}\n"
-                f"---\n"
-                f"Asset Content:\n{asset.content}\n"
-                f"---\n\n"
-                f"User's test query: {request.query}"
-            )
+            # First message: inject full asset context
+            # Subsequent messages: send only the user query
+            # Note: message_count could be stale if a prior stream_message failed
+            # after saving the user msg but before _update_session_metadata.
+            # Re-injecting context in that case is harmless (slightly noisy but safe).
+            if session.message_count == 0:
+                message = (
+                    f"You are testing the following {asset.asset_type} asset.\n"
+                    f"Asset Name: {asset.name}\n"
+                    f"Asset Title: {asset.title}\n"
+                    f"Department: {asset.department}\n"
+                    f"Format: {asset.format}\n"
+                    f"---\n"
+                    f"Asset Content:\n{asset.content}\n"
+                    f"---\n\n"
+                    f"User's test query: {request.query}"
+                )
+            else:
+                message = request.query
 
             config = CKOConfig()
 
             async for event in cko_service.stream_message(
                 session_id=session.id,
                 user_id=user_id,
-                message=asset_context,
+                message=message,
                 config=config
             ):
                 event_type = event.get("type", "unknown")
@@ -618,12 +728,6 @@ async def test_asset(
                 user_id=user_id,
             )
             yield f"event: error\ndata: {json.dumps({'error': 'An internal error occurred during asset test'})}\n\n"
-        finally:
-            if session is not None and cko_service is not None:
-                try:
-                    await cko_service.delete_session(session.id, user_id)
-                except Exception:
-                    logger.warning("Failed to clean up test session", session_id=session.id)
 
     return StreamingResponse(
         generate(),
@@ -634,6 +738,59 @@ async def test_asset(
             "X-Accel-Buffering": "no",
         }
     )
+
+
+# ============================================================================
+# Test Message Management
+# ============================================================================
+
+@router.get("/{asset_id}/test/messages")
+async def get_test_messages(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Get previous test conversation messages for an asset."""
+    try:
+        from app.services.studio_cko_conversation_service import get_cko_conversation_service
+
+        cko_service = get_cko_conversation_service()
+        session_id, messages = await cko_service.get_asset_test_messages(user_id, asset_id)
+
+        if session_id is None:
+            return {"sessionId": None, "messages": []}
+
+        return {
+            "sessionId": session_id,
+            "messages": [m.to_dict() for m in messages],
+        }
+
+    except Exception:
+        logger.exception("Failed to get test messages", asset_id=asset_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get test messages",
+        ) from None
+
+
+@router.delete("/{asset_id}/test")
+async def clear_test_session(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Delete test session and all messages for an asset."""
+    try:
+        from app.services.studio_cko_conversation_service import get_cko_conversation_service
+
+        cko_service = get_cko_conversation_service()
+        deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
+    except Exception:
+        logger.exception("Failed to clear test session", asset_id=asset_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to clear test session",
+        ) from None
+    else:
+        return {"deleted": deleted}
 
 
 # ============================================================================
