@@ -19,7 +19,7 @@ import {
   FileText,
   Table,
   Presentation,
-  AlertTriangle,
+  TriangleAlert,
   RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -489,6 +489,31 @@ export function AssetsView() {
     }
   }
 
+  const handleNavigateToDuplicate = async (assetId: string) => {
+    const match = assets.find(a => a.id === assetId)
+    if (match) {
+      handleSelectAsset(match)
+    } else {
+      try {
+        const fetched = await getAsset(assetId)
+        handleSelectAsset(fetched)
+      } catch {
+        // Non-critical
+      }
+    }
+  }
+
+  const handleRecheckDuplicates = () => {
+    if (!selectedAsset) return
+    const id = ++dedupIdRef.current
+    setIsDedupLoading(true)
+    setDedupResult(null)
+    findAssetDuplicates(selectedAsset.id)
+      .then(result => { if (dedupIdRef.current === id) setDedupResult(result) })
+      .catch(() => {})
+      .finally(() => { if (dedupIdRef.current === id) setIsDedupLoading(false) })
+  }
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -636,7 +661,7 @@ export function AssetsView() {
               <StatusBadge status={selectedAsset.status} />
               {dedupResult?.hasDuplicates && (
                 <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
-                  <AlertTriangle className="w-3 h-3" />
+                  <TriangleAlert className="w-3 h-3" />
                   {dupCount} duplicate{dupCount !== 1 ? 's' : ''}
                 </span>
               )}
@@ -752,15 +777,7 @@ export function AssetsView() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xs uppercase tracking-wider text-empire-text-muted">Duplicates</h3>
                   <button
-                    onClick={() => {
-                      if (!selectedAsset) return
-                      const id = ++dedupIdRef.current
-                      setIsDedupLoading(true)
-                      findAssetDuplicates(selectedAsset.id)
-                        .then(result => { if (dedupIdRef.current === id) setDedupResult(result) })
-                        .catch(() => {})
-                        .finally(() => { if (dedupIdRef.current === id) setIsDedupLoading(false) })
-                    }}
+                    onClick={handleRecheckDuplicates}
                     className="flex items-center gap-1 text-xs text-empire-text-muted hover:text-empire-text"
                   >
                     <RefreshCw className={cn('w-3 h-3', isDedupLoading && 'animate-spin')} /> Re-check
@@ -774,19 +791,7 @@ export function AssetsView() {
                       {dedupResult.exactMatches.map(m => (
                         <button
                           key={m.id}
-                          onClick={async () => {
-                            const match = assets.find(a => a.id === m.id)
-                            if (match) {
-                              handleSelectAsset(match)
-                            } else {
-                              try {
-                                const fetched = await getAsset(m.id)
-                                handleSelectAsset(fetched)
-                              } catch {
-                                // Non-critical
-                              }
-                            }
-                          }}
+                          onClick={() => handleNavigateToDuplicate(m.id)}
                           className="w-full text-left p-2 rounded bg-red-500/10 border border-red-500/20 text-sm hover:bg-red-500/20 transition-colors"
                         >
                           <span className="text-red-400 font-medium">Exact duplicate:</span>{' '}
@@ -797,19 +802,7 @@ export function AssetsView() {
                       {dedupResult.nearMatches.map(m => (
                         <button
                           key={m.id}
-                          onClick={async () => {
-                            const match = assets.find(a => a.id === m.id)
-                            if (match) {
-                              handleSelectAsset(match)
-                            } else {
-                              try {
-                                const fetched = await getAsset(m.id)
-                                handleSelectAsset(fetched)
-                              } catch {
-                                // Non-critical
-                              }
-                            }
-                          }}
+                          onClick={() => handleNavigateToDuplicate(m.id)}
                           className="w-full text-left p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-sm hover:bg-yellow-500/20 transition-colors"
                         >
                           <span className="text-yellow-400 font-medium">Similar to:</span>{' '}

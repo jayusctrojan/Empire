@@ -49,7 +49,7 @@ class AssetDedupService:
             return 0.0
         intersection = len(words_a & words_b)
         union = len(words_a | words_b)
-        return intersection / union if union > 0 else 0.0
+        return intersection / union
 
     async def check_duplicates(
         self,
@@ -77,7 +77,7 @@ class AssetDedupService:
             # Find exact matches by content_hash
             query = (
                 self.supabase.client.table("studio_assets")
-                .select("id, title, name, asset_type, department, content")
+                .select("id, title, name, asset_type, department")
                 .eq("user_id", user_id)
                 .eq("content_hash", content_hash)
             )
@@ -151,7 +151,7 @@ class AssetDedupService:
         )
 
         if not result.data:
-            raise ValueError(f"Asset {asset_id} not found")
+            raise ValueError("Asset not found")
 
         row = result.data[0]
         return await self.check_duplicates(
