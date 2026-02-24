@@ -105,23 +105,26 @@ export function ProjectMemoryPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, searchQuery, memories.length])
 
-  // Initial load
-  useEffect(() => {
-    loadMemories(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  // Stable ref for loadMemories — avoids stale closures in IntersectionObserver
+  const loadMemoriesRef = useRef(loadMemories)
+  useEffect(() => { loadMemoriesRef.current = loadMemories }, [loadMemories])
 
-  // Debounced search
+  // Debounced search + initial load (unified to avoid duplicate loads on mount)
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    if (!searchQuery) {
+      // Empty search — load immediately (handles initial mount + clearing search)
+      loadMemoriesRef.current(true)
+      return
+    }
     searchTimerRef.current = setTimeout(() => {
-      loadMemories(true)
+      loadMemoriesRef.current(true)
     }, SEARCH_DEBOUNCE_MS)
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery])
+  }, [searchQuery, projectId])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -130,7 +133,7 @@ export function ProjectMemoryPanel({
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && hasMore && !isLoading) {
-          loadMemories(false)
+          loadMemoriesRef.current(false)
         }
       },
       { threshold: 0.1 },
@@ -146,8 +149,8 @@ export function ProjectMemoryPanel({
     try {
       await onSaveMemoryContext(pinnedText)
       setIsEditingPinned(false)
-    } catch {
-      // silent
+    } catch (e) {
+      console.warn('Failed to save pinned context', e)
     } finally {
       setIsSavingPinned(false)
     }
@@ -162,8 +165,8 @@ export function ProjectMemoryPanel({
       setNoteContent('')
       setIsAddingNote(false)
       loadMemories(true)
-    } catch {
-      // silent
+    } catch (e) {
+      console.warn('Failed to add memory note', e)
     } finally {
       setIsSavingNote(false)
     }
@@ -194,8 +197,8 @@ export function ProjectMemoryPanel({
       await updateMemory(memoryId, { summary: editSummary })
       setEditingMemoryId(null)
       loadMemories(true)
-    } catch {
-      // silent
+    } catch (e) {
+      console.warn('Failed to update memory', e)
     }
   }
 
@@ -205,12 +208,13 @@ export function ProjectMemoryPanel({
       await deleteMemory(memoryId)
       setDeletingId(null)
       setMemories(prev => prev.filter(m => m.id !== memoryId))
+      setTotal(prev => Math.max(0, prev - 1))
       if (expandedId === memoryId) {
         setExpandedId(null)
         setExpandedDetail(null)
       }
-    } catch {
-      // silent
+    } catch (e) {
+      console.warn('Failed to delete memory', e)
     }
   }
 
@@ -227,6 +231,7 @@ export function ProjectMemoryPanel({
             </span>
             {!isEditingPinned ? (
               <button
+                aria-label="Edit pinned context"
                 onClick={() => setIsEditingPinned(true)}
                 className="p-1.5 rounded hover:bg-empire-border transition-colors"
               >
@@ -235,6 +240,7 @@ export function ProjectMemoryPanel({
             ) : (
               <div className="flex items-center gap-1">
                 <button
+                  aria-label="Save pinned context"
                   onClick={handleSavePinned}
                   disabled={isSavingPinned}
                   className="p-1.5 rounded hover:bg-green-500/20 transition-colors"
@@ -242,6 +248,7 @@ export function ProjectMemoryPanel({
                   <Check className="w-4 h-4 text-green-500" />
                 </button>
                 <button
+                  aria-label="Cancel editing pinned context"
                   onClick={() => {
                     setPinnedText(memoryContext)
                     setIsEditingPinned(false)
@@ -347,6 +354,8 @@ export function ProjectMemoryPanel({
                 {/* Memory Card Header */}
                 <div className="flex items-start gap-2">
                   <button
+                    aria-label={`${expandedId === memory.id ? 'Collapse' : 'Expand'} memory ${memory.id}`}
+                    aria-expanded={expandedId === memory.id}
                     onClick={() => handleToggleExpand(memory.id)}
                     className="mt-0.5 p-0.5 rounded hover:bg-empire-border transition-colors flex-shrink-0"
                   >
@@ -403,6 +412,7 @@ export function ProjectMemoryPanel({
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {editingMemoryId !== memory.id && (
                       <button
+                        aria-label={`Edit memory ${memory.id}`}
                         onClick={() => {
                           setEditingMemoryId(memory.id)
                           setEditSummary(memory.summaryPreview)

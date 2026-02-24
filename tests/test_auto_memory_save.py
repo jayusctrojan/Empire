@@ -195,7 +195,7 @@ class TestStoreMemoryUpsert:
         service = SessionMemoryService()
 
         # Existing record updated more than 60 seconds ago
-        old_updated_at = (datetime.utcnow() - timedelta(seconds=120)).isoformat()
+        old_updated_at = (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat()
         existing_memory_id = "mem-existing-001"
 
         mock_supabase = MagicMock()
@@ -237,7 +237,7 @@ class TestStoreMemoryUpsert:
         service = SessionMemoryService()
 
         # Updated only 10 seconds ago — inside cooldown
-        recent_updated_at = (datetime.utcnow() - timedelta(seconds=10)).isoformat()
+        recent_updated_at = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
         existing_memory_id = "mem-recent-002"
 
         mock_supabase = MagicMock()
@@ -510,7 +510,7 @@ class TestAutoSaveWireTest:
             else:
                 return MagicMock(data=message_rows)    # SELECT messages for memory
 
-        table.execute.side_effect = lambda: execute_side_effect()
+        table.execute.side_effect = execute_side_effect
 
         mock_memory_service = MagicMock()
         save_called_with = {}
@@ -524,7 +524,7 @@ class TestAutoSaveWireTest:
         # Capture the coroutine passed to create_task so we can await it
         captured_coro = []
 
-        def fake_create_task(coro, **kwargs):
+        def fake_create_task(coro, **_kwargs):  # noqa: ARG001
             captured_coro.append(coro)
             # Return a dummy task-like object
             mock_task = MagicMock()

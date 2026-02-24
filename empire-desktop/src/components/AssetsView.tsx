@@ -362,6 +362,7 @@ export function AssetsView() {
     setIsTestStreaming(false)
     setDedupResult(null)
     setTestContextInfo(null)
+    setShowMemorySaved(false)
 
     try {
       const historyResult = await getAssetHistory(asset.id)
@@ -517,6 +518,7 @@ export function AssetsView() {
     } else {
       try {
         const fetched = await getAsset(assetId)
+        setAssets(prev => [fetched, ...prev.filter(a => a.id !== fetched.id)])
         handleSelectAsset(fetched)
       } catch {
         // Non-critical
@@ -976,7 +978,7 @@ export function AssetsView() {
               {/* Test Controls */}
               <div className="border-t border-empire-border p-3">
                 {/* Context info bar + clear button */}
-                {(testMessages.length > 0 || testContextInfo) && (
+                {(testMessages.length > 0 || testContextInfo || showMemorySaved) && (
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] text-empire-text-muted">
                       {testContextInfo && testContextInfo.messageCount > 0

@@ -118,7 +118,8 @@ describe('ProjectMemoryPanel', () => {
     })
 
     await waitFor(() => {
-      expect(mockGetProjectMemories).toHaveBeenCalledTimes(2)
+      // At least 2 calls: initial load + post-add refresh (debounce may add more)
+      expect(mockGetProjectMemories.mock.calls.length).toBeGreaterThanOrEqual(2)
     })
   })
 

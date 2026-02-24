@@ -242,23 +242,9 @@ def test_clear_test_session_fires_memory_save_before_delete():
     mock_cko.save_test_session_memory = AsyncMock(return_value="mem-task")
     mock_cko.delete_asset_test_session = AsyncMock(return_value=True)
 
-    created_tasks = []
-
-    def fake_create_task(coro, **kwargs):
-        t = MagicMock(spec=asyncio.Task)
-        created_tasks.append(coro)
-        try:
-            coro.close()
-        except Exception:
-            pass
-        return t
-
-    with (
-        patch(
-            "app.services.studio_cko_conversation_service.get_cko_conversation_service",
-            return_value=mock_cko,
-        ),
-        patch("asyncio.create_task", side_effect=fake_create_task),
+    with patch(
+        "app.services.studio_cko_conversation_service.get_cko_conversation_service",
+        return_value=mock_cko,
     ):
         client = TestClient(app, raise_server_exceptions=True)
         response = client.delete("/api/studio/assets/asset-AAA/test")
@@ -266,7 +252,8 @@ def test_clear_test_session_fires_memory_save_before_delete():
     assert response.status_code == 200
     body = response.json()
     assert body["deleted"] is True
-    assert len(created_tasks) == 1
+    # save_test_session_memory is awaited (not fire-and-forget) before deletion
+    mock_cko.save_test_session_memory.assert_awaited_once_with("sess-found", "test-user", "asset-AAA")
     mock_cko.delete_asset_test_session.assert_awaited_once_with("test-user", "asset-AAA")
 
 

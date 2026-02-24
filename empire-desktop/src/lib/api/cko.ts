@@ -20,8 +20,10 @@ export interface CKOSession {
   pendingClarifications: number
   contextSummary: string | null
   projectId: string | null
-  createdAt: string
-  updatedAt: string
+  assetId?: string | null
+  sessionType?: string | null
+  createdAt: string | null
+  updatedAt: string | null
   lastMessageAt: string | null
   /** @deprecated Use camelCase `messageCount` instead. Kept for backend snake_case compat. */
   message_count?: number
@@ -30,7 +32,9 @@ export interface CKOSession {
   /** @deprecated Use camelCase `lastMessageAt` instead. */
   last_message_at?: string | null
   /** @deprecated Use camelCase `createdAt` instead. */
-  created_at?: string
+  created_at?: string | null
+  /** @deprecated Use camelCase `updatedAt` instead. */
+  updated_at?: string | null
 }
 
 export interface CKOSource {
@@ -209,7 +213,7 @@ export async function* streamCKOMessage(
         if (line.startsWith('event: ')) {
           // Event type line — currently unused but parsed for completeness
         } else if (line.startsWith('data: ')) {
-          eventData += line.slice(6)
+          eventData += (eventData ? '\n' : '') + line.slice(6)
         } else if (line === '' && eventData) {
           // End of event
           try {
@@ -223,8 +227,7 @@ export async function* streamCKOMessage(
       }
     }
   } finally {
-    reader.cancel().catch(() => {})
-    reader.releaseLock()
+    await reader.cancel().catch(() => {})
   }
 }
 

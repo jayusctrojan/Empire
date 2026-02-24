@@ -801,18 +801,15 @@ async def clear_test_session(
         except Exception:
             logger.exception("Failed to find test session for memory save")
 
-        # Fire-and-forget: save memory before clearing
+        # Await memory save before deleting to avoid race (delete could remove messages)
         if session_id:
-            task = asyncio.create_task(
-                cko_service.save_test_session_memory(session_id, user_id, asset_id)
-            )
-            def _on_memory_save_done(t: asyncio.Task) -> None:
-                if t.cancelled():
-                    return
-                exc = t.exception()
-                if exc is not None:
-                    logger.error("save_test_session_memory task failed", asset_id=asset_id, exc_info=exc)
-            task.add_done_callback(_on_memory_save_done)
+            try:
+                await asyncio.wait_for(
+                    cko_service.save_test_session_memory(session_id, user_id, asset_id),
+                    timeout=30.0,
+                )
+            except Exception:
+                logger.exception("save_test_session_memory failed", asset_id=asset_id)
 
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
     except Exception:
