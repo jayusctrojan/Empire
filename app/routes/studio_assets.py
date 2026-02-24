@@ -806,10 +806,13 @@ async def clear_test_session(
             task = asyncio.create_task(
                 cko_service.save_test_session_memory(session_id, user_id, asset_id)
             )
-            task.add_done_callback(
-                lambda t: logger.exception("save_test_session_memory task failed", exc_info=t.exception())
-                if t.exception() else None
-            )
+            def _on_memory_save_done(t: asyncio.Task) -> None:
+                if t.cancelled():
+                    return
+                exc = t.exception()
+                if exc is not None:
+                    logger.error("save_test_session_memory task failed", asset_id=asset_id, exc_info=exc)
+            task.add_done_callback(_on_memory_save_done)
 
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
     except Exception:

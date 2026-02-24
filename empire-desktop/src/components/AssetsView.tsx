@@ -210,6 +210,7 @@ export function AssetsView() {
   const [showMemorySaved, setShowMemorySaved] = useState(false)
   const isSearchInitialized = useRef(false)
   const fetchIdRef = useRef(0)
+  const testContextReqIdRef = useRef(0)
   const pendingHistoryRef = useRef<string | null>(null)
 
   // Dedup state
@@ -274,10 +275,10 @@ export function AssetsView() {
   useEffect(() => {
     if (activeTab !== 'test' || !selectedAsset) return
     // Load context info
-    const contextRequestId = ++fetchIdRef.current
+    const contextRequestId = ++testContextReqIdRef.current
     getTestContextInfo(selectedAsset.id)
       .then(info => {
-        if (fetchIdRef.current !== contextRequestId) return // stale
+        if (testContextReqIdRef.current !== contextRequestId) return // stale
         setTestContextInfo({ messageCount: info.messageCount, approxTokens: info.approxTokens })
       })
       .catch(() => {})
@@ -360,6 +361,7 @@ export function AssetsView() {
     setTestArtifacts([])
     setIsTestStreaming(false)
     setDedupResult(null)
+    setTestContextInfo(null)
 
     try {
       const historyResult = await getAssetHistory(asset.id)

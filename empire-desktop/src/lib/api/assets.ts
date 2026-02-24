@@ -193,7 +193,7 @@ export interface DedupCheckResponse {
   hasDuplicates: boolean
 }
 
-export async function checkDuplicates(content: string, assetType?: string): Promise<DedupCheckResponse> {
+export async function checkDuplicates(content: string, assetType?: AssetType): Promise<DedupCheckResponse> {
   return post<DedupCheckResponse>('/api/studio/assets/duplicates/check', { content, assetType })
 }
 

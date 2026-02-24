@@ -132,30 +132,13 @@ describe('ProjectMemoryPanel', () => {
       expect(screen.getByText('Memory to delete')).toBeInTheDocument()
     })
 
-    // Click delete (Trash2 icon button) — it's the last button in the memory card actions
-    // The delete button renders Trash2 icon, which appears as an SVG. Find it by the button structure.
-    const trashButtons = screen.getAllByRole('button')
-    // The Trash2 button is the icon-only button at the end of the memory card
-    // We need the button that triggers setDeletingId — click the last small button group
-    // Since buttons have no text, find by proximity: the card has edit + delete buttons
-    // Trash2 button is rendered with class containing "hover:bg-red-500"
-    const allButtons = screen.getAllByRole('button')
-    // Filter to find buttons inside the memory card (after "Add Note" and search)
-    // The Trash2 delete button is after the Edit2 button in the card
-    // Just click the last button (Trash2)
-    const deleteBtn = allButtons[allButtons.length - 1]
+    // Click delete button via aria-label
+    const deleteBtn = screen.getByLabelText('delete-memory-mem-1')
     fireEvent.click(deleteBtn)
 
-    // After first click, confirm button appears (Check icon with red color)
-    // The confirm button is the first in the confirm pair
-    await waitFor(() => {
-      // After clicking delete, the Trash2 is replaced with Check + X buttons
-      const updatedButtons = screen.getAllByRole('button')
-      // The confirm (Check) button appears where Trash2 was
-      // Click the one that triggers handleDelete
-      const confirmBtn = updatedButtons[updatedButtons.length - 2] // Check before X
-      fireEvent.click(confirmBtn)
-    })
+    // Click confirm button via aria-label
+    const confirmBtn = await screen.findByLabelText('confirm-delete-mem-1')
+    fireEvent.click(confirmBtn)
 
     await waitFor(() => {
       expect(mockDeleteMemory).toHaveBeenCalledWith('mem-1')

@@ -377,10 +377,6 @@ class TestAutoSaveFailureModes:
             MagicMock(data=[session_row]),
         ]
 
-        # Simulate create_task being called; the coroutine itself raises
-        async def failing_auto_save(session):
-            raise RuntimeError("LLM call failed unexpectedly")
-
         with patch(
             "app.services.studio_cko_conversation_service.asyncio.create_task"
         ) as mock_create_task:

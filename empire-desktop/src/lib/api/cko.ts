@@ -161,7 +161,8 @@ export async function sendCKOMessage(
  */
 export async function* streamCKOMessage(
   sessionId: string,
-  request: CKOMessageRequest
+  request: CKOMessageRequest,
+  signal?: AbortSignal,
 ): AsyncGenerator<CKOStreamChunk> {
   const baseUrl = getApiBaseUrl()
   const url = `${baseUrl}/api/studio/cko/sessions/${sessionId}/messages/stream`
@@ -179,6 +180,7 @@ export async function* streamCKOMessage(
     method: 'POST',
     headers,
     body: JSON.stringify(request),
+    signal,
   })
 
   if (!response.ok) {
@@ -190,11 +192,12 @@ export async function* streamCKOMessage(
 
   const decoder = new TextDecoder()
   let buffer = ''
+  let eventData = ''
 
   try {
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done || signal?.aborted) break
 
       buffer += decoder.decode(value, { stream: true })
 
@@ -202,13 +205,11 @@ export async function* streamCKOMessage(
       const lines = buffer.split('\n')
       buffer = lines.pop() || '' // Keep incomplete line in buffer
 
-      let eventData = ''
-
       for (const line of lines) {
         if (line.startsWith('event: ')) {
           // Event type line — currently unused but parsed for completeness
         } else if (line.startsWith('data: ')) {
-          eventData = line.slice(6)
+          eventData += line.slice(6)
         } else if (line === '' && eventData) {
           // End of event
           try {

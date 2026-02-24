@@ -50,6 +50,7 @@ export function ProjectMemoryPanel({
   const [searchQuery, setSearchQuery] = useState('')
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fetchIdRef = useRef(0)
+  const detailFetchIdRef = useRef(0)
 
   // Add note
   const [isAddingNote, setIsAddingNote] = useState(false)
@@ -176,10 +177,11 @@ export function ProjectMemoryPanel({
       return
     }
     setExpandedId(memoryId)
-    const id = fetchIdRef.current
+    setExpandedDetail(null)
+    const id = ++detailFetchIdRef.current
     try {
       const detail = await getMemoryDetail(memoryId)
-      if (fetchIdRef.current !== id) return // stale
+      if (detailFetchIdRef.current !== id) return // stale
       if (detail) setExpandedDetail(detail)
     } catch {
       // silent
@@ -413,12 +415,14 @@ export function ProjectMemoryPanel({
                     {deletingId === memory.id ? (
                       <div className="flex items-center gap-1">
                         <button
+                          aria-label={`confirm-delete-${memory.id}`}
                           onClick={() => handleDelete(memory.id)}
                           className="p-1 rounded hover:bg-red-500/20"
                         >
                           <Check className="w-3 h-3 text-red-500" />
                         </button>
                         <button
+                          aria-label={`cancel-delete-${memory.id}`}
                           onClick={() => setDeletingId(null)}
                           className="p-1 rounded hover:bg-empire-border"
                         >
@@ -427,6 +431,7 @@ export function ProjectMemoryPanel({
                       </div>
                     ) : (
                       <button
+                        aria-label={`delete-memory-${memory.id}`}
                         onClick={() => setDeletingId(memory.id)}
                         className="p-1 rounded hover:bg-red-500/10 transition-colors"
                       >

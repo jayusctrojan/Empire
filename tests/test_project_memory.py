@@ -65,7 +65,7 @@ def mock_service():
 
 
 @pytest.fixture
-def client(mock_service):
+def client(mock_service):  # noqa: ARG001 — injected by pytest fixture chain
     """
     Build a TestClient with a lightweight app containing only the session_memory router.
     """
@@ -299,7 +299,7 @@ class TestSearchMemories:
         body = response.json()
         assert body["memories"] == []
 
-    def test_search_validates_short_query(self, client, mock_service):
+    def test_search_validates_short_query(self, client):
         response = client.post(
             "/api/session-memory/search",
             json={"query": "ab"},  # min_length=3

@@ -1865,6 +1865,8 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 user_id=user_id,
                 messages=messages,
                 retention_type=RetentionType.CKO,
+                # Note: asset_id is attached via UPDATE below, not passed here.
+                # Test memories are asset-scoped, not project-scoped.
             )
 
             # Attach asset_id directly if memory was created
@@ -1938,11 +1940,21 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                         project_id=project_id,
                         message_count=new_count,
                     )
-                    task = asyncio.create_task(self._auto_save_session_memory(session))
-                    task.add_done_callback(
-                        lambda t: logger.exception("auto_save_session_memory task failed", exc_info=t.exception())
-                        if t.exception() else None
+                    task = asyncio.create_task(
+                        self._auto_save_session_memory(session),
+                        name=f"auto-save-memory-{session_id}",
                     )
+                    def _on_autosave_done(t: asyncio.Task) -> None:
+                        if t.cancelled():
+                            return
+                        exc = t.exception()
+                        if exc is not None:
+                            logger.error(
+                                "Auto-save session memory task failed",
+                                session_id=session_id,
+                                exc_info=exc,
+                            )
+                    task.add_done_callback(_on_autosave_done)
 
 
 # ============================================================================
