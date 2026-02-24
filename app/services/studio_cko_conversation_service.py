@@ -1865,8 +1865,10 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 user_id=user_id,
                 messages=messages,
                 retention_type=RetentionType.CKO,
-                # Note: asset_id is attached via UPDATE below, not passed here.
-                # Test memories are asset-scoped, not project-scoped.
+                # Intentionally omitting project_id: test memories are
+                # asset-scoped (linked via asset_id UPDATE below), not
+                # project-scoped. They should appear in asset context,
+                # not in the Project Memory Panel.
             )
 
             # Attach asset_id directly if memory was created

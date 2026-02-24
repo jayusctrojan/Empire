@@ -8,6 +8,15 @@ Tests for:
 - Failure isolation: exceptions in memory path must not surface to callers
 - DB INSERT failure handling
 - Wire test: Supabase + LLM mocked end-to-end trigger
+
+Patch target note:
+    ``get_session_memory_service`` is imported *inline* (inside function
+    bodies) in ``studio_cko_conversation_service.py``, NOT at the module
+    top-level.  Inline imports resolve the name from the source module at
+    call-time, so patching the *source* module attribute
+    (``app.services.session_memory_service.get_session_memory_service``)
+    is the correct target.  Patching at the consumer module would fail
+    because the name does not exist in its module-level namespace.
 """
 
 import asyncio

@@ -8,6 +8,10 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
 
 
+class _UniqueViolation(Exception):
+    """Stub for a DB unique-constraint error in tests."""
+
+
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -168,7 +172,7 @@ class TestGetOrCreateAssetTestSession:
             if call_count == 1:
                 return Mock(data=[])  # SELECT: not found
             elif call_count == 2:
-                raise Exception("duplicate key value violates unique constraint")
+                raise _UniqueViolation("duplicate key value violates unique constraint")
             else:
                 return Mock(data=[row])  # Retry SELECT: found
 
