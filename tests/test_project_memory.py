@@ -56,7 +56,7 @@ def mock_service():
     with patch("app.routes.session_memory.get_session_memory_service") as factory:
         svc = Mock()
         svc.add_note = AsyncMock(return_value=str(uuid4()))
-        svc.get_project_memories = AsyncMock(return_value=[])
+        svc.get_project_memories = AsyncMock(return_value=([], 0))
         svc.get_relevant_memories = AsyncMock(return_value=[])
         svc.update_memory = AsyncMock(return_value=True)
         svc.delete_memory = AsyncMock(return_value=True)
@@ -154,7 +154,7 @@ class TestGetProjectMemories:
     def test_returns_memories_for_project(self, client, mock_service):
         mem1 = _make_session_memory(project_id="proj-xyz", summary="Used React for the frontend.")
         mem2 = _make_session_memory(project_id="proj-xyz", summary="Chose PostgreSQL for persistence.")
-        mock_service.get_project_memories.return_value = [mem1, mem2]
+        mock_service.get_project_memories.return_value = ([mem1, mem2], 2)
 
         response = client.get("/api/session-memory/project/proj-xyz")
 
@@ -169,7 +169,7 @@ class TestGetProjectMemories:
         assert mem2.id in ids_in_response
 
     def test_returns_empty_for_project_with_no_memories(self, client, mock_service):
-        mock_service.get_project_memories.return_value = []
+        mock_service.get_project_memories.return_value = ([], 0)
 
         response = client.get("/api/session-memory/project/proj-empty")
 

@@ -344,6 +344,7 @@ async def search_memories(
 async def get_project_memories(
     project_id: str,
     limit: int = Query(default=10, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
     user_id: str = Depends(get_current_user)
 ):
     """
@@ -352,10 +353,11 @@ async def get_project_memories(
     try:
         service = get_session_memory_service()
 
-        memories = await service.get_project_memories(
+        memories, total = await service.get_project_memories(
             user_id=user_id,
             project_id=project_id,
-            limit=limit
+            limit=limit,
+            offset=offset,
         )
 
         return MemoryListResponse(
@@ -372,7 +374,7 @@ async def get_project_memories(
                 )
                 for m in memories
             ],
-            total=len(memories)
+            total=total,
         )
 
     except Exception as e:

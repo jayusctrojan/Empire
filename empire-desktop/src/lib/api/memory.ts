@@ -164,9 +164,8 @@ export async function searchMemories(
   query: string,
   projectId?: string,
   limit = 10,
-  offset = 0,
 ): Promise<{ memories: MemorySummary[]; total: number }> {
-  const body: Record<string, unknown> = { query, limit, offset }
+  const body: Record<string, unknown> = { query, limit }
   if (projectId) body.project_id = projectId
   const res = await post<MemoryListResponse>('/api/session-memory/search', body)
   return {

@@ -336,6 +336,7 @@ export async function* testAssetStream(
       } catch { /* ignore */ }
     }
   } finally {
+    await reader.cancel().catch(() => {})
     signal?.removeEventListener('abort', onAbort)
   }
 }

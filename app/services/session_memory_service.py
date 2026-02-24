@@ -744,18 +744,20 @@ Ended with: {last_msg}..."""
         self,
         user_id: str,
         project_id: str,
-        limit: int = DEFAULT_MEMORY_LIMIT
-    ) -> List[SessionMemory]:
+        limit: int = DEFAULT_MEMORY_LIMIT,
+        offset: int = 0,
+    ) -> tuple[list[SessionMemory], int]:
         """
-        Get all memories for a specific project.
+        Get memories for a specific project with pagination.
 
         Args:
             user_id: User ID
             project_id: Project ID
-            limit: Maximum results
+            limit: Maximum results per page
+            offset: Number of results to skip
 
         Returns:
-            List of project memories
+            Tuple of (memories list, total count)
         """
         import time
         start_time = time.time()
@@ -763,13 +765,24 @@ Ended with: {last_msg}..."""
         try:
             supabase = get_supabase()
 
+            capped_limit = min(limit, MAX_MEMORY_LIMIT)
+
+            # Count total matching records
+            count_result = supabase.table("session_memories").select(
+                "id", count="exact"
+            ).eq("user_id", user_id).eq(
+                "project_id", project_id
+            ).execute()
+            total = count_result.count if count_result.count is not None else 0
+
+            # Fetch paginated results
             result = supabase.table("session_memories").select(
                 "*"
             ).eq("user_id", user_id).eq(
                 "project_id", project_id
             ).order(
                 "created_at", desc=True
-            ).limit(min(limit, MAX_MEMORY_LIMIT)).execute()
+            ).range(offset, offset + capped_limit - 1).execute()
 
             memories = []
             for row in (result.data or []):
@@ -792,7 +805,7 @@ Ended with: {last_msg}..."""
             MEMORY_RETRIEVED.labels(method="project").inc(len(memories))
             MEMORY_RETRIEVAL_LATENCY.labels(method="project").observe(duration)
 
-            return memories
+            return memories, total
 
         except Exception as e:
             logger.error(
@@ -800,7 +813,7 @@ Ended with: {last_msg}..."""
                 project_id=project_id,
                 error=str(e)
             )
-            return []
+            return [], 0
 
     # ==========================================================================
     # Session Resumption

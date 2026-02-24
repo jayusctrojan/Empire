@@ -159,14 +159,7 @@ class TestGetOrCreateAssetTestSession:
         row = _make_session_row()
         table = mock_supabase_storage.supabase.table.return_value
 
-        # First query: not found
-        # Insert: fails with unique constraint
-        # Retry query: found
-        table.execute.side_effect = [
-            Mock(data=[]),  # SELECT: not found
-            Exception("duplicate key value violates unique constraint"),
-        ]
-        # The insert raises, so we mock it differently
+        # First query: not found → Insert: raises unique constraint → Retry: found
         call_count = 0
 
         def side_effect():

@@ -83,7 +83,7 @@ export function ProjectMemoryPanel({
     try {
       const offset = reset ? 0 : memories.length
       const result = searchQuery.trim()
-        ? await searchMemories(searchQuery, projectId, PAGE_SIZE, offset)
+        ? await searchMemories(searchQuery, projectId, PAGE_SIZE)
         : await getProjectMemories(projectId, PAGE_SIZE, offset)
       if (fetchIdRef.current !== id) return // stale
       if (reset) {
@@ -375,12 +375,14 @@ export function ProjectMemoryPanel({
                         />
                         <div className="flex gap-1 mt-1">
                           <button
+                            aria-label="Save edit"
                             onClick={() => handleSaveEdit(memory.id)}
                             className="p-1 rounded hover:bg-green-500/20"
                           >
                             <Check className="w-3 h-3 text-green-500" />
                           </button>
                           <button
+                            aria-label="Cancel edit"
                             onClick={() => setEditingMemoryId(null)}
                             className="p-1 rounded hover:bg-red-500/20"
                           >
