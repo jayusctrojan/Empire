@@ -228,20 +228,23 @@ export async function* streamCKOMessage(
       }
     }
 
-    // Flush any trailing data left in buffer/eventData when stream closes
-    // without a final blank line
-    if (buffer) {
-      if (buffer.startsWith('data:')) {
-        const payload = buffer[5] === ' ' ? buffer.slice(6) : buffer.slice(5)
-        eventData += (eventData ? '\n' : '') + payload
+    // Don't flush on abort — the consumer has already signaled intent to stop
+    if (!signal?.aborted) {
+      // Flush any trailing data left in buffer/eventData when stream closes
+      // without a final blank line
+      if (buffer) {
+        if (buffer.startsWith('data:')) {
+          const payload = buffer[5] === ' ' ? buffer.slice(6) : buffer.slice(5)
+          eventData += (eventData ? '\n' : '') + payload
+        }
       }
-    }
-    if (eventData) {
-      try {
-        const chunk = JSON.parse(eventData) as CKOStreamChunk
-        yield chunk
-      } catch {
-        // Ignore malformed trailing JSON
+      if (eventData) {
+        try {
+          const chunk = JSON.parse(eventData) as CKOStreamChunk
+          yield chunk
+        } catch {
+          // Ignore malformed trailing JSON
+        }
       }
     }
   } finally {

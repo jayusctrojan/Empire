@@ -81,6 +81,8 @@ class AssetDedupService:
                 .eq("user_id", user_id)
                 .eq("content_hash", content_hash)
             )
+            if asset_type:
+                query = query.eq("asset_type", asset_type)
             if exclude_id:
                 query = query.neq("id", exclude_id)
             result = await asyncio.to_thread(query.execute)

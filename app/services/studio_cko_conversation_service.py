@@ -1776,7 +1776,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
     async def _auto_save_session_memory(self, session: CKOSession) -> None:
         """
         Fire-and-forget: save/upsert session memory for this conversation.
-        Called at message 5, then every 10 (15, 25, 35...).
+        Called at message 6, then every 10 (16, 26, 36...).
         """
         try:
             from app.services.session_memory_service import get_session_memory_service

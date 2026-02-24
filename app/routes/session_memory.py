@@ -326,7 +326,7 @@ async def search_memories(
                     conversation_id=m.conversation_id,
                     project_id=m.project_id,
                     summary_preview=m.summary[:200] + "..." if len(m.summary) > 200 else m.summary,
-                    tags=m.tags,
+                    tags=m.tags or [],
                     created_at=m.created_at,
                     updated_at=m.updated_at
                 )
@@ -368,7 +368,7 @@ async def get_project_memories(
                     conversation_id=m.conversation_id,
                     project_id=m.project_id,
                     summary_preview=m.summary[:200] + "..." if len(m.summary) > 200 else m.summary,
-                    tags=m.tags,
+                    tags=m.tags or [],
                     created_at=m.created_at,
                     updated_at=m.updated_at
                 )

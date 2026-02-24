@@ -412,7 +412,7 @@ class AssetManagementService:
         try:
             new_version = asset.version + 1
             content = updates.get("content")
-            if not isinstance(content, str):
+            if not isinstance(content, str) or not content.strip():
                 raise AssetUpdateError("Content must be a non-empty string")
 
             # Create new record with incremented version
