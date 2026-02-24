@@ -803,8 +803,12 @@ async def clear_test_session(
 
         # Fire-and-forget: save memory before clearing
         if session_id:
-            asyncio.create_task(
+            task = asyncio.create_task(
                 cko_service.save_test_session_memory(session_id, user_id, asset_id)
+            )
+            task.add_done_callback(
+                lambda t: logger.exception("save_test_session_memory task failed", exc_info=t.exception())
+                if t.exception() else None
             )
 
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
@@ -854,12 +858,6 @@ async def get_test_context_info(
         # Rough token estimate: sum content lengths / 4
         approx_tokens = 0
         if msg_count > 0:
-            token_result = await asyncio.to_thread(
-                lambda: cko_service.supabase.supabase.rpc(
-                    "get_session_token_estimate",
-                    {"p_session_id": row["id"]},
-                ).execute()
-            ) if False else None  # Skip RPC — estimate from count
             approx_tokens = msg_count * 150  # rough average
 
         return {

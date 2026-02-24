@@ -181,7 +181,7 @@ export interface DedupMatch {
   id: string
   title: string
   name: string
-  assetType: string
+  assetType: AssetType
   department: string
   similarity?: number
 }

@@ -133,15 +133,34 @@ class SessionMemoryService:
     # Memory Creation
     # ==========================================================================
 
+    async def add_note(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: str,
+        tags: Optional[List[str]] = None,
+        project_id: Optional[str] = None,
+        retention_type: RetentionType = RetentionType.INDEFINITE,
+    ) -> Optional[str]:
+        """Public API for creating manual memory notes (no LLM summarization)."""
+        return await self._store_memory(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            summary=summary,
+            tags=tags or [],
+            project_id=project_id,
+            retention_type=retention_type,
+        )
+
     async def _store_memory(
         self,
         user_id: str,
         conversation_id: str,
         summary: str,
-        key_decisions: List[Dict] = None,
-        files_mentioned: List[Dict] = None,
-        code_preserved: List[Dict] = None,
-        tags: List[str] = None,
+        key_decisions: Optional[List[Dict]] = None,
+        files_mentioned: Optional[List[Dict]] = None,
+        code_preserved: Optional[List[Dict]] = None,
+        tags: Optional[List[str]] = None,
         project_id: Optional[str] = None,
         asset_id: Optional[str] = None,
         retention_type: RetentionType = RetentionType.PROJECT,
@@ -163,15 +182,18 @@ class SessionMemoryService:
         expires_at = self._calculate_expiration(retention_type)
         now = datetime.utcnow().isoformat()
 
+        import asyncio
         supabase = get_supabase()
 
         if upsert_by_conversation:
             # Check for existing memory
-            existing = supabase.table("session_memories").select(
-                "id, updated_at"
-            ).eq("conversation_id", conversation_id).eq(
-                "user_id", user_id
-            ).limit(1).execute()
+            existing = await asyncio.to_thread(
+                lambda: supabase.table("session_memories").select(
+                    "id, updated_at"
+                ).eq("conversation_id", conversation_id).eq(
+                    "user_id", user_id
+                ).limit(1).execute()
+            )
 
             if existing.data:
                 row = existing.data[0]
@@ -186,16 +208,23 @@ class SessionMemoryService:
                     )
                     return row["id"]
 
-                # Update existing
-                supabase.table("session_memories").update({
+                # Update existing — omit embedding if None to preserve existing value
+                update_payload = {
                     "summary": summary,
                     "key_decisions": json.dumps(key_decisions),
                     "files_mentioned": json.dumps(files_mentioned),
                     "code_preserved": json.dumps(code_preserved),
                     "tags": tags,
-                    "embedding": embedding,
                     "updated_at": now,
-                }).eq("id", row["id"]).execute()
+                }
+                if embedding is not None:
+                    update_payload["embedding"] = embedding
+
+                await asyncio.to_thread(
+                    lambda: supabase.table("session_memories").update(
+                        update_payload
+                    ).eq("id", row["id"]).execute()
+                )
 
                 MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
                 logger.info(
@@ -219,15 +248,18 @@ class SessionMemoryService:
             "code_preserved": json.dumps(code_preserved),
             "tags": tags,
             "retention_type": retention_type.value,
-            "embedding": embedding,
             "created_at": now,
             "updated_at": now,
             "expires_at": expires_at.isoformat() if expires_at else None,
         }
+        if embedding is not None:
+            insert_data["embedding"] = embedding
         if asset_id:
             insert_data["asset_id"] = asset_id
 
-        supabase.table("session_memories").insert(insert_data).execute()
+        await asyncio.to_thread(
+            lambda: supabase.table("session_memories").insert(insert_data).execute()
+        )
 
         MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
         logger.info(

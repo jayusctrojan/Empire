@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { ProjectMemoryPanel } from './ProjectMemoryPanel'
 import {
@@ -58,10 +58,6 @@ describe('ProjectMemoryPanel', () => {
     mockAddMemoryNote.mockResolvedValue({ memoryId: 'new-1' })
     mockDeleteMemory.mockResolvedValue(undefined)
     mockSearchMemories.mockResolvedValue(emptyResult)
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   it('renders empty state when no memories', async () => {

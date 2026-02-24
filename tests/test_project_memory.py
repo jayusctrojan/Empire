@@ -55,7 +55,7 @@ def mock_service():
     """
     with patch("app.routes.session_memory.get_session_memory_service") as factory:
         svc = Mock()
-        svc._store_memory = AsyncMock(return_value=str(uuid4()))
+        svc.add_note = AsyncMock(return_value=str(uuid4()))
         svc.get_project_memories = AsyncMock(return_value=[])
         svc.get_relevant_memories = AsyncMock(return_value=[])
         svc.update_memory = AsyncMock(return_value=True)
@@ -95,7 +95,7 @@ class TestAddMemoryNote:
 
     def test_creates_memory_with_correct_fields(self, client, mock_service):
         fixed_id = str(uuid4())
-        mock_service._store_memory.return_value = fixed_id
+        mock_service.add_note.return_value = fixed_id
 
         response = client.post(
             "/api/session-memory/note",
@@ -112,8 +112,8 @@ class TestAddMemoryNote:
         assert body["memory_id"] == fixed_id
         assert "Decided to migrate DB to Supabase" in body["summary_preview"]
 
-        mock_service._store_memory.assert_awaited_once()
-        call_kwargs = mock_service._store_memory.call_args.kwargs
+        mock_service.add_note.assert_awaited_once()
+        call_kwargs = mock_service.add_note.call_args.kwargs
         assert call_kwargs["user_id"] == "test-user"
         assert call_kwargs["project_id"] == "proj-123"
         assert call_kwargs["summary"] == "Decided to migrate DB to Supabase."
@@ -122,14 +122,14 @@ class TestAddMemoryNote:
         assert call_kwargs["retention_type"] == RetentionType.INDEFINITE
 
     # Test 2 — POST /note validates required fields
-    def test_rejects_missing_project_id(self, client, mock_service):
+    def test_rejects_missing_project_id(self, client):
         response = client.post(
             "/api/session-memory/note",
             json={"content": "Some note without a project."},
         )
         assert response.status_code == 422
 
-    def test_rejects_missing_content(self, client, mock_service):
+    def test_rejects_missing_content(self, client):
         response = client.post(
             "/api/session-memory/note",
             json={"project_id": "proj-123"},
@@ -137,7 +137,7 @@ class TestAddMemoryNote:
         assert response.status_code == 422
 
     # Test 3 — POST /note rejects empty content
-    def test_rejects_empty_content(self, client, mock_service):
+    def test_rejects_empty_content(self, client):
         response = client.post(
             "/api/session-memory/note",
             json={"project_id": "proj-123", "content": ""},

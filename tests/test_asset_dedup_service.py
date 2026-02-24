@@ -201,7 +201,7 @@ async def test_check_duplicates_excludes_specified_id(dedup_service, mock_supaba
 
     assert result["has_duplicates"] is False
     # Verify neq was called with the exclude_id
-    mock_supabase_client.neq.assert_called()
+    mock_supabase_client.neq.assert_any_call("id", "self-id")
 
 
 @pytest.mark.asyncio

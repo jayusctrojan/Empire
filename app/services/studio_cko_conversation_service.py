@@ -1871,9 +1871,11 @@ Please answer based on the sources above. Include citations like [1], [2] when r
             if memory_id:
                 from app.core.database import get_supabase
                 supabase = get_supabase()
-                supabase.table("session_memories").update(
-                    {"asset_id": asset_id}
-                ).eq("id", memory_id).execute()
+                await asyncio.to_thread(
+                    lambda: supabase.table("session_memories").update(
+                        {"asset_id": asset_id}
+                    ).eq("id", memory_id).execute()
+                )
 
             return memory_id
         except Exception:
@@ -1923,8 +1925,9 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 .execute()
         )
 
-        # Auto-save trigger: at message 5, then every 10 (15, 25, 35...)
-        if new_count == 5 or (new_count > 5 and new_count % 10 == 5):
+        # Auto-save trigger: at message 6, then every 10 (16, 26, 36...)
+        # new_count is always even (current + 2), so check even thresholds
+        if new_count == 6 or (new_count > 6 and new_count % 10 == 6):
             if session_result.data:
                 row = session_result.data[0]
                 project_id = row.get("project_id")
@@ -1935,7 +1938,11 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                         project_id=project_id,
                         message_count=new_count,
                     )
-                    asyncio.create_task(self._auto_save_session_memory(session))
+                    task = asyncio.create_task(self._auto_save_session_memory(session))
+                    task.add_done_callback(
+                        lambda t: logger.exception("auto_save_session_memory task failed", exc_info=t.exception())
+                        if t.exception() else None
+                    )
 
 
 # ============================================================================

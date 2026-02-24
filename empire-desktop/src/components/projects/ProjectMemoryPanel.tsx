@@ -82,7 +82,7 @@ export function ProjectMemoryPanel({
     try {
       const offset = reset ? 0 : memories.length
       const result = searchQuery.trim()
-        ? await searchMemories(searchQuery, projectId, PAGE_SIZE)
+        ? await searchMemories(searchQuery, projectId, PAGE_SIZE, offset)
         : await getProjectMemories(projectId, PAGE_SIZE, offset)
       if (fetchIdRef.current !== id) return // stale
       if (reset) {
@@ -176,8 +176,10 @@ export function ProjectMemoryPanel({
       return
     }
     setExpandedId(memoryId)
+    const id = fetchIdRef.current
     try {
       const detail = await getMemoryDetail(memoryId)
+      if (fetchIdRef.current !== id) return // stale
       if (detail) setExpandedDetail(detail)
     } catch {
       // silent

@@ -268,7 +268,7 @@ async def add_memory_note(
         from uuid import uuid4
 
         service = get_session_memory_service()
-        memory_id = await service._store_memory(
+        memory_id = await service.add_note(
             user_id=user_id,
             conversation_id=f"manual-note-{uuid4()}",
             summary=request.content,
@@ -290,8 +290,8 @@ async def add_memory_note(
         )
 
     except Exception as e:
-        logger.error("add_memory_note_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("add_memory_note_failed")
+        raise HTTPException(status_code=500, detail="Failed to save note") from e
 
 
 # =============================================================================

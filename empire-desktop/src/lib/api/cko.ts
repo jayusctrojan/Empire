@@ -23,10 +23,13 @@ export interface CKOSession {
   createdAt: string
   updatedAt: string
   lastMessageAt: string | null
-  // Convenience alias for search
+  /** @deprecated Use camelCase `messageCount` instead. Kept for backend snake_case compat. */
   message_count?: number
+  /** @deprecated Use camelCase `contextSummary` instead. */
   context_summary?: string | null
+  /** @deprecated Use camelCase `lastMessageAt` instead. */
   last_message_at?: string | null
+  /** @deprecated Use camelCase `createdAt` instead. */
   created_at?: string
 }
 
@@ -188,36 +191,39 @@ export async function* streamCKOMessage(
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
 
-    buffer += decoder.decode(value, { stream: true })
+      buffer += decoder.decode(value, { stream: true })
 
-    // Parse SSE events
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || '' // Keep incomplete line in buffer
+      // Parse SSE events
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || '' // Keep incomplete line in buffer
 
-    let eventType = ''
-    let eventData = ''
+      let eventData = ''
 
-    for (const line of lines) {
-      if (line.startsWith('event: ')) {
-        eventType = line.slice(7).trim()
-      } else if (line.startsWith('data: ')) {
-        eventData = line.slice(6)
-      } else if (line === '' && eventData) {
-        // End of event
-        try {
-          const chunk = JSON.parse(eventData) as CKOStreamChunk
-          yield chunk
-        } catch {
-          // Ignore malformed JSON
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          // Event type line — currently unused but parsed for completeness
+        } else if (line.startsWith('data: ')) {
+          eventData = line.slice(6)
+        } else if (line === '' && eventData) {
+          // End of event
+          try {
+            const chunk = JSON.parse(eventData) as CKOStreamChunk
+            yield chunk
+          } catch {
+            // Ignore malformed JSON
+          }
+          eventData = ''
         }
-        eventType = ''
-        eventData = ''
       }
     }
+  } finally {
+    reader.cancel().catch(() => {})
+    reader.releaseLock()
   }
 }
 

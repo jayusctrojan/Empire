@@ -84,7 +84,7 @@ def _make_message_rows(count: int):
         rows.append({
             "role": "user" if i % 2 == 0 else "cko",
             "content": f"Message content {i}",
-            "created_at": f"2026-02-20T00:0{i}:00Z",
+            "created_at": f"2026-02-20T00:{i:02d}:00Z",
         })
     return rows
 
@@ -97,10 +97,10 @@ class TestAutoSaveTriggerLogic:
     """Tests for the threshold logic inside _update_session_metadata."""
 
     @pytest.mark.asyncio
-    async def test_auto_save_fires_at_message_count_5(self, cko_service, mock_supabase_storage):
-        """Auto-save task is created when new message count reaches exactly 5."""
-        # current_count = 3, so new_count = 3 + 2 = 5 -> trigger
-        session_row = _make_session_row(message_count=3, project_id="proj-111")
+    async def test_auto_save_fires_at_message_count_6(self, cko_service, mock_supabase_storage):
+        """Auto-save task is created when new message count reaches exactly 6."""
+        # current_count = 4, so new_count = 4 + 2 = 6 -> trigger
+        session_row = _make_session_row(message_count=4, project_id="proj-111")
         table = mock_supabase_storage.supabase.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),  # SELECT title/message_count/project_id/user_id
@@ -135,12 +135,12 @@ class TestAutoSaveTriggerLogic:
         mock_create_task.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_auto_save_fires_again_at_message_count_15(
+    async def test_auto_save_fires_again_at_message_count_16(
         self, cko_service, mock_supabase_storage
     ):
-        """Auto-save fires again at count 15 (every-10 cadence after 5)."""
-        # current_count = 13, new_count = 13 + 2 = 15 -> trigger (15 % 10 == 5)
-        session_row = _make_session_row(message_count=13, project_id="proj-111")
+        """Auto-save fires again at count 16 (every-10 cadence after 6)."""
+        # current_count = 14, new_count = 14 + 2 = 16 -> trigger (16 % 10 == 6)
+        session_row = _make_session_row(message_count=14, project_id="proj-111")
         table = mock_supabase_storage.supabase.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),
@@ -158,9 +158,9 @@ class TestAutoSaveTriggerLogic:
     async def test_auto_save_does_not_fire_without_project_id(
         self, cko_service, mock_supabase_storage
     ):
-        """Auto-save is skipped when project_id is None, even at count 5."""
+        """Auto-save is skipped when project_id is None, even at count 6."""
         # project_id is None — guard condition should prevent create_task
-        session_row = _make_session_row(message_count=3, project_id=None)
+        session_row = _make_session_row(message_count=4, project_id=None)
         table = mock_supabase_storage.supabase.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),
@@ -370,7 +370,7 @@ class TestAutoSaveFailureModes:
         If _auto_save_session_memory raises an exception internally,
         _update_session_metadata must still complete without propagating.
         """
-        session_row = _make_session_row(message_count=3, project_id="proj-111")
+        session_row = _make_session_row(message_count=4, project_id="proj-111")
         table = mock_supabase_storage.supabase.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),
@@ -488,14 +488,14 @@ class TestAutoSaveWireTest:
     ):
         """
         With Supabase and LLM fully mocked:
-        - Call _update_session_metadata with a session that has current count=3
-          so new_count = 5 (trigger threshold)
+        - Call _update_session_metadata with a session that has current count=4
+          so new_count = 6 (trigger threshold)
         - Verify that asyncio.create_task is called with a coroutine that,
           when awaited, invokes save_session_memory on the SessionMemoryService.
         """
         from app.services.studio_cko_conversation_service import CKOSession
 
-        session_row = _make_session_row(message_count=3, project_id="proj-111")
+        session_row = _make_session_row(message_count=4, project_id="proj-111")
         message_rows = _make_message_rows(6)  # 6 messages -> above 3-message floor
 
         table = mock_supabase_storage.supabase.table.return_value

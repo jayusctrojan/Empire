@@ -274,8 +274,12 @@ export function AssetsView() {
   useEffect(() => {
     if (activeTab !== 'test' || !selectedAsset) return
     // Load context info
+    const contextRequestId = ++fetchIdRef.current
     getTestContextInfo(selectedAsset.id)
-      .then(info => setTestContextInfo({ messageCount: info.messageCount, approxTokens: info.approxTokens }))
+      .then(info => {
+        if (fetchIdRef.current !== contextRequestId) return // stale
+        setTestContextInfo({ messageCount: info.messageCount, approxTokens: info.approxTokens })
+      })
       .catch(() => {})
     if (testMessages.length > 0 || isTestStreaming) return // Already have messages
     const requestId = ++testMsgIdRef.current
