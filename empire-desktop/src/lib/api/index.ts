@@ -121,6 +121,7 @@ export {
   findAssetDuplicates,
   getTestMessages,
   clearTestSession,
+  getTestContextInfo,
   ASSET_TYPE_CONFIG,
   ASSET_STATUS_CONFIG,
   DEPARTMENTS,
@@ -140,7 +141,6 @@ export {
   type DedupCheckResponse,
   type TestSessionMessage,
   type TestMessagesResponse,
-  getTestContextInfo,
   type TestContextInfo,
 } from './assets'
 

@@ -259,8 +259,8 @@ async def create_session(
         logger.error("Failed to create CKO session", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create session: {str(e)}"
-        )
+            detail="Failed to create session"
+        ) from e
 
 
 @router.get("/sessions", response_model=List[SessionResponse])

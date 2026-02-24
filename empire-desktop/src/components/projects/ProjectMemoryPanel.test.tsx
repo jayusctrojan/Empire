@@ -152,6 +152,7 @@ describe('ProjectMemoryPanel', () => {
   })
 
   it('search filters memories (debounced)', async () => {
+    vi.useFakeTimers()
     // The component calls searchMemories (instead of getProjectMemories) when
     // searchQuery has a value, after a 300ms debounce.
     const results = [makeMemory('mem-search', 'Search result memory')]
@@ -159,21 +160,20 @@ describe('ProjectMemoryPanel', () => {
 
     render(<ProjectMemoryPanel {...defaultProps} />)
 
-    // Wait for initial load
-    await waitFor(() => {
-      expect(mockGetProjectMemories).toHaveBeenCalled()
-    })
+    // Flush initial load
+    await act(async () => { vi.advanceTimersByTime(0) })
 
     const searchInput = screen.getByPlaceholderText(/search memories/i)
     fireEvent.change(searchInput, { target: { value: 'search query' } })
 
-    // After debounce, searchMemories should be called with the query
-    await waitFor(() => {
-      expect(mockSearchMemories).toHaveBeenCalled()
-    }, { timeout: 2000 })
+    // Advance past debounce
+    await act(async () => { vi.advanceTimersByTime(300) })
 
+    expect(mockSearchMemories).toHaveBeenCalled()
     expect(mockSearchMemories.mock.calls[0][0]).toBe('search query')
     expect(mockSearchMemories.mock.calls[0][1]).toBe('project-123')
+
+    vi.useRealTimers()
   })
 
   it('handles API errors gracefully (no crash, no error shown)', async () => {

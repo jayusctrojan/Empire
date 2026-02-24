@@ -286,7 +286,7 @@ async def add_memory_note(
         return SaveMemoryResponse(
             success=True,
             memory_id=memory_id,
-            summary_preview=request.content[:200]
+            summary_preview=request.content[:200] + "..." if len(request.content) > 200 else request.content
         )
 
     except Exception as e:
@@ -481,7 +481,7 @@ async def get_resumable_sessions(
             "get_resumable_sessions_failed",
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get resumable sessions") from e
 
 
 @router.post("/resume/{conversation_id}", response_model=ResumeSessionResponse)
@@ -525,7 +525,7 @@ async def resume_session(
             conversation_id=conversation_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to resume session") from e
 
 
 # =============================================================================
@@ -575,7 +575,7 @@ async def update_memory(
             memory_id=memory_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to update memory") from e
 
 
 @router.delete("/{memory_id}")
@@ -607,7 +607,7 @@ async def delete_memory(
             memory_id=memory_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete memory") from e
 
 
 # =============================================================================

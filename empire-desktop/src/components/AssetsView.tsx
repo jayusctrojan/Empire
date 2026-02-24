@@ -208,6 +208,7 @@ export function AssetsView() {
   // Test context info state
   const [testContextInfo, setTestContextInfo] = useState<{ messageCount: number; approxTokens: number } | null>(null)
   const [showMemorySaved, setShowMemorySaved] = useState(false)
+  const memorySavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isSearchInitialized = useRef(false)
   const fetchIdRef = useRef(0)
   const testContextReqIdRef = useRef(0)
@@ -363,6 +364,7 @@ export function AssetsView() {
     setDedupResult(null)
     setTestContextInfo(null)
     setShowMemorySaved(false)
+    if (memorySavedTimerRef.current) { clearTimeout(memorySavedTimerRef.current); memorySavedTimerRef.current = null }
 
     try {
       const historyResult = await getAssetHistory(asset.id)
@@ -503,7 +505,8 @@ export function AssetsView() {
         await clearTestSession(selectedAsset.id)
         if (hadMessages) {
           setShowMemorySaved(true)
-          setTimeout(() => setShowMemorySaved(false), 2000)
+          if (memorySavedTimerRef.current) clearTimeout(memorySavedTimerRef.current)
+          memorySavedTimerRef.current = setTimeout(() => setShowMemorySaved(false), 2000)
         }
       } catch {
         // Non-critical

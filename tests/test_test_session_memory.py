@@ -58,6 +58,9 @@ def _make_cko_service(supabase_inner=None):
               return_value=MagicMock()),
     ):
         from app.services.studio_cko_conversation_service import StudioCKOConversationService
+        # Skip __init__ to avoid wiring all dependencies — only supabase and config
+        # are needed for save_test_session_memory. If __init__ adds required attrs,
+        # set them here or switch to the full fixture pattern in test_asset_test_sessions.py.
         service = StudioCKOConversationService.__new__(StudioCKOConversationService)
         service.supabase = storage_wrapper
         service.config = MagicMock()
@@ -246,7 +249,9 @@ def test_clear_test_session_fires_memory_save_before_delete():
     assert body["deleted"] is True
     # save_test_session_memory is awaited (not fire-and-forget) before deletion
     mock_cko.find_test_session_id.assert_awaited_once_with("test-user", "asset-AAA")
-    mock_cko.save_test_session_memory.assert_awaited_once_with("sess-found", "test-user", "asset-AAA")
+    mock_cko.save_test_session_memory.assert_awaited_once_with(
+        "sess-found", "test-user", "asset-AAA"
+    )
     mock_cko.delete_asset_test_session.assert_awaited_once_with("test-user", "asset-AAA")
 
 

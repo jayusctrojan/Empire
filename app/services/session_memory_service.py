@@ -711,7 +711,7 @@ Ended with: {last_msg}..."""
                     key_decisions=json.loads(row.get("key_decisions", "[]")),
                     files_mentioned=json.loads(row.get("files_mentioned", "[]")),
                     code_preserved=json.loads(row.get("code_preserved", "[]")),
-                    tags=row.get("tags", []),
+                    tags=row.get("tags") or [],
                     retention_type=RetentionType(row["retention_type"]),
                     created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")),
                     updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
@@ -793,7 +793,7 @@ Ended with: {last_msg}..."""
                     key_decisions=json.loads(row.get("key_decisions", "[]")),
                     files_mentioned=json.loads(row.get("files_mentioned", "[]")),
                     code_preserved=json.loads(row.get("code_preserved", "[]")),
-                    tags=row.get("tags", []),
+                    tags=row.get("tags") or [],
                     retention_type=RetentionType(row["retention_type"]),
                     created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")),
                     updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))

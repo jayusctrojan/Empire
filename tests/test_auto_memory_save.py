@@ -376,8 +376,9 @@ class TestAutoSaveFailureModes:
         self, cko_service, mock_supabase_storage
     ):
         """
-        If _auto_save_session_memory raises an exception internally,
-        _update_session_metadata must still complete without propagating.
+        Verify _update_session_metadata delegates auto-save via create_task
+        (fire-and-forget). Exception isolation within the coroutine itself
+        is tested by test_auto_save_exception_caught_inside_auto_save_session_memory.
         """
         session_row = _make_session_row(message_count=4, project_id="proj-111")
         table = mock_supabase_storage.supabase.table.return_value

@@ -144,7 +144,8 @@ export async function updateMemory(
 }
 
 export async function deleteMemory(memoryId: string): Promise<void> {
-  await del<{ success: boolean }>(`/api/session-memory/${memoryId}`)
+  const res = await del<{ success: boolean }>(`/api/session-memory/${memoryId}`)
+  if (!res.success) throw new Error(`Failed to delete memory ${memoryId}`)
 }
 
 export async function addMemoryNote(
