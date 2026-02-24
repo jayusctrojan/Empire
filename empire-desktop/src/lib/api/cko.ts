@@ -210,10 +210,11 @@ export async function* streamCKOMessage(
       buffer = lines.pop() || '' // Keep incomplete line in buffer
 
       for (const line of lines) {
-        if (line.startsWith('event: ')) {
+        if (line.startsWith('event:')) {
           // Event type line — currently unused but parsed for completeness
-        } else if (line.startsWith('data: ')) {
-          eventData += (eventData ? '\n' : '') + line.slice(6)
+        } else if (line.startsWith('data:')) {
+          const payload = line[5] === ' ' ? line.slice(6) : line.slice(5)
+          eventData += (eventData ? '\n' : '') + payload
         } else if (line === '' && eventData) {
           // End of event
           try {

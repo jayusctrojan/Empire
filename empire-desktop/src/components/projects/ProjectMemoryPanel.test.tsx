@@ -44,10 +44,15 @@ const emptyResult = { memories: [], total: 0 }
 
 // IntersectionObserver is not available in jsdom
 class MockIntersectionObserver {
+  callback: IntersectionObserverCallback
+  options?: IntersectionObserverInit
   observe = vi.fn()
   unobserve = vi.fn()
   disconnect = vi.fn()
-  constructor() {}
+  constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+    this.callback = callback
+    this.options = options
+  }
 }
 vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
 

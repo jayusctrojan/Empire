@@ -9,7 +9,7 @@ Task: 207 - Implement Session Memory & Persistence
 import os
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 import structlog
@@ -180,7 +180,7 @@ class SessionMemoryService:
         tags = tags or []
 
         expires_at = self._calculate_expiration(retention_type)
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         import asyncio
         supabase = get_supabase()
@@ -200,8 +200,8 @@ class SessionMemoryService:
                 # 60-second cooldown
                 last_updated = datetime.fromisoformat(
                     row["updated_at"].replace("Z", "+00:00")
-                ).replace(tzinfo=None)
-                if (datetime.utcnow() - last_updated).total_seconds() < 60:
+                )
+                if (datetime.now(timezone.utc) - last_updated).total_seconds() < 60:
                     logger.debug(
                         "Skipping upsert — cooldown active",
                         conversation_id=conversation_id,
@@ -767,22 +767,15 @@ Ended with: {last_msg}..."""
 
             capped_limit = min(limit, MAX_MEMORY_LIMIT)
 
-            # Count total matching records
-            count_result = supabase.table("session_memories").select(
-                "id", count="exact"
-            ).eq("user_id", user_id).eq(
-                "project_id", project_id
-            ).execute()
-            total = count_result.count if count_result.count is not None else 0
-
-            # Fetch paginated results
             result = supabase.table("session_memories").select(
-                "*"
+                "*", count="exact"
             ).eq("user_id", user_id).eq(
                 "project_id", project_id
             ).order(
                 "created_at", desc=True
             ).range(offset, offset + capped_limit - 1).execute()
+
+            total = result.count if result.count is not None else 0
 
             memories = []
             for row in (result.data or []):
@@ -795,6 +788,7 @@ Ended with: {last_msg}..."""
                     key_decisions=json.loads(row.get("key_decisions", "[]")),
                     files_mentioned=json.loads(row.get("files_mentioned", "[]")),
                     code_preserved=json.loads(row.get("code_preserved", "[]")),
+                    tags=row.get("tags", []),
                     retention_type=RetentionType(row["retention_type"]),
                     created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")),
                     updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
@@ -805,15 +799,14 @@ Ended with: {last_msg}..."""
             MEMORY_RETRIEVED.labels(method="project").inc(len(memories))
             MEMORY_RETRIEVAL_LATENCY.labels(method="project").observe(duration)
 
-            return memories, total
-
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to get project memories",
                 project_id=project_id,
-                error=str(e)
             )
             return [], 0
+        else:
+            return memories, total
 
     # ==========================================================================
     # Session Resumption

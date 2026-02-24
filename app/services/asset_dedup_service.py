@@ -111,6 +111,8 @@ class AssetDedupService:
             candidate_result = await asyncio.to_thread(candidate_query.execute)
 
             for row in candidate_result.data or []:
+                if not row.get("content"):
+                    continue
                 sim = self.jaccard_similarity(content, row["content"])
                 if sim >= self.JACCARD_THRESHOLD:
                     near_matches.append({

@@ -92,10 +92,13 @@ export function ProjectMemoryPanel({
         setMemories(prev => [...prev, ...result.memories])
       }
       setTotal(result.total)
+      const isSearch = !!searchQuery.trim()
       setHasMore(
-        reset
-          ? result.memories.length < result.total
-          : memories.length + result.memories.length < result.total
+        isSearch
+          ? false // search endpoint doesn't support offset-based pagination
+          : reset
+            ? result.memories.length < result.total
+            : memories.length + result.memories.length < result.total
       )
     } catch {
       // advisory — fail silently

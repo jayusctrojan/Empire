@@ -230,15 +230,7 @@ def test_clear_test_session_fires_memory_save_before_delete():
 
     mock_cko = MagicMock()
 
-    db_inner = _make_supabase_mock()
-    session_result = MagicMock()
-    session_result.data = [{"id": "sess-found"}]
-    db_inner.execute.return_value = session_result
-
-    storage_wrapper = MagicMock()
-    storage_wrapper.supabase = db_inner
-    mock_cko.supabase = storage_wrapper
-
+    mock_cko.find_test_session_id = AsyncMock(return_value="sess-found")
     mock_cko.save_test_session_memory = AsyncMock(return_value="mem-task")
     mock_cko.delete_asset_test_session = AsyncMock(return_value=True)
 
@@ -253,6 +245,7 @@ def test_clear_test_session_fires_memory_save_before_delete():
     body = response.json()
     assert body["deleted"] is True
     # save_test_session_memory is awaited (not fire-and-forget) before deletion
+    mock_cko.find_test_session_id.assert_awaited_once_with("test-user", "asset-AAA")
     mock_cko.save_test_session_memory.assert_awaited_once_with("sess-found", "test-user", "asset-AAA")
     mock_cko.delete_asset_test_session.assert_awaited_once_with("test-user", "asset-AAA")
 
@@ -267,13 +260,8 @@ def test_clear_test_session_returns_even_if_session_lookup_fails():
 
     mock_cko = MagicMock()
 
-    db_inner = _make_supabase_mock()
-    db_inner.execute.side_effect = Exception("DB connection lost")
-
-    storage_wrapper = MagicMock()
-    storage_wrapper.supabase = db_inner
-    mock_cko.supabase = storage_wrapper
-
+    # find_test_session_id returns None (simulates internal DB failure caught by service)
+    mock_cko.find_test_session_id = AsyncMock(return_value=None)
     mock_cko.save_test_session_memory = AsyncMock(return_value=None)
     mock_cko.delete_asset_test_session = AsyncMock(return_value=False)
 
@@ -285,6 +273,7 @@ def test_clear_test_session_returns_even_if_session_lookup_fails():
         response = client.delete("/api/studio/assets/asset-BBB/test")
 
     assert response.status_code == 200
+    mock_cko.find_test_session_id.assert_awaited_once_with("test-user", "asset-BBB")
     mock_cko.save_test_session_memory.assert_not_awaited()
     mock_cko.delete_asset_test_session.assert_awaited_once_with("test-user", "asset-BBB")
 
@@ -298,17 +287,9 @@ def test_get_test_context_info_returns_message_count_and_tokens():
     _override_auth(app)
 
     mock_cko = MagicMock()
-
-    db_inner = _make_supabase_mock()
-    session_result = MagicMock()
-    session_result.data = [
-        {"id": "sess-context-01", "message_count": 8, "created_at": "2024-06-15T12:00:00Z"}
-    ]
-    db_inner.execute.return_value = session_result
-
-    storage_wrapper = MagicMock()
-    storage_wrapper.supabase = db_inner
-    mock_cko.supabase = storage_wrapper
+    mock_cko.get_test_session_info = AsyncMock(return_value={
+        "id": "sess-context-01", "message_count": 8, "created_at": "2024-06-15T12:00:00Z"
+    })
 
     with patch(
         "app.services.studio_cko_conversation_service.get_cko_conversation_service",
@@ -330,15 +311,7 @@ def test_get_test_context_info_returns_zeros_when_no_session():
     _override_auth(app)
 
     mock_cko = MagicMock()
-
-    db_inner = _make_supabase_mock()
-    empty_result = MagicMock()
-    empty_result.data = []
-    db_inner.execute.return_value = empty_result
-
-    storage_wrapper = MagicMock()
-    storage_wrapper.supabase = db_inner
-    mock_cko.supabase = storage_wrapper
+    mock_cko.get_test_session_info = AsyncMock(return_value=None)
 
     with patch(
         "app.services.studio_cko_conversation_service.get_cko_conversation_service",

@@ -1889,6 +1889,46 @@ Please answer based on the sources above. Include citations like [1], [2] when r
             )
             return None
 
+    async def find_test_session_id(
+        self, user_id: str, asset_id: str
+    ) -> Optional[str]:
+        """Find the session ID for an asset's test session, or None."""
+        try:
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("asset_id", asset_id)
+                .eq("session_type", "asset_test")
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                return result.data[0]["id"]
+        except Exception:
+            logger.exception("Failed to find test session", asset_id=asset_id)
+        return None
+
+    async def get_test_session_info(
+        self, user_id: str, asset_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get lightweight context info for an asset's test session."""
+        try:
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                .select("id, message_count, created_at")
+                .eq("user_id", user_id)
+                .eq("asset_id", asset_id)
+                .eq("session_type", "asset_test")
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                return result.data[0]
+        except Exception:
+            logger.exception("Failed to get test session info", asset_id=asset_id)
+        return None
+
     async def _update_session_metadata(
         self,
         session_id: str,

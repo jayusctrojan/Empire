@@ -11,6 +11,9 @@ from datetime import datetime, timezone
 class _UniqueViolation(Exception):
     """Stub for a DB unique-constraint error in tests."""
 
+    def __init__(self) -> None:
+        super().__init__("duplicate key value violates unique constraint")
+
 
 # =============================================================================
 # Fixtures
@@ -172,7 +175,7 @@ class TestGetOrCreateAssetTestSession:
             if call_count == 1:
                 return Mock(data=[])  # SELECT: not found
             elif call_count == 2:
-                raise _UniqueViolation("duplicate key value violates unique constraint")
+                raise _UniqueViolation()
             else:
                 return Mock(data=[row])  # Retry SELECT: found
 

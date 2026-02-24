@@ -785,21 +785,7 @@ async def clear_test_session(
         cko_service = get_cko_conversation_service()
 
         # Find session to save memory from (before deleting)
-        session_id = None
-        try:
-            result = await asyncio.to_thread(
-                lambda: cko_service.supabase.supabase.table("studio_cko_sessions")
-                .select("id")
-                .eq("user_id", user_id)
-                .eq("asset_id", asset_id)
-                .eq("session_type", "asset_test")
-                .limit(1)
-                .execute()
-            )
-            if result.data:
-                session_id = result.data[0]["id"]
-        except Exception:
-            logger.exception("Failed to find test session for memory save")
+        session_id = await cko_service.find_test_session_id(user_id, asset_id)
 
         # Await memory save before deleting to avoid race (delete could remove messages)
         if session_id:
@@ -833,18 +819,9 @@ async def get_test_context_info(
 
         cko_service = get_cko_conversation_service()
 
-        # Find the test session
-        session_result = await asyncio.to_thread(
-            lambda: cko_service.supabase.supabase.table("studio_cko_sessions")
-            .select("id, message_count, created_at")
-            .eq("user_id", user_id)
-            .eq("asset_id", asset_id)
-            .eq("session_type", "asset_test")
-            .limit(1)
-            .execute()
-        )
+        row = await cko_service.get_test_session_info(user_id, asset_id)
 
-        if not session_result.data:
+        if not row:
             return {
                 "sessionId": None,
                 "messageCount": 0,
@@ -852,18 +829,12 @@ async def get_test_context_info(
                 "createdAt": None,
             }
 
-        row = session_result.data[0]
         msg_count = row.get("message_count", 0)
-
-        # Rough token estimate: sum content lengths / 4
-        approx_tokens = 0
-        if msg_count > 0:
-            approx_tokens = msg_count * 150  # rough average
 
         return {
             "sessionId": row["id"],
             "messageCount": msg_count,
-            "approxTokens": approx_tokens,
+            "approxTokens": msg_count * 150 if msg_count > 0 else 0,
             "createdAt": row.get("created_at"),
         }
     except Exception:
