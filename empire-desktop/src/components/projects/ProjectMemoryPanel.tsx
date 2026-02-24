@@ -98,9 +98,11 @@ export function ProjectMemoryPanel({
       }
       setTotal(result.total)
       const isSearch = !!searchQuery.trim()
+      // Guard: empty page means no more data (prevents infinite loop if total > offset)
+      const emptyPage = result.memories.length === 0
       setHasMore(
-        isSearch
-          ? false // search endpoint doesn't support offset-based pagination
+        isSearch || emptyPage
+          ? false
           : offsetRef.current < result.total
       )
     } catch {

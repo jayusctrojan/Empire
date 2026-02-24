@@ -2,7 +2,7 @@
 Empire v7.5 - Auto-Accumulation Memory Save Tests
 
 Tests for:
-- Auto-save trigger logic in _update_session_metadata (message counts 5, 15, 25...)
+- Auto-save trigger logic in _update_session_metadata (message counts 6, 16, 26...)
 - _auto_save_session_memory message fetching and ContextMessage conversion
 - SessionMemoryService._store_memory upsert + 60-second cooldown
 - Failure isolation: exceptions in memory path must not surface to callers

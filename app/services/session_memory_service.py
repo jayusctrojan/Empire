@@ -216,7 +216,7 @@ class SessionMemoryService:
                     "code_preserved": json.dumps(code_preserved),
                     "tags": tags,
                     "updated_at": now,
-                    "expires_at": expires_at,
+                    "expires_at": expires_at.isoformat() if expires_at else None,
                 }
                 if embedding is not None:
                     update_payload["embedding"] = embedding
@@ -595,10 +595,10 @@ Ended with: {last_msg}..."""
 
         if retention_type == RetentionType.CKO:
             # CKO memories last 90 days
-            return datetime.utcnow() + timedelta(days=90)
+            return datetime.now(timezone.utc) + timedelta(days=90)
 
         # Default PROJECT retention
-        return datetime.utcnow() + timedelta(days=self.memory_expiration_days)
+        return datetime.now(timezone.utc) + timedelta(days=self.memory_expiration_days)
 
     # ==========================================================================
     # Embedding Generation
@@ -711,6 +711,7 @@ Ended with: {last_msg}..."""
                     key_decisions=json.loads(row.get("key_decisions", "[]")),
                     files_mentioned=json.loads(row.get("files_mentioned", "[]")),
                     code_preserved=json.loads(row.get("code_preserved", "[]")),
+                    tags=row.get("tags", []),
                     retention_type=RetentionType(row["retention_type"]),
                     created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")),
                     updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
@@ -760,6 +761,7 @@ Ended with: {last_msg}..."""
         Returns:
             Tuple of (memories list, total count)
         """
+        import asyncio
         import time
         start_time = time.time()
 
@@ -768,13 +770,15 @@ Ended with: {last_msg}..."""
 
             capped_limit = min(limit, MAX_MEMORY_LIMIT)
 
-            result = supabase.table("session_memories").select(
-                "*", count="exact"
-            ).eq("user_id", user_id).eq(
-                "project_id", project_id
-            ).order(
-                "created_at", desc=True
-            ).range(offset, offset + capped_limit - 1).execute()
+            result = await asyncio.to_thread(
+                lambda: supabase.table("session_memories").select(
+                    "*", count="exact"
+                ).eq("user_id", user_id).eq(
+                    "project_id", project_id
+                ).order(
+                    "created_at", desc=True
+                ).range(offset, offset + capped_limit - 1).execute()
+            )
 
             total = result.count if result.count is not None else 0
 
