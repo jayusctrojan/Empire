@@ -201,6 +201,8 @@ class SessionMemoryService:
                 last_updated = datetime.fromisoformat(
                     row["updated_at"].replace("Z", "+00:00")
                 )
+                if last_updated.tzinfo is None:
+                    last_updated = last_updated.replace(tzinfo=timezone.utc)
                 if (datetime.now(timezone.utc) - last_updated).total_seconds() < 60:
                     logger.debug(
                         "Skipping upsert — cooldown active",
@@ -769,6 +771,9 @@ Ended with: {last_msg}..."""
             supabase = get_supabase()
 
             capped_limit = min(limit, MAX_MEMORY_LIMIT)
+            if capped_limit <= 0:
+                return [], 0
+            offset = max(0, offset)
 
             result = await asyncio.to_thread(
                 lambda: supabase.table("session_memories").select(
