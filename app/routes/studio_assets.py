@@ -14,6 +14,7 @@ Endpoints:
 - GET /api/studio/assets/health - Health check
 """
 
+import asyncio
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from fastapi.responses import StreamingResponse
@@ -782,6 +783,30 @@ async def clear_test_session(
         from app.services.studio_cko_conversation_service import get_cko_conversation_service
 
         cko_service = get_cko_conversation_service()
+
+        # Find session to save memory from (before deleting)
+        session_id = None
+        try:
+            result = await asyncio.to_thread(
+                lambda: cko_service.supabase.supabase.table("studio_cko_sessions")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("asset_id", asset_id)
+                .eq("session_type", "asset_test")
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                session_id = result.data[0]["id"]
+        except Exception:
+            logger.exception("Failed to find test session for memory save")
+
+        # Fire-and-forget: save memory before clearing
+        if session_id:
+            asyncio.create_task(
+                cko_service.save_test_session_memory(session_id, user_id, asset_id)
+            )
+
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
     except Exception:
         logger.exception("Failed to clear test session", asset_id=asset_id)
@@ -791,6 +816,64 @@ async def clear_test_session(
         ) from None
     else:
         return {"deleted": deleted}
+
+
+@router.get("/{asset_id}/test/context")
+async def get_test_context_info(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Get lightweight context info for a test session."""
+    try:
+        from app.services.studio_cko_conversation_service import get_cko_conversation_service
+
+        cko_service = get_cko_conversation_service()
+
+        # Find the test session
+        session_result = await asyncio.to_thread(
+            lambda: cko_service.supabase.supabase.table("studio_cko_sessions")
+            .select("id, message_count, created_at")
+            .eq("user_id", user_id)
+            .eq("asset_id", asset_id)
+            .eq("session_type", "asset_test")
+            .limit(1)
+            .execute()
+        )
+
+        if not session_result.data:
+            return {
+                "sessionId": None,
+                "messageCount": 0,
+                "approxTokens": 0,
+                "createdAt": None,
+            }
+
+        row = session_result.data[0]
+        msg_count = row.get("message_count", 0)
+
+        # Rough token estimate: sum content lengths / 4
+        approx_tokens = 0
+        if msg_count > 0:
+            token_result = await asyncio.to_thread(
+                lambda: cko_service.supabase.supabase.rpc(
+                    "get_session_token_estimate",
+                    {"p_session_id": row["id"]},
+                ).execute()
+            ) if False else None  # Skip RPC — estimate from count
+            approx_tokens = msg_count * 150  # rough average
+
+        return {
+            "sessionId": row["id"],
+            "messageCount": msg_count,
+            "approxTokens": approx_tokens,
+            "createdAt": row.get("created_at"),
+        }
+    except Exception:
+        logger.exception("Failed to get test context info", asset_id=asset_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get test context info",
+        ) from None
 
 
 # ============================================================================

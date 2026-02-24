@@ -124,6 +124,13 @@ class UpdateMemoryRequest(BaseModel):
     retention_type: Optional[str] = None
 
 
+class AddNoteRequest(BaseModel):
+    """Request for adding a manual memory note."""
+    project_id: str = Field(..., description="Project to attach note to")
+    content: str = Field(..., min_length=1, max_length=5000, description="Note content")
+    tags: Optional[List[str]] = Field(None, description="Optional tags")
+
+
 # =============================================================================
 # Memory Creation Endpoints
 # =============================================================================
@@ -246,6 +253,44 @@ async def save_session_memory(
             conversation_id=request.conversation_id,
             error=str(e)
         )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/note", response_model=SaveMemoryResponse)
+async def add_memory_note(
+    request: AddNoteRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Create a manual memory note for a project. No LLM summarization.
+    """
+    try:
+        from uuid import uuid4
+
+        service = get_session_memory_service()
+        memory_id = await service._store_memory(
+            user_id=user_id,
+            conversation_id=f"manual-note-{uuid4()}",
+            summary=request.content,
+            tags=request.tags or [],
+            project_id=request.project_id,
+            retention_type=RetentionType.INDEFINITE,
+        )
+
+        if not memory_id:
+            return SaveMemoryResponse(
+                success=False,
+                error="Failed to save note"
+            )
+
+        return SaveMemoryResponse(
+            success=True,
+            memory_id=memory_id,
+            summary_preview=request.content[:200]
+        )
+
+    except Exception as e:
+        logger.error("add_memory_note_failed", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 

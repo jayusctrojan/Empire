@@ -52,6 +52,7 @@ router = APIRouter(prefix="/api/studio/cko", tags=["AI Studio CKO"])
 class CreateSessionRequest(BaseModel):
     """Request to create a new CKO session"""
     title: Optional[str] = Field(None, max_length=200, description="Optional session title")
+    project_id: Optional[str] = Field(None, description="Optional project to link session to")
 
 
 class SessionResponse(BaseModel):
@@ -62,6 +63,7 @@ class SessionResponse(BaseModel):
     messageCount: int
     pendingClarifications: int
     contextSummary: Optional[str]
+    projectId: Optional[str] = None
     createdAt: Optional[str]
     updatedAt: Optional[str]
     lastMessageAt: Optional[str]
@@ -247,7 +249,8 @@ async def create_session(
 
         session = await service.create_session(
             user_id=user_id,
-            title=request.title
+            title=request.title,
+            project_id=request.project_id,
         )
 
         return SessionResponse(**session.to_dict())

@@ -133,13 +133,120 @@ class SessionMemoryService:
     # Memory Creation
     # ==========================================================================
 
+    async def _store_memory(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: str,
+        key_decisions: List[Dict] = None,
+        files_mentioned: List[Dict] = None,
+        code_preserved: List[Dict] = None,
+        tags: List[str] = None,
+        project_id: Optional[str] = None,
+        asset_id: Optional[str] = None,
+        retention_type: RetentionType = RetentionType.PROJECT,
+        embedding: Optional[List[float]] = None,
+        upsert_by_conversation: bool = False,
+    ) -> Optional[str]:
+        """
+        Store or upsert a session memory entry.
+
+        If upsert_by_conversation=True and a memory already exists for this
+        conversation_id + user_id, UPDATE it instead of creating a new one.
+        Enforces a 60-second cooldown on upserts.
+        """
+        key_decisions = key_decisions or []
+        files_mentioned = files_mentioned or []
+        code_preserved = code_preserved or []
+        tags = tags or []
+
+        expires_at = self._calculate_expiration(retention_type)
+        now = datetime.utcnow().isoformat()
+
+        supabase = get_supabase()
+
+        if upsert_by_conversation:
+            # Check for existing memory
+            existing = supabase.table("session_memories").select(
+                "id, updated_at"
+            ).eq("conversation_id", conversation_id).eq(
+                "user_id", user_id
+            ).limit(1).execute()
+
+            if existing.data:
+                row = existing.data[0]
+                # 60-second cooldown
+                last_updated = datetime.fromisoformat(
+                    row["updated_at"].replace("Z", "+00:00")
+                ).replace(tzinfo=None)
+                if (datetime.utcnow() - last_updated).total_seconds() < 60:
+                    logger.debug(
+                        "Skipping upsert — cooldown active",
+                        conversation_id=conversation_id,
+                    )
+                    return row["id"]
+
+                # Update existing
+                supabase.table("session_memories").update({
+                    "summary": summary,
+                    "key_decisions": json.dumps(key_decisions),
+                    "files_mentioned": json.dumps(files_mentioned),
+                    "code_preserved": json.dumps(code_preserved),
+                    "tags": tags,
+                    "embedding": embedding,
+                    "updated_at": now,
+                }).eq("id", row["id"]).execute()
+
+                MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
+                logger.info(
+                    "Session memory upserted",
+                    memory_id=row["id"],
+                    conversation_id=conversation_id,
+                )
+                return row["id"]
+
+        # Insert new memory
+        memory_id = str(uuid4())
+
+        insert_data = {
+            "id": memory_id,
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "project_id": project_id,
+            "summary": summary,
+            "key_decisions": json.dumps(key_decisions),
+            "files_mentioned": json.dumps(files_mentioned),
+            "code_preserved": json.dumps(code_preserved),
+            "tags": tags,
+            "retention_type": retention_type.value,
+            "embedding": embedding,
+            "created_at": now,
+            "updated_at": now,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+        if asset_id:
+            insert_data["asset_id"] = asset_id
+
+        supabase.table("session_memories").insert(insert_data).execute()
+
+        MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
+        logger.info(
+            "Session memory stored",
+            memory_id=memory_id,
+            conversation_id=conversation_id,
+            project_id=project_id,
+            asset_id=asset_id,
+        )
+        return memory_id
+
     async def save_session_memory(
         self,
         conversation_id: str,
         user_id: str,
         messages: List[ContextMessage],
         project_id: Optional[str] = None,
-        retention_type: RetentionType = RetentionType.PROJECT
+        retention_type: RetentionType = RetentionType.PROJECT,
+        upsert_by_conversation: bool = False,
     ) -> Optional[str]:
         """
         Save a summary of the current session as a memory.
@@ -150,6 +257,7 @@ class SessionMemoryService:
             messages: List of context messages
             project_id: Optional project ID
             retention_type: Memory retention policy
+            upsert_by_conversation: If True, update existing memory for this conversation
 
         Returns:
             Memory ID if successful, None otherwise
@@ -178,33 +286,19 @@ class SessionMemoryService:
             # Generate embedding for semantic search
             embedding = await self._generate_embedding(summary)
 
-            # Calculate expiration based on retention type
-            expires_at = self._calculate_expiration(retention_type)
-
-            # Create memory ID
-            memory_id = str(uuid4())
-
-            # Save to database
-            supabase = get_supabase()
-            supabase.table("session_memories").insert({
-                "id": memory_id,
-                "user_id": user_id,
-                "conversation_id": conversation_id,
-                "project_id": project_id,
-                "summary": summary,
-                "key_decisions": json.dumps(key_decisions),
-                "files_mentioned": json.dumps(files_mentioned),
-                "code_preserved": json.dumps(code_references),
-                "tags": tags,
-                "retention_type": retention_type.value,
-                "embedding": embedding,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
-                "expires_at": expires_at.isoformat() if expires_at else None
-            }).execute()
-
-            # Record metric
-            MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
+            memory_id = await self._store_memory(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                summary=summary,
+                key_decisions=key_decisions,
+                files_mentioned=files_mentioned,
+                code_preserved=code_references,
+                tags=tags,
+                project_id=project_id,
+                retention_type=retention_type,
+                embedding=embedding,
+                upsert_by_conversation=upsert_by_conversation,
+            )
 
             logger.info(
                 "Session memory saved",

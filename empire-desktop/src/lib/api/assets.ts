@@ -224,6 +224,17 @@ export async function clearTestSession(assetId: string): Promise<{ deleted: bool
   return del<{ deleted: boolean }>(`/api/studio/assets/${assetId}/test`)
 }
 
+export interface TestContextInfo {
+  sessionId: string | null
+  messageCount: number
+  approxTokens: number
+  createdAt: string | null
+}
+
+export async function getTestContextInfo(assetId: string): Promise<TestContextInfo> {
+  return get<TestContextInfo>(`/api/studio/assets/${assetId}/test/context`)
+}
+
 /**
  * Stream an asset test through the CKO pipeline with asset context injected.
  * Returns SSE events: phase, token, artifact, done, error.

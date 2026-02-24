@@ -140,6 +140,8 @@ export {
   type DedupCheckResponse,
   type TestSessionMessage,
   type TestMessagesResponse,
+  getTestContextInfo,
+  type TestContextInfo,
 } from './assets'
 
 // Classifications API (AI Studio)
@@ -242,6 +244,18 @@ export {
   downloadArtifact,
   type ArtifactListResponse,
 } from './artifacts'
+
+// Session Memory API (Accumulated Knowledge)
+export {
+  getProjectMemories,
+  getMemoryDetail,
+  updateMemory,
+  deleteMemory,
+  addMemoryNote,
+  searchMemories,
+  type MemorySummary,
+  type MemoryDetail,
+} from './memory'
 
 // Unified Search API
 export {

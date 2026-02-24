@@ -34,6 +34,7 @@ import {
   findAssetDuplicates,
   getTestMessages,
   clearTestSession,
+  getTestContextInfo,
   ASSET_TYPE_CONFIG,
   ASSET_STATUS_CONFIG,
   DEPARTMENTS,
@@ -203,6 +204,10 @@ export function AssetsView() {
   const [testArtifacts, setTestArtifacts] = useState<AssetTestStreamChunk[]>([])
   const testMessagesEndRef = useRef<HTMLDivElement>(null)
   const testAbortRef = useRef<AbortController | null>(null)
+
+  // Test context info state
+  const [testContextInfo, setTestContextInfo] = useState<{ messageCount: number; approxTokens: number } | null>(null)
+  const [showMemorySaved, setShowMemorySaved] = useState(false)
   const isSearchInitialized = useRef(false)
   const fetchIdRef = useRef(0)
   const pendingHistoryRef = useRef<string | null>(null)
@@ -265,9 +270,13 @@ export function AssetsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAsset?.id])
 
-  // Load test messages when Test tab is activated
+  // Load test messages and context info when Test tab is activated
   useEffect(() => {
     if (activeTab !== 'test' || !selectedAsset) return
+    // Load context info
+    getTestContextInfo(selectedAsset.id)
+      .then(info => setTestContextInfo({ messageCount: info.messageCount, approxTokens: info.approxTokens }))
+      .catch(() => {})
     if (testMessages.length > 0 || isTestStreaming) return // Already have messages
     const requestId = ++testMsgIdRef.current
     getTestMessages(selectedAsset.id)
@@ -475,14 +484,20 @@ export function AssetsView() {
   const handleClearTest = async () => {
     testAbortRef.current?.abort()
     testAbortRef.current = null
+    const hadMessages = testMessages.length > 0
     setTestMessages([])
     setTestStreamingContent('')
     setTestPhase(null)
     setTestArtifacts([])
     setIsTestStreaming(false)
+    setTestContextInfo(null)
     if (selectedAsset) {
       try {
         await clearTestSession(selectedAsset.id)
+        if (hadMessages) {
+          setShowMemorySaved(true)
+          setTimeout(() => setShowMemorySaved(false), 2000)
+        }
       } catch {
         // Non-critical
       }
@@ -954,14 +969,25 @@ export function AssetsView() {
 
               {/* Test Controls */}
               <div className="border-t border-empire-border p-3">
-                {testMessages.length > 0 && (
-                  <div className="flex justify-end mb-2">
-                    <button
-                      onClick={handleClearTest}
-                      className="flex items-center gap-1 text-xs text-empire-text-muted hover:text-empire-text"
-                    >
-                      <Trash2 className="w-3 h-3" /> Clear test
-                    </button>
+                {/* Context info bar + clear button */}
+                {(testMessages.length > 0 || testContextInfo) && (
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-empire-text-muted">
+                      {testContextInfo && testContextInfo.messageCount > 0
+                        ? `${testContextInfo.messageCount} messages · ~${(testContextInfo.approxTokens / 1000).toFixed(1)}K tokens`
+                        : ''}
+                      {showMemorySaved && (
+                        <span className="ml-2 text-green-400">Memory saved</span>
+                      )}
+                    </span>
+                    {testMessages.length > 0 && (
+                      <button
+                        onClick={handleClearTest}
+                        className="flex items-center gap-1 text-xs text-empire-text-muted hover:text-empire-text"
+                      >
+                        <Trash2 className="w-3 h-3" /> Clear test
+                      </button>
+                    )}
                   </div>
                 )}
                 <div className="flex items-center gap-2">

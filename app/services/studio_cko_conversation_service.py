@@ -108,6 +108,7 @@ class CKOSession:
     context_summary: Optional[str] = None
     asset_id: Optional[str] = None
     session_type: str = "cko"
+    project_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_message_at: Optional[datetime] = None
@@ -122,6 +123,7 @@ class CKOSession:
             "contextSummary": self.context_summary,
             "assetId": self.asset_id,
             "sessionType": self.session_type,
+            "projectId": self.project_id,
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "lastMessageAt": self.last_message_at.isoformat() if self.last_message_at else None,
@@ -356,18 +358,25 @@ class StudioCKOConversationService:
             context_summary=row.get("context_summary"),
             asset_id=row.get("asset_id"),
             session_type=row.get("session_type") or "cko",
+            project_id=row.get("project_id"),
             created_at=self._parse_dt(row.get("created_at")),
             updated_at=self._parse_dt(row.get("updated_at")),
             last_message_at=self._parse_dt(row.get("last_message_at")),
         )
 
-    async def create_session(self, user_id: str, title: Optional[str] = None) -> CKOSession:
+    async def create_session(
+        self,
+        user_id: str,
+        title: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> CKOSession:
         """
         Create a new CKO conversation session.
 
         Args:
             user_id: The user's ID
             title: Optional session title (auto-generated if not provided)
+            project_id: Optional project to link this session to
 
         Returns:
             CKOSession object
@@ -375,15 +384,21 @@ class StudioCKOConversationService:
         try:
             now = datetime.now(timezone.utc)
 
+            insert_data = {
+                "user_id": user_id,
+                "title": title or "New Conversation",
+                "message_count": 0,
+                "pending_clarifications": 0,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+            if project_id:
+                insert_data["project_id"] = project_id
+
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions").insert({
-                    "user_id": user_id,
-                    "title": title or "New Conversation",
-                    "message_count": 0,
-                    "pending_clarifications": 0,
-                    "created_at": now.isoformat(),
-                    "updated_at": now.isoformat(),
-                }).execute()
+                lambda: self.supabase.supabase.table("studio_cko_sessions").insert(
+                    insert_data
+                ).execute()
             )
 
             if result.data and len(result.data) > 0:
@@ -1758,6 +1773,116 @@ Please answer based on the sources above. Include citations like [1], [2] when r
 
         return cited
 
+    async def _auto_save_session_memory(self, session: CKOSession) -> None:
+        """
+        Fire-and-forget: save/upsert session memory for this conversation.
+        Called at message 5, then every 10 (15, 25, 35...).
+        """
+        try:
+            from app.services.session_memory_service import get_session_memory_service
+            from app.models.context_models import ContextMessage, MessageRole, RetentionType
+
+            # Fetch all messages for this session
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_messages")
+                .select("role, content, created_at")
+                .eq("session_id", session.id)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            if not result.data or len(result.data) < 3:
+                return
+
+            # Convert to ContextMessage format
+            messages = [
+                ContextMessage(
+                    id=f"cko-{i}",
+                    context_id=session.id,
+                    role=MessageRole.USER if row["role"] == "user" else MessageRole.ASSISTANT,
+                    content=row["content"],
+                    token_count=len(row["content"]) // 4,
+                    is_protected=False,
+                    position=i,
+                )
+                for i, row in enumerate(result.data)
+            ]
+
+            service = get_session_memory_service()
+            await service.save_session_memory(
+                conversation_id=session.id,
+                user_id=session.user_id,
+                messages=messages,
+                project_id=session.project_id,
+                retention_type=RetentionType.CKO,
+                upsert_by_conversation=True,
+            )
+        except Exception:
+            logger.exception(
+                "Auto-save session memory failed (advisory)",
+                session_id=session.id,
+            )
+
+    async def save_test_session_memory(
+        self,
+        session_id: str,
+        user_id: str,
+        asset_id: str,
+    ) -> Optional[str]:
+        """
+        Save a summary of a test session as a session memory.
+        Returns memory_id or None if <3 messages.
+        """
+        try:
+            from app.services.session_memory_service import get_session_memory_service
+            from app.models.context_models import ContextMessage, MessageRole, RetentionType
+
+            result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_messages")
+                .select("role, content, created_at")
+                .eq("session_id", session_id)
+                .order("created_at", desc=False)
+                .execute()
+            )
+            if not result.data or len(result.data) < 3:
+                return None
+
+            messages = [
+                ContextMessage(
+                    id=f"test-{i}",
+                    context_id=session_id,
+                    role=MessageRole.USER if row["role"] == "user" else MessageRole.ASSISTANT,
+                    content=row["content"],
+                    token_count=len(row["content"]) // 4,
+                    is_protected=False,
+                    position=i,
+                )
+                for i, row in enumerate(result.data)
+            ]
+
+            service = get_session_memory_service()
+            memory_id = await service.save_session_memory(
+                conversation_id=session_id,
+                user_id=user_id,
+                messages=messages,
+                retention_type=RetentionType.CKO,
+            )
+
+            # Attach asset_id directly if memory was created
+            if memory_id:
+                from app.core.database import get_supabase
+                supabase = get_supabase()
+                supabase.table("session_memories").update(
+                    {"asset_id": asset_id}
+                ).eq("id", memory_id).execute()
+
+            return memory_id
+        except Exception:
+            logger.exception(
+                "Save test session memory failed (advisory)",
+                session_id=session_id,
+            )
+            return None
+
     async def _update_session_metadata(
         self,
         session_id: str,
@@ -1771,7 +1896,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
         title_update = {}
         session_result = await asyncio.to_thread(
             lambda: self.supabase.supabase.table("studio_cko_sessions")
-                .select("title, message_count")
+                .select("title, message_count, project_id, user_id")
                 .eq("id", session_id)
                 .limit(1)
                 .execute()
@@ -1785,17 +1910,32 @@ Please answer based on the sources above. Include citations like [1], [2] when r
 
         # Read current count first, then update (avoids nested query race condition)
         current_count = session_result.data[0].get("message_count", 0) if session_result.data else 0
+        new_count = current_count + 2
         await asyncio.to_thread(
             lambda: self.supabase.supabase.table("studio_cko_sessions")
                 .update({
                     **title_update,
-                    "message_count": current_count + 2,
+                    "message_count": new_count,
                     "last_message_at": now.isoformat(),
                     "updated_at": now.isoformat(),
                 })
                 .eq("id", session_id)
                 .execute()
         )
+
+        # Auto-save trigger: at message 5, then every 10 (15, 25, 35...)
+        if new_count == 5 or (new_count > 5 and new_count % 10 == 5):
+            if session_result.data:
+                row = session_result.data[0]
+                project_id = row.get("project_id")
+                if project_id:
+                    session = CKOSession(
+                        id=session_id,
+                        user_id=row["user_id"],
+                        project_id=project_id,
+                        message_count=new_count,
+                    )
+                    asyncio.create_task(self._auto_save_session_memory(session))
 
 
 # ============================================================================
