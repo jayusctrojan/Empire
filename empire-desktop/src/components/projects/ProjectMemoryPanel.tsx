@@ -71,6 +71,9 @@ export function ProjectMemoryPanel({
   // Infinite scroll sentinel
   const sentinelRef = useRef<HTMLDivElement>(null)
 
+  // Mutable offset ref — avoids memories.length in useCallback deps
+  const offsetRef = useRef(0)
+
   // Sync pinned text when prop changes
   useEffect(() => {
     if (!isEditingPinned) setPinnedText(memoryContext)
@@ -81,32 +84,31 @@ export function ProjectMemoryPanel({
     const id = ++fetchIdRef.current
     setIsLoading(true)
     try {
-      const offset = reset ? 0 : memories.length
+      const offset = reset ? 0 : offsetRef.current
       const result = searchQuery.trim()
         ? await searchMemories(searchQuery, projectId, PAGE_SIZE)
         : await getProjectMemories(projectId, PAGE_SIZE, offset)
       if (fetchIdRef.current !== id) return // stale
       if (reset) {
         setMemories(result.memories)
+        offsetRef.current = result.memories.length
       } else {
         setMemories(prev => [...prev, ...result.memories])
+        offsetRef.current += result.memories.length
       }
       setTotal(result.total)
       const isSearch = !!searchQuery.trim()
       setHasMore(
         isSearch
           ? false // search endpoint doesn't support offset-based pagination
-          : reset
-            ? result.memories.length < result.total
-            : memories.length + result.memories.length < result.total
+          : offsetRef.current < result.total
       )
     } catch {
       // advisory — fail silently
     } finally {
       if (fetchIdRef.current === id) setIsLoading(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, searchQuery, memories.length])
+  }, [projectId, searchQuery])
 
   // Stable ref for loadMemories — avoids stale closures in IntersectionObserver
   const loadMemoriesRef = useRef(loadMemories)
@@ -211,6 +213,7 @@ export function ProjectMemoryPanel({
       await deleteMemory(memoryId)
       setDeletingId(null)
       setMemories(prev => prev.filter(m => m.id !== memoryId))
+      offsetRef.current = Math.max(0, offsetRef.current - 1)
       setTotal(prev => Math.max(0, prev - 1))
       if (expandedId === memoryId) {
         setExpandedId(null)
@@ -306,6 +309,7 @@ export function ProjectMemoryPanel({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search memories..."
+            aria-label="Search memories"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-empire-border bg-empire-sidebar text-empire-text text-sm placeholder:text-empire-text-muted focus:outline-none focus:ring-2 focus:ring-empire-primary/50"
           />
         </div>
@@ -400,9 +404,11 @@ export function ProjectMemoryPanel({
                     )}
                     <div className="flex items-center gap-2 mt-1.5 text-[10px] text-empire-text-muted">
                       <span>
-                        {memory.conversationId.startsWith('manual-note-')
+                        {memory.conversationId?.startsWith('manual-note-')
                           ? 'Manual'
-                          : 'CKO'}
+                          : memory.conversationId
+                            ? 'CKO'
+                            : 'Unknown'}
                       </span>
                       <span>·</span>
                       <span>{new Date(memory.createdAt).toLocaleDateString()}</span>
@@ -506,7 +512,7 @@ export function ProjectMemoryPanel({
                             key={i}
                             className="text-[10px] p-2 rounded bg-empire-bg text-empire-text overflow-x-auto mt-1"
                           >
-                            <code>{c.content.slice(0, 300)}</code>
+                            <code>{c.content.slice(0, 300)}{c.content.length > 300 ? '…' : ''}</code>
                           </pre>
                         ))}
                       </div>

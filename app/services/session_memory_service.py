@@ -216,6 +216,7 @@ class SessionMemoryService:
                     "code_preserved": json.dumps(code_preserved),
                     "tags": tags,
                     "updated_at": now,
+                    "expires_at": expires_at,
                 }
                 if embedding is not None:
                     update_payload["embedding"] = embedding

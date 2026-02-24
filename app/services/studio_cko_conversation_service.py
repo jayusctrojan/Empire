@@ -1803,6 +1803,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                     token_count=len(row["content"]) // 4,
                     is_protected=False,
                     position=i,
+                    created_at=self._parse_dt(row.get("created_at")) or datetime.now(timezone.utc),
                 )
                 for i, row in enumerate(result.data)
             ]
@@ -1855,6 +1856,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                     token_count=len(row["content"]) // 4,
                     is_protected=False,
                     position=i,
+                    created_at=self._parse_dt(row.get("created_at")) or datetime.now(timezone.utc),
                 )
                 for i, row in enumerate(result.data)
             ]
