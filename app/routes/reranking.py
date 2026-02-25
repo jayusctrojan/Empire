@@ -238,10 +238,11 @@ async def rerank_batch(
                 "error": str(e)
             })
 
+    successful_count = sum(1 for r in results if r.get("success"))
     return {
-        "success": True,
+        "success": successful_count == len(queries),
         "total_queries": len(queries),
-        "successful_queries": sum(1 for r in results if r.get("success")),
+        "successful_queries": successful_count,
         "total_time_ms": total_time_ms,
         "results": results
     }
@@ -269,7 +270,7 @@ async def reranking_health():
                 data = response.json()
                 models = [m.get("name", "") for m in data.get("models", [])]
                 bge_available = any("bge-reranker" in m.lower() for m in models)
-                qwen_available = any(m == "qwen3.5:35b" for m in models)
+                qwen_available = any("qwen3.5" in m.lower() for m in models)
     except Exception as e:
         logger.warning(f"Failed to check Ollama model availability: {e}")
     providers["ollama"] = bge_available

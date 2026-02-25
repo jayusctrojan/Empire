@@ -18,6 +18,7 @@ to provide comprehensive answers with proper citations.
 """
 
 import asyncio
+import copy
 import time
 import os
 from datetime import datetime, timezone
@@ -99,7 +100,11 @@ class CKOSource:
 
 @dataclass
 class CKOSession:
-    """A CKO conversation session"""
+    """A CKO conversation session
+
+    Note: project_id requires the studio_cko_sessions.project_id column
+    (added in PR #169 migration: add_project_id_to_cko_sessions).
+    """
     id: str
     user_id: str
     title: Optional[str] = None
@@ -1489,12 +1494,13 @@ class StudioCKOConversationService:
                 enable_metrics=True,
             )
 
-            reranking_service = RerankingService(config=rerank_config)
+            ollama_service = RerankingService(config=rerank_config)
+            llm_service = None
             try:
-                result = await reranking_service.rerank(query=query, results=search_results)
+                result = await ollama_service.rerank(query=query, results=search_results)
             except Exception as ollama_err:
                 logger.warning(f"Ollama reranking failed, trying LLM fallback: {ollama_err}")
-                await reranking_service.close()
+                await ollama_service.close()
                 # Fallback to LLM-based reranking
                 llm_config = RerankingConfig(
                     provider=RerankingProvider.LLM,
@@ -1503,15 +1509,18 @@ class StudioCKOConversationService:
                     score_threshold=0.3,
                     enable_metrics=True,
                 )
-                reranking_service = RerankingService(config=llm_config)
-                result = await reranking_service.rerank(query=query, results=search_results)
+                llm_service = RerankingService(config=llm_config)
+                result = await llm_service.rerank(query=query, results=search_results)
             finally:
-                await reranking_service.close()
+                await ollama_service.close()
+                if llm_service is not None:
+                    await llm_service.close()
 
             if not result.reranked_results:
                 return sources[:top_k]
 
             # Map reranked scores back to CKOSource objects by index-based unique ID
+            # Use copy to avoid mutating the caller's original objects
             source_map = {
                 f"{s.doc_id}::{i}": s for i, s in enumerate(sources)
             }
@@ -1519,8 +1528,9 @@ class StudioCKOConversationService:
             for sr in result.reranked_results:
                 original = source_map.get(sr.chunk_id)
                 if original:
-                    original.relevance_score = sr.score
-                    reranked_sources.append(original)
+                    updated = copy.copy(original)
+                    updated.relevance_score = sr.score
+                    reranked_sources.append(updated)
 
             if result.metrics:
                 logger.info(

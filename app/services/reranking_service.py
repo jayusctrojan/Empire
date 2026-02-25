@@ -392,8 +392,8 @@ class RerankingService:
             self.llm_client = get_llm_client(self.config.llm_provider)
 
         docs = [
-            {"id": r.chunk_id, "content": r.content[:500]}
-            for r in results
+            {"index": i, "content": r.content[:500]}
+            for i, r in enumerate(results)
         ]
 
         prompt = f"""Given the query: "{query}"
@@ -459,6 +459,9 @@ Return ONLY a JSON object with a single key "relevance_scores" containing a list
             NDCG score (0.0 to 1.0)
         """
         if not results:
+            return 0.0
+
+        if np is None:
             return 0.0
 
         k = k or len(results)
