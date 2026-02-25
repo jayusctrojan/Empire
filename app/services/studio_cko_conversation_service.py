@@ -1844,6 +1844,26 @@ Please answer based on the sources above. Include citations like [1], [2] when r
             from app.services.session_memory_service import get_session_memory_service
             from app.models.context_models import ContextMessage, MessageRole, RetentionType
 
+            # Verify ownership + scope before reading messages
+            session_check = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                .select("id")
+                .eq("id", session_id)
+                .eq("user_id", user_id)
+                .eq("asset_id", asset_id)
+                .eq("session_type", "asset_test")
+                .limit(1)
+                .execute()
+            )
+            if not session_check.data:
+                logger.warning(
+                    "Invalid test session memory save request",
+                    session_id=session_id,
+                    user_id=user_id,
+                    asset_id=asset_id,
+                )
+                return None
+
             result = await asyncio.to_thread(
                 lambda: self.supabase.supabase.table("studio_cko_messages")
                 .select("role, content, created_at")
@@ -1955,8 +1975,6 @@ Please answer based on the sources above. Include citations like [1], [2] when r
         """Update session metadata after a message exchange."""
         now = datetime.now(timezone.utc)
 
-        # Auto-generate title from first message if not set
-        title_update = {}
         session_result = await asyncio.to_thread(
             lambda: self.supabase.supabase.table("studio_cko_sessions")
                 .select("title, message_count, project_id, user_id")
@@ -1965,15 +1983,14 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 .execute()
         )
 
-        if session_result.data:
-            current = session_result.data[0]
-            if current.get("message_count", 0) == 0 or current.get("title") == "New Conversation":
-                # Generate title from first user message
-                title_update["title"] = user_message[:50] + ("..." if len(user_message) > 50 else "")
-
         # Optimistic compare-and-set: retry up to 3 times on concurrent conflicts
         for _attempt in range(3):
-            current_count = session_result.data[0].get("message_count", 0) if session_result.data else 0
+            current = session_result.data[0] if session_result.data else {}
+            current_count = current.get("message_count", 0)
+            # Recompute title_update each iteration to avoid stale data after re-read
+            title_update = {}
+            if current_count == 0 or current.get("title") == "New Conversation":
+                title_update["title"] = user_message[:50] + ("..." if len(user_message) > 50 else "")
             new_count = current_count + 2
             update_result = await asyncio.to_thread(
                 lambda: self.supabase.supabase.table("studio_cko_sessions")

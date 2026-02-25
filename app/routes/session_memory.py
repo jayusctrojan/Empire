@@ -126,7 +126,7 @@ class UpdateMemoryRequest(BaseModel):
 
 class AddNoteRequest(BaseModel):
     """Request for adding a manual memory note."""
-    project_id: str = Field(..., description="Project to attach note to")
+    project_id: str = Field(..., min_length=1, description="Project to attach note to")
     content: str = Field(..., min_length=1, max_length=5000, description="Note content")
     tags: Optional[List[str]] = Field(None, description="Optional tags")
 

@@ -332,11 +332,15 @@ export function AssetsView() {
     testMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [testMessages, testStreamingContent])
 
-  // Abort in-flight test stream on unmount
+  // Abort in-flight test stream and clear timers on unmount
   useEffect(() => {
     return () => {
       testAbortRef.current?.abort()
       testAbortRef.current = null
+      if (memorySavedTimerRef.current) {
+        clearTimeout(memorySavedTimerRef.current)
+        memorySavedTimerRef.current = null
+      }
     }
   }, [])
 

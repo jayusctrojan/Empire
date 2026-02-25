@@ -209,7 +209,8 @@ export async function* streamCKOMessage(
       const lines = buffer.split('\n')
       buffer = lines.pop() || '' // Keep incomplete line in buffer
 
-      for (const line of lines) {
+      for (const rawLine of lines) {
+        const line = rawLine.replace(/\r$/, '')
         if (line.startsWith('event:')) {
           // Event type line — currently unused but parsed for completeness
         } else if (line.startsWith('data:')) {
@@ -227,6 +228,9 @@ export async function* streamCKOMessage(
         }
       }
     }
+
+    // Flush any buffered UTF-8 bytes from streaming decoder
+    buffer += decoder.decode()
 
     // Don't flush on abort — the consumer has already signaled intent to stop
     if (!signal?.aborted) {
