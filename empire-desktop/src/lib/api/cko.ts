@@ -67,7 +67,7 @@ export interface CKOMessage {
   clarificationAnswer?: string
   rating?: number
   ratingFeedback?: string
-  createdAt: string
+  createdAt: string | null
 }
 
 export interface CKOStreamChunk {

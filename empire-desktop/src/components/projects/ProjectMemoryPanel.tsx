@@ -462,9 +462,14 @@ export function ProjectMemoryPanel({
                     {editingMemoryId !== memory.id && (
                       <button
                         aria-label={`Edit memory ${memory.id}`}
-                        onClick={() => {
+                        onClick={async () => {
                           setEditingMemoryId(memory.id)
-                          setEditSummary(memory.summaryPreview)
+                          try {
+                            const detail = await getMemoryDetail(memory.id)
+                            setEditSummary(detail?.summary ?? memory.summaryPreview)
+                          } catch {
+                            setEditSummary(memory.summaryPreview)
+                          }
                         }}
                         className="p-1 rounded hover:bg-empire-border transition-colors"
                       >

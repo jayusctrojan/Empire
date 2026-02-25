@@ -158,6 +158,9 @@ export async function addMemoryNote(
     content,
     tags,
   })
+  if (!res.success || !res.memory_id) {
+    throw new Error('Failed to save memory note')
+  }
   return { memoryId: res.memory_id }
 }
 
