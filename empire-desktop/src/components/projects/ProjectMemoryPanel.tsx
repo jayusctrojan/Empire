@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useReducer } from 'react'
 import {
   Lock,
   Edit2,
@@ -30,6 +30,49 @@ interface ProjectMemoryPanelProps {
 const PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 300
 
+// Consolidated memory list state to reduce useState declarations
+interface MemoryListState {
+  memories: MemorySummary[]
+  total: number
+  isLoading: boolean
+  hasMore: boolean
+}
+
+type MemoryListAction =
+  | { type: 'LOAD_START' }
+  | { type: 'LOAD_SUCCESS'; memories: MemorySummary[]; total: number; reset: boolean; hasMore: boolean }
+  | { type: 'LOAD_FAIL' }
+  | { type: 'DELETE'; memoryId: string }
+
+const initialListState: MemoryListState = {
+  memories: [],
+  total: 0,
+  isLoading: false,
+  hasMore: false,
+}
+
+function memoryListReducer(state: MemoryListState, action: MemoryListAction): MemoryListState {
+  switch (action.type) {
+    case 'LOAD_START':
+      return { ...state, isLoading: true }
+    case 'LOAD_SUCCESS':
+      return {
+        memories: action.reset ? action.memories : [...state.memories, ...action.memories],
+        total: action.total,
+        isLoading: false,
+        hasMore: action.hasMore,
+      }
+    case 'LOAD_FAIL':
+      return { ...state, isLoading: false }
+    case 'DELETE':
+      return {
+        ...state,
+        memories: state.memories.filter(m => m.id !== action.memoryId),
+        total: Math.max(0, state.total - 1),
+      }
+  }
+}
+
 export function ProjectMemoryPanel({
   projectId,
   memoryContext,
@@ -40,11 +83,9 @@ export function ProjectMemoryPanel({
   const [isEditingPinned, setIsEditingPinned] = useState(false)
   const [isSavingPinned, setIsSavingPinned] = useState(false)
 
-  // Accumulated knowledge state
-  const [memories, setMemories] = useState<MemorySummary[]>([])
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(false)
+  // Accumulated knowledge state (consolidated via useReducer)
+  const [listState, dispatch] = useReducer(memoryListReducer, initialListState)
+  const { memories, total, isLoading, hasMore } = listState
 
   // Search
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,7 +123,7 @@ export function ProjectMemoryPanel({
   // Load memories
   const loadMemories = useCallback(async (reset = false) => {
     const id = ++fetchIdRef.current
-    setIsLoading(true)
+    dispatch({ type: 'LOAD_START' })
     try {
       const offset = reset ? 0 : offsetRef.current
       const result = searchQuery.trim()
@@ -90,25 +131,21 @@ export function ProjectMemoryPanel({
         : await getProjectMemories(projectId, PAGE_SIZE, offset)
       if (fetchIdRef.current !== id) return // stale
       if (reset) {
-        setMemories(result.memories)
         offsetRef.current = result.memories.length
       } else {
-        setMemories(prev => [...prev, ...result.memories])
         offsetRef.current += result.memories.length
       }
-      setTotal(result.total)
       const isSearch = !!searchQuery.trim()
-      // Guard: empty page means no more data (prevents infinite loop if total > offset)
       const emptyPage = result.memories.length === 0
-      setHasMore(
-        isSearch || emptyPage
-          ? false
-          : offsetRef.current < result.total
-      )
+      dispatch({
+        type: 'LOAD_SUCCESS',
+        memories: result.memories,
+        total: result.total,
+        reset,
+        hasMore: isSearch || emptyPage ? false : offsetRef.current < result.total,
+      })
     } catch {
-      // advisory — fail silently
-    } finally {
-      if (fetchIdRef.current === id) setIsLoading(false)
+      if (fetchIdRef.current === id) dispatch({ type: 'LOAD_FAIL' })
     }
   }, [projectId, searchQuery])
 
@@ -119,7 +156,7 @@ export function ProjectMemoryPanel({
   // Debounced search + initial load (unified to avoid duplicate loads on mount)
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    if (!searchQuery) {
+    if (!searchQuery.trim()) {
       // Empty search — load immediately (handles initial mount + clearing search)
       loadMemoriesRef.current(true)
       return
@@ -214,9 +251,8 @@ export function ProjectMemoryPanel({
     try {
       await deleteMemory(memoryId)
       setDeletingId(null)
-      setMemories(prev => prev.filter(m => m.id !== memoryId))
+      dispatch({ type: 'DELETE', memoryId })
       offsetRef.current = Math.max(0, offsetRef.current - 1)
-      setTotal(prev => Math.max(0, prev - 1))
       if (expandedId === memoryId) {
         setExpandedId(null)
         setExpandedDetail(null)

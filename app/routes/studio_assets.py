@@ -796,8 +796,14 @@ async def clear_test_session(
                 )
             except Exception:
                 logger.exception("save_test_session_memory failed", asset_id=asset_id)
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Failed to save test session memory; session was not cleared",
+                ) from None
 
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Failed to clear test session", asset_id=asset_id)
         raise HTTPException(

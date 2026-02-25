@@ -343,9 +343,16 @@ class StudioCKOConversationService:
     @staticmethod
     def _parse_dt(value: Optional[str]) -> Optional[datetime]:
         """Parse ISO datetime from Supabase (handles Z suffix)."""
-        if not value:
+        if value is None:
             return None
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if isinstance(value, datetime):
+            return value
+        if not isinstance(value, str):
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
 
     def _row_to_session(self, row: Dict[str, Any]) -> CKOSession:
         """Convert DB row to CKOSession. Single source of truth."""
@@ -1877,11 +1884,19 @@ Please answer based on the sources above. Include citations like [1], [2] when r
             if memory_id:
                 from app.core.database import get_supabase
                 supabase = get_supabase()
-                await asyncio.to_thread(
-                    lambda: supabase.table("session_memories").update(
-                        {"asset_id": asset_id}
-                    ).eq("id", memory_id).execute()
-                )
+                try:
+                    await asyncio.to_thread(
+                        lambda: supabase.table("session_memories").update(
+                            {"asset_id": asset_id}
+                        ).eq("id", memory_id).execute()
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to attach asset_id to saved test memory",
+                        session_id=session_id,
+                        memory_id=memory_id,
+                        asset_id=asset_id,
+                    )
 
             return memory_id
         except Exception:
@@ -1956,20 +1971,35 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 # Generate title from first user message
                 title_update["title"] = user_message[:50] + ("..." if len(user_message) > 50 else "")
 
-        # Read current count first, then update (avoids nested query race condition)
-        current_count = session_result.data[0].get("message_count", 0) if session_result.data else 0
-        new_count = current_count + 2
-        await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("studio_cko_sessions")
-                .update({
-                    **title_update,
-                    "message_count": new_count,
-                    "last_message_at": now.isoformat(),
-                    "updated_at": now.isoformat(),
-                })
-                .eq("id", session_id)
-                .execute()
-        )
+        # Optimistic compare-and-set: retry up to 3 times on concurrent conflicts
+        for _attempt in range(3):
+            current_count = session_result.data[0].get("message_count", 0) if session_result.data else 0
+            new_count = current_count + 2
+            update_result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                    .update({
+                        **title_update,
+                        "message_count": new_count,
+                        "last_message_at": now.isoformat(),
+                        "updated_at": now.isoformat(),
+                    })
+                    .eq("id", session_id)
+                    .eq("message_count", current_count)
+                    .execute()
+            )
+            if update_result.data:
+                break
+            # Re-read for retry
+            session_result = await asyncio.to_thread(
+                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                    .select("title, message_count, project_id, user_id")
+                    .eq("id", session_id)
+                    .limit(1)
+                    .execute()
+            )
+        else:
+            logger.warning("Concurrent metadata update conflict", session_id=session_id)
+            return
 
         # Auto-save trigger: at message 6, then every 10 (16, 26, 36...)
         # new_count is always even (current + 2), so check even thresholds

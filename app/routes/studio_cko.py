@@ -247,6 +247,26 @@ async def create_session(
     try:
         logger.info("Creating CKO session", user_id=user_id)
 
+        # Validate project ownership if project_id is provided
+        if request.project_id:
+            from app.core.database import get_supabase
+            import asyncio as _asyncio
+
+            supabase = get_supabase()
+            project_check = await _asyncio.to_thread(
+                lambda: supabase.table("projects")
+                .select("id")
+                .eq("id", request.project_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if not project_check.data:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Project not found or access denied",
+                )
+
         session = await service.create_session(
             user_id=user_id,
             title=request.title,
@@ -255,6 +275,8 @@ async def create_session(
 
         return SessionResponse(**session.to_dict())
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to create CKO session", user_id=user_id, error=str(e))
         raise HTTPException(

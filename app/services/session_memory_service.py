@@ -260,9 +260,28 @@ class SessionMemoryService:
         if asset_id:
             insert_data["asset_id"] = asset_id
 
-        await asyncio.to_thread(
-            lambda: supabase.table("session_memories").insert(insert_data).execute()
-        )
+        try:
+            await asyncio.to_thread(
+                lambda: supabase.table("session_memories").insert(insert_data).execute()
+            )
+        except Exception as insert_err:
+            if not upsert_by_conversation:
+                raise
+            # Concurrent insert for same conversation — fall back to update
+            logger.warning(
+                "Insert conflict on upsert path, falling back to update",
+                conversation_id=conversation_id,
+            )
+            existing_retry = await asyncio.to_thread(
+                lambda: supabase.table("session_memories").select("id")
+                .eq("conversation_id", conversation_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if existing_retry.data:
+                return existing_retry.data[0]["id"]
+            raise insert_err
 
         MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
         logger.info(

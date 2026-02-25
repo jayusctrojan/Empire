@@ -267,11 +267,18 @@ async def add_memory_note(
     try:
         from uuid import uuid4
 
+        normalized_content = request.content.strip()
+        if not normalized_content:
+            return SaveMemoryResponse(
+                success=False,
+                error="Note content cannot be blank"
+            )
+
         service = get_session_memory_service()
         memory_id = await service.add_note(
             user_id=user_id,
             conversation_id=f"manual-note-{uuid4()}",
-            summary=request.content,
+            summary=normalized_content,
             tags=request.tags or [],
             project_id=request.project_id,
             retention_type=RetentionType.INDEFINITE,
@@ -286,7 +293,7 @@ async def add_memory_note(
         return SaveMemoryResponse(
             success=True,
             memory_id=memory_id,
-            summary_preview=request.content[:200] + "..." if len(request.content) > 200 else request.content
+            summary_preview=normalized_content[:200] + "..." if len(normalized_content) > 200 else normalized_content
         )
 
     except Exception as e:
