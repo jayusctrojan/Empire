@@ -92,6 +92,7 @@ export function ProjectMemoryPanel({
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const fetchIdRef = useRef(0)
   const detailFetchIdRef = useRef(0)
+  const editFetchIdRef = useRef(0)
 
   // Add note
   const [isAddingNote, setIsAddingNote] = useState(false)
@@ -126,8 +127,9 @@ export function ProjectMemoryPanel({
     dispatch({ type: 'LOAD_START' })
     try {
       const offset = reset ? 0 : offsetRef.current
-      const result = searchQuery.trim()
-        ? await searchMemories(searchQuery, projectId, PAGE_SIZE)
+      const trimmedQuery = searchQuery.trim()
+      const result = trimmedQuery
+        ? await searchMemories(trimmedQuery, projectId, PAGE_SIZE)
         : await getProjectMemories(projectId, PAGE_SIZE, offset)
       if (fetchIdRef.current !== id) return // stale
       if (reset) {
@@ -135,7 +137,7 @@ export function ProjectMemoryPanel({
       } else {
         offsetRef.current += result.memories.length
       }
-      const isSearch = !!searchQuery.trim()
+      const isSearch = !!trimmedQuery
       const emptyPage = result.memories.length === 0
       dispatch({
         type: 'LOAD_SUCCESS',
@@ -463,12 +465,17 @@ export function ProjectMemoryPanel({
                       <button
                         aria-label={`Edit memory ${memory.id}`}
                         onClick={async () => {
+                          const requestId = ++editFetchIdRef.current
                           setEditingMemoryId(memory.id)
                           try {
                             const detail = await getMemoryDetail(memory.id)
-                            setEditSummary(detail?.summary ?? memory.summaryPreview)
+                            if (editFetchIdRef.current === requestId) {
+                              setEditSummary(detail?.summary ?? memory.summaryPreview)
+                            }
                           } catch {
-                            setEditSummary(memory.summaryPreview)
+                            if (editFetchIdRef.current === requestId) {
+                              setEditSummary(memory.summaryPreview)
+                            }
                           }
                         }}
                         className="p-1 rounded hover:bg-empire-border transition-colors"

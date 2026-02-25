@@ -494,12 +494,6 @@ export function AssetsView() {
     testAbortRef.current?.abort()
     testAbortRef.current = null
     const hadMessages = testMessages.length > 0
-    setTestMessages([])
-    setTestStreamingContent('')
-    setTestPhase(null)
-    setTestArtifacts([])
-    setIsTestStreaming(false)
-    setTestContextInfo(null)
     if (selectedAsset) {
       try {
         await clearTestSession(selectedAsset.id)
@@ -509,9 +503,16 @@ export function AssetsView() {
           memorySavedTimerRef.current = setTimeout(() => setShowMemorySaved(false), 2000)
         }
       } catch {
-        // Non-critical
+        setActionMessage({ type: 'error', text: 'Failed to clear test session' })
+        return
       }
     }
+    setTestMessages([])
+    setTestStreamingContent('')
+    setTestPhase(null)
+    setTestArtifacts([])
+    setIsTestStreaming(false)
+    setTestContextInfo(null)
   }
 
   const handleNavigateToDuplicate = async (assetId: string) => {

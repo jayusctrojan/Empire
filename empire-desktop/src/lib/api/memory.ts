@@ -120,6 +120,9 @@ export async function getProjectMemories(
     `/api/session-memory/project/${projectId}`,
     params,
   )
+  if (!res.success) {
+    throw new Error('Failed to load project memories')
+  }
   return {
     memories: (res.memories ?? []).map(toMemorySummary),
     total: res.total ?? 0,
@@ -172,6 +175,9 @@ export async function searchMemories(
   const body: Record<string, unknown> = { query, limit }
   if (projectId) body.project_id = projectId
   const res = await post<MemoryListResponse>('/api/session-memory/search', body)
+  if (!res.success) {
+    throw new Error('Failed to search memories')
+  }
   return {
     memories: (res.memories ?? []).map(toMemorySummary),
     total: res.total ?? 0,
