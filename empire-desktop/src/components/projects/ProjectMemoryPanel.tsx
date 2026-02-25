@@ -466,16 +466,16 @@ export function ProjectMemoryPanel({
                         aria-label={`Edit memory ${memory.id}`}
                         onClick={async () => {
                           const requestId = ++editFetchIdRef.current
+                          const fallback = memory.summaryPreview
                           setEditingMemoryId(memory.id)
+                          setEditSummary(fallback)
                           try {
                             const detail = await getMemoryDetail(memory.id)
                             if (editFetchIdRef.current === requestId) {
-                              setEditSummary(detail?.summary ?? memory.summaryPreview)
+                              setEditSummary(prev => prev === fallback ? (detail?.summary ?? fallback) : prev)
                             }
                           } catch {
-                            if (editFetchIdRef.current === requestId) {
-                              setEditSummary(memory.summaryPreview)
-                            }
+                            // fallback already set — nothing to do
                           }
                         }}
                         className="p-1 rounded hover:bg-empire-border transition-colors"

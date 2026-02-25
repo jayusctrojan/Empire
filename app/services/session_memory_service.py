@@ -828,12 +828,12 @@ Ended with: {last_msg}..."""
             MEMORY_RETRIEVED.labels(method="project").inc(len(memories))
             MEMORY_RETRIEVAL_LATENCY.labels(method="project").observe(duration)
 
-        except Exception as e:
+        except Exception:
             logger.exception(
                 "Failed to get project memories",
                 project_id=project_id,
             )
-            return [], 0
+            raise
         else:
             return memories, total
 

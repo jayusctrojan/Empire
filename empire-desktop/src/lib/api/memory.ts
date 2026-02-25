@@ -131,6 +131,9 @@ export async function getProjectMemories(
 
 export async function getMemoryDetail(memoryId: string): Promise<MemoryDetail | null> {
   const res = await get<MemoryDetailResponse>(`/api/session-memory/${memoryId}`)
+  if (!res.success) {
+    throw new Error('Failed to load memory detail')
+  }
   return res.memory ? toMemoryDetail(res.memory) : null
 }
 
@@ -143,6 +146,9 @@ export async function updateMemory(
   if (updates.tags !== undefined) body.tags = updates.tags
   if (updates.retentionType !== undefined) body.retention_type = updates.retentionType
   const res = await patch<MemoryDetailResponse>(`/api/session-memory/${memoryId}`, body)
+  if (!res.success) {
+    throw new Error('Failed to update memory')
+  }
   return res.memory ? toMemoryDetail(res.memory) : null
 }
 

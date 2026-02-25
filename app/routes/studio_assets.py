@@ -36,6 +36,7 @@ from app.services.asset_management_service import (
     get_asset_management_service,
 )
 from app.services.asset_dedup_service import (
+    AssetDedupAssetNotFoundError,
     AssetDedupService,
     get_asset_dedup_service,
 )
@@ -378,7 +379,7 @@ async def find_asset_duplicates(
     try:
         result = await dedup.find_duplicates_for_asset(asset_id, user_id)
         return _build_dedup_response(result)
-    except ValueError:
+    except AssetDedupAssetNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Asset not found",

@@ -20,6 +20,10 @@ from app.services.supabase_storage import get_supabase_storage
 logger = structlog.get_logger(__name__)
 
 
+class AssetDedupAssetNotFoundError(Exception):
+    """Raised when the target asset does not exist or is inaccessible."""
+
+
 class AssetDedupService:
     """Advisory duplicate detection for studio assets."""
 
@@ -155,7 +159,7 @@ class AssetDedupService:
         )
 
         if not result.data:
-            raise ValueError("Asset not found")
+            raise AssetDedupAssetNotFoundError("Asset not found")
 
         row = result.data[0]
         return await self.check_duplicates(
