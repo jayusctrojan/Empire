@@ -107,10 +107,13 @@ async def rerank_documents(request: RerankRequest):
             "ollama": RerankingProvider.OLLAMA,
             "llm": RerankingProvider.LLM,
         }
-        provider = provider_map.get(
-            request.provider.lower() if request.provider else "ollama",
-            RerankingProvider.OLLAMA
-        )
+        normalized_provider = (request.provider or "ollama").lower()
+        if normalized_provider not in provider_map:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported provider: {normalized_provider}. Allowed: {', '.join(provider_map.keys())}"
+            )
+        provider = provider_map[normalized_provider]
 
         # Create config
         config = RerankingConfig(
@@ -158,7 +161,7 @@ async def rerank_documents(request: RerankRequest):
                 "output_count": result.metrics.total_output_results if result.metrics else len(reranked_docs),
                 "reranking_time_ms": result.metrics.reranking_time_ms if result.metrics else 0,
                 "provider": result.metrics.provider.value if result.metrics and result.metrics.provider else provider.value,
-                "model": result.metrics.model if result.metrics else config.model,
+                "model": result.metrics.model if result.metrics else config.resolved_model,
                 "ndcg": result.metrics.ndcg if result.metrics else None
             }
 
@@ -254,27 +257,26 @@ async def reranking_health():
 
     providers = {}
 
-    # Check Ollama
+    # Check Ollama models
+    bge_available = False
+    qwen_available = False
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             response = await client.get("http://localhost:11434/api/tags")
-            ollama_available = response.status_code == 200
-            # Check if bge-reranker model is available
-            if ollama_available:
+            if response.status_code == 200:
                 data = response.json()
                 models = [m.get("name", "") for m in data.get("models", [])]
-                ollama_available = any("bge-reranker" in m.lower() for m in models)
+                bge_available = any("bge-reranker" in m.lower() for m in models)
+                qwen_available = any(m == "qwen3.5:35b" for m in models)
     except Exception:
-        ollama_available = False
-    providers["ollama"] = ollama_available
-
-    # Check LLM fallback (Qwen 3.5 via same Ollama instance)
-    providers["llm"] = ollama_available  # same Ollama, different model
+        pass
+    providers["ollama"] = bge_available
+    providers["llm"] = qwen_available
 
     # Determine default provider
-    if ollama_available:
+    if bge_available:
         default = "ollama"
-    elif providers["llm"]:
+    elif qwen_available:
         default = "llm"
     else:
         default = "none"

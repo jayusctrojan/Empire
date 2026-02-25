@@ -1446,10 +1446,10 @@ class StudioCKOConversationService:
             )
             from app.services.hybrid_search_service import SearchResult
 
-            # Convert CKOSource → SearchResult
+            # Convert CKOSource → SearchResult (use index-based unique ID to avoid doc_id collisions)
             search_results = [
                 SearchResult(
-                    chunk_id=s.doc_id,
+                    chunk_id=f"{s.doc_id}::{i}",
                     content=s.snippet,
                     score=s.relevance_score,
                     rank=i + 1,
@@ -1476,9 +1476,9 @@ class StudioCKOConversationService:
             if not result.reranked_results:
                 return sources[:top_k]
 
-            # Map reranked scores back to CKOSource objects by chunk_id
+            # Map reranked scores back to CKOSource objects by index-based unique ID
             source_map = {
-                s.doc_id: s for s in sources
+                f"{s.doc_id}::{i}": s for i, s in enumerate(sources)
             }
             reranked_sources = []
             for sr in result.reranked_results:

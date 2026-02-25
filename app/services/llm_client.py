@@ -168,8 +168,11 @@ class FireworksLLMClient(OpenAICompatibleClient):
         enable_thinking: bool = True,
         thinking_budget: int = 4096,
     ):
+        resolved_api_key = api_key or os.environ.get("FIREWORKS_API_KEY")
+        if not resolved_api_key:
+            raise ValueError("FIREWORKS_API_KEY is required for FireworksLLMClient")
         client = AsyncOpenAI(
-            api_key=api_key or os.environ.get("FIREWORKS_API_KEY", ""),
+            api_key=resolved_api_key,
             base_url="https://api.fireworks.ai/inference/v1",
         )
         super().__init__(client)

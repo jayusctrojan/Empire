@@ -22,7 +22,7 @@ def ollama_available() -> bool:
         if resp.status_code != 200:
             return False
         models = [m.get("name", "") for m in resp.json().get("models", [])]
-        return any("qwen3.5" in m for m in models)
+        return any(m == "qwen3.5:35b" for m in models)
     except Exception:
         return False
 
@@ -31,7 +31,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(
         not ollama_available(),
-        reason="Ollama not running or qwen3.5 model not available",
+        reason="Ollama not running or qwen3.5:35b model not available",
     ),
 ]
 

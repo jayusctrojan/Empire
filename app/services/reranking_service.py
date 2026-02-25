@@ -59,7 +59,7 @@ class RerankingProvider(str, Enum):
 class RerankingConfig:
     """Configuration for reranking service"""
     provider: RerankingProvider = RerankingProvider.OLLAMA
-    model: str = "bge-reranker-v2-m3"  # Ollama model
+    model: Optional[str] = None  # Resolved per-provider: bge-reranker-v2-m3 (Ollama), qwen3.5:35b (LLM)
     llm_provider: str = "ollama_vlm"  # LLM fallback provider (local Qwen 3.5)
     base_url: str = "http://localhost:11434"
     top_k: int = 10
@@ -68,6 +68,15 @@ class RerankingConfig:
     enable_metrics: bool = True
     timeout: int = 30
     batch_size: int = 10  # For parallel Ollama requests
+
+    @property
+    def resolved_model(self) -> str:
+        """Return the actual model name based on provider"""
+        if self.model:
+            return self.model
+        if self.provider == RerankingProvider.OLLAMA:
+            return "bge-reranker-v2-m3"
+        return "qwen3.5:35b"
 
 
 @dataclass
@@ -127,7 +136,7 @@ class RerankingService:
 
         logger.info(
             f"Initialized RerankingService with provider={self.config.provider}, "
-            f"model={self.config.model}"
+            f"model={self.config.resolved_model}"
         )
 
     async def _get_http_client(self) -> httpx.AsyncClient:
@@ -164,7 +173,7 @@ class RerankingService:
         metrics = RerankingMetrics(
             total_input_results=len(results),
             provider=self.config.provider,
-            model=self.config.model
+            model=self.config.resolved_model
         )
 
         # Handle empty results
@@ -234,7 +243,7 @@ class RerankingService:
                 response = await client.post(
                     f"{self.config.base_url}/api/generate",
                     json={
-                        "model": self.config.model,
+                        "model": self.config.resolved_model,
                         "prompt": prompt,
                         "stream": False
                     }
@@ -301,7 +310,7 @@ class RerankingService:
                 prompt = f"query: {query}\ndoc: {result.content[:500]}"
                 try:
                     response = await self.ollama_client.generate(
-                        model=self.config.model,
+                        model=self.config.resolved_model,
                         prompt=prompt,
                         stream=False
                     )
@@ -433,8 +442,8 @@ Return ONLY a JSON object with a single key "relevance_scores" containing a list
             return reranked
 
         except Exception as e:
-            logger.error(f"LLM reranking failed: {e}")
-            return results
+            logger.error(f"LLM reranking failed: {e}", exc_info=True)
+            raise
 
     def _calculate_ndcg(self, results: List[SearchResult], k: Optional[int] = None) -> float:
         """
