@@ -445,7 +445,7 @@ export function ProjectMemoryPanel({
                         {memory.conversationId?.startsWith('manual-note-')
                           ? 'Manual'
                           : memory.conversationId
-                            ? 'CKO'
+                            ? 'Auto'
                             : 'Unknown'}
                       </span>
                       <span>·</span>

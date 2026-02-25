@@ -58,12 +58,9 @@ def _make_cko_service(supabase_inner=None):
               return_value=MagicMock()),
     ):
         from app.services.studio_cko_conversation_service import StudioCKOConversationService
-        # Skip __init__ to avoid wiring all dependencies — only supabase and config
-        # are needed for save_test_session_memory. If __init__ adds required attrs,
-        # set them here or switch to the full fixture pattern in test_asset_test_sessions.py.
-        service = StudioCKOConversationService.__new__(StudioCKOConversationService)
-        service.supabase = storage_wrapper
-        service.config = MagicMock()
+        # All dependency getters are patched above, so __init__ will use the mocks.
+        # This is safer than __new__ bypass as it ensures all attrs are initialized.
+        service = StudioCKOConversationService()
         return service, supabase_inner
 
 

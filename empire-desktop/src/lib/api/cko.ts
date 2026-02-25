@@ -3,7 +3,7 @@
  * AI Studio conversation management with multi-model pipeline
  */
 
-import { get, post, del, getApiBaseUrl } from './client'
+import { get, post, patch, del, getApiBaseUrl } from './client'
 import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 import { fetch } from '@tauri-apps/plugin-http'
@@ -137,7 +137,7 @@ export async function deleteCKOSession(sessionId: string): Promise<void> {
 }
 
 export async function updateCKOSession(sessionId: string, title: string): Promise<CKOSession> {
-  return post<CKOSession>(`/api/studio/cko/sessions/${sessionId}`, { title })
+  return patch<CKOSession>(`/api/studio/cko/sessions/${sessionId}`, { title })
 }
 
 // ============================================================================
