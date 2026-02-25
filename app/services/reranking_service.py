@@ -127,12 +127,7 @@ class RerankingService:
         self._http_client = http_client
         self._owns_http_client = False
         self.ollama_client = ollama_client
-        self.llm_client = llm_client
-
-        # Initialize LLM fallback client if needed
-        if self.config.provider == RerankingProvider.LLM and self.llm_client is None:
-            from app.services.llm_client import get_llm_client
-            self.llm_client = get_llm_client(self.config.llm_provider)
+        self.llm_client = llm_client  # Lazy-initialized in _rerank_with_llm when needed
 
         logger.info(
             f"Initialized RerankingService with provider={self.config.provider}, "
@@ -418,7 +413,14 @@ Return ONLY a JSON object with a single key "relevance_scores" containing a list
                 temperature=0.1,
             )
 
-            scores_data = json.loads(response_text)
+            # Strip markdown fences if present (common LLM output pattern)
+            cleaned = response_text.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[-1]  # Remove opening fence line
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3].strip()
+
+            scores_data = json.loads(cleaned)
             relevance_scores = scores_data.get("relevance_scores", [])
 
             reranked = []

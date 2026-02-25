@@ -3,7 +3,7 @@ Empire v7.3 - Reranking API Routes (Task 29)
 
 REST API endpoints for reranking search results using:
 - BGE-Reranker-v2 via Ollama (local, <200ms latency) - Primary
-- Claude API (fallback)
+- Local Qwen 3.5 LLM via Ollama (fallback)
 
 Target: +15-25% precision improvement over raw retrieval
 """
@@ -175,6 +175,8 @@ async def rerank_documents(request: RerankRequest):
         finally:
             await service.close()
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Reranking failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Reranking failed: {str(e)}")
@@ -268,8 +270,8 @@ async def reranking_health():
                 models = [m.get("name", "") for m in data.get("models", [])]
                 bge_available = any("bge-reranker" in m.lower() for m in models)
                 qwen_available = any(m == "qwen3.5:35b" for m in models)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to check Ollama model availability: {e}")
     providers["ollama"] = bge_available
     providers["llm"] = qwen_available
 

@@ -108,6 +108,7 @@ class CKOSession:
     context_summary: Optional[str] = None
     asset_id: Optional[str] = None
     session_type: str = "cko"
+    project_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_message_at: Optional[datetime] = None
@@ -122,6 +123,7 @@ class CKOSession:
             "contextSummary": self.context_summary,
             "assetId": self.asset_id,
             "sessionType": self.session_type,
+            "projectId": self.project_id,
             "createdAt": self.created_at.isoformat() if self.created_at else None,
             "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
             "lastMessageAt": self.last_message_at.isoformat() if self.last_message_at else None,
@@ -342,9 +344,16 @@ class StudioCKOConversationService:
     @staticmethod
     def _parse_dt(value: Optional[str]) -> Optional[datetime]:
         """Parse ISO datetime from Supabase (handles Z suffix)."""
-        if not value:
+        if value is None:
             return None
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if isinstance(value, datetime):
+            return value
+        if not isinstance(value, str):
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
 
     def _row_to_session(self, row: Dict[str, Any]) -> CKOSession:
         """Convert DB row to CKOSession. Single source of truth."""
@@ -357,18 +366,25 @@ class StudioCKOConversationService:
             context_summary=row.get("context_summary"),
             asset_id=row.get("asset_id"),
             session_type=row.get("session_type") or "cko",
+            project_id=row.get("project_id"),
             created_at=self._parse_dt(row.get("created_at")),
             updated_at=self._parse_dt(row.get("updated_at")),
             last_message_at=self._parse_dt(row.get("last_message_at")),
         )
 
-    async def create_session(self, user_id: str, title: Optional[str] = None) -> CKOSession:
+    async def create_session(
+        self,
+        user_id: str,
+        title: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> CKOSession:
         """
         Create a new CKO conversation session.
 
         Args:
             user_id: The user's ID
             title: Optional session title (auto-generated if not provided)
+            project_id: Optional project to link this session to
 
         Returns:
             CKOSession object
@@ -376,15 +392,21 @@ class StudioCKOConversationService:
         try:
             now = datetime.now(timezone.utc)
 
+            insert_data = {
+                "user_id": user_id,
+                "title": title or "New Conversation",
+                "message_count": 0,
+                "pending_clarifications": 0,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+            if project_id:
+                insert_data["project_id"] = project_id
+
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions").insert({
-                    "user_id": user_id,
-                    "title": title or "New Conversation",
-                    "message_count": 0,
-                    "pending_clarifications": 0,
-                    "created_at": now.isoformat(),
-                    "updated_at": now.isoformat(),
-                }).execute()
+                lambda: self.supabase.supabase.table("studio_cko_sessions").insert(
+                    insert_data
+                ).execute()
             )
 
             if result.data and len(result.data) > 0:
@@ -1469,6 +1491,19 @@ class StudioCKOConversationService:
 
             reranking_service = RerankingService(config=rerank_config)
             try:
+                result = await reranking_service.rerank(query=query, results=search_results)
+            except Exception as ollama_err:
+                logger.warning(f"Ollama reranking failed, trying LLM fallback: {ollama_err}")
+                await reranking_service.close()
+                # Fallback to LLM-based reranking
+                llm_config = RerankingConfig(
+                    provider=RerankingProvider.LLM,
+                    top_k=top_k,
+                    max_input_results=len(search_results),
+                    score_threshold=0.3,
+                    enable_metrics=True,
+                )
+                reranking_service = RerankingService(config=llm_config)
                 result = await reranking_service.rerank(query=query, results=search_results)
             finally:
                 await reranking_service.close()
