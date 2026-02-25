@@ -280,7 +280,25 @@ class SessionMemoryService:
                 .execute()
             )
             if existing_retry.data:
-                return existing_retry.data[0]["id"]
+                retry_id = existing_retry.data[0]["id"]
+                retry_payload = {
+                    "summary": summary,
+                    "key_decisions": json.dumps(key_decisions or []),
+                    "files_mentioned": json.dumps(files_mentioned or []),
+                    "code_preserved": json.dumps(code_preserved or []),
+                    "tags": tags or [],
+                    "updated_at": now,
+                    "expires_at": expires_at.isoformat() if expires_at else None,
+                }
+                if embedding is not None:
+                    retry_payload["embedding"] = embedding
+                await asyncio.to_thread(
+                    lambda: supabase.table("session_memories")
+                    .update(retry_payload)
+                    .eq("id", retry_id)
+                    .execute()
+                )
+                return retry_id
             raise insert_err
 
         MEMORY_SAVED.labels(retention_type=retention_type.value).inc()

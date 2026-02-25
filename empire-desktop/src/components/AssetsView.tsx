@@ -353,6 +353,7 @@ export function AssetsView() {
     testAbortRef.current?.abort()
     testAbortRef.current = null
     testMsgIdRef.current += 1 // Invalidate stale getTestMessages responses
+    testContextReqIdRef.current += 1 // Invalidate stale getTestContextInfo responses
     pendingHistoryRef.current = asset.id
     setSelectedAsset(asset)
     setIsDetailOpen(true)
