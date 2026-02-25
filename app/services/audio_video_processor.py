@@ -26,7 +26,7 @@ class AudioVideoProcessor:
     Comprehensive audio/video processor integrating:
     - ffmpeg-python for audio/video extraction and frame extraction
     - Local distil-whisper for transcription (via WhisperSTTService)
-    - Local Qwen2.5-VL for frame analysis (via VisionService)
+    - Local Qwen 3.5 for frame analysis (via VisionService)
     """
 
     def __init__(self):

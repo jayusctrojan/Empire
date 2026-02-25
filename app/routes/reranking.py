@@ -43,7 +43,7 @@ class RerankRequest(BaseModel):
     """Request to rerank documents"""
     query: str = Field(..., description="Search query to rank documents against")
     documents: List[DocumentToRerank] = Field(..., description="Documents to rerank")
-    provider: Optional[str] = Field("ollama", description="Reranking provider: ollama (primary), claude (fallback)")
+    provider: Optional[str] = Field("ollama", description="Reranking provider: ollama (primary), llm (Qwen 3.5 fallback)")
     model: Optional[str] = Field(None, description="Model name (provider-specific)")
     top_k: Optional[int] = Field(10, ge=1, le=100, description="Number of top results to return")
     score_threshold: Optional[float] = Field(0.3, ge=0.0, le=1.0, description="Minimum score threshold")
@@ -82,7 +82,7 @@ async def rerank_documents(request: RerankRequest):
     Rerank documents by relevance to a query
 
     Uses BGE-Reranker-v2 (Ollama) by default for <200ms local latency.
-    Claude API available as fallback.
+    Local Qwen 3.5 LLM available as fallback.
 
     **Example:**
     ```json
@@ -103,9 +103,9 @@ async def rerank_documents(request: RerankRequest):
     """
     try:
         # Parse provider
-        provider_map = {
+        provider_map: dict = {
             "ollama": RerankingProvider.OLLAMA,
-            "claude": RerankingProvider.CLAUDE
+            "llm": RerankingProvider.LLM,
         }
         provider = provider_map.get(
             request.provider.lower() if request.provider else "ollama",
@@ -268,14 +268,14 @@ async def reranking_health():
         ollama_available = False
     providers["ollama"] = ollama_available
 
-    # Check Claude (via API key presence)
-    providers["claude"] = bool(os.getenv("ANTHROPIC_API_KEY"))
+    # Check LLM fallback (Qwen 3.5 via same Ollama instance)
+    providers["llm"] = ollama_available  # same Ollama, different model
 
     # Determine default provider
     if ollama_available:
         default = "ollama"
-    elif providers["claude"]:
-        default = "claude"
+    elif providers["llm"]:
+        default = "llm"
     else:
         default = "none"
 
@@ -307,20 +307,20 @@ async def list_providers():
             "use_case": "Primary - development and production"
         },
         {
-            "id": "claude",
-            "name": "Claude Haiku",
-            "model": "claude-3-5-haiku-20241022",
-            "description": "Fast LLM-based reranking using Claude Haiku",
-            "latency": "300-800ms",
-            "cost": "$0.25/1M input, $1.25/1M output tokens",
-            "use_case": "Fallback when Ollama unavailable"
+            "id": "llm",
+            "name": "Local Qwen 3.5",
+            "model": "qwen3.5:35b",
+            "description": "LLM-based reranking using local Qwen 3.5 via Ollama",
+            "latency": "1-2s",
+            "cost": "Free (local)",
+            "use_case": "Fallback when BGE-Reranker unavailable"
         }
     ]
 
     return RerankProvidersResponse(
         providers=providers,
         default="ollama",
-        recommendation="Use 'ollama' for best performance (<200ms latency). Claude Haiku available as fallback."
+        recommendation="Use 'ollama' for best performance (<200ms latency). Local Qwen 3.5 available as fallback."
     )
 
 
@@ -337,7 +337,7 @@ async def reranking_stats():
         "average_latency_ms": 0,
         "provider_usage": {
             "ollama": 0,
-            "claude": 0
+            "llm": 0
         },
         "average_ndcg": 0.0,
         "precision_improvement": "+15-25% (target)"

@@ -172,13 +172,14 @@ class CKOConfig:
     dedupe_threshold: float = 0.9
     rrf_k: int = 60
 
-    # Query expansion
-    enable_query_expansion: bool = True
+    # Query expansion (disabled — Prompt Engineer already enriches queries;
+    # re-enable with provider="ollama_vlm" for local Qwen 3.5 expansion)
+    enable_query_expansion: bool = False
     num_query_variations: int = 5
     expansion_strategy: str = "balanced"
 
-    # Claude settings
-    model: str = "moonshotai/Kimi-K2.5-Thinking"
+    # Reasoning engine (Kimi K2.5 via Fireworks AI)
+    model: str = "accounts/fireworks/models/kimi-k2p5"
     max_context_tokens: int = 8000
     response_max_tokens: int = 2000
     temperature: float = 0.3
@@ -229,8 +230,8 @@ class StudioCKOConversationService:
         self.supabase = get_supabase_storage()
         self.embedding_service = get_embedding_service()
 
-        # Initialize LLM client (Together AI / Kimi K2.5 Thinking by default)
-        self.llm_client = get_llm_client(provider="together")
+        # Initialize LLM client (Fireworks AI / Kimi K2.5 with thinking)
+        self.llm_client = get_llm_client(provider="fireworks")
 
         # Initialize query expansion service
         try:
@@ -1386,7 +1387,7 @@ class StudioCKOConversationService:
         query_variations: List[str],
         config: CKOConfig
     ) -> List[CKOSource]:
-        """Search global knowledge base with all query variations."""
+        """Search global knowledge base with all query variations, then rerank."""
         all_sources: List[CKOSource] = []
 
         # Generate embeddings for all variations
@@ -1396,13 +1397,13 @@ class StudioCKOConversationService:
         ]
         embedding_results = await asyncio.gather(*embedding_tasks)
 
-        # Search for each embedding
+        # Search for each embedding (fetch 3x for reranking headroom)
         search_tasks = []
         for result in embedding_results:
             search_tasks.append(
                 self._search_kb_with_embedding(
                     query_embedding=result.embedding,
-                    limit=config.global_kb_limit,
+                    limit=config.global_kb_limit * 3,
                     min_similarity=config.min_similarity
                 )
             )
@@ -1416,7 +1417,90 @@ class StudioCKOConversationService:
         # Deduplicate and rank using RRF
         deduped = self._dedupe_and_rank_sources(all_sources, config)
 
-        return deduped[:config.global_kb_limit]
+        # Rerank with BGE-Reranker-v2 (local, <200ms) for +15-25% precision
+        reranked = await self._rerank_sources(
+            query=query_variations[0],
+            sources=deduped,
+            top_k=config.global_kb_limit,
+        )
+
+        return reranked
+
+    async def _rerank_sources(
+        self,
+        query: str,
+        sources: List[CKOSource],
+        top_k: int = 10,
+    ) -> List[CKOSource]:
+        """Rerank CKO sources using BGE-Reranker-v2 with Qwen 3.5 LLM fallback.
+
+        Converts CKOSource → SearchResult for the reranker, then maps scores back.
+        Falls back to original ranking on any error.
+        """
+        if not sources:
+            return []
+
+        try:
+            from app.services.reranking_service import (
+                RerankingService, RerankingConfig, RerankingProvider
+            )
+            from app.services.hybrid_search_service import SearchResult
+
+            # Convert CKOSource → SearchResult
+            search_results = [
+                SearchResult(
+                    chunk_id=s.doc_id,
+                    content=s.snippet,
+                    score=s.relevance_score,
+                    rank=i + 1,
+                    method="vector",
+                    metadata=s.metadata,
+                )
+                for i, s in enumerate(sources)
+            ]
+
+            rerank_config = RerankingConfig(
+                provider=RerankingProvider.OLLAMA,
+                top_k=top_k,
+                max_input_results=len(search_results),
+                score_threshold=0.3,
+                enable_metrics=True,
+            )
+
+            reranking_service = RerankingService(config=rerank_config)
+            try:
+                result = await reranking_service.rerank(query=query, results=search_results)
+            finally:
+                await reranking_service.close()
+
+            if not result.reranked_results:
+                return sources[:top_k]
+
+            # Map reranked scores back to CKOSource objects by chunk_id
+            source_map = {
+                s.doc_id: s for s in sources
+            }
+            reranked_sources = []
+            for sr in result.reranked_results:
+                original = source_map.get(sr.chunk_id)
+                if original:
+                    original.relevance_score = sr.score
+                    reranked_sources.append(original)
+
+            if result.metrics:
+                logger.info(
+                    "CKO reranking complete",
+                    input=result.metrics.total_input_results,
+                    output=result.metrics.total_output_results,
+                    time_ms=f"{result.metrics.reranking_time_ms:.0f}",
+                    ndcg=result.metrics.ndcg,
+                )
+
+            return reranked_sources[:top_k]
+
+        except Exception as e:
+            logger.warning(f"Reranking failed, using original ranking: {e}")
+            return sources[:top_k]
 
     async def _search_kb_with_embedding(
         self,

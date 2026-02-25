@@ -28,10 +28,11 @@ logger = logging.getLogger(__name__)
 class ServiceProvider(str, Enum):
     """Supported service providers for cost tracking"""
     ANTHROPIC = "anthropic"  # Claude API
-    TOGETHER = "together"  # Together AI (Kimi K2.5 Thinking)
+    FIREWORKS = "fireworks"  # Fireworks AI (Kimi K2.5)
+    TOGETHER = "together"  # Together AI (legacy, kept for historical data)
     GOOGLE = "google"  # Google Gemini API
     WHISPER_LOCAL = "whisper_local"  # Local distil-whisper (free)
-    OLLAMA_LOCAL = "ollama_local"  # Local Ollama Qwen-VL (free)
+    OLLAMA_LOCAL = "ollama_local"  # Local Ollama Qwen 3.5 (free)
     MISTRAL = "mistral"  # Mistral AI API
     LANGEXTRACT = "langextract"  # Document parsing
     RENDER = "render"  # Cloud hosting
@@ -133,7 +134,7 @@ class CostTrackingService:
     Centralized cost tracking for all Empire services
 
     Features:
-    - Track costs from Claude, Together, Google, Whisper Local, Ollama Qwen-VL (local), Mistral, LangExtract, Render, Supabase, B2
+    - Track costs from Claude, Fireworks (Kimi K2.5), Google, Whisper Local, Ollama Qwen 3.5 (local), Mistral, LangExtract, Render, Supabase, B2
     - Store cost data in Supabase
     - Generate monthly cost reports
     - Budget alerts at 80% threshold
@@ -171,7 +172,14 @@ class CostTrackingService:
                 "output": 0.000005,  # $5 per 1M tokens
             },
         },
+        ServiceProvider.FIREWORKS: {
+            "accounts/fireworks/models/kimi-k2p5": {
+                "input": 0.0000006,  # $0.60 per 1M tokens
+                "output": 0.000003,  # $3.00 per 1M tokens
+            },
+        },
         ServiceProvider.TOGETHER: {
+            # Legacy pricing kept for historical cost lookups
             "moonshotai/Kimi-K2.5-Thinking": {
                 "input": 0.0000005,  # $0.50 per 1M tokens
                 "output": 0.0000028,  # $2.80 per 1M tokens
@@ -191,7 +199,7 @@ class CostTrackingService:
             },
         },
         ServiceProvider.OLLAMA_LOCAL: {
-            "qwen2.5vl:32b-q8_0": {
+            "qwen3.5:35b": {
                 "input": 0.0,  # Local compute — $0
                 "output": 0.0,
             },
