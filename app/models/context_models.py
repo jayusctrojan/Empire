@@ -202,6 +202,10 @@ class SessionMemory(BaseModel):
         default_factory=list,
         description="Important code snippets"
     )
+    tags: List[str] = Field(
+        default_factory=list,
+        description="Memory tags"
+    )
     retention_type: RetentionType = Field(..., description="Retention policy")
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

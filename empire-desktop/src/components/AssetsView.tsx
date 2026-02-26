@@ -34,6 +34,7 @@ import {
   findAssetDuplicates,
   getTestMessages,
   clearTestSession,
+  getTestContextInfo,
   ASSET_TYPE_CONFIG,
   ASSET_STATUS_CONFIG,
   DEPARTMENTS,
@@ -203,8 +204,14 @@ export function AssetsView() {
   const [testArtifacts, setTestArtifacts] = useState<AssetTestStreamChunk[]>([])
   const testMessagesEndRef = useRef<HTMLDivElement>(null)
   const testAbortRef = useRef<AbortController | null>(null)
+
+  // Test context info state
+  const [testContextInfo, setTestContextInfo] = useState<{ messageCount: number; approxTokens: number } | null>(null)
+  const [showMemorySaved, setShowMemorySaved] = useState(false)
+  const memorySavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isSearchInitialized = useRef(false)
   const fetchIdRef = useRef(0)
+  const testContextReqIdRef = useRef(0)
   const pendingHistoryRef = useRef<string | null>(null)
 
   // Dedup state
@@ -265,9 +272,17 @@ export function AssetsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAsset?.id])
 
-  // Load test messages when Test tab is activated
+  // Load test messages and context info when Test tab is activated
   useEffect(() => {
     if (activeTab !== 'test' || !selectedAsset) return
+    // Load context info
+    const contextRequestId = ++testContextReqIdRef.current
+    getTestContextInfo(selectedAsset.id)
+      .then(info => {
+        if (testContextReqIdRef.current !== contextRequestId) return // stale
+        setTestContextInfo({ messageCount: info.messageCount, approxTokens: info.approxTokens })
+      })
+      .catch(() => {})
     if (testMessages.length > 0 || isTestStreaming) return // Already have messages
     const requestId = ++testMsgIdRef.current
     getTestMessages(selectedAsset.id)
@@ -317,11 +332,15 @@ export function AssetsView() {
     testMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [testMessages, testStreamingContent])
 
-  // Abort in-flight test stream on unmount
+  // Abort in-flight test stream and clear timers on unmount
   useEffect(() => {
     return () => {
       testAbortRef.current?.abort()
       testAbortRef.current = null
+      if (memorySavedTimerRef.current) {
+        clearTimeout(memorySavedTimerRef.current)
+        memorySavedTimerRef.current = null
+      }
     }
   }, [])
 
@@ -334,6 +353,7 @@ export function AssetsView() {
     testAbortRef.current?.abort()
     testAbortRef.current = null
     testMsgIdRef.current += 1 // Invalidate stale getTestMessages responses
+    testContextReqIdRef.current += 1 // Invalidate stale getTestContextInfo responses
     pendingHistoryRef.current = asset.id
     setSelectedAsset(asset)
     setIsDetailOpen(true)
@@ -347,6 +367,9 @@ export function AssetsView() {
     setTestArtifacts([])
     setIsTestStreaming(false)
     setDedupResult(null)
+    setTestContextInfo(null)
+    setShowMemorySaved(false)
+    if (memorySavedTimerRef.current) { clearTimeout(memorySavedTimerRef.current); memorySavedTimerRef.current = null }
 
     try {
       const historyResult = await getAssetHistory(asset.id)
@@ -475,18 +498,26 @@ export function AssetsView() {
   const handleClearTest = async () => {
     testAbortRef.current?.abort()
     testAbortRef.current = null
+    const hadMessages = testMessages.length > 0
+    if (selectedAsset) {
+      try {
+        await clearTestSession(selectedAsset.id)
+        if (hadMessages) {
+          setShowMemorySaved(true)
+          if (memorySavedTimerRef.current) clearTimeout(memorySavedTimerRef.current)
+          memorySavedTimerRef.current = setTimeout(() => setShowMemorySaved(false), 2000)
+        }
+      } catch {
+        setActionMessage({ type: 'error', text: 'Failed to clear test session' })
+        return
+      }
+    }
     setTestMessages([])
     setTestStreamingContent('')
     setTestPhase(null)
     setTestArtifacts([])
     setIsTestStreaming(false)
-    if (selectedAsset) {
-      try {
-        await clearTestSession(selectedAsset.id)
-      } catch {
-        // Non-critical
-      }
-    }
+    setTestContextInfo(null)
   }
 
   const handleNavigateToDuplicate = async (assetId: string) => {
@@ -496,6 +527,7 @@ export function AssetsView() {
     } else {
       try {
         const fetched = await getAsset(assetId)
+        setAssets(prev => [fetched, ...prev.filter(a => a.id !== fetched.id)])
         handleSelectAsset(fetched)
       } catch {
         // Non-critical
@@ -954,14 +986,25 @@ export function AssetsView() {
 
               {/* Test Controls */}
               <div className="border-t border-empire-border p-3">
-                {testMessages.length > 0 && (
-                  <div className="flex justify-end mb-2">
-                    <button
-                      onClick={handleClearTest}
-                      className="flex items-center gap-1 text-xs text-empire-text-muted hover:text-empire-text"
-                    >
-                      <Trash2 className="w-3 h-3" /> Clear test
-                    </button>
+                {/* Context info bar + clear button */}
+                {(testMessages.length > 0 || testContextInfo || showMemorySaved) && (
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-empire-text-muted">
+                      {testContextInfo && testContextInfo.messageCount > 0
+                        ? `${testContextInfo.messageCount} messages · ~${(testContextInfo.approxTokens / 1000).toFixed(1)}K tokens`
+                        : ''}
+                      {showMemorySaved && (
+                        <span className="ml-2 text-green-400">Memory saved</span>
+                      )}
+                    </span>
+                    {testMessages.length > 0 && (
+                      <button
+                        onClick={handleClearTest}
+                        className="flex items-center gap-1 text-xs text-empire-text-muted hover:text-empire-text"
+                      >
+                        <Trash2 className="w-3 h-3" /> Clear test
+                      </button>
+                    )}
                   </div>
                 )}
                 <div className="flex items-center gap-2">

@@ -14,6 +14,7 @@ Endpoints:
 - GET /api/studio/assets/health - Health check
 """
 
+import asyncio
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from fastapi.responses import StreamingResponse
@@ -35,6 +36,7 @@ from app.services.asset_management_service import (
     get_asset_management_service,
 )
 from app.services.asset_dedup_service import (
+    AssetDedupAssetNotFoundError,
     AssetDedupService,
     get_asset_dedup_service,
 )
@@ -377,7 +379,7 @@ async def find_asset_duplicates(
     try:
         result = await dedup.find_duplicates_for_asset(asset_id, user_id)
         return _build_dedup_response(result)
-    except ValueError:
+    except AssetDedupAssetNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Asset not found",
@@ -782,7 +784,27 @@ async def clear_test_session(
         from app.services.studio_cko_conversation_service import get_cko_conversation_service
 
         cko_service = get_cko_conversation_service()
+
+        # Find session to save memory from (before deleting)
+        session_id = await cko_service.find_test_session_id(user_id, asset_id)
+
+        # Await memory save before deleting to avoid race (delete could remove messages)
+        if session_id:
+            try:
+                await asyncio.wait_for(
+                    cko_service.save_test_session_memory(session_id, user_id, asset_id),
+                    timeout=30.0,
+                )
+            except Exception:
+                logger.exception("save_test_session_memory failed", asset_id=asset_id)
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Failed to save test session memory; session was not cleared",
+                ) from None
+
         deleted = await cko_service.delete_asset_test_session(user_id, asset_id)
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Failed to clear test session", asset_id=asset_id)
         raise HTTPException(
@@ -791,6 +813,43 @@ async def clear_test_session(
         ) from None
     else:
         return {"deleted": deleted}
+
+
+@router.get("/{asset_id}/test/context")
+async def get_test_context_info(
+    asset_id: str,
+    user_id: str = Depends(get_current_user),
+):
+    """Get lightweight context info for a test session."""
+    try:
+        from app.services.studio_cko_conversation_service import get_cko_conversation_service
+
+        cko_service = get_cko_conversation_service()
+
+        row = await cko_service.get_test_session_info(user_id, asset_id)
+
+        if not row:
+            return {
+                "sessionId": None,
+                "messageCount": 0,
+                "approxTokens": 0,
+                "createdAt": None,
+            }
+
+        msg_count = row.get("message_count", 0)
+
+        return {
+            "sessionId": row["id"],
+            "messageCount": msg_count,
+            "approxTokens": msg_count * 150 if msg_count > 0 else 0,
+            "createdAt": row.get("created_at"),
+        }
+    except Exception:
+        logger.exception("Failed to get test context info", asset_id=asset_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get test context info",
+        ) from None
 
 
 # ============================================================================

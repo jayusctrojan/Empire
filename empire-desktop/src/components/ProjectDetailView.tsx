@@ -5,7 +5,6 @@ import {
   Plus,
   MoreVertical,
   RefreshCw,
-  Lock,
   Edit2,
   Check,
   X,
@@ -17,7 +16,7 @@ import { useChatStore } from '@/stores/chat'
 import { useAppStore } from '@/stores/app'
 import type { Project, Conversation } from '@/types'
 import { get } from '@/lib/api'
-import { SourcesSection } from './projects'
+import { SourcesSection, ProjectMemoryPanel } from './projects'
 
 interface ProjectDetailViewProps {
   project: Project
@@ -29,11 +28,9 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
 
-  // Memory & Instructions state
+  // Instructions state
   const [instructions, setInstructions] = useState(project.instructions || '')
-  const [memoryContext, setMemoryContext] = useState(project.memoryContext || '')
   const [isEditingInstructions, setIsEditingInstructions] = useState(false)
-  const [isEditingMemory, setIsEditingMemory] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   // Menu state
@@ -72,19 +69,6 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
       setIsEditingInstructions(false)
     } catch (err) {
       console.error('Failed to save instructions:', err)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  // Save memory
-  const saveMemory = async () => {
-    setIsSaving(true)
-    try {
-      await updateProject(project.id, { memoryContext })
-      setIsEditingMemory(false)
-    } catch (err) {
-      console.error('Failed to save memory:', err)
     } finally {
       setIsSaving(false)
     }
@@ -300,62 +284,14 @@ export function ProjectDetailView({ project, onBack }: ProjectDetailViewProps) {
 
         {/* Right: Project Knowledge Panel (like Claude Desktop) */}
         <div className="w-96 flex-shrink-0 overflow-y-auto p-4 space-y-4 bg-empire-bg">
-          {/* Memory Section */}
-          <div className="rounded-xl border border-empire-border bg-empire-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-medium text-empire-text">Memory</h2>
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 text-xs text-empire-text-muted px-2 py-1 rounded-full bg-empire-border">
-                  <Lock className="w-3 h-3" />
-                  Only you
-                </span>
-                {!isEditingMemory ? (
-                  <button
-                    onClick={() => setIsEditingMemory(true)}
-                    className="p-1.5 rounded hover:bg-empire-border transition-colors"
-                  >
-                    <Edit2 className="w-4 h-4 text-empire-text-muted" />
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={saveMemory}
-                      disabled={isSaving}
-                      className="p-1.5 rounded hover:bg-green-500/20 transition-colors"
-                    >
-                      <Check className="w-4 h-4 text-green-500" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMemoryContext(project.memoryContext || '')
-                        setIsEditingMemory(false)
-                      }}
-                      className="p-1.5 rounded hover:bg-red-500/20 transition-colors"
-                    >
-                      <X className="w-4 h-4 text-red-500" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            {isEditingMemory ? (
-              <textarea
-                value={memoryContext}
-                onChange={(e) => setMemoryContext(e.target.value)}
-                placeholder="Add context about this project..."
-                className="w-full min-h-[80px] p-3 rounded-lg border border-empire-border bg-empire-sidebar text-empire-text text-sm placeholder:text-empire-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-empire-primary/50"
-              />
-            ) : (
-              <p className="text-sm text-empire-text-muted leading-relaxed">
-                {memoryContext || 'Purpose & context not set. Click edit to add.'}
-              </p>
-            )}
-            {memoryContext && !isEditingMemory && (
-              <p className="text-xs text-empire-text-muted mt-2">
-                Last updated {new Date(project.updatedAt).toLocaleDateString()}
-              </p>
-            )}
-          </div>
+          {/* Project Memory Panel (Pinned Context + Accumulated Knowledge) */}
+          <ProjectMemoryPanel
+            projectId={project.id}
+            memoryContext={project.memoryContext || ''}
+            onSaveMemoryContext={async (ctx) => {
+              await updateProject(project.id, { memoryContext: ctx })
+            }}
+          />
 
           {/* Instructions Section */}
           <div className="rounded-xl border border-empire-border bg-empire-card p-4">

@@ -124,6 +124,13 @@ class UpdateMemoryRequest(BaseModel):
     retention_type: Optional[str] = None
 
 
+class AddNoteRequest(BaseModel):
+    """Request for adding a manual memory note."""
+    project_id: str = Field(..., min_length=1, description="Project to attach note to")
+    content: str = Field(..., min_length=1, max_length=5000, description="Note content")
+    tags: Optional[List[str]] = Field(None, description="Optional tags")
+
+
 # =============================================================================
 # Memory Creation Endpoints
 # =============================================================================
@@ -246,7 +253,52 @@ async def save_session_memory(
             conversation_id=request.conversation_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to save session memory") from e
+
+
+@router.post("/note", response_model=SaveMemoryResponse)
+async def add_memory_note(
+    request: AddNoteRequest,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Create a manual memory note for a project. No LLM summarization.
+    """
+    try:
+        from uuid import uuid4
+
+        normalized_content = request.content.strip()
+        if not normalized_content:
+            return SaveMemoryResponse(
+                success=False,
+                error="Note content cannot be blank"
+            )
+
+        service = get_session_memory_service()
+        memory_id = await service.add_note(
+            user_id=user_id,
+            conversation_id=f"manual-note-{uuid4()}",
+            summary=normalized_content,
+            tags=request.tags or [],
+            project_id=request.project_id,
+            retention_type=RetentionType.INDEFINITE,
+        )
+
+        if not memory_id:
+            return SaveMemoryResponse(
+                success=False,
+                error="Failed to save note"
+            )
+
+        return SaveMemoryResponse(
+            success=True,
+            memory_id=memory_id,
+            summary_preview=normalized_content[:200] + "..." if len(normalized_content) > 200 else normalized_content
+        )
+
+    except Exception as e:
+        logger.exception("add_memory_note_failed")
+        raise HTTPException(status_code=500, detail="Failed to save note") from e
 
 
 # =============================================================================
@@ -281,7 +333,7 @@ async def search_memories(
                     conversation_id=m.conversation_id,
                     project_id=m.project_id,
                     summary_preview=m.summary[:200] + "..." if len(m.summary) > 200 else m.summary,
-                    tags=[],  # Tags not in SessionMemory model yet
+                    tags=m.tags or [],
                     created_at=m.created_at,
                     updated_at=m.updated_at
                 )
@@ -292,13 +344,14 @@ async def search_memories(
 
     except Exception as e:
         logger.error("search_memories_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to search memories") from e
 
 
 @router.get("/project/{project_id}", response_model=MemoryListResponse)
 async def get_project_memories(
     project_id: str,
-    limit: int = Query(default=10, ge=1, le=50),
+    limit: int = Query(default=10, ge=1, le=20),
+    offset: int = Query(default=0, ge=0),
     user_id: str = Depends(get_current_user)
 ):
     """
@@ -307,10 +360,11 @@ async def get_project_memories(
     try:
         service = get_session_memory_service()
 
-        memories = await service.get_project_memories(
+        memories, total = await service.get_project_memories(
             user_id=user_id,
             project_id=project_id,
-            limit=limit
+            limit=limit,
+            offset=offset,
         )
 
         return MemoryListResponse(
@@ -321,13 +375,13 @@ async def get_project_memories(
                     conversation_id=m.conversation_id,
                     project_id=m.project_id,
                     summary_preview=m.summary[:200] + "..." if len(m.summary) > 200 else m.summary,
-                    tags=[],
+                    tags=m.tags or [],
                     created_at=m.created_at,
                     updated_at=m.updated_at
                 )
                 for m in memories
             ],
-            total=len(memories)
+            total=total,
         )
 
     except Exception as e:
@@ -336,7 +390,7 @@ async def get_project_memories(
             project_id=project_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve project memories") from e
 
 
 @router.get("/{memory_id}", response_model=MemoryDetailResponse)
@@ -387,7 +441,7 @@ async def get_memory(
             memory_id=memory_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve memory") from e
 
 
 # =============================================================================
@@ -434,7 +488,7 @@ async def get_resumable_sessions(
             "get_resumable_sessions_failed",
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get resumable sessions") from e
 
 
 @router.post("/resume/{conversation_id}", response_model=ResumeSessionResponse)
@@ -478,7 +532,7 @@ async def resume_session(
             conversation_id=conversation_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to resume session") from e
 
 
 # =============================================================================
@@ -528,7 +582,7 @@ async def update_memory(
             memory_id=memory_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to update memory") from e
 
 
 @router.delete("/{memory_id}")
@@ -560,7 +614,7 @@ async def delete_memory(
             memory_id=memory_id,
             error=str(e)
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete memory") from e
 
 
 # =============================================================================

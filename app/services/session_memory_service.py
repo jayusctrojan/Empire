@@ -9,7 +9,7 @@ Task: 207 - Implement Session Memory & Persistence
 import os
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
 import structlog
@@ -133,13 +133,192 @@ class SessionMemoryService:
     # Memory Creation
     # ==========================================================================
 
+    async def add_note(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: str,
+        tags: Optional[List[str]] = None,
+        project_id: Optional[str] = None,
+        retention_type: RetentionType = RetentionType.INDEFINITE,
+    ) -> Optional[str]:
+        """Public API for creating manual memory notes (no LLM summarization)."""
+        return await self._store_memory(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            summary=summary,
+            tags=tags or [],
+            project_id=project_id,
+            retention_type=retention_type,
+        )
+
+    async def _store_memory(
+        self,
+        user_id: str,
+        conversation_id: str,
+        summary: str,
+        key_decisions: Optional[List[Dict]] = None,
+        files_mentioned: Optional[List[Dict]] = None,
+        code_preserved: Optional[List[Dict]] = None,
+        tags: Optional[List[str]] = None,
+        project_id: Optional[str] = None,
+        asset_id: Optional[str] = None,
+        retention_type: RetentionType = RetentionType.PROJECT,
+        embedding: Optional[List[float]] = None,
+        upsert_by_conversation: bool = False,
+    ) -> Optional[str]:
+        """
+        Store or upsert a session memory entry.
+
+        If upsert_by_conversation=True and a memory already exists for this
+        conversation_id + user_id, UPDATE it instead of creating a new one.
+        Enforces a 60-second cooldown on upserts.
+        """
+        key_decisions = key_decisions or []
+        files_mentioned = files_mentioned or []
+        code_preserved = code_preserved or []
+        tags = tags or []
+
+        expires_at = self._calculate_expiration(retention_type)
+        now = datetime.now(timezone.utc).isoformat()
+
+        import asyncio
+        supabase = get_supabase()
+
+        if upsert_by_conversation:
+            # Check for existing memory
+            existing = await asyncio.to_thread(
+                lambda: supabase.table("session_memories").select(
+                    "id, updated_at"
+                ).eq("conversation_id", conversation_id).eq(
+                    "user_id", user_id
+                ).limit(1).execute()
+            )
+
+            if existing.data:
+                row = existing.data[0]
+                # 60-second cooldown
+                last_updated = datetime.fromisoformat(
+                    row["updated_at"].replace("Z", "+00:00")
+                )
+                if last_updated.tzinfo is None:
+                    last_updated = last_updated.replace(tzinfo=timezone.utc)
+                if (datetime.now(timezone.utc) - last_updated).total_seconds() < 60:
+                    logger.debug(
+                        "Skipping upsert — cooldown active",
+                        conversation_id=conversation_id,
+                    )
+                    return row["id"]
+
+                # Update existing — omit embedding if None to preserve existing value
+                update_payload = {
+                    "summary": summary,
+                    "key_decisions": json.dumps(key_decisions),
+                    "files_mentioned": json.dumps(files_mentioned),
+                    "code_preserved": json.dumps(code_preserved),
+                    "tags": tags,
+                    "updated_at": now,
+                    "expires_at": expires_at.isoformat() if expires_at else None,
+                }
+                if embedding is not None:
+                    update_payload["embedding"] = embedding
+
+                await asyncio.to_thread(
+                    lambda: supabase.table("session_memories").update(
+                        update_payload
+                    ).eq("id", row["id"]).execute()
+                )
+
+                MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
+                logger.info(
+                    "Session memory upserted",
+                    memory_id=row["id"],
+                    conversation_id=conversation_id,
+                )
+                return row["id"]
+
+        # Insert new memory
+        memory_id = str(uuid4())
+
+        insert_data = {
+            "id": memory_id,
+            "user_id": user_id,
+            "conversation_id": conversation_id,
+            "project_id": project_id,
+            "summary": summary,
+            "key_decisions": json.dumps(key_decisions),
+            "files_mentioned": json.dumps(files_mentioned),
+            "code_preserved": json.dumps(code_preserved),
+            "tags": tags,
+            "retention_type": retention_type.value,
+            "created_at": now,
+            "updated_at": now,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+        if embedding is not None:
+            insert_data["embedding"] = embedding
+        if asset_id:
+            insert_data["asset_id"] = asset_id
+
+        try:
+            await asyncio.to_thread(
+                lambda: supabase.table("session_memories").insert(insert_data).execute()
+            )
+        except Exception as insert_err:
+            if not upsert_by_conversation:
+                raise
+            # Concurrent insert for same conversation — fall back to update
+            logger.warning(
+                "Insert conflict on upsert path, falling back to update",
+                conversation_id=conversation_id,
+            )
+            existing_retry = await asyncio.to_thread(
+                lambda: supabase.table("session_memories").select("id")
+                .eq("conversation_id", conversation_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if existing_retry.data:
+                retry_id = existing_retry.data[0]["id"]
+                retry_payload = {
+                    "summary": summary,
+                    "key_decisions": json.dumps(key_decisions or []),
+                    "files_mentioned": json.dumps(files_mentioned or []),
+                    "code_preserved": json.dumps(code_preserved or []),
+                    "tags": tags or [],
+                    "updated_at": now,
+                    "expires_at": expires_at.isoformat() if expires_at else None,
+                }
+                if embedding is not None:
+                    retry_payload["embedding"] = embedding
+                await asyncio.to_thread(
+                    lambda: supabase.table("session_memories")
+                    .update(retry_payload)
+                    .eq("id", retry_id)
+                    .execute()
+                )
+                return retry_id
+            raise insert_err
+
+        MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
+        logger.info(
+            "Session memory stored",
+            memory_id=memory_id,
+            conversation_id=conversation_id,
+            project_id=project_id,
+            asset_id=asset_id,
+        )
+        return memory_id
+
     async def save_session_memory(
         self,
         conversation_id: str,
         user_id: str,
         messages: List[ContextMessage],
         project_id: Optional[str] = None,
-        retention_type: RetentionType = RetentionType.PROJECT
+        retention_type: RetentionType = RetentionType.PROJECT,
+        upsert_by_conversation: bool = False,
     ) -> Optional[str]:
         """
         Save a summary of the current session as a memory.
@@ -150,6 +329,7 @@ class SessionMemoryService:
             messages: List of context messages
             project_id: Optional project ID
             retention_type: Memory retention policy
+            upsert_by_conversation: If True, update existing memory for this conversation
 
         Returns:
             Memory ID if successful, None otherwise
@@ -178,33 +358,19 @@ class SessionMemoryService:
             # Generate embedding for semantic search
             embedding = await self._generate_embedding(summary)
 
-            # Calculate expiration based on retention type
-            expires_at = self._calculate_expiration(retention_type)
-
-            # Create memory ID
-            memory_id = str(uuid4())
-
-            # Save to database
-            supabase = get_supabase()
-            supabase.table("session_memories").insert({
-                "id": memory_id,
-                "user_id": user_id,
-                "conversation_id": conversation_id,
-                "project_id": project_id,
-                "summary": summary,
-                "key_decisions": json.dumps(key_decisions),
-                "files_mentioned": json.dumps(files_mentioned),
-                "code_preserved": json.dumps(code_references),
-                "tags": tags,
-                "retention_type": retention_type.value,
-                "embedding": embedding,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
-                "expires_at": expires_at.isoformat() if expires_at else None
-            }).execute()
-
-            # Record metric
-            MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
+            memory_id = await self._store_memory(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                summary=summary,
+                key_decisions=key_decisions,
+                files_mentioned=files_mentioned,
+                code_preserved=code_references,
+                tags=tags,
+                project_id=project_id,
+                retention_type=retention_type,
+                embedding=embedding,
+                upsert_by_conversation=upsert_by_conversation,
+            )
 
             logger.info(
                 "Session memory saved",
@@ -468,10 +634,10 @@ Ended with: {last_msg}..."""
 
         if retention_type == RetentionType.CKO:
             # CKO memories last 90 days
-            return datetime.utcnow() + timedelta(days=90)
+            return datetime.now(timezone.utc) + timedelta(days=90)
 
         # Default PROJECT retention
-        return datetime.utcnow() + timedelta(days=self.memory_expiration_days)
+        return datetime.now(timezone.utc) + timedelta(days=self.memory_expiration_days)
 
     # ==========================================================================
     # Embedding Generation
@@ -584,6 +750,7 @@ Ended with: {last_msg}..."""
                     key_decisions=json.loads(row.get("key_decisions", "[]")),
                     files_mentioned=json.loads(row.get("files_mentioned", "[]")),
                     code_preserved=json.loads(row.get("code_preserved", "[]")),
+                    tags=row.get("tags") or [],
                     retention_type=RetentionType(row["retention_type"]),
                     created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")),
                     updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
@@ -618,32 +785,44 @@ Ended with: {last_msg}..."""
         self,
         user_id: str,
         project_id: str,
-        limit: int = DEFAULT_MEMORY_LIMIT
-    ) -> List[SessionMemory]:
+        limit: int = DEFAULT_MEMORY_LIMIT,
+        offset: int = 0,
+    ) -> tuple[list[SessionMemory], int]:
         """
-        Get all memories for a specific project.
+        Get memories for a specific project with pagination.
 
         Args:
             user_id: User ID
             project_id: Project ID
-            limit: Maximum results
+            limit: Maximum results per page
+            offset: Number of results to skip
 
         Returns:
-            List of project memories
+            Tuple of (memories list, total count)
         """
+        import asyncio
         import time
         start_time = time.time()
 
         try:
             supabase = get_supabase()
 
-            result = supabase.table("session_memories").select(
-                "*"
-            ).eq("user_id", user_id).eq(
-                "project_id", project_id
-            ).order(
-                "created_at", desc=True
-            ).limit(min(limit, MAX_MEMORY_LIMIT)).execute()
+            capped_limit = min(limit, MAX_MEMORY_LIMIT)
+            if capped_limit <= 0:
+                return [], 0
+            offset = max(0, offset)
+
+            result = await asyncio.to_thread(
+                lambda: supabase.table("session_memories").select(
+                    "*", count="exact"
+                ).eq("user_id", user_id).eq(
+                    "project_id", project_id
+                ).order(
+                    "created_at", desc=True
+                ).range(offset, offset + capped_limit - 1).execute()
+            )
+
+            total = result.count if result.count is not None else 0
 
             memories = []
             for row in (result.data or []):
@@ -656,6 +835,7 @@ Ended with: {last_msg}..."""
                     key_decisions=json.loads(row.get("key_decisions", "[]")),
                     files_mentioned=json.loads(row.get("files_mentioned", "[]")),
                     code_preserved=json.loads(row.get("code_preserved", "[]")),
+                    tags=row.get("tags") or [],
                     retention_type=RetentionType(row["retention_type"]),
                     created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")),
                     updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00"))
@@ -666,15 +846,14 @@ Ended with: {last_msg}..."""
             MEMORY_RETRIEVED.labels(method="project").inc(len(memories))
             MEMORY_RETRIEVAL_LATENCY.labels(method="project").observe(duration)
 
-            return memories
-
-        except Exception as e:
-            logger.error(
+        except Exception:
+            logger.exception(
                 "Failed to get project memories",
                 project_id=project_id,
-                error=str(e)
             )
-            return []
+            raise
+        else:
+            return memories, total
 
     # ==========================================================================
     # Session Resumption
