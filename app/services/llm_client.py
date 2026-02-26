@@ -1,7 +1,7 @@
 """
 LLM Client Abstraction Layer
 
-Thin wrapper normalizing Anthropic, OpenAI-compatible (Together AI, Ollama), and
+Thin wrapper normalizing Anthropic, OpenAI-compatible (Fireworks AI, Ollama), and
 Google Gemini APIs for easy model swaps via config. Used by CKO conversation
 service, vision service, and audio/video processor.
 """
@@ -79,7 +79,7 @@ class LLMClient(ABC):
 
 
 class OpenAICompatibleClient(LLMClient):
-    """Base for any OpenAI-API-compatible provider (Together, Ollama, vLLM, etc.)."""
+    """Base for any OpenAI-API-compatible provider (Fireworks, Ollama, vLLM, etc.)."""
 
     DEFAULT_MODEL: str = ""  # Subclass must define
 
@@ -157,17 +157,78 @@ class OpenAICompatibleClient(LLMClient):
         return response.choices[0].message.content or ""
 
 
-class TogetherLLMClient(OpenAICompatibleClient):
-    """Together AI client (OpenAI-compatible API)."""
+class FireworksLLMClient(OpenAICompatibleClient):
+    """Fireworks AI client for Kimi K2.5 with thinking/reasoning support."""
 
-    DEFAULT_MODEL = "moonshotai/Kimi-K2.5-Thinking"
+    DEFAULT_MODEL = "accounts/fireworks/models/kimi-k2p5"
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        enable_thinking: bool = True,
+        thinking_budget: int = 4096,
+    ):
+        resolved_api_key = api_key or os.environ.get("FIREWORKS_API_KEY")
+        if not resolved_api_key:
+            raise ValueError("FIREWORKS_API_KEY is required for FireworksLLMClient")
         client = AsyncOpenAI(
-            api_key=api_key or os.environ.get("TOGETHER_API_KEY", ""),
-            base_url="https://api.together.xyz/v1",
+            api_key=resolved_api_key,
+            base_url="https://api.fireworks.ai/inference/v1",
         )
         super().__init__(client)
+        self.enable_thinking = enable_thinking
+        self.thinking_budget = thinking_budget
+
+    def _thinking_extra_body(self) -> Optional[Dict[str, Any]]:
+        if not self.enable_thinking:
+            return None
+        return {"thinking": {"type": "enabled", "budget_tokens": self.thinking_budget}}
+
+    async def generate(
+        self,
+        system: str,
+        messages: List[Dict[str, str]],
+        max_tokens: int = 2000,
+        temperature: float = 0.3,
+        model: Optional[str] = None,
+    ) -> str:
+        full_messages = [{"role": "system", "content": system}] + messages
+        kwargs: Dict[str, Any] = dict(
+            model=model or self.DEFAULT_MODEL,
+            messages=full_messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        extra = self._thinking_extra_body()
+        if extra:
+            kwargs["extra_body"] = extra
+        response = await self.client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content or ""
+
+    async def stream(
+        self,
+        system: str,
+        messages: List[Dict[str, str]],
+        max_tokens: int = 2000,
+        temperature: float = 0.3,
+        model: Optional[str] = None,
+    ) -> AsyncIterator[str]:
+        full_messages = [{"role": "system", "content": system}] + messages
+        kwargs: Dict[str, Any] = dict(
+            model=model or self.DEFAULT_MODEL,
+            messages=full_messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=True,
+        )
+        extra = self._thinking_extra_body()
+        if extra:
+            kwargs["extra_body"] = extra
+        response = await self.client.chat.completions.create(**kwargs)
+        async for chunk in response:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
 
     def is_retryable(self, error: Exception) -> bool:
         return isinstance(
@@ -176,10 +237,14 @@ class TogetherLLMClient(OpenAICompatibleClient):
         )
 
 
-class OllamaVLMClient(OpenAICompatibleClient):
-    """Local Ollama VLM client for Qwen2.5-VL vision-language model."""
+# Keep alias for backwards compatibility in tests/imports
+TogetherLLMClient = FireworksLLMClient
 
-    DEFAULT_MODEL = "qwen2.5vl:32b-q8_0"
+
+class OllamaVLMClient(OpenAICompatibleClient):
+    """Local Ollama VLM client for Qwen 3.5 vision-language model."""
+
+    DEFAULT_MODEL = "qwen3.5:35b"
     KEEP_ALIVE = "30m"
 
     def __init__(self, base_url: Optional[str] = None):
@@ -437,11 +502,15 @@ class GeminiLLMClient(LLMClient):
 _clients: Dict[str, LLMClient] = {}
 
 
-def get_llm_client(provider: str = "together") -> LLMClient:
+def get_llm_client(provider: str = "fireworks") -> LLMClient:
     """Factory: get or create an LLM client by provider name."""
     if provider not in _clients:
-        if provider == "together":
-            _clients[provider] = TogetherLLMClient()
+        if provider == "fireworks":
+            _clients[provider] = FireworksLLMClient()
+        elif provider in ("together", "fireworks_no_thinking"):
+            # "together" kept as alias for backwards compatibility
+            # "fireworks_no_thinking" for query expansion or lightweight tasks
+            _clients[provider] = FireworksLLMClient(enable_thinking=False)
         elif provider == "anthropic":
             _clients[provider] = AnthropicLLMClient()
         elif provider == "gemini":

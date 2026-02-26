@@ -1,7 +1,7 @@
 """
-Integration tests for local perception layer (Ollama Qwen-VL + Whisper STT).
+Integration tests for local perception layer (Ollama Qwen 3.5 + Whisper STT).
 
-These tests require Ollama to be running with the qwen2.5vl:32b-q8_0 model.
+These tests require Ollama to be running with the qwen3.5:35b model.
 Skip automatically in CI or when Ollama is not available.
 """
 
@@ -22,7 +22,7 @@ def ollama_available() -> bool:
         if resp.status_code != 200:
             return False
         models = [m.get("name", "") for m in resp.json().get("models", [])]
-        return any("qwen2.5vl" in m for m in models)
+        return any(m == "qwen3.5:35b" for m in models)
     except Exception:
         return False
 
@@ -31,7 +31,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(
         not ollama_available(),
-        reason="Ollama not running or qwen2.5vl model not available",
+        reason="Ollama not running or qwen3.5:35b model not available",
     ),
 ]
 

@@ -3,7 +3,7 @@ Empire v7.3 - Reranking API Routes (Task 29)
 
 REST API endpoints for reranking search results using:
 - BGE-Reranker-v2 via Ollama (local, <200ms latency) - Primary
-- Claude API (fallback)
+- Local Qwen 3.5 LLM via Ollama (fallback)
 
 Target: +15-25% precision improvement over raw retrieval
 """
@@ -43,7 +43,7 @@ class RerankRequest(BaseModel):
     """Request to rerank documents"""
     query: str = Field(..., description="Search query to rank documents against")
     documents: List[DocumentToRerank] = Field(..., description="Documents to rerank")
-    provider: Optional[str] = Field("ollama", description="Reranking provider: ollama (primary), claude (fallback)")
+    provider: Optional[str] = Field("ollama", description="Reranking provider: ollama (primary), llm (Qwen 3.5 fallback)")
     model: Optional[str] = Field(None, description="Model name (provider-specific)")
     top_k: Optional[int] = Field(10, ge=1, le=100, description="Number of top results to return")
     score_threshold: Optional[float] = Field(0.3, ge=0.0, le=1.0, description="Minimum score threshold")
@@ -82,7 +82,7 @@ async def rerank_documents(request: RerankRequest):
     Rerank documents by relevance to a query
 
     Uses BGE-Reranker-v2 (Ollama) by default for <200ms local latency.
-    Claude API available as fallback.
+    Local Qwen 3.5 LLM available as fallback.
 
     **Example:**
     ```json
@@ -103,14 +103,17 @@ async def rerank_documents(request: RerankRequest):
     """
     try:
         # Parse provider
-        provider_map = {
+        provider_map: dict = {
             "ollama": RerankingProvider.OLLAMA,
-            "claude": RerankingProvider.CLAUDE
+            "llm": RerankingProvider.LLM,
         }
-        provider = provider_map.get(
-            request.provider.lower() if request.provider else "ollama",
-            RerankingProvider.OLLAMA
-        )
+        normalized_provider = (request.provider or "ollama").lower()
+        if normalized_provider not in provider_map:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported provider: {normalized_provider}. Allowed: {', '.join(provider_map.keys())}"
+            )
+        provider = provider_map[normalized_provider]
 
         # Create config
         config = RerankingConfig(
@@ -158,7 +161,7 @@ async def rerank_documents(request: RerankRequest):
                 "output_count": result.metrics.total_output_results if result.metrics else len(reranked_docs),
                 "reranking_time_ms": result.metrics.reranking_time_ms if result.metrics else 0,
                 "provider": result.metrics.provider.value if result.metrics and result.metrics.provider else provider.value,
-                "model": result.metrics.model if result.metrics else config.model,
+                "model": result.metrics.model if result.metrics else config.resolved_model,
                 "ndcg": result.metrics.ndcg if result.metrics else None
             }
 
@@ -172,6 +175,8 @@ async def rerank_documents(request: RerankRequest):
         finally:
             await service.close()
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Reranking failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Reranking failed: {str(e)}")
@@ -233,10 +238,11 @@ async def rerank_batch(
                 "error": str(e)
             })
 
+    successful_count = sum(1 for r in results if r.get("success"))
     return {
-        "success": True,
+        "success": successful_count == len(queries),
         "total_queries": len(queries),
-        "successful_queries": sum(1 for r in results if r.get("success")),
+        "successful_queries": successful_count,
         "total_time_ms": total_time_ms,
         "results": results
     }
@@ -254,28 +260,27 @@ async def reranking_health():
 
     providers = {}
 
-    # Check Ollama
+    # Check Ollama models
+    bge_available = False
+    qwen_available = False
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             response = await client.get("http://localhost:11434/api/tags")
-            ollama_available = response.status_code == 200
-            # Check if bge-reranker model is available
-            if ollama_available:
+            if response.status_code == 200:
                 data = response.json()
                 models = [m.get("name", "") for m in data.get("models", [])]
-                ollama_available = any("bge-reranker" in m.lower() for m in models)
-    except Exception:
-        ollama_available = False
-    providers["ollama"] = ollama_available
-
-    # Check Claude (via API key presence)
-    providers["claude"] = bool(os.getenv("ANTHROPIC_API_KEY"))
+                bge_available = any("bge-reranker" in m.lower() for m in models)
+                qwen_available = any("qwen3.5" in m.lower() for m in models)
+    except Exception as e:
+        logger.warning(f"Failed to check Ollama model availability: {e}")
+    providers["ollama"] = bge_available
+    providers["llm"] = qwen_available
 
     # Determine default provider
-    if ollama_available:
+    if bge_available:
         default = "ollama"
-    elif providers["claude"]:
-        default = "claude"
+    elif qwen_available:
+        default = "llm"
     else:
         default = "none"
 
@@ -307,20 +312,20 @@ async def list_providers():
             "use_case": "Primary - development and production"
         },
         {
-            "id": "claude",
-            "name": "Claude Haiku",
-            "model": "claude-3-5-haiku-20241022",
-            "description": "Fast LLM-based reranking using Claude Haiku",
-            "latency": "300-800ms",
-            "cost": "$0.25/1M input, $1.25/1M output tokens",
-            "use_case": "Fallback when Ollama unavailable"
+            "id": "llm",
+            "name": "Local Qwen 3.5",
+            "model": "qwen3.5:35b",
+            "description": "LLM-based reranking using local Qwen 3.5 via Ollama",
+            "latency": "1-2s",
+            "cost": "Free (local)",
+            "use_case": "Fallback when BGE-Reranker unavailable"
         }
     ]
 
     return RerankProvidersResponse(
         providers=providers,
         default="ollama",
-        recommendation="Use 'ollama' for best performance (<200ms latency). Claude Haiku available as fallback."
+        recommendation="Use 'ollama' for best performance (<200ms latency). Local Qwen 3.5 available as fallback."
     )
 
 
@@ -337,7 +342,7 @@ async def reranking_stats():
         "average_latency_ms": 0,
         "provider_usage": {
             "ollama": 0,
-            "claude": 0
+            "llm": 0
         },
         "average_ndcg": 0.0,
         "precision_improvement": "+15-25% (target)"

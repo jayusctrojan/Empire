@@ -22,8 +22,8 @@ from app.services.query_expansion_service import (
 def expansion_config():
     """Create test configuration"""
     return QueryExpansionConfig(
-        model="moonshotai/Kimi-K2.5-Thinking",
-        provider="together",
+        model="qwen3.5:35b",
+        provider="ollama_vlm",
         max_tokens=300,
         temperature=0.7,
         default_num_variations=5,
@@ -64,8 +64,8 @@ class TestQueryExpansionConfig:
     def test_config_defaults(self):
         """Test default configuration values"""
         config = QueryExpansionConfig()
-        assert config.model == "moonshotai/Kimi-K2.5-Thinking"
-        assert config.provider == "together"
+        assert config.model == "qwen3.5:35b"
+        assert config.provider == "ollama_vlm"
         assert config.max_tokens == 300
         assert config.temperature == 0.7
         assert config.default_num_variations == 5
@@ -109,7 +109,7 @@ class TestQueryExpansionService:
         assert len(result.expanded_queries) == 6  # 5 + original
         assert "California insurance policy" in result.expanded_queries
         assert result.strategy == "balanced"
-        assert result.model_used == "moonshotai/Kimi-K2.5-Thinking"
+        assert result.model_used == "qwen3.5:35b"
 
     @pytest.mark.asyncio
     async def test_expand_query_synonyms_strategy(self, query_expansion_service):

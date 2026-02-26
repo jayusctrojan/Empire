@@ -1,24 +1,27 @@
 """
-Query Expansion Service using Kimi K2.5 Thinking (Together AI)
+Query Expansion Service
 
 Expands user queries into multiple variations to improve search recall.
-Uses Kimi K2.5 Thinking via Together AI for fast, cost-effective query generation.
+Currently DISABLED in the CKO pipeline (Prompt Engineer handles query enrichment).
+
+Can be re-enabled with local Qwen 3.5-35B via Ollama for zero-cost expansion:
+    config = QueryExpansionConfig(
+        model="qwen3.5:35b",
+        provider="ollama_vlm",
+    )
+    service = get_query_expansion_service(config=config)
+
+Or with Fireworks AI for cloud-based expansion:
+    config = QueryExpansionConfig(
+        model="accounts/fireworks/models/kimi-k2p5",
+        provider="fireworks",
+    )
 
 Features:
 - Multiple expansion strategies (synonyms, reformulations, specifics)
 - Configurable temperature and creativity
 - Retry logic with exponential backoff
 - Caching of expanded queries
-
-Usage:
-    from app.services.query_expansion_service import get_query_expansion_service
-
-    service = get_query_expansion_service()
-    expanded = await service.expand_query(
-        "California insurance policy",
-        num_variations=5,
-        strategy="balanced"
-    )
 """
 
 import asyncio
@@ -46,9 +49,9 @@ class ExpansionStrategy(Enum):
 @dataclass
 class QueryExpansionConfig:
     """Configuration for query expansion service"""
-    # Model configuration
-    model: str = "moonshotai/Kimi-K2.5-Thinking"
-    provider: str = "together"
+    # Model configuration (defaults to local Qwen 3.5 for zero-cost expansion)
+    model: str = "qwen3.5:35b"
+    provider: str = "ollama_vlm"
     max_tokens: int = 300
     temperature: float = 0.7
 
@@ -85,7 +88,7 @@ class QueryExpansionResult:
 
 
 class QueryExpansionService:
-    """Service for expanding queries using Kimi K2.5 Thinking (Together AI)"""
+    """Service for expanding queries (default: local Qwen 3.5, configurable to Fireworks AI)"""
 
     def __init__(
         self,
