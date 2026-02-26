@@ -267,10 +267,15 @@ class SessionMemoryService:
         except Exception as insert_err:
             if not upsert_by_conversation:
                 raise
-            # Concurrent insert for same conversation — fall back to update
+            # Only fall back to update for constraint violations (concurrent insert)
+            err_str = str(insert_err).lower()
+            is_constraint = "23505" in err_str or "duplicate key" in err_str or "unique constraint" in err_str
+            if not is_constraint:
+                raise
             logger.warning(
                 "Insert conflict on upsert path, falling back to update",
                 conversation_id=conversation_id,
+                error=str(insert_err),
             )
             existing_retry = await asyncio.to_thread(
                 lambda: supabase.table("session_memories").select("id")
@@ -299,7 +304,7 @@ class SessionMemoryService:
                     .execute()
                 )
                 return retry_id
-            raise insert_err
+            raise
 
         MEMORY_SAVED.labels(retention_type=retention_type.value).inc()
         logger.info(

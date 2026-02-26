@@ -420,6 +420,8 @@ export function AssetsView() {
 
   const handleSendTest = async (query: string) => {
     if (!selectedAsset || !query.trim() || isTestStreaming) return
+    // Invalidate any in-flight initial history fetch for this asset
+    testMsgIdRef.current += 1
 
     const controller = new AbortController()
     testAbortRef.current = controller

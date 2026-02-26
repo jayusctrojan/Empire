@@ -274,6 +274,22 @@ async def add_memory_note(
                 error="Note content cannot be blank"
             )
 
+        # Validate project ownership before persisting
+        if request.project_id:
+            import asyncio as _asyncio
+            from app.core.database import get_supabase
+            supabase = get_supabase()
+            project_check = await _asyncio.to_thread(
+                lambda: supabase.table("projects")
+                .select("id")
+                .eq("id", request.project_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if not project_check.data:
+                raise HTTPException(status_code=403, detail="Project not found or access denied")
+
         service = get_session_memory_service()
         memory_id = await service.add_note(
             user_id=user_id,

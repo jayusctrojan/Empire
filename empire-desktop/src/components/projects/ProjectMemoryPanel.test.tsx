@@ -49,6 +49,7 @@ class MockIntersectionObserver {
   observe = vi.fn()
   unobserve = vi.fn()
   disconnect = vi.fn()
+  takeRecords = vi.fn(() => [] as IntersectionObserverEntry[])
   constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
     this.callback = callback
     this.options = options

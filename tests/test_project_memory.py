@@ -52,8 +52,19 @@ def _make_session_memory(
 def mock_service():
     """
     Patch get_session_memory_service so the route receives a controlled Mock.
+    Also patch get_supabase for project ownership checks.
     """
-    with patch("app.routes.session_memory.get_session_memory_service") as factory:
+    mock_supabase = Mock()
+    # Default: project ownership check returns data (authorized)
+    mock_table = Mock()
+    mock_table.select.return_value = mock_table
+    mock_table.eq.return_value = mock_table
+    mock_table.limit.return_value = mock_table
+    mock_table.execute.return_value = Mock(data=[{"id": "proj-123"}])
+    mock_supabase.table.return_value = mock_table
+
+    with patch("app.routes.session_memory.get_session_memory_service") as factory, \
+         patch("app.core.database.get_supabase", return_value=mock_supabase):
         svc = Mock()
         svc.add_note = AsyncMock(return_value=str(uuid4()))
         svc.get_project_memories = AsyncMock(return_value=([], 0))
