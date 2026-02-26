@@ -6,7 +6,7 @@ Empire v7.5 - Asset deduplication
 import pytest
 from unittest.mock import Mock, patch
 
-from app.services.asset_dedup_service import AssetDedupService
+from app.services.asset_dedup_service import AssetDedupAssetNotFoundError, AssetDedupService
 
 
 # =============================================================================
@@ -228,8 +228,8 @@ async def test_check_duplicates_cross_department(dedup_service, mock_supabase_cl
 
 @pytest.mark.asyncio
 async def test_find_duplicates_for_asset_raises_not_found(dedup_service, mock_supabase_client):
-    """find_duplicates_for_asset raises ValueError when asset not found."""
+    """find_duplicates_for_asset raises AssetDedupAssetNotFoundError when asset not found."""
     mock_supabase_client.execute.return_value = Mock(data=[])
 
-    with pytest.raises(ValueError, match="not found"):
+    with pytest.raises(AssetDedupAssetNotFoundError, match="not found"):
         await dedup_service.find_duplicates_for_asset("nonexistent", "user-1")
