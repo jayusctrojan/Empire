@@ -22,6 +22,12 @@ from enum import Enum
 
 import httpx
 
+# Optional: numpy for NDCG calculation
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
 from app.services.hybrid_search_service import SearchResult
 from app.services.circuit_breaker import (
     CircuitBreaker,
@@ -507,11 +513,3 @@ def get_reranking_service(config: Optional[RerankingConfig] = None) -> Reranking
         _reranking_service = RerankingService(config=config)
 
     return _reranking_service
-
-
-# Import numpy for NDCG calculation
-try:
-    import numpy as np
-except ImportError:
-    logger.warning("numpy not available, NDCG calculation will be disabled")
-    np = None

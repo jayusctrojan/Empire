@@ -390,6 +390,8 @@ class StudioCKOConversationService:
             user_id: The user's ID
             title: Optional session title (auto-generated if not provided)
             project_id: Optional project to link this session to
+                (requires PR #169 migration; stored on CKOSession but
+                not inserted until the column exists)
 
         Returns:
             CKOSession object
@@ -405,8 +407,6 @@ class StudioCKOConversationService:
                 "created_at": now.isoformat(),
                 "updated_at": now.isoformat(),
             }
-            if project_id:
-                insert_data["project_id"] = project_id
 
             result = await asyncio.to_thread(
                 lambda: self.supabase.supabase.table("studio_cko_sessions").insert(
@@ -1500,8 +1500,7 @@ class StudioCKOConversationService:
                 result = await ollama_service.rerank(query=query, results=search_results)
             except Exception as ollama_err:
                 logger.warning(f"Ollama reranking failed, trying LLM fallback: {ollama_err}")
-                await ollama_service.close()
-                # Fallback to LLM-based reranking
+                # Fallback to LLM-based reranking (ollama_service closed in finally)
                 llm_config = RerankingConfig(
                     provider=RerankingProvider.LLM,
                     top_k=top_k,
@@ -1806,6 +1805,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 ),
                 name=f"artifact-upload-{artifact_id}",
             )
+
             def _on_upload_done(t: asyncio.Task) -> None:
                 if t.cancelled():
                     return
