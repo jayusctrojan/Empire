@@ -11,7 +11,7 @@ Supports:
 - Comprehensive metrics and NDCG calculation
 """
 
-import os
+import re
 import time
 import json
 import logging
@@ -262,7 +262,6 @@ class RerankingService:
                 relevance_score = float(score_text)
             except ValueError:
                 # Try to extract number from response
-                import re
                 numbers = re.findall(r"[-+]?\d*\.?\d+", score_text)
                 relevance_score = float(numbers[0]) if numbers else 0.5
 
@@ -422,7 +421,6 @@ Return ONLY a JSON object with a single key "relevance_scores" containing a list
 
             # Strip markdown fences if present (common LLM output pattern)
             # Handles both multiline (```json\n...\n```) and compact (```json{...}```) forms
-            import re
             cleaned = response_text.strip()
             cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
             cleaned = re.sub(r"\s*```$", "", cleaned)

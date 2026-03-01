@@ -22,7 +22,7 @@ import copy
 import time
 import os
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any, AsyncIterator, Tuple
+from typing import List, Optional, Dict, Any, AsyncIterator, Tuple, Union
 from dataclasses import dataclass, field
 from enum import Enum
 import structlog
@@ -347,7 +347,7 @@ class StudioCKOConversationService:
     # =========================================================================
 
     @staticmethod
-    def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+    def _parse_dt(value: Optional[Union[str, datetime]]) -> Optional[datetime]:
         """Parse ISO datetime from Supabase (handles Z suffix)."""
         if value is None:
             return None
@@ -1508,9 +1508,24 @@ class StudioCKOConversationService:
             llm_service = None
             try:
                 result = await ollama_service.rerank(query=query, results=search_results)
+
+                # rerank() swallows exceptions and sets metrics.error instead
+                if result.metrics and result.metrics.error:
+                    logger.warning(
+                        "Ollama reranking failed, trying LLM fallback",
+                        ollama_error=result.metrics.error,
+                    )
+                    llm_config = RerankingConfig(
+                        provider=RerankingProvider.LLM,
+                        top_k=top_k,
+                        max_input_results=len(search_results),
+                        score_threshold=0.3,
+                        enable_metrics=True,
+                    )
+                    llm_service = RerankingService(config=llm_config)
+                    result = await llm_service.rerank(query=query, results=search_results)
             except Exception as ollama_err:
-                logger.warning(f"Ollama reranking failed, trying LLM fallback: {ollama_err}")
-                # Fallback to LLM-based reranking (ollama_service closed in finally)
+                logger.warning(f"Ollama reranking raised unexpectedly: {ollama_err}")
                 llm_config = RerankingConfig(
                     provider=RerankingProvider.LLM,
                     top_k=top_k,
