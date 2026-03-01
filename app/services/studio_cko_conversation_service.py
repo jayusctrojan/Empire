@@ -399,6 +399,12 @@ class StudioCKOConversationService:
         try:
             now = datetime.now(timezone.utc)
 
+            if project_id:
+                logger.debug(
+                    "project_id provided but not persisted (requires PR #169 migration)",
+                    project_id=project_id,
+                )
+
             insert_data = {
                 "user_id": user_id,
                 "title": title or "New Conversation",

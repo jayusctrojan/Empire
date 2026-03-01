@@ -420,19 +420,24 @@ Return ONLY a JSON object with a single key "relevance_scores" containing a list
             )
 
             # Strip markdown fences if present (common LLM output pattern)
+            # Handles both multiline (```json\n...\n```) and compact (```json{...}```) forms
+            import re
             cleaned = response_text.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1]  # Remove opening fence line
-                if cleaned.endswith("```"):
-                    cleaned = cleaned[:-3].strip()
+            cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
 
             scores_data = json.loads(cleaned)
             relevance_scores = scores_data.get("relevance_scores", [])
 
             reranked = []
             for i, result in enumerate(results):
-                score = relevance_scores[i] if i < len(relevance_scores) else result.score
-                score = max(0.0, min(1.0, float(score)))
+                raw_score = relevance_scores[i] if i < len(relevance_scores) else result.score
+                try:
+                    score = float(raw_score)
+                except (ValueError, TypeError):
+                    numbers = re.findall(r"[-+]?\d*\.?\d+", str(raw_score))
+                    score = float(numbers[0]) if numbers else result.score
+                score = max(0.0, min(1.0, score))
 
                 reranked_result = SearchResult(
                     chunk_id=result.chunk_id,
