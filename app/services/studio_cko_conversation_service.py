@@ -400,9 +400,9 @@ class StudioCKOConversationService:
             now = datetime.now(timezone.utc)
 
             if project_id:
-                logger.debug(
-                    "project_id provided but not persisted (requires PR #169 migration)",
-                    project_id=project_id,
+                raise ValueError(
+                    "project_id is not yet persistable in studio_cko_sessions. "
+                    "Apply migration add_project_id_to_cko_sessions (PR #169) before using this field."
                 )
 
             insert_data = {
@@ -1451,8 +1451,12 @@ class StudioCKOConversationService:
         deduped = self._dedupe_and_rank_sources(all_sources, config)
 
         # Rerank with BGE-Reranker-v2 (local, <200ms) for +15-25% precision
+        rerank_query = query_variations[0] if query_variations else ""
+        if not rerank_query:
+            return deduped[:config.global_kb_limit]
+
         reranked = await self._rerank_sources(
-            query=query_variations[0],
+            query=rerank_query,
             sources=deduped,
             top_k=config.global_kb_limit,
         )

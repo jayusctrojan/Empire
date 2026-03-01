@@ -415,6 +415,7 @@ Return ONLY a JSON object with a single key "relevance_scores" containing a list
             response_text = await self.llm_client.generate(
                 system="You are a relevance scoring assistant. Output only valid JSON.",
                 messages=[{"role": "user", "content": prompt}],
+                model=self.config.resolved_model,
                 max_tokens=500,
                 temperature=0.1,
             )
