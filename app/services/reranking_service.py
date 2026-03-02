@@ -82,7 +82,12 @@ class RerankingConfig:
             return self.model
         if self.provider == RerankingProvider.OLLAMA:
             return "bge-reranker-v2-m3"
-        return "qwen3.5:35b"
+        if self.llm_provider == "ollama_vlm":
+            return "qwen3.5:35b"
+        raise ValueError(
+            "RerankingConfig.model must be set when provider=LLM "
+            "and llm_provider is not ollama_vlm"
+        )
 
 
 @dataclass

@@ -1524,6 +1524,12 @@ class StudioCKOConversationService:
                     )
                     llm_service = RerankingService(config=llm_config)
                     result = await llm_service.rerank(query=query, results=search_results)
+                    if result.metrics and result.metrics.error:
+                        logger.warning(
+                            "LLM reranking fallback also failed, using original ranking",
+                            llm_error=result.metrics.error,
+                        )
+                        return sources[:top_k]
             except Exception as ollama_err:
                 logger.warning(f"Ollama reranking raised unexpectedly: {ollama_err}")
                 llm_config = RerankingConfig(
@@ -1535,6 +1541,12 @@ class StudioCKOConversationService:
                 )
                 llm_service = RerankingService(config=llm_config)
                 result = await llm_service.rerank(query=query, results=search_results)
+                if result.metrics and result.metrics.error:
+                    logger.warning(
+                        "LLM reranking fallback failed after exception, using original ranking",
+                        llm_error=result.metrics.error,
+                    )
+                    return sources[:top_k]
             finally:
                 await ollama_service.close()
                 if llm_service is not None:
