@@ -238,8 +238,9 @@ class RerankingService:
         query: str,
         result: SearchResult,
         index: int
-    ) -> tuple[int, SearchResult]:
-        """Rerank a single result with Ollama (with circuit breaker protection)"""
+    ) -> tuple[int, SearchResult, bool]:
+        """Rerank a single result with Ollama (with circuit breaker protection).
+        Returns (index, result, success) where success=False means original was kept."""
         prompt = f"query: {query}\ndoc: {result.content[:500]}"
         circuit = get_ollama_circuit_breaker()
 
@@ -286,11 +287,11 @@ class RerankingService:
                 sparse_score=getattr(result, 'sparse_score', None),
                 fuzzy_score=getattr(result, 'fuzzy_score', None)
             )
-            return (index, reranked_result)
+            return (index, reranked_result, True)
 
         except Exception as e:
             logger.warning(f"Failed to rerank result {result.chunk_id}: {e}")
-            return (index, result)
+            return (index, result, False)
 
     async def _rerank_with_ollama(
         self,
@@ -368,7 +369,9 @@ class RerankingService:
                 if isinstance(result, Exception):
                     errors += 1
                 else:
-                    idx, reranked_result = result
+                    idx, reranked_result, success = result
+                    if not success:
+                        errors += 1
                     all_results[idx] = reranked_result
 
         # Fill in any missing results with originals
