@@ -134,7 +134,8 @@ class TestCKOSearch:
         """Test that search uses query expansion when enabled"""
         mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=[])
 
-        await cko_service.search("test query")
+        config = CKOConfig(enable_query_expansion=True)
+        await cko_service.search("test query", config=config)
 
         mock_query_expansion.expand_query.assert_called_once()
 
@@ -145,7 +146,8 @@ class TestCKOSearch:
         mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=[])
 
         # Should not raise — falls back gracefully
-        results = await cko_service.search("test query")
+        config = CKOConfig(enable_query_expansion=True)
+        results = await cko_service.search("test query", config=config)
 
         assert results == []
         # Embedding was still called with the original query
