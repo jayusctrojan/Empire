@@ -263,9 +263,10 @@ export const useProjectMemoryStore = create<ProjectMemoryState>((set, get) => {
 
     // === Reset ===
     reset: () => {
-      fetchId = 0
-      detailFetchId = 0
-      editFetchId = 0
+      // Invalidate in-flight requests without reusing request ids.
+      fetchId += 1
+      detailFetchId += 1
+      editFetchId += 1
       offset = 0
       if (searchTimer) clearTimeout(searchTimer)
       searchTimer = null
