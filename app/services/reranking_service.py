@@ -514,7 +514,8 @@ def get_reranking_service(config: Optional[RerankingConfig] = None) -> Reranking
     Get or create singleton reranking service instance
 
     Args:
-        config: Optional configuration (only used on first call)
+        config: Optional configuration (only applied on first initialization;
+                subsequent calls return the existing instance regardless of config)
 
     Returns:
         RerankingService instance
