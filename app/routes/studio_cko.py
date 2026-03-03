@@ -52,6 +52,7 @@ router = APIRouter(prefix="/api/studio/cko", tags=["AI Studio CKO"])
 class CreateSessionRequest(BaseModel):
     """Request to create a new CKO session"""
     title: Optional[str] = Field(None, max_length=200, description="Optional session title")
+    project_id: Optional[str] = Field(None, description="Optional project to link session to")
 
 
 class SessionResponse(BaseModel):
@@ -62,6 +63,7 @@ class SessionResponse(BaseModel):
     messageCount: int
     pendingClarifications: int
     contextSummary: Optional[str]
+    projectId: Optional[str] = None
     createdAt: Optional[str]
     updatedAt: Optional[str]
     lastMessageAt: Optional[str]
@@ -245,19 +247,42 @@ async def create_session(
     try:
         logger.info("Creating CKO session", user_id=user_id)
 
+        # Validate project ownership if project_id is provided
+        if request.project_id:
+            from app.core.database import get_supabase
+            import asyncio as _asyncio
+
+            supabase = get_supabase()
+            project_check = await _asyncio.to_thread(
+                lambda: supabase.table("projects")
+                .select("id")
+                .eq("id", request.project_id)
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if not project_check.data:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Project not found or access denied",
+                )
+
         session = await service.create_session(
             user_id=user_id,
-            title=request.title
+            title=request.title,
+            project_id=request.project_id,
         )
 
         return SessionResponse(**session.to_dict())
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to create CKO session", user_id=user_id, error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create session: {str(e)}"
-        )
+            detail="Failed to create session"
+        ) from e
 
 
 @router.get("/sessions", response_model=List[SessionResponse])

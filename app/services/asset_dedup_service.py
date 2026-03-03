@@ -20,6 +20,10 @@ from app.services.supabase_storage import get_supabase_storage
 logger = structlog.get_logger(__name__)
 
 
+class AssetDedupAssetNotFoundError(Exception):
+    """Raised when the target asset does not exist or is inaccessible."""
+
+
 class AssetDedupService:
     """Advisory duplicate detection for studio assets."""
 
@@ -38,7 +42,7 @@ class AssetDedupService:
     def compute_content_hash(content: str) -> str:
         """MD5 of normalized (lowercase, collapsed whitespace) content, first 16 hex chars."""
         normalized = re.sub(r"\s+", " ", content.lower()).strip()
-        return hashlib.md5(normalized.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
+        return hashlib.md5(normalized.encode("utf-8")).hexdigest()[:16]  # noqa: S324 — content hash, not security
 
     @staticmethod
     def jaccard_similarity(a: str, b: str) -> float:
@@ -81,6 +85,8 @@ class AssetDedupService:
                 .eq("user_id", user_id)
                 .eq("content_hash", content_hash)
             )
+            if asset_type:
+                query = query.eq("asset_type", asset_type)
             if exclude_id:
                 query = query.neq("id", exclude_id)
             result = await asyncio.to_thread(query.execute)
@@ -111,6 +117,8 @@ class AssetDedupService:
             candidate_result = await asyncio.to_thread(candidate_query.execute)
 
             for row in candidate_result.data or []:
+                if not row.get("content"):
+                    continue
                 sim = self.jaccard_similarity(content, row["content"])
                 if sim >= self.JACCARD_THRESHOLD:
                     near_matches.append({
@@ -151,7 +159,7 @@ class AssetDedupService:
         )
 
         if not result.data:
-            raise ValueError("Asset not found")
+            raise AssetDedupAssetNotFoundError("Asset not found")
 
         row = result.data[0]
         return await self.check_duplicates(

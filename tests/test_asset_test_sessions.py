@@ -8,6 +8,13 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from datetime import datetime, timezone
 
 
+class _UniqueViolation(Exception):
+    """Stub for a DB unique-constraint error in tests."""
+
+    def __init__(self) -> None:
+        super().__init__("duplicate key value violates unique constraint")
+
+
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -159,14 +166,7 @@ class TestGetOrCreateAssetTestSession:
         row = _make_session_row()
         table = mock_supabase_storage.supabase.table.return_value
 
-        # First query: not found
-        # Insert: fails with unique constraint
-        # Retry query: found
-        table.execute.side_effect = [
-            Mock(data=[]),  # SELECT: not found
-            Exception("duplicate key value violates unique constraint"),
-        ]
-        # The insert raises, so we mock it differently
+        # First query: not found → Insert: raises unique constraint → Retry: found
         call_count = 0
 
         def side_effect():
@@ -175,7 +175,7 @@ class TestGetOrCreateAssetTestSession:
             if call_count == 1:
                 return Mock(data=[])  # SELECT: not found
             elif call_count == 2:
-                raise Exception("duplicate key value violates unique constraint")
+                raise _UniqueViolation()
             else:
                 return Mock(data=[row])  # Retry SELECT: found
 

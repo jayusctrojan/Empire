@@ -411,6 +411,9 @@ class AssetManagementService:
         """
         try:
             new_version = asset.version + 1
+            content = updates.get("content")
+            if not isinstance(content, str) or not content.strip():
+                raise AssetUpdateError("Content must be a non-empty string")
 
             # Create new record with incremented version
             new_asset_data = {
@@ -419,7 +422,7 @@ class AssetManagementService:
                 "department": asset.department,
                 "name": updates.get("name", asset.name),
                 "title": updates.get("title", asset.title),
-                "content": updates["content"],
+                "content": content,
                 "format": asset.format,
                 "status": updates.get("status", asset.status),
                 "source_document_id": asset.source_document_id,
@@ -433,7 +436,7 @@ class AssetManagementService:
                 "storage_path": asset.storage_path,
                 "version": new_version,
                 "parent_version_id": asset.id,
-                "content_hash": AssetDedupService.compute_content_hash(updates["content"]),
+                "content_hash": AssetDedupService.compute_content_hash(content),
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }

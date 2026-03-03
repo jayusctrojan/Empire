@@ -181,7 +181,7 @@ export interface DedupMatch {
   id: string
   title: string
   name: string
-  assetType: string
+  assetType: AssetType
   department: string
   similarity?: number
 }
@@ -193,7 +193,7 @@ export interface DedupCheckResponse {
   hasDuplicates: boolean
 }
 
-export async function checkDuplicates(content: string, assetType?: string): Promise<DedupCheckResponse> {
+export async function checkDuplicates(content: string, assetType?: AssetType): Promise<DedupCheckResponse> {
   return post<DedupCheckResponse>('/api/studio/assets/duplicates/check', { content, assetType })
 }
 
@@ -222,6 +222,17 @@ export async function getTestMessages(assetId: string): Promise<TestMessagesResp
 
 export async function clearTestSession(assetId: string): Promise<{ deleted: boolean }> {
   return del<{ deleted: boolean }>(`/api/studio/assets/${assetId}/test`)
+}
+
+export interface TestContextInfo {
+  sessionId: string | null
+  messageCount: number
+  approxTokens: number
+  createdAt: string | null
+}
+
+export async function getTestContextInfo(assetId: string): Promise<TestContextInfo> {
+  return get<TestContextInfo>(`/api/studio/assets/${assetId}/test/context`)
 }
 
 /**
@@ -325,6 +336,7 @@ export async function* testAssetStream(
       } catch { /* ignore */ }
     }
   } finally {
+    await reader.cancel().catch(() => {})
     signal?.removeEventListener('abort', onAbort)
   }
 }

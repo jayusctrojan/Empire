@@ -6,6 +6,8 @@ Empire v7.5 - Asset deduplication
 import pytest
 from unittest.mock import Mock, patch
 
+from app.services.asset_dedup_service import AssetDedupAssetNotFoundError, AssetDedupService
+
 
 # =============================================================================
 # Static Method Tests (no mocks needed)
@@ -15,26 +17,22 @@ class TestComputeContentHash:
     """Tests for AssetDedupService.compute_content_hash()"""
 
     def test_deterministic(self):
-        from app.services.asset_dedup_service import AssetDedupService
         h1 = AssetDedupService.compute_content_hash("hello world")
         h2 = AssetDedupService.compute_content_hash("hello world")
         assert h1 == h2
         assert len(h1) == 16
 
     def test_normalizes_whitespace_and_case(self):
-        from app.services.asset_dedup_service import AssetDedupService
         h1 = AssetDedupService.compute_content_hash("Hello   World")
         h2 = AssetDedupService.compute_content_hash("hello world")
         assert h1 == h2
 
     def test_empty_string(self):
-        from app.services.asset_dedup_service import AssetDedupService
         h = AssetDedupService.compute_content_hash("")
         assert isinstance(h, str)
         assert len(h) == 16
 
     def test_unicode_and_special_chars(self):
-        from app.services.asset_dedup_service import AssetDedupService
         h = AssetDedupService.compute_content_hash("日本語テスト 🚀 café")
         assert isinstance(h, str)
         assert len(h) == 16
@@ -44,15 +42,12 @@ class TestJaccardSimilarity:
     """Tests for AssetDedupService.jaccard_similarity()"""
 
     def test_identical_strings(self):
-        from app.services.asset_dedup_service import AssetDedupService
         assert AssetDedupService.jaccard_similarity("the quick brown fox", "the quick brown fox") == 1.0
 
     def test_disjoint_strings(self):
-        from app.services.asset_dedup_service import AssetDedupService
         assert AssetDedupService.jaccard_similarity("hello world", "foo bar baz") == 0.0
 
     def test_partial_overlap(self):
-        from app.services.asset_dedup_service import AssetDedupService
         # "the quick" overlap, "brown fox" vs "red dog" disjoint
         # words_a = {the, quick, brown, fox}, words_b = {the, quick, red, dog}
         # intersection = {the, quick} = 2, union = {the, quick, brown, fox, red, dog} = 6
@@ -60,12 +55,10 @@ class TestJaccardSimilarity:
         assert abs(sim - 2 / 6) < 0.001
 
     def test_empty_string(self):
-        from app.services.asset_dedup_service import AssetDedupService
         assert AssetDedupService.jaccard_similarity("", "hello") == 0.0
         assert AssetDedupService.jaccard_similarity("hello", "") == 0.0
 
     def test_large_word_sets(self):
-        from app.services.asset_dedup_service import AssetDedupService
         # 10,000 words each, should still return quickly
         a = " ".join(f"word{i}" for i in range(10000))
         b = " ".join(f"word{i}" for i in range(5000, 15000))
@@ -80,9 +73,14 @@ class TestJaccardSimilarity:
 
 @pytest.fixture
 def mock_supabase_client():
-    """Mock Supabase client chain for dedup queries."""
+    """Mock Supabase client chain for dedup queries.
+
+    Note: self-referential chain (mock.table.return_value = mock) means all
+    chained methods share the same mock. execute.side_effect must match call
+    order across both exact-match and candidate queries.
+    """
     mock = Mock()
-    # Make chainable
+    # Make chainable — see docstring for coupling note
     mock.table.return_value = mock
     mock.select.return_value = mock
     mock.eq.return_value = mock
@@ -95,7 +93,6 @@ def mock_supabase_client():
 
 @pytest.fixture
 def dedup_service(mock_supabase_client):
-    from app.services.asset_dedup_service import AssetDedupService
     svc = AssetDedupService()
     mock_storage = Mock()
     mock_storage.client = mock_supabase_client
@@ -201,7 +198,7 @@ async def test_check_duplicates_excludes_specified_id(dedup_service, mock_supaba
 
     assert result["has_duplicates"] is False
     # Verify neq was called with the exclude_id
-    mock_supabase_client.neq.assert_called()
+    mock_supabase_client.neq.assert_any_call("id", "self-id")
 
 
 @pytest.mark.asyncio
@@ -231,8 +228,8 @@ async def test_check_duplicates_cross_department(dedup_service, mock_supabase_cl
 
 @pytest.mark.asyncio
 async def test_find_duplicates_for_asset_raises_not_found(dedup_service, mock_supabase_client):
-    """find_duplicates_for_asset raises ValueError when asset not found."""
+    """find_duplicates_for_asset raises AssetDedupAssetNotFoundError when asset not found."""
     mock_supabase_client.execute.return_value = Mock(data=[])
 
-    with pytest.raises(ValueError, match="not found"):
+    with pytest.raises(AssetDedupAssetNotFoundError, match="not found"):
         await dedup_service.find_duplicates_for_asset("nonexistent", "user-1")
