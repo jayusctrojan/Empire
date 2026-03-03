@@ -90,7 +90,7 @@ def service_with_fallback(mock_primary, mock_fallback, mock_file_handler):
         def factory_side_effect(provider):
             if provider == "ollama_vlm":
                 return mock_primary
-            elif provider == "together":
+            elif provider == "fireworks":
                 return mock_fallback
             raise ValueError(f"Unexpected provider: {provider}")
 
@@ -111,7 +111,7 @@ class TestAnalyzeImageHappyPath:
         result = await service.analyze_image("img-001", analysis_type=analysis_type)
         assert result.success is True
         assert result.description == "Primary analysis result"
-        assert result.model_used == "qwen2.5vl:32b-q8_0"
+        assert result.model_used == "qwen3.5:35b"
         assert result.file_id == "img-001"
         assert result.analysis_type == analysis_type
 
@@ -244,7 +244,7 @@ class TestCloudFallbackConfig:
     def test_cloud_fallback_enabled_via_env(self, service_with_fallback):
         assert service_with_fallback.cloud_fallback_enabled is True
         assert service_with_fallback.fallback_client is not None
-        assert service_with_fallback.fallback_model == "moonshotai/Kimi-K2.5-Thinking"
+        assert service_with_fallback.fallback_model == "accounts/fireworks/models/kimi-k2p5"
 
 
 # ---------------------------------------------------------------------------
@@ -480,4 +480,4 @@ class TestVisionAnalysisResultDefault:
             success=True, file_id="test", analysis_type=VisionAnalysisType.GENERAL,
             description="test",
         )
-        assert result.model_used == "qwen2.5vl:32b-q8_0"
+        assert result.model_used == "qwen3.5:35b"

@@ -1,9 +1,9 @@
 """
-Empire v7.4 - Vision Service (Local Perception Layer)
-Image/frame analysis via local Qwen2.5-VL-32B (Ollama) with opt-in cloud fallback.
+Empire v7.5 - Vision Service (Local Perception Layer)
+Image/frame analysis via local Qwen 3.5-35B (Ollama) with opt-in cloud fallback.
 
-Primary: Ollama Qwen2.5-VL (local, $0)
-Fallback: Together AI Kimi K2.5 Thinking (cloud, opt-in via VISION_CLOUD_FALLBACK=true)
+Primary: Ollama Qwen 3.5 (local, $0)
+Fallback: Fireworks AI Kimi K2.5 (cloud, opt-in via VISION_CLOUD_FALLBACK=true)
 """
 
 import asyncio
@@ -48,7 +48,7 @@ class VisionAnalysisResult:
     detected_objects: Optional[List[str]] = None
     confidence_score: Optional[float] = None
     processing_time_ms: Optional[float] = None
-    model_used: str = "qwen2.5vl:32b-q8_0"
+    model_used: str = "qwen3.5:35b"
     error: Optional[str] = None
     timestamp: Optional[datetime] = None
 
@@ -128,10 +128,10 @@ Be as comprehensive as possible.""",
 
 class VisionService:
     """
-    Vision analysis using local Qwen2.5-VL (Ollama) with opt-in cloud fallback.
+    Vision analysis using local Qwen 3.5-35B (Ollama) with opt-in cloud fallback.
 
-    Primary: Ollama Qwen2.5-VL-32B (local, $0)
-    Fallback: Together AI Kimi K2.5 Thinking (cloud, opt-in via VISION_CLOUD_FALLBACK=true)
+    Primary: Ollama Qwen 3.5 (local, $0, native vision-language model)
+    Fallback: Fireworks AI Kimi K2.5 (cloud, opt-in via VISION_CLOUD_FALLBACK=true)
 
     Features:
     - Multiple analysis types (general, document, diagram, code, detailed)
@@ -143,7 +143,7 @@ class VisionService:
     - Integration with chat file handler
     """
 
-    VISION_MODEL = "qwen2.5vl:32b-q8_0"
+    VISION_MODEL = "qwen3.5:35b"
 
     def __init__(
         self,
@@ -159,10 +159,10 @@ class VisionService:
             "VISION_CLOUD_FALLBACK", "false"
         ).lower() == "true"
         self.fallback_client = (
-            get_llm_client("together") if self.cloud_fallback_enabled else None
+            get_llm_client("fireworks") if self.cloud_fallback_enabled else None
         )
         self.fallback_model = (
-            "moonshotai/Kimi-K2.5-Thinking" if self.cloud_fallback_enabled else None
+            "accounts/fireworks/models/kimi-k2p5" if self.cloud_fallback_enabled else None
         )
 
         self.max_tokens = max_tokens

@@ -1,7 +1,8 @@
 """
 Tests for Reranking Service (BGE-Reranker-v2)
 
-Tests reranking functionality using BGE-Reranker-v2 via Ollama (dev) and Claude API (prod).
+Tests reranking functionality using BGE-Reranker-v2 via Ollama (primary)
+and local Qwen 3.5 LLM (fallback).
 Validates relevance improvements, ranking quality, and performance metrics.
 
 Run with: python3 -m pytest tests/test_reranking_service.py -v
@@ -35,11 +36,11 @@ def reranking_config_dev():
 
 
 @pytest.fixture
-def reranking_config_prod():
-    """Create test configuration for production (Claude API)"""
+def reranking_config_llm():
+    """Create test configuration for LLM fallback (local Qwen 3.5)"""
     return RerankingConfig(
-        provider=RerankingProvider.CLAUDE,
-        model="claude-3-5-haiku-20241022",
+        provider=RerankingProvider.LLM,
+        llm_provider="ollama_vlm",
         top_k=10,
         max_input_results=30,
         score_threshold=0.5,
@@ -72,11 +73,10 @@ def mock_ollama_client():
 
 
 @pytest.fixture
-def mock_anthropic_client():
-    """Create mock Anthropic client"""
+def mock_llm_client():
+    """Create mock LLM client for fallback reranking (Qwen 3.5)"""
     client = Mock()
-    client.messages = Mock()
-    client.messages.create = AsyncMock()
+    client.generate = AsyncMock()
     return client
 
 
@@ -127,22 +127,20 @@ async def test_rerank_with_ollama_provider(reranking_config_dev, sample_search_r
 
 
 @pytest.mark.asyncio
-async def test_rerank_with_claude_provider(reranking_config_prod, sample_search_results, mock_anthropic_client):
+async def test_rerank_with_llm_provider(reranking_config_llm, sample_search_results, mock_llm_client):
     """
-    Test reranking using Claude API provider
+    Test reranking using local LLM (Qwen 3.5) fallback provider
 
     Verifies:
-    - Claude API is called correctly
-    - Results are reranked using Claude's relevance assessment
+    - LLM client is called correctly
+    - Results are reranked using LLM's relevance assessment
     - Top K results are returned
     - Proper error handling
     """
-    # Configure mock response from Claude
-    mock_anthropic_client.messages.create.return_value = Mock(
-        content=[Mock(text='{"relevance_scores": [0.95, 0.88, 0.82, 0.79, 0.75, 0.71, 0.68, 0.64, 0.60, 0.55]}')]
-    )
+    # Configure mock response from LLM
+    mock_llm_client.generate.return_value = '{"relevance_scores": [0.95, 0.88, 0.82, 0.79, 0.75, 0.71, 0.68, 0.64, 0.60, 0.55]}'
 
-    service = RerankingService(config=reranking_config_prod, anthropic_client=mock_anthropic_client)
+    service = RerankingService(config=reranking_config_llm, llm_client=mock_llm_client)
 
     # Execute reranking
     result = await service.rerank(
@@ -152,18 +150,18 @@ async def test_rerank_with_claude_provider(reranking_config_prod, sample_search_
 
     # Assertions
     assert isinstance(result, RerankingResult)
-    assert len(result.reranked_results) <= reranking_config_prod.top_k
+    assert len(result.reranked_results) <= reranking_config_llm.top_k
 
     # Verify results are ordered by score
     scores = [r.score for r in result.reranked_results]
     assert scores == sorted(scores, reverse=True)
 
-    # Verify Claude API was called
-    assert mock_anthropic_client.messages.create.called
+    # Verify LLM client was called
+    assert mock_llm_client.generate.called
 
-    # Verify correct model was used
-    call_args = mock_anthropic_client.messages.create.call_args
-    assert call_args.kwargs["model"] == "claude-3-5-haiku-20241022"
+    # Verify correct call signature (system prompt + messages)
+    call_args = mock_llm_client.generate.call_args
+    assert "relevance" in call_args.kwargs.get("system", "").lower() or "relevance" in str(call_args)
 
 
 @pytest.mark.asyncio

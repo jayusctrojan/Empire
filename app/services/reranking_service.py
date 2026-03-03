@@ -1,17 +1,17 @@
 """
 Reranking Service - BGE-Reranker-v2 Integration
 
-Reranks search results using BGE-Reranker-v2 via Ollama (primary) or Claude API (fallback).
+Reranks search results using BGE-Reranker-v2 via Ollama (primary) or local Qwen 3.5 (fallback).
 Improves precision by +15-25% with <200ms latency locally.
 
 Supports:
 - Ollama BGE-Reranker-v2-M3 (local, primary) - <200ms latency
-- Claude API for reranking (fallback)
+- Local Qwen 3.5 LLM for reranking (fallback) - ~1-2s latency
 - Score thresholding and Top-K selection
 - Comprehensive metrics and NDCG calculation
 """
 
-import os
+import re
 import time
 import json
 import logging
@@ -21,7 +21,12 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 import httpx
-from anthropic import Anthropic
+
+# Optional: numpy for NDCG calculation
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 from app.services.hybrid_search_service import SearchResult
 from app.services.circuit_breaker import (
@@ -53,23 +58,36 @@ def get_ollama_circuit_breaker() -> CircuitBreaker:
 class RerankingProvider(str, Enum):
     """Reranking provider options"""
     OLLAMA = "ollama"  # Primary - local BGE-Reranker-v2
-    CLAUDE = "claude"  # Fallback
+    LLM = "llm"  # Fallback - local Qwen 3.5 via Ollama
 
 
 @dataclass
 class RerankingConfig:
     """Configuration for reranking service"""
     provider: RerankingProvider = RerankingProvider.OLLAMA
-    model: str = "bge-reranker-v2-m3"  # Ollama model
-    claude_model: str = "claude-3-5-haiku-20241022"  # Fast & cheap for reranking
+    model: Optional[str] = None  # Resolved per-provider: bge-reranker-v2-m3 (Ollama), qwen3.5:35b (LLM)
+    llm_provider: str = "ollama_vlm"  # LLM fallback provider (local Qwen 3.5)
     base_url: str = "http://localhost:11434"
     top_k: int = 10
     max_input_results: int = 30
     score_threshold: float = 0.5
     enable_metrics: bool = True
-    anthropic_api_key: Optional[str] = None
     timeout: int = 30
     batch_size: int = 10  # For parallel Ollama requests
+
+    @property
+    def resolved_model(self) -> str:
+        """Return the actual model name based on provider"""
+        if self.model:
+            return self.model
+        if self.provider == RerankingProvider.OLLAMA:
+            return "bge-reranker-v2-m3"
+        if self.llm_provider == "ollama_vlm":
+            return "qwen3.5:35b"
+        raise ValueError(
+            "RerankingConfig.model must be set when provider=LLM "
+            "and llm_provider is not ollama_vlm"
+        )
 
 
 @dataclass
@@ -97,14 +115,14 @@ class RerankingService:
 
     Supports multiple providers:
     - Ollama (local BGE-Reranker-v2-M3) - <200ms latency (primary)
-    - Claude API (fallback)
+    - Local Qwen 3.5 LLM via Ollama (fallback) - ~1-2s latency
     """
 
     def __init__(
         self,
         config: Optional[RerankingConfig] = None,
         ollama_client: Optional[Any] = None,
-        anthropic_client: Optional[Anthropic] = None,
+        llm_client: Optional[Any] = None,
         http_client: Optional[httpx.AsyncClient] = None
     ):
         """
@@ -113,23 +131,18 @@ class RerankingService:
         Args:
             config: Reranking configuration
             ollama_client: Optional mock Ollama client for testing
-            anthropic_client: Optional mock Anthropic client for testing
+            llm_client: Optional LLM client for LLM-based reranking fallback
             http_client: Optional httpx async client for Ollama API calls
         """
         self.config = config or RerankingConfig()
         self._http_client = http_client
         self._owns_http_client = False
-
-        # Initialize clients based on provider
-        if self.config.provider == RerankingProvider.OLLAMA:
-            self.ollama_client = ollama_client
-        elif self.config.provider == RerankingProvider.CLAUDE:
-            api_key = self.config.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
-            self.anthropic_client = anthropic_client or Anthropic(api_key=api_key)
+        self.ollama_client = ollama_client
+        self.llm_client = llm_client  # Lazy-initialized in _rerank_with_llm when needed
 
         logger.info(
             f"Initialized RerankingService with provider={self.config.provider}, "
-            f"model={self.config.model}"
+            f"model={self.config.resolved_model}"
         )
 
     async def _get_http_client(self) -> httpx.AsyncClient:
@@ -166,7 +179,7 @@ class RerankingService:
         metrics = RerankingMetrics(
             total_input_results=len(results),
             provider=self.config.provider,
-            model=self.config.model
+            model=self.config.resolved_model
         )
 
         # Handle empty results
@@ -182,8 +195,8 @@ class RerankingService:
             # Rerank based on provider
             if self.config.provider == RerankingProvider.OLLAMA:
                 reranked = await self._rerank_with_ollama(query, input_results)
-            elif self.config.provider == RerankingProvider.CLAUDE:
-                reranked = await self._rerank_with_claude(query, input_results)
+            elif self.config.provider == RerankingProvider.LLM:
+                reranked = await self._rerank_with_llm(query, input_results)
             else:
                 raise ValueError(f"Unsupported provider: {self.config.provider}")
 
@@ -225,8 +238,9 @@ class RerankingService:
         query: str,
         result: SearchResult,
         index: int
-    ) -> tuple[int, SearchResult]:
-        """Rerank a single result with Ollama (with circuit breaker protection)"""
+    ) -> tuple[int, SearchResult, bool]:
+        """Rerank a single result with Ollama (with circuit breaker protection).
+        Returns (index, result, success) where success=False means original was kept."""
         prompt = f"query: {query}\ndoc: {result.content[:500]}"
         circuit = get_ollama_circuit_breaker()
 
@@ -236,7 +250,7 @@ class RerankingService:
                 response = await client.post(
                     f"{self.config.base_url}/api/generate",
                     json={
-                        "model": self.config.model,
+                        "model": self.config.resolved_model,
                         "prompt": prompt,
                         "stream": False
                     }
@@ -254,7 +268,6 @@ class RerankingService:
                 relevance_score = float(score_text)
             except ValueError:
                 # Try to extract number from response
-                import re
                 numbers = re.findall(r"[-+]?\d*\.?\d+", score_text)
                 relevance_score = float(numbers[0]) if numbers else 0.5
 
@@ -274,11 +287,11 @@ class RerankingService:
                 sparse_score=getattr(result, 'sparse_score', None),
                 fuzzy_score=getattr(result, 'fuzzy_score', None)
             )
-            return (index, reranked_result)
+            return (index, reranked_result, True)
 
         except Exception as e:
             logger.warning(f"Failed to rerank result {result.chunk_id}: {e}")
-            return (index, result)
+            return (index, result, False)
 
     async def _rerank_with_ollama(
         self,
@@ -303,7 +316,7 @@ class RerankingService:
                 prompt = f"query: {query}\ndoc: {result.content[:500]}"
                 try:
                     response = await self.ollama_client.generate(
-                        model=self.config.model,
+                        model=self.config.resolved_model,
                         prompt=prompt,
                         stream=False
                     )
@@ -356,7 +369,9 @@ class RerankingService:
                 if isinstance(result, Exception):
                     errors += 1
                 else:
-                    idx, reranked_result = result
+                    idx, reranked_result, success = result
+                    if not success:
+                        errors += 1
                     all_results[idx] = reranked_result
 
         # Fill in any missing results with originals
@@ -370,13 +385,13 @@ class RerankingService:
 
         return all_results
 
-    async def _rerank_with_claude(
+    async def _rerank_with_llm(
         self,
         query: str,
         results: List[SearchResult]
     ) -> List[SearchResult]:
         """
-        Rerank using Claude Haiku API (fast & cost-effective fallback)
+        Rerank using local LLM (Qwen 3.5 via Ollama) as fallback.
 
         Args:
             query: Search query
@@ -385,16 +400,15 @@ class RerankingService:
         Returns:
             List of results with updated scores
         """
-        # Prepare documents for Claude
+        if self.llm_client is None:
+            from app.services.llm_client import get_llm_client
+            self.llm_client = get_llm_client(self.config.llm_provider)
+
         docs = [
-            {
-                "id": r.chunk_id,
-                "content": r.content[:500]
-            }
-            for r in results
+            {"index": i, "content": r.content[:500]}
+            for i, r in enumerate(results)
         ]
 
-        # Create reranking prompt
         prompt = f"""Given the query: "{query}"
 
 Rate the relevance of each document on a scale of 0.0 to 1.0.
@@ -402,28 +416,35 @@ Rate the relevance of each document on a scale of 0.0 to 1.0.
 Documents:
 {json.dumps(docs, indent=2)}
 
-Return a JSON object with a single key "relevance_scores" containing a list of scores (floats) in the same order as the documents."""
+Return ONLY a JSON object with a single key "relevance_scores" containing a list of scores (floats) in the same order as the documents. No other text."""
 
         try:
-            # Call Claude Haiku API (fast & cheap for reranking)
-            response = await self.anthropic_client.messages.create(
-                model=self.config.claude_model,
+            response_text = await self.llm_client.generate(
+                system="You are a relevance scoring assistant. Output only valid JSON.",
+                messages=[{"role": "user", "content": prompt}],
+                model=self.config.resolved_model,
                 max_tokens=500,
-                messages=[{
-                    "role": "user",
-                    "content": prompt
-                }]
+                temperature=0.1,
             )
 
-            # Parse response
-            response_text = response.content[0].text
-            scores_data = json.loads(response_text)
+            # Strip markdown fences if present (common LLM output pattern)
+            # Handles both multiline (```json\n...\n```) and compact (```json{...}```) forms
+            cleaned = response_text.strip()
+            cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
+
+            scores_data = json.loads(cleaned)
             relevance_scores = scores_data.get("relevance_scores", [])
 
-            # Update results with new scores
             reranked = []
             for i, result in enumerate(results):
-                score = relevance_scores[i] if i < len(relevance_scores) else result.score
+                raw_score = relevance_scores[i] if i < len(relevance_scores) else result.score
+                try:
+                    score = float(raw_score)
+                except (ValueError, TypeError):
+                    numbers = re.findall(r"[-+]?\d*\.?\d+", str(raw_score))
+                    score = float(numbers[0]) if numbers else result.score
+                score = max(0.0, min(1.0, score))
 
                 reranked_result = SearchResult(
                     chunk_id=result.chunk_id,
@@ -441,9 +462,8 @@ Return a JSON object with a single key "relevance_scores" containing a list of s
             return reranked
 
         except Exception as e:
-            logger.error(f"Claude reranking failed: {e}")
-            # Return original results on error
-            return results
+            logger.error(f"LLM reranking failed: {e}", exc_info=True)
+            raise
 
     def _calculate_ndcg(self, results: List[SearchResult], k: Optional[int] = None) -> float:
         """
@@ -457,6 +477,9 @@ Return a JSON object with a single key "relevance_scores" containing a list of s
             NDCG score (0.0 to 1.0)
         """
         if not results:
+            return 0.0
+
+        if np is None:
             return 0.0
 
         k = k or len(results)
@@ -491,7 +514,8 @@ def get_reranking_service(config: Optional[RerankingConfig] = None) -> Reranking
     Get or create singleton reranking service instance
 
     Args:
-        config: Optional configuration (only used on first call)
+        config: Optional configuration (only applied on first initialization;
+                subsequent calls return the existing instance regardless of config)
 
     Returns:
         RerankingService instance
@@ -502,11 +526,3 @@ def get_reranking_service(config: Optional[RerankingConfig] = None) -> Reranking
         _reranking_service = RerankingService(config=config)
 
     return _reranking_service
-
-
-# Import numpy for NDCG calculation
-try:
-    import numpy as np
-except ImportError:
-    logger.warning("numpy not available, NDCG calculation will be disabled")
-    np = None

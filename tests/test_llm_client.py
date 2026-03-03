@@ -9,6 +9,7 @@ import openai
 from app.services.llm_client import (
     LLMClient,
     OpenAICompatibleClient,
+    FireworksLLMClient,
     TogetherLLMClient,
     OllamaVLMClient,
     AnthropicLLMClient,
@@ -19,12 +20,12 @@ from app.services.llm_client import (
 
 
 # ---------------------------------------------------------------------------
-# TogetherLLMClient
+# FireworksLLMClient (aliased as TogetherLLMClient for backwards compat)
 # ---------------------------------------------------------------------------
 
 
 class TestTogetherLLMClient:
-    """Tests for the Together AI (OpenAI-compatible) LLM client."""
+    """Tests for the Fireworks AI (OpenAI-compatible) LLM client."""
 
     @pytest.fixture(autouse=True)
     def clear_singletons(self):
@@ -34,8 +35,8 @@ class TestTogetherLLMClient:
 
     @pytest.fixture
     def client(self):
-        with patch.dict("os.environ", {"TOGETHER_API_KEY": "test-key"}):
-            return TogetherLLMClient(api_key="test-key")
+        with patch.dict("os.environ", {"FIREWORKS_API_KEY": "test-key"}):
+            return FireworksLLMClient(api_key="test-key")
 
     @pytest.mark.asyncio
     async def test_generate_returns_text(self, client):
@@ -54,7 +55,7 @@ class TestTogetherLLMClient:
         assert result == "Hello from Kimi"
         client.client.chat.completions.create.assert_awaited_once()
         call_kwargs = client.client.chat.completions.create.call_args[1]
-        assert call_kwargs["model"] == "moonshotai/Kimi-K2.5-Thinking"
+        assert call_kwargs["model"] == "accounts/fireworks/models/kimi-k2p5"
         assert call_kwargs["messages"][0] == {"role": "system", "content": "You are helpful."}
         assert call_kwargs["messages"][1] == {"role": "user", "content": "Hi"}
 
@@ -379,10 +380,15 @@ class TestGetLLMClient:
         yield
         _clients.clear()
 
-    def test_returns_together_client(self):
-        with patch.dict("os.environ", {"TOGETHER_API_KEY": "test"}):
+    def test_returns_fireworks_client(self):
+        with patch.dict("os.environ", {"FIREWORKS_API_KEY": "test"}):
+            client = get_llm_client("fireworks")
+            assert isinstance(client, FireworksLLMClient)
+
+    def test_together_alias_returns_fireworks(self):
+        with patch.dict("os.environ", {"FIREWORKS_API_KEY": "test"}):
             client = get_llm_client("together")
-            assert isinstance(client, TogetherLLMClient)
+            assert isinstance(client, FireworksLLMClient)
 
     def test_returns_anthropic_client(self):
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test"}):
@@ -395,9 +401,9 @@ class TestGetLLMClient:
             assert isinstance(client, GeminiLLMClient)
 
     def test_caches_clients(self):
-        with patch.dict("os.environ", {"TOGETHER_API_KEY": "test"}):
-            client1 = get_llm_client("together")
-            client2 = get_llm_client("together")
+        with patch.dict("os.environ", {"FIREWORKS_API_KEY": "test"}):
+            client1 = get_llm_client("fireworks")
+            client2 = get_llm_client("fireworks")
             assert client1 is client2
 
     def test_returns_ollama_vlm_client(self):
@@ -416,7 +422,7 @@ class TestGetLLMClient:
 
 
 class TestOllamaVLMClient:
-    """Tests for the Ollama VLM (Qwen2.5-VL) client."""
+    """Tests for the Ollama VLM (Qwen 3.5) client."""
 
     @pytest.fixture(autouse=True)
     def clear_singletons(self):
@@ -430,7 +436,7 @@ class TestOllamaVLMClient:
             return OllamaVLMClient()
 
     def test_default_model(self, client):
-        assert client.DEFAULT_MODEL == "qwen2.5vl:32b-q8_0"
+        assert client.DEFAULT_MODEL == "qwen3.5:35b"
 
     def test_base_url_default(self, client):
         assert client._ollama_base == "http://localhost:11434"

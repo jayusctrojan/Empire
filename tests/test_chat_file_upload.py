@@ -578,7 +578,7 @@ class TestVisionService:
             return service
 
     def test_initialization(self, vision_service):
-        assert vision_service.primary_model == "qwen2.5vl:32b-q8_0"
+        assert vision_service.primary_model == "qwen3.5:35b"
         assert vision_service.cache_results is True
 
     @pytest.mark.asyncio

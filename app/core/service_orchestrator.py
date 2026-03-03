@@ -37,7 +37,7 @@ from app.models.preflight import (
 logger = structlog.get_logger(__name__)
 
 # Required Ollama models for local embeddings + vision
-OLLAMA_REQUIRED_MODELS = ["bge-m3", "qwen2.5vl:32b-q8_0"]
+OLLAMA_REQUIRED_MODELS = ["bge-m3", "qwen3.5:35b"]
 
 
 # =============================================================================
