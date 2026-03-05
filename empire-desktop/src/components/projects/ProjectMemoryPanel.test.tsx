@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { ProjectMemoryPanel } from './ProjectMemoryPanel'
+import { useProjectMemoryStore } from '@/stores/projectMemory'
 import {
   getProjectMemories,
   getMemoryDetail,
@@ -59,6 +60,8 @@ vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
 describe('ProjectMemoryPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset Zustand store between tests to avoid state leaking
+    useProjectMemoryStore.getState().reset()
     mockGetProjectMemories.mockResolvedValue(emptyResult)
     mockAddMemoryNote.mockResolvedValue({ memoryId: 'new-1' })
     mockDeleteMemory.mockResolvedValue(undefined)

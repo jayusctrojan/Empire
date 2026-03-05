@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useReducer } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   Lock,
   Edit2,
@@ -10,16 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
-import {
-  getProjectMemories,
-  getMemoryDetail,
-  addMemoryNote,
-  deleteMemory,
-  updateMemory,
-  searchMemories,
-  type MemorySummary,
-  type MemoryDetail,
-} from '@/lib/api/memory'
+import { useProjectMemoryStore } from '@/stores/projectMemory'
 
 interface ProjectMemoryPanelProps {
   projectId: string
@@ -27,150 +18,36 @@ interface ProjectMemoryPanelProps {
   onSaveMemoryContext: (ctx: string) => Promise<void>
 }
 
-const PAGE_SIZE = 10
-const SEARCH_DEBOUNCE_MS = 300
-
-// Consolidated memory list state to reduce useState declarations
-interface MemoryListState {
-  memories: MemorySummary[]
-  total: number
-  isLoading: boolean
-  hasMore: boolean
-}
-
-type MemoryListAction =
-  | { type: 'LOAD_START' }
-  | { type: 'LOAD_SUCCESS'; memories: MemorySummary[]; total: number; reset: boolean; hasMore: boolean }
-  | { type: 'LOAD_FAIL' }
-  | { type: 'DELETE'; memoryId: string }
-
-const initialListState: MemoryListState = {
-  memories: [],
-  total: 0,
-  isLoading: false,
-  hasMore: false,
-}
-
-function memoryListReducer(state: MemoryListState, action: MemoryListAction): MemoryListState {
-  switch (action.type) {
-    case 'LOAD_START':
-      return { ...state, isLoading: true }
-    case 'LOAD_SUCCESS':
-      return {
-        memories: action.reset ? action.memories : [...state.memories, ...action.memories],
-        total: action.total,
-        isLoading: false,
-        hasMore: action.hasMore,
-      }
-    case 'LOAD_FAIL':
-      return { ...state, isLoading: false }
-    case 'DELETE':
-      return {
-        ...state,
-        memories: state.memories.filter(m => m.id !== action.memoryId),
-        total: Math.max(0, state.total - 1),
-      }
-  }
-}
-
 export function ProjectMemoryPanel({
   projectId,
   memoryContext,
   onSaveMemoryContext,
 }: ProjectMemoryPanelProps) {
-  // Pinned context state
-  const [pinnedText, setPinnedText] = useState(memoryContext)
-  const [isEditingPinned, setIsEditingPinned] = useState(false)
-  const [isSavingPinned, setIsSavingPinned] = useState(false)
+  const store = useProjectMemoryStore()
+  const {
+    pinnedText, isEditingPinned, isSavingPinned,
+    memories, total, isLoading, hasMore,
+    searchQuery,
+    isAddingNote, noteContent, isSavingNote,
+    expandedId, expandedDetail,
+    editingMemoryId, editSummary,
+    deletingId,
+  } = store
 
-  // Accumulated knowledge state (consolidated via useReducer)
-  const [listState, dispatch] = useReducer(memoryListReducer, initialListState)
-  const { memories, total, isLoading, hasMore } = listState
-
-  // Search
-  const [searchQuery, setSearchQuery] = useState('')
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const fetchIdRef = useRef(0)
-  const detailFetchIdRef = useRef(0)
-  const editFetchIdRef = useRef(0)
-
-  // Add note
-  const [isAddingNote, setIsAddingNote] = useState(false)
-  const [noteContent, setNoteContent] = useState('')
-  const [isSavingNote, setIsSavingNote] = useState(false)
-
-  // Expanded memory detail
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [expandedDetail, setExpandedDetail] = useState<MemoryDetail | null>(null)
-
-  // Inline edit
-  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null)
-  const [editSummary, setEditSummary] = useState('')
-
-  // Delete confirmation
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
-  // Infinite scroll sentinel
+  // DOM ref for infinite scroll sentinel (stays in component)
   const sentinelRef = useRef<HTMLDivElement>(null)
-
-  // Mutable offset ref — avoids memories.length in useCallback deps
-  const offsetRef = useRef(0)
 
   // Sync pinned text when prop changes
   useEffect(() => {
-    if (!isEditingPinned) setPinnedText(memoryContext)
+    if (!isEditingPinned) store.setPinnedText(memoryContext)
   }, [memoryContext, isEditingPinned])
 
-  // Load memories
-  const loadMemories = useCallback(async (reset = false) => {
-    const id = ++fetchIdRef.current
-    dispatch({ type: 'LOAD_START' })
-    try {
-      const offset = reset ? 0 : offsetRef.current
-      const trimmedQuery = searchQuery.trim()
-      const result = trimmedQuery
-        ? await searchMemories(trimmedQuery, projectId, PAGE_SIZE)
-        : await getProjectMemories(projectId, PAGE_SIZE, offset)
-      if (fetchIdRef.current !== id) return // stale
-      if (reset) {
-        offsetRef.current = result.memories.length
-      } else {
-        offsetRef.current += result.memories.length
-      }
-      const isSearch = !!trimmedQuery
-      const emptyPage = result.memories.length === 0
-      dispatch({
-        type: 'LOAD_SUCCESS',
-        memories: result.memories,
-        total: result.total,
-        reset,
-        hasMore: isSearch || emptyPage ? false : offsetRef.current < result.total,
-      })
-    } catch {
-      if (fetchIdRef.current === id) dispatch({ type: 'LOAD_FAIL' })
-    }
-  }, [projectId, searchQuery])
-
-  // Stable ref for loadMemories — avoids stale closures in IntersectionObserver
-  const loadMemoriesRef = useRef(loadMemories)
-  useEffect(() => { loadMemoriesRef.current = loadMemories }, [loadMemories])
-
-  // Debounced search + initial load (unified to avoid duplicate loads on mount)
+  // Reset store and load when projectId changes
   useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    if (!searchQuery.trim()) {
-      // Empty search — load immediately (handles initial mount + clearing search)
-      loadMemoriesRef.current(true)
-      return
-    }
-    searchTimerRef.current = setTimeout(() => {
-      loadMemoriesRef.current(true)
-    }, SEARCH_DEBOUNCE_MS)
-    return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, projectId])
+    store.reset()
+    store.setPinnedText(memoryContext)
+    store.fetchMemories(projectId, true)
+  }, [projectId])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -178,91 +55,16 @@ export function ProjectMemoryPanel({
     if (!el) return
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && hasMore && !isLoading) {
-          loadMemoriesRef.current(false)
+        const s = useProjectMemoryStore.getState()
+        if (entry.isIntersecting && s.hasMore && !s.isLoading) {
+          s.fetchMemories(projectId, false)
         }
       },
       { threshold: 0.1 },
     )
     observer.observe(el)
     return () => observer.disconnect()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMore, isLoading])
-
-  // Save pinned context
-  const handleSavePinned = async () => {
-    setIsSavingPinned(true)
-    try {
-      await onSaveMemoryContext(pinnedText)
-      setIsEditingPinned(false)
-    } catch (e) {
-      console.warn('Failed to save pinned context', e)
-    } finally {
-      setIsSavingPinned(false)
-    }
-  }
-
-  // Add note
-  const handleAddNote = async () => {
-    if (!noteContent.trim()) return
-    setIsSavingNote(true)
-    try {
-      await addMemoryNote(projectId, noteContent.trim())
-      setNoteContent('')
-      setIsAddingNote(false)
-      loadMemories(true)
-    } catch (e) {
-      console.warn('Failed to add memory note', e)
-    } finally {
-      setIsSavingNote(false)
-    }
-  }
-
-  // Toggle expand
-  const handleToggleExpand = async (memoryId: string) => {
-    if (expandedId === memoryId) {
-      setExpandedId(null)
-      setExpandedDetail(null)
-      return
-    }
-    setExpandedId(memoryId)
-    setExpandedDetail(null)
-    const id = ++detailFetchIdRef.current
-    try {
-      const detail = await getMemoryDetail(memoryId)
-      if (detailFetchIdRef.current !== id) return // stale
-      if (detail) setExpandedDetail(detail)
-    } catch {
-      // silent
-    }
-  }
-
-  // Inline edit save
-  const handleSaveEdit = async (memoryId: string) => {
-    try {
-      await updateMemory(memoryId, { summary: editSummary })
-      setEditingMemoryId(null)
-      loadMemories(true)
-    } catch (e) {
-      console.warn('Failed to update memory', e)
-    }
-  }
-
-  // Delete memory
-  const handleDelete = async (memoryId: string) => {
-    try {
-      await deleteMemory(memoryId)
-      setDeletingId(null)
-      dispatch({ type: 'DELETE', memoryId })
-      offsetRef.current = Math.max(0, offsetRef.current - 1)
-      if (expandedId === memoryId) {
-        setExpandedId(null)
-        setExpandedDetail(null)
-      }
-    } catch (e) {
-      console.warn('Failed to delete memory', e)
-    }
-  }
+  }, [hasMore, isLoading, projectId])
 
   return (
     <div className="space-y-4">
@@ -278,7 +80,7 @@ export function ProjectMemoryPanel({
             {!isEditingPinned ? (
               <button
                 aria-label="Edit pinned context"
-                onClick={() => setIsEditingPinned(true)}
+                onClick={() => store.startEditingPinned()}
                 className="p-1.5 rounded hover:bg-empire-border transition-colors"
               >
                 <Edit2 className="w-4 h-4 text-empire-text-muted" />
@@ -287,7 +89,7 @@ export function ProjectMemoryPanel({
               <div className="flex items-center gap-1">
                 <button
                   aria-label="Save pinned context"
-                  onClick={handleSavePinned}
+                  onClick={() => store.savePinnedContext(onSaveMemoryContext)}
                   disabled={isSavingPinned}
                   className="p-1.5 rounded hover:bg-green-500/20 transition-colors"
                 >
@@ -295,10 +97,7 @@ export function ProjectMemoryPanel({
                 </button>
                 <button
                   aria-label="Cancel editing pinned context"
-                  onClick={() => {
-                    setPinnedText(memoryContext)
-                    setIsEditingPinned(false)
-                  }}
+                  onClick={() => store.cancelEditingPinned(memoryContext)}
                   className="p-1.5 rounded hover:bg-red-500/20 transition-colors"
                 >
                   <X className="w-4 h-4 text-red-500" />
@@ -310,7 +109,7 @@ export function ProjectMemoryPanel({
         {isEditingPinned ? (
           <textarea
             value={pinnedText}
-            onChange={(e) => setPinnedText(e.target.value)}
+            onChange={(e) => store.setPinnedText(e.target.value)}
             placeholder="Add context about this project..."
             className="w-full min-h-[80px] p-3 rounded-lg border border-empire-border bg-empire-sidebar text-empire-text text-sm placeholder:text-empire-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-empire-primary/50"
           />
@@ -333,7 +132,7 @@ export function ProjectMemoryPanel({
             )}
           </h2>
           <button
-            onClick={() => setIsAddingNote(true)}
+            onClick={() => store.openAddNote()}
             className="flex items-center gap-1 text-xs text-empire-primary hover:text-empire-primary/80 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -347,7 +146,7 @@ export function ProjectMemoryPanel({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => store.setSearchQuery(e.target.value, projectId)}
             placeholder="Search memories..."
             aria-label="Search memories"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-empire-border bg-empire-sidebar text-empire-text text-sm placeholder:text-empire-text-muted focus:outline-none focus:ring-2 focus:ring-empire-primary/50"
@@ -359,23 +158,20 @@ export function ProjectMemoryPanel({
           <div className="mb-3 p-3 rounded-lg border border-empire-primary/30 bg-empire-sidebar">
             <textarea
               value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
+              onChange={(e) => store.setNoteContent(e.target.value)}
               placeholder="Write a note..."
               className="w-full min-h-[60px] p-2 rounded border border-empire-border bg-empire-bg text-empire-text text-sm placeholder:text-empire-text-muted resize-none focus:outline-none focus:ring-1 focus:ring-empire-primary/50"
               autoFocus
             />
             <div className="flex justify-end gap-2 mt-2">
               <button
-                onClick={() => {
-                  setIsAddingNote(false)
-                  setNoteContent('')
-                }}
+                onClick={() => store.closeAddNote()}
                 className="px-3 py-1 text-xs rounded border border-empire-border text-empire-text-muted hover:bg-empire-border transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleAddNote}
+                onClick={() => store.saveNote(projectId)}
                 disabled={!noteContent.trim() || isSavingNote}
                 className="px-3 py-1 text-xs rounded bg-empire-primary text-white hover:bg-empire-primary/90 disabled:opacity-50 transition-colors"
               >
@@ -403,7 +199,7 @@ export function ProjectMemoryPanel({
                   <button
                     aria-label={`${expandedId === memory.id ? 'Collapse' : 'Expand'} memory ${memory.id}`}
                     aria-expanded={expandedId === memory.id}
-                    onClick={() => handleToggleExpand(memory.id)}
+                    onClick={() => store.toggleExpand(memory.id)}
                     className="mt-0.5 p-0.5 rounded hover:bg-empire-border transition-colors flex-shrink-0"
                   >
                     {expandedId === memory.id ? (
@@ -417,20 +213,20 @@ export function ProjectMemoryPanel({
                       <div>
                         <textarea
                           value={editSummary}
-                          onChange={(e) => setEditSummary(e.target.value)}
+                          onChange={(e) => store.setEditSummary(e.target.value)}
                           className="w-full min-h-[40px] p-2 rounded border border-empire-border bg-empire-bg text-empire-text text-xs resize-none focus:outline-none focus:ring-1 focus:ring-empire-primary/50"
                         />
                         <div className="flex gap-1 mt-1">
                           <button
                             aria-label="Save edit"
-                            onClick={() => handleSaveEdit(memory.id)}
+                            onClick={() => store.saveEdit(projectId)}
                             className="p-1 rounded hover:bg-green-500/20"
                           >
                             <Check className="w-3 h-3 text-green-500" />
                           </button>
                           <button
                             aria-label="Cancel edit"
-                            onClick={() => setEditingMemoryId(null)}
+                            onClick={() => store.cancelEdit()}
                             className="p-1 rounded hover:bg-red-500/20"
                           >
                             <X className="w-3 h-3 text-red-500" />
@@ -464,20 +260,7 @@ export function ProjectMemoryPanel({
                     {editingMemoryId !== memory.id && (
                       <button
                         aria-label={`Edit memory ${memory.id}`}
-                        onClick={async () => {
-                          const requestId = ++editFetchIdRef.current
-                          const fallback = memory.summaryPreview
-                          setEditingMemoryId(memory.id)
-                          setEditSummary(fallback)
-                          try {
-                            const detail = await getMemoryDetail(memory.id)
-                            if (editFetchIdRef.current === requestId) {
-                              setEditSummary(prev => prev === fallback ? (detail?.summary ?? fallback) : prev)
-                            }
-                          } catch {
-                            // fallback already set — nothing to do
-                          }
-                        }}
+                        onClick={() => store.startEdit(memory)}
                         className="p-1 rounded hover:bg-empire-border transition-colors"
                       >
                         <Edit2 className="w-3 h-3 text-empire-text-muted" />
@@ -487,14 +270,14 @@ export function ProjectMemoryPanel({
                       <div className="flex items-center gap-1">
                         <button
                           aria-label={`confirm-delete-${memory.id}`}
-                          onClick={() => handleDelete(memory.id)}
+                          onClick={() => store.confirmDelete(memory.id, projectId)}
                           className="p-1 rounded hover:bg-red-500/20"
                         >
                           <Check className="w-3 h-3 text-red-500" />
                         </button>
                         <button
                           aria-label={`cancel-delete-${memory.id}`}
-                          onClick={() => setDeletingId(null)}
+                          onClick={() => store.cancelDelete()}
                           className="p-1 rounded hover:bg-empire-border"
                         >
                           <X className="w-3 h-3 text-empire-text-muted" />
@@ -503,7 +286,7 @@ export function ProjectMemoryPanel({
                     ) : (
                       <button
                         aria-label={`delete-memory-${memory.id}`}
-                        onClick={() => setDeletingId(memory.id)}
+                        onClick={() => store.startDelete(memory.id)}
                         className="p-1 rounded hover:bg-red-500/10 transition-colors"
                       >
                         <Trash2 className="w-3 h-3 text-empire-text-muted" />
