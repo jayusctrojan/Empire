@@ -39,7 +39,7 @@ def _make_cko_service(supabase_inner=None):
         supabase_inner = _make_supabase_mock()
 
     storage_wrapper = MagicMock()
-    storage_wrapper.supabase = supabase_inner
+    storage_wrapper.client = supabase_inner
 
     with (
         patch("app.services.studio_cko_conversation_service.get_supabase_storage",
