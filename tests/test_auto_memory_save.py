@@ -33,7 +33,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, call
 def mock_supabase_storage():
     """Mock SupabaseStorageService wrapper used by StudioCKOConversationService."""
     mock = MagicMock()
-    mock.supabase = MagicMock()
+    mock.client = MagicMock()
     # Default chainable table query builder — callers override .execute() per test
     table = MagicMock()
     table.select.return_value = table
@@ -47,7 +47,7 @@ def mock_supabase_storage():
     table.range.return_value = table
     table.limit.return_value = table
     table.execute.return_value = MagicMock(data=[])
-    mock.supabase.table.return_value = table
+    mock.client.table.return_value = table
     return mock
 
 
@@ -110,7 +110,7 @@ class TestAutoSaveTriggerLogic:
         """Auto-save task is created when new message count reaches exactly 6."""
         # current_count = 4, so new_count = 4 + 2 = 6 -> trigger
         session_row = _make_session_row(message_count=4, project_id="proj-111")
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),  # SELECT title/message_count/project_id/user_id
             MagicMock(data=[session_row]),  # UPDATE
@@ -130,7 +130,7 @@ class TestAutoSaveTriggerLogic:
         """Auto-save task is NOT created when new count is 4 (below threshold)."""
         # current_count = 2, new_count = 2 + 2 = 4 -> no trigger
         session_row = _make_session_row(message_count=2, project_id="proj-111")
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),
             MagicMock(data=[session_row]),
@@ -150,7 +150,7 @@ class TestAutoSaveTriggerLogic:
         """Auto-save fires again at count 16 (every-10 cadence after 6)."""
         # current_count = 14, new_count = 14 + 2 = 16 -> trigger (16 % 10 == 6)
         session_row = _make_session_row(message_count=14, project_id="proj-111")
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),
             MagicMock(data=[session_row]),
@@ -170,7 +170,7 @@ class TestAutoSaveTriggerLogic:
         """Auto-save is skipped when project_id is None, even at count 6."""
         # project_id is None — guard condition should prevent create_task
         session_row = _make_session_row(message_count=4, project_id=None)
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),
             MagicMock(data=[session_row]),
@@ -299,7 +299,7 @@ class TestAutoSaveSessionMemoryConversion:
 
         # 4 messages: user, cko, user, cko
         message_rows = _make_message_rows(4)
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.return_value = MagicMock(data=message_rows)
 
         captured_messages = []
@@ -348,7 +348,7 @@ class TestAutoSaveSessionMemoryConversion:
         )
 
         # Only 2 messages — below minimum threshold
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.return_value = MagicMock(data=_make_message_rows(2))
 
         mock_memory_service = MagicMock()
@@ -381,7 +381,7 @@ class TestAutoSaveFailureModes:
         is tested by test_auto_save_exception_caught_inside_auto_save_session_memory.
         """
         session_row = _make_session_row(message_count=4, project_id="proj-111")
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.side_effect = [
             MagicMock(data=[session_row]),
             MagicMock(data=[session_row]),
@@ -416,7 +416,7 @@ class TestAutoSaveFailureModes:
             message_count=5,
         )
 
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.return_value = MagicMock(data=_make_message_rows(4))
 
         mock_memory_service = MagicMock()
@@ -504,7 +504,7 @@ class TestAutoSaveWireTest:
         session_row = _make_session_row(message_count=4, project_id="proj-111")
         message_rows = _make_message_rows(6)  # 6 messages -> above 3-message floor
 
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
 
         # _update_session_metadata: SELECT then UPDATE
         # _auto_save_session_memory: SELECT messages

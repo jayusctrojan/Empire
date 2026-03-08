@@ -23,7 +23,7 @@ class _UniqueViolation(Exception):
 def mock_supabase_storage():
     """Mock Supabase storage."""
     mock = Mock()
-    mock.supabase = Mock()
+    mock.client = Mock()
     # Chainable query builder
     table = Mock()
     table.select.return_value = table
@@ -37,7 +37,7 @@ def mock_supabase_storage():
     table.range.return_value = table
     table.limit.return_value = table
     table.execute.return_value = Mock(data=[])
-    mock.supabase.table.return_value = table
+    mock.client.table.return_value = table
     return mock
 
 
@@ -132,7 +132,7 @@ class TestGetOrCreateAssetTestSession:
     async def test_returns_existing_session(self, cko_service, mock_supabase_storage):
         """Should return existing session if one exists."""
         row = _make_session_row(message_count=3)
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.return_value = Mock(data=[row])
 
         session = await cko_service.get_or_create_asset_test_session(
@@ -146,7 +146,7 @@ class TestGetOrCreateAssetTestSession:
     async def test_creates_new_session(self, cko_service, mock_supabase_storage):
         """Should create new session when none exists."""
         new_row = _make_session_row()
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         # First query: no existing, then insert returns new row
         table.execute.side_effect = [
             Mock(data=[]),  # SELECT: not found
@@ -164,7 +164,7 @@ class TestGetOrCreateAssetTestSession:
     async def test_handles_race_condition(self, cko_service, mock_supabase_storage):
         """Should re-query on unique constraint violation."""
         row = _make_session_row()
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
 
         # First query: not found → Insert: raises unique constraint → Retry: found
         call_count = 0
@@ -197,7 +197,7 @@ class TestDeleteAssetTestSession:
     @pytest.mark.asyncio
     async def test_deletes_session(self, cko_service, mock_supabase_storage):
         """Should find and delete the test session."""
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.side_effect = [
             Mock(data=[{"id": "session-1"}]),  # Find session
             Mock(data=[]),  # Delete messages
@@ -210,7 +210,7 @@ class TestDeleteAssetTestSession:
     @pytest.mark.asyncio
     async def test_returns_false_when_not_found(self, cko_service, mock_supabase_storage):
         """Should return False when no test session exists."""
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.return_value = Mock(data=[])
 
         result = await cko_service.delete_asset_test_session("user-1", "nonexistent")
@@ -226,7 +226,7 @@ class TestListSessionsFilter:
     async def test_excludes_asset_test_sessions(self, cko_service, mock_supabase_storage):
         """list_sessions should filter to only CKO sessions."""
         cko_row = _make_session_row(id="cko-1", session_type="cko", asset_id=None)
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.return_value = Mock(data=[cko_row])
 
         sessions = await cko_service.list_sessions("user-1")
@@ -239,7 +239,7 @@ class TestListSessionsFilter:
     async def test_returns_null_session_type(self, cko_service, mock_supabase_storage):
         """Backward compat: sessions with NULL session_type should be returned."""
         row = _make_session_row(id="old-1", session_type=None, asset_id=None)
-        table = mock_supabase_storage.supabase.table.return_value
+        table = mock_supabase_storage.client.table.return_value
         table.execute.return_value = Mock(data=[row])
 
         sessions = await cko_service.list_sessions("user-1")

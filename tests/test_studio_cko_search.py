@@ -22,9 +22,9 @@ from app.services.studio_cko_conversation_service import (
 def mock_supabase_storage():
     """Mock Supabase storage"""
     mock = Mock()
-    mock.supabase = Mock()
-    mock.supabase.rpc.return_value = Mock()
-    mock.supabase.rpc.return_value.execute.return_value = Mock(data=[])
+    mock.client = Mock()
+    mock.client.rpc.return_value = Mock()
+    mock.client.rpc.return_value.execute.return_value = Mock(data=[])
     return mock
 
 
@@ -68,7 +68,7 @@ class TestCKOSearch:
     async def test_search_returns_sources(self, cko_service, mock_supabase_storage):
         """Test that search returns a list of CKOSource objects"""
         # Mock vector_search RPC to return results
-        mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=[
+        mock_supabase_storage.client.rpc.return_value.execute.return_value = Mock(data=[
             {
                 "document_id": "doc-1",
                 "content": "Revenue grew 15% year over year",
@@ -103,7 +103,7 @@ class TestCKOSearch:
     @pytest.mark.asyncio
     async def test_search_empty_results(self, cko_service, mock_supabase_storage):
         """Test that search returns empty list when no matches"""
-        mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=[])
+        mock_supabase_storage.client.rpc.return_value.execute.return_value = Mock(data=[])
 
         results = await cko_service.search("completely unrelated gibberish query")
 
@@ -123,7 +123,7 @@ class TestCKOSearch:
             }
             for i in range(20)
         ]
-        mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=many_results)
+        mock_supabase_storage.client.rpc.return_value.execute.return_value = Mock(data=many_results)
 
         results = await cko_service.search("test query", limit=3)
 
@@ -132,7 +132,7 @@ class TestCKOSearch:
     @pytest.mark.asyncio
     async def test_search_uses_query_expansion(self, cko_service, mock_query_expansion, mock_supabase_storage):
         """Test that search uses query expansion when enabled"""
-        mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=[])
+        mock_supabase_storage.client.rpc.return_value.execute.return_value = Mock(data=[])
 
         config = CKOConfig(enable_query_expansion=True)
         await cko_service.search("test query", config=config)
@@ -143,7 +143,7 @@ class TestCKOSearch:
     async def test_search_fallback_on_expansion_failure(self, cko_service, mock_query_expansion, mock_supabase_storage, mock_embedding_service):
         """Test that search falls back to original query if expansion fails"""
         mock_query_expansion.expand_query.side_effect = Exception("expansion failed")
-        mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=[])
+        mock_supabase_storage.client.rpc.return_value.execute.return_value = Mock(data=[])
 
         # Should not raise — falls back gracefully
         config = CKOConfig(enable_query_expansion=True)
@@ -156,7 +156,7 @@ class TestCKOSearch:
     @pytest.mark.asyncio
     async def test_search_source_fields(self, cko_service, mock_supabase_storage):
         """Test that source fields are populated correctly"""
-        mock_supabase_storage.supabase.rpc.return_value.execute.return_value = Mock(data=[
+        mock_supabase_storage.client.rpc.return_value.execute.return_value = Mock(data=[
             {
                 "document_id": "doc-abc",
                 "content": "Test content snippet here",

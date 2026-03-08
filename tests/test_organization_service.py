@@ -29,7 +29,7 @@ from app.services.organization_service import (
 def mock_supabase():
     """Create a mock Supabase storage instance."""
     mock = MagicMock()
-    mock.supabase = MagicMock()
+    mock.client = MagicMock()
     return mock
 
 
@@ -96,7 +96,7 @@ class TestCreateOrg:
     @pytest.mark.asyncio
     async def test_create_org_success(self, org_service, mock_supabase, sample_org_row):
         # Mock insert org
-        mock_supabase.supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.insert.return_value.execute.return_value = MagicMock(
             data=[sample_org_row]
         )
 
@@ -113,7 +113,7 @@ class TestCreateOrg:
     @pytest.mark.asyncio
     async def test_create_org_custom_slug(self, org_service, mock_supabase, sample_org_row):
         sample_org_row["slug"] = "custom-slug"
-        mock_supabase.supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.insert.return_value.execute.return_value = MagicMock(
             data=[sample_org_row]
         )
 
@@ -127,7 +127,7 @@ class TestCreateOrg:
 
     @pytest.mark.asyncio
     async def test_create_org_failure(self, org_service, mock_supabase):
-        mock_supabase.supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.insert.return_value.execute.return_value = MagicMock(
             data=[]
         )
 
@@ -143,15 +143,15 @@ class TestGetOrg:
     @pytest.mark.asyncio
     async def test_get_org_as_member(self, org_service, mock_supabase, sample_org_row, sample_membership_row):
         # Mock membership check
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[sample_membership_row]
         )
         # Mock org fetch
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[sample_org_row]
         )
         # Mock member count
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
             count=3
         )
 
@@ -164,7 +164,7 @@ class TestGetOrg:
     @pytest.mark.asyncio
     async def test_get_org_not_member(self, org_service, mock_supabase):
         # Mock membership check — no membership found
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[]
         )
 
@@ -181,19 +181,19 @@ class TestUpdateOrg:
     async def test_update_org_success(self, org_service, mock_supabase, sample_org_row, sample_membership_row):
         """Test owner can update org name."""
         # Mock membership check — owner role
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[sample_membership_row]
         )
         # Mock update
         updated_row = {**sample_org_row, "name": "New Name"}
-        mock_supabase.supabase.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.update.return_value.eq.return_value.execute.return_value = MagicMock(
             data=[updated_row]
         )
         # Mock get_org after update (membership + org fetch + count)
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[updated_row]
         )
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
             count=1
         )
 
@@ -205,7 +205,7 @@ class TestUpdateOrg:
     async def test_update_requires_admin(self, org_service, mock_supabase, sample_membership_row):
         # Mock membership check — viewer role
         viewer_membership = {**sample_membership_row, "role": "viewer"}
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[viewer_membership]
         )
 
@@ -223,7 +223,7 @@ class TestMembership:
         admin_membership = {**sample_membership_row, "role": "admin"}
 
         # Mock membership check (requester is admin)
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[admin_membership]
         )
         # Mock insert
@@ -234,7 +234,7 @@ class TestMembership:
             "role": "member",
             "created_at": "2026-01-15T12:00:00+00:00",
         }
-        mock_supabase.supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.insert.return_value.execute.return_value = MagicMock(
             data=[new_member]
         )
 
@@ -247,7 +247,7 @@ class TestMembership:
     @pytest.mark.asyncio
     async def test_add_member_denied_for_regular_member(self, org_service, mock_supabase, sample_membership_row):
         member_role = {**sample_membership_row, "role": "member"}
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[member_role]
         )
 
@@ -256,7 +256,7 @@ class TestMembership:
 
     @pytest.mark.asyncio
     async def test_invalid_role_raises(self, org_service, mock_supabase, sample_membership_row):
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[sample_membership_row]
         )
 
@@ -267,7 +267,7 @@ class TestMembership:
     async def test_admin_cannot_assign_owner_role(self, org_service, mock_supabase, sample_membership_row):
         """Admin trying to assign 'owner' role should raise PermissionError."""
         admin_membership = {**sample_membership_row, "role": "admin"}
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[admin_membership]
         )
 
@@ -282,12 +282,12 @@ class TestMembership:
 
         # First call: requester membership (admin)
         # Second call: target membership (owner)
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[admin_membership]
         )
         # For the target lookup, mock returns owner
         # Note: both calls go through the same mock chain; we use side_effect for sequential calls
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.side_effect = [
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.side_effect = [
             MagicMock(data=[admin_membership]),  # requester
             MagicMock(data=[owner_membership]),   # target
         ]
@@ -298,7 +298,7 @@ class TestMembership:
     @pytest.mark.asyncio
     async def test_owner_cannot_remove_self(self, org_service, mock_supabase, sample_membership_row):
         # Both requester and target are the same owner
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[sample_membership_row]
         )
 
@@ -345,21 +345,21 @@ class TestExport:
     async def test_export_org_data_success(self, org_service, mock_supabase, sample_org_row, sample_membership_row):
         """Test owner can export org data."""
         # Mock membership check — owner
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[sample_membership_row]
         )
         # Mock get_org internals (org fetch + count)
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[sample_org_row]
         )
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
             count=1, data=[sample_membership_row]
         )
         # Mock projects + sources
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(
             data=[], count=0
         )
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.order.return_value.execute.return_value = MagicMock(
             data=[sample_membership_row]
         )
 
@@ -373,7 +373,7 @@ class TestExport:
     async def test_export_requires_owner(self, org_service, mock_supabase, sample_membership_row):
         # Mock membership as member (not owner)
         member_row = {**sample_membership_row, "role": "member"}
-        mock_supabase.supabase.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+        mock_supabase.client.table.return_value.select.return_value.eq.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
             data=[member_row]
         )
 
