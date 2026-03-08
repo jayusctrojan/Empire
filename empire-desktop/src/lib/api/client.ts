@@ -10,6 +10,7 @@ import type { RetryConfig, APIError } from '@/types'
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_EMPIRE_API_URL as string || 'https://jb-empire-api.onrender.com'
+const API_KEY = import.meta.env.VITE_EMPIRE_API_KEY as string | undefined
 
 // Default retry configuration
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
@@ -77,6 +78,9 @@ function buildHeaders(customHeaders?: Record<string, string>): Record<string, st
   const token = getAuthToken()
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
+  } else if (API_KEY) {
+    // Fall back to API key when no JWT (e.g., Clerk not configured in Tauri)
+    headers['Authorization'] = API_KEY
   }
 
   // Inject current org ID for multi-tenant scoping
@@ -212,6 +216,8 @@ export async function postFormData<T>(endpoint: string, formData: FormData): Pro
   const headers: Record<string, string> = {}
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
+  } else if (API_KEY) {
+    headers['Authorization'] = API_KEY
   }
   // Inject current org ID for multi-tenant scoping
   const currentOrg = useOrgStore.getState().currentOrg

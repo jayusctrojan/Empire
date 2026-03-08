@@ -2,6 +2,8 @@ import { useAuth } from '@clerk/clerk-react'
 import { useState, useEffect, type ReactNode } from 'react'
 import { SignInPage } from './SignInPage'
 
+const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string
+
 interface ProtectedRouteProps {
   children: ReactNode
   fallback?: ReactNode
@@ -19,9 +21,22 @@ const isBrowserOrTest = (): boolean => {
 
 /**
  * Protected route wrapper
- * Shows sign-in page when user is not authenticated
+ * Shows sign-in page when user is not authenticated.
+ * When Clerk is not configured (no publishable key), renders children directly.
  */
 export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
+  // If Clerk is not configured, skip auth entirely — useAuth() requires ClerkProvider
+  if (!CLERK_PUBLISHABLE_KEY) {
+    return <>{children}</>
+  }
+
+  return <ClerkProtectedRoute fallback={fallback}>{children}</ClerkProtectedRoute>
+}
+
+/**
+ * Inner component that safely uses Clerk hooks (only rendered when ClerkProvider is present)
+ */
+function ClerkProtectedRoute({ children, fallback }: ProtectedRouteProps) {
   const { isLoaded, isSignedIn } = useAuth()
   const [bypassAuth, setBypassAuth] = useState(false)
 

@@ -85,7 +85,9 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
             Welcome to Empire
           </h1>
           <p className="text-empire-text-muted">
-            Which company are you working on today?
+            {userOrgs.length > 0
+              ? 'Which company are you working on today?'
+              : 'Set up your first organization to get started.'}
           </p>
         </div>
 
@@ -93,48 +95,68 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
         {loadError && (
           <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
             <p className="text-sm text-red-400">{loadError}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 text-xs text-empire-text-muted hover:text-empire-primary transition-colors underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Empty state — no orgs yet */}
+        {!loadError && userOrgs.length === 0 && (
+          <div className="mb-6 p-4 rounded-xl bg-empire-surface border border-empire-border text-center">
+            <p className="text-sm text-empire-text-muted mb-1">
+              No organizations yet.
+            </p>
+            <p className="text-xs text-empire-text-muted">
+              Create your first organization to get started.
+            </p>
           </div>
         )}
 
         {/* Organization List */}
-        <div className="space-y-2 mb-6">
-          {userOrgs.map((org) => (
-            <button
-              key={org.id}
-              onClick={() => handleSelectOrg(org)}
-              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl bg-empire-surface hover:bg-empire-surface-hover border border-empire-border hover:border-empire-primary/50 transition-all group"
-            >
-              {/* Logo or Initial */}
-              {org.logoUrl ? (
-                <img
-                  src={org.logoUrl}
-                  alt={org.name}
-                  className="w-10 h-10 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-lg bg-empire-primary/20 flex items-center justify-center text-empire-primary font-semibold text-lg">
-                  {org.name.charAt(0).toUpperCase()}
-                </div>
-              )}
+        {userOrgs.length > 0 && (
+          <div className="space-y-2 mb-6">
+            {userOrgs.map((org) => (
+              <button
+                key={org.id}
+                onClick={() => handleSelectOrg(org)}
+                className="w-full flex items-center gap-4 px-4 py-3 rounded-xl bg-empire-surface hover:bg-empire-surface-hover border border-empire-border hover:border-empire-primary/50 transition-all group"
+              >
+                {/* Logo or Initial */}
+                {org.logoUrl ? (
+                  <img
+                    src={org.logoUrl}
+                    alt={org.name}
+                    className="w-10 h-10 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-empire-primary/20 flex items-center justify-center text-empire-primary font-semibold text-lg">
+                    {org.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
 
-              {/* Name + Meta */}
-              <div className="flex-1 text-left">
-                <div className="font-medium text-empire-text">{org.name}</div>
-                <div className="text-sm text-empire-text-muted flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5" />
-                  {org.memberCount} {org.memberCount === 1 ? 'member' : 'members'}
-                  {org.userRole && (
-                    <span className="px-1.5 py-0.5 text-xs rounded bg-empire-primary/10 text-empire-primary capitalize">
-                      {org.userRole}
-                    </span>
-                  )}
+                {/* Name + Meta */}
+                <div className="flex-1 text-left">
+                  <div className="font-medium text-empire-text">{org.name}</div>
+                  <div className="text-sm text-empire-text-muted flex items-center gap-2">
+                    <Users className="w-3.5 h-3.5" />
+                    {org.memberCount} {org.memberCount === 1 ? 'member' : 'members'}
+                    {org.userRole && (
+                      <span className="px-1.5 py-0.5 text-xs rounded bg-empire-primary/10 text-empire-primary capitalize">
+                        {org.userRole}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <ChevronRight className="w-5 h-5 text-empire-text-muted group-hover:text-empire-primary transition-colors" />
-            </button>
-          ))}
-        </div>
+                <ChevronRight className="w-5 h-5 text-empire-text-muted group-hover:text-empire-primary transition-colors" />
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Create New Organization */}
         {!showCreate ? (
@@ -143,7 +165,7 @@ export function OrgPicker({ onOrgSelected }: OrgPickerProps) {
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-empire-border hover:border-empire-primary/50 text-empire-text-muted hover:text-empire-primary transition-all"
           >
             <Plus className="w-4 h-4" />
-            Add Organization
+            {userOrgs.length === 0 ? 'Create Organization' : 'Add Organization'}
           </button>
         ) : (
           <div className="p-4 rounded-xl bg-empire-surface border border-empire-border">
