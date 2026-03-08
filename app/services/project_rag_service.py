@@ -401,7 +401,7 @@ class ProjectRAGService:
         try:
             # Call the RPC function created in Task 59
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.rpc(
+                lambda: self.supabase.client.rpc(
                     'match_source_embeddings',
                     {
                         'query_embedding': query_embedding,
@@ -446,7 +446,7 @@ class ProjectRAGService:
         try:
             # Call the existing vector_search RPC
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.rpc(
+                lambda: self.supabase.client.rpc(
                     'vector_search',
                     {
                         'query_embedding': query_embedding,

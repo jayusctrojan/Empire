@@ -104,7 +104,7 @@ class OrganizationService:
 
         # Insert organization + owner membership atomically via RPC or sequential with cleanup
         org_result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("organizations")
+            lambda: self.supabase.client.table("organizations")
             .insert({
                 "name": name,
                 "slug": slug,
@@ -123,7 +123,7 @@ class OrganizationService:
         # Add creator as owner — clean up org on failure
         try:
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("org_memberships")
+                lambda: self.supabase.client.table("org_memberships")
                 .insert({
                     "org_id": org_id,
                     "user_id": owner_user_id,
@@ -134,7 +134,7 @@ class OrganizationService:
         except Exception:
             # Roll back: delete the orphaned organization
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("organizations")
+                lambda: self.supabase.client.table("organizations")
                 .delete()
                 .eq("id", org_id)
                 .execute()
@@ -148,7 +148,7 @@ class OrganizationService:
     async def get_user_orgs(self, user_id: str) -> List[Organization]:
         """List organizations the user belongs to."""
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("org_memberships")
+            lambda: self.supabase.client.table("org_memberships")
             .select("org_id, role, organizations(id, name, slug, logo_url, settings, created_at, updated_at)")
             .eq("user_id", user_id)
             .execute()
@@ -162,7 +162,7 @@ class OrganizationService:
 
             # Get member count for each org
             count_result = await asyncio.to_thread(
-                lambda oid=row["org_id"]: self.supabase.supabase.table("org_memberships")
+                lambda oid=row["org_id"]: self.supabase.client.table("org_memberships")
                 .select("id", count="exact")
                 .eq("org_id", oid)
                 .execute()
@@ -184,7 +184,7 @@ class OrganizationService:
             return None
 
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("organizations")
+            lambda: self.supabase.client.table("organizations")
             .select("*")
             .eq("id", org_id)
             .limit(1)
@@ -195,7 +195,7 @@ class OrganizationService:
             return None
 
         count_result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("org_memberships")
+            lambda: self.supabase.client.table("org_memberships")
             .select("id", count="exact")
             .eq("org_id", org_id)
             .execute()
@@ -232,7 +232,7 @@ class OrganizationService:
             return await self.get_org(org_id, user_id)
 
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("organizations")
+            lambda: self.supabase.client.table("organizations")
             .update(update_data)
             .eq("id", org_id)
             .execute()
@@ -266,7 +266,7 @@ class OrganizationService:
             raise PermissionError("Only owners can assign the owner role")
 
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("org_memberships")
+            lambda: self.supabase.client.table("org_memberships")
             .insert({
                 "org_id": org_id,
                 "user_id": target_user_id,
@@ -300,7 +300,7 @@ class OrganizationService:
             raise PermissionError("Only owners can remove other owners")
 
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("org_memberships")
+            lambda: self.supabase.client.table("org_memberships")
             .delete()
             .eq("org_id", org_id)
             .eq("user_id", target_user_id)
@@ -319,7 +319,7 @@ class OrganizationService:
             return []
 
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("org_memberships")
+            lambda: self.supabase.client.table("org_memberships")
             .select("*")
             .eq("org_id", org_id)
             .order("created_at")
@@ -355,7 +355,7 @@ class OrganizationService:
 
         # Get all projects in this org
         projects_result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("projects")
+            lambda: self.supabase.client.table("projects")
             .select("*")
             .eq("org_id", org_id)
             .execute()
@@ -366,7 +366,7 @@ class OrganizationService:
         # Get project sources for all org projects (single query)
         if project_ids:
             sources_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("project_sources")
+                lambda: self.supabase.client.table("project_sources")
                 .select("*")
                 .in_("project_id", project_ids)
                 .execute()
@@ -391,7 +391,7 @@ class OrganizationService:
     async def _get_membership(self, org_id: str, user_id: str) -> Optional[OrgMembership]:
         """Get a user's membership in an org."""
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("org_memberships")
+            lambda: self.supabase.client.table("org_memberships")
             .select("*")
             .eq("org_id", org_id)
             .eq("user_id", user_id)

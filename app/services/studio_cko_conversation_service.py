@@ -409,7 +409,7 @@ class StudioCKOConversationService:
                 insert_data["project_id"] = project_id
 
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions").insert(
+                lambda: self.supabase.client.table("studio_cko_sessions").insert(
                     insert_data
                 ).execute()
             )
@@ -438,7 +438,7 @@ class StudioCKOConversationService:
         """
         try:
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .select("*")
                     .eq("id", session_id)
                     .eq("user_id", user_id)
@@ -474,7 +474,7 @@ class StudioCKOConversationService:
         """
         try:
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .select("*")
                     .eq("user_id", user_id)
                     .or_("session_type.eq.cko,session_type.is.null")
@@ -502,7 +502,7 @@ class StudioCKOConversationService:
         """Update session title."""
         try:
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .update({"title": title, "updated_at": datetime.now(timezone.utc).isoformat()})
                     .eq("id", session_id)
                     .eq("user_id", user_id)
@@ -518,7 +518,7 @@ class StudioCKOConversationService:
         try:
             # Delete messages first (foreign key constraint)
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .delete()
                     .eq("session_id", session_id)
                     .execute()
@@ -526,7 +526,7 @@ class StudioCKOConversationService:
 
             # Delete session
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .delete()
                     .eq("id", session_id)
                     .eq("user_id", user_id)
@@ -553,7 +553,7 @@ class StudioCKOConversationService:
         """Find existing test session for an asset or create one."""
         # Try to find existing
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("studio_cko_sessions")
+            lambda: self.supabase.client.table("studio_cko_sessions")
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("asset_id", asset_id)
@@ -568,7 +568,7 @@ class StudioCKOConversationService:
         now = datetime.now(timezone.utc)
         try:
             insert_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions").insert({
+                lambda: self.supabase.client.table("studio_cko_sessions").insert({
                     "user_id": user_id,
                     "asset_id": asset_id,
                     "session_type": "asset_test",
@@ -587,7 +587,7 @@ class StudioCKOConversationService:
             err_msg = str(insert_err)
             if "23505" in err_msg or "duplicate key" in err_msg.lower():
                 retry_result = await asyncio.to_thread(
-                    lambda: self.supabase.supabase.table("studio_cko_sessions")
+                    lambda: self.supabase.client.table("studio_cko_sessions")
                         .select("*")
                         .eq("user_id", user_id)
                         .eq("asset_id", asset_id)
@@ -607,7 +607,7 @@ class StudioCKOConversationService:
         """Get messages for an asset's test session. Returns (session_id, messages)."""
         try:
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .select("id")
                     .eq("user_id", user_id)
                     .eq("asset_id", asset_id)
@@ -629,7 +629,7 @@ class StudioCKOConversationService:
         try:
             # Find the session
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .select("id")
                     .eq("user_id", user_id)
                     .eq("asset_id", asset_id)
@@ -1086,7 +1086,7 @@ class StudioCKOConversationService:
                 return []
 
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .select("*")
                     .eq("session_id", session_id)
                     .order("created_at", desc=False)
@@ -1158,7 +1158,7 @@ class StudioCKOConversationService:
 
             # Verify message belongs to user's session
             msg_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .select("id, session_id")
                     .eq("id", message_id)
                     .limit(1)
@@ -1182,7 +1182,7 @@ class StudioCKOConversationService:
                 update_data["rating_feedback"] = feedback
 
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .update(update_data)
                     .eq("id", message_id)
                     .execute()
@@ -1224,7 +1224,7 @@ class StudioCKOConversationService:
         try:
             # Get the clarification message
             msg_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .select("*")
                     .eq("id", message_id)
                     .eq("is_clarification", True)
@@ -1246,7 +1246,7 @@ class StudioCKOConversationService:
 
             # Update clarification status
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .update({
                         "clarification_status": "answered",
                         "clarification_answer": answer,
@@ -1258,7 +1258,7 @@ class StudioCKOConversationService:
 
             # Update session pending count
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.rpc(
+                lambda: self.supabase.client.rpc(
                     "decrement_pending_clarifications",
                     {"p_session_id": session_id}
                 ).execute()
@@ -1283,7 +1283,7 @@ class StudioCKOConversationService:
         try:
             # Get the message
             msg_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .select("session_id")
                     .eq("id", message_id)
                     .eq("is_clarification", True)
@@ -1301,7 +1301,7 @@ class StudioCKOConversationService:
 
             # Update status to skipped
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                     .update({
                         "clarification_status": "skipped",
                         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -1312,7 +1312,7 @@ class StudioCKOConversationService:
 
             # Update session pending count
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.rpc(
+                lambda: self.supabase.client.rpc(
                     "decrement_pending_clarifications",
                     {"p_session_id": session_id}
                 ).execute()
@@ -1333,14 +1333,14 @@ class StudioCKOConversationService:
         """
         try:
             count_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.rpc(
+                lambda: self.supabase.client.rpc(
                     "get_pending_clarifications_count",
                     {"p_user_id": user_id}
                 ).execute()
             )
 
             overdue_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.rpc(
+                lambda: self.supabase.client.rpc(
                     "has_overdue_clarifications",
                     {"p_user_id": user_id}
                 ).execute()
@@ -1388,7 +1388,7 @@ class StudioCKOConversationService:
             insert_data["clarification_status"] = ClarificationStatus.PENDING.value
 
         result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("studio_cko_messages")
+            lambda: self.supabase.client.table("studio_cko_messages")
                 .insert(insert_data)
                 .execute()
         )
@@ -1586,7 +1586,7 @@ class StudioCKOConversationService:
         """Search KB with a single embedding vector."""
         try:
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.rpc(
+                lambda: self.supabase.client.rpc(
                     "vector_search",
                     {
                         "query_embedding": query_embedding,
@@ -1815,7 +1815,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 artifact_data["org_id"] = org_id
 
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_artifacts")
+                lambda: self.supabase.client.table("studio_cko_artifacts")
                 .insert(artifact_data)
                 .execute()
             )
@@ -1877,7 +1877,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
 
             # Update artifact with storage URL
             await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_artifacts")
+                lambda: self.supabase.client.table("studio_cko_artifacts")
                 .update({
                     "storage_url": document.storage_url,
                     "storage_path": document.storage_path,
@@ -1929,7 +1929,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
 
             # Fetch all messages for this session
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                 .select("role, content, created_at")
                 .eq("session_id", session.id)
                 .order("created_at", desc=False)
@@ -1984,7 +1984,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
 
             # Verify ownership + scope before reading messages
             session_check = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                 .select("id")
                 .eq("id", session_id)
                 .eq("user_id", user_id)
@@ -2003,7 +2003,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 return None
 
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_messages")
+                lambda: self.supabase.client.table("studio_cko_messages")
                 .select("role, content, created_at")
                 .eq("session_id", session_id)
                 .order("created_at", desc=False)
@@ -2070,7 +2070,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
         """Find the session ID for an asset's test session, or None."""
         try:
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                 .select("id")
                 .eq("user_id", user_id)
                 .eq("asset_id", asset_id)
@@ -2090,7 +2090,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
         """Get lightweight context info for an asset's test session."""
         try:
             result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                 .select("id, message_count, created_at")
                 .eq("user_id", user_id)
                 .eq("asset_id", asset_id)
@@ -2114,7 +2114,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
         now = datetime.now(timezone.utc)
 
         session_result = await asyncio.to_thread(
-            lambda: self.supabase.supabase.table("studio_cko_sessions")
+            lambda: self.supabase.client.table("studio_cko_sessions")
                 .select("title, message_count, project_id, user_id")
                 .eq("id", session_id)
                 .limit(1)
@@ -2131,7 +2131,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 title_update["title"] = user_message[:50] + ("..." if len(user_message) > 50 else "")
             new_count = current_count + 2
             update_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .update({
                         **title_update,
                         "message_count": new_count,
@@ -2146,7 +2146,7 @@ Please answer based on the sources above. Include citations like [1], [2] when r
                 break
             # Re-read for retry
             session_result = await asyncio.to_thread(
-                lambda: self.supabase.supabase.table("studio_cko_sessions")
+                lambda: self.supabase.client.table("studio_cko_sessions")
                     .select("title, message_count, project_id, user_id")
                     .eq("id", session_id)
                     .limit(1)
